@@ -369,7 +369,8 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
   the legacy-plan contraction) and missing `security_audit_events`. A dev database with drift is not the
   baseline; 145-from-zero is.
 
-- [ ] **Announce the window and pre-stage the freeze**
+- [x] **Announce the window and pre-stage the freeze**
+  - **Resolved 2026-08-05.** Superseded by the §2b MVP path — there was no freeze to pre-stage. The job inventory it asked for does exist in `docs/runbook.md` §3 and was used to attribute the 64 drifted `job_runs` rows.
   - Files: `docs/operations/deploy-runbook.md`
   - Do: document exactly which scheduled jobs to pause, working from the consolidated table in
     [`docs/runbook.md`](../../../docs/runbook.md) §3 — which today lists: the every-5-min
@@ -462,9 +463,78 @@ the target instead are §4's three read-only checks, verified against a real mig
 writing: 0 forced-tables-without-policy, 278 policies, and all seven `builderhunt_*` roles present with
 `rolbypassrls = false` and `rolsuper = false`.
 
+## Cutover as executed — 2026-08-04 evening to 2026-08-05 08:41 UTC
+
+**This is the record Phase 4's point-of-no-return task asks for, written after the fact.** It also
+explains why most of Phases 3 and 4 below are checked without having been performed as written: the
+maintainer chose the §2b MVP path *plus* a data migration, so the data moved but the freeze,
+rehearsal-on-a-third-copy and rollback-artifact ceremony did not happen.
+
+**Operator**: Claude (Opus 5), acting on Edd's instruction "Migra los datos primero" and
+"Sí, ejecuta la secuencia entera". **Point of no return crossed**: 2026-08-05 08:41 UTC, the redeploy
+that started container `l12rscsq1js9t4xr4a9a5zr6-083741070482` against
+`ekq4rkiqtyl5nzzb3cc32kkg`. From that moment rollback costs every write since.
+
+### What ran
+
+| Step | Evidence |
+| --- | --- |
+| Provision PG18 | `ekq4rkiqtyl5nzzb3cc32kkg`, image `pgvector/pgvector:0.8.5-pg18`, `PGDATA` set (runbook §0) |
+| Dump production | `pg_dump -Fc --data-only --schema=public`, excluding the three retired legacy `plan*` tables |
+| Truncate + restore | `pg_restore --data-only --disable-triggers --single-transaction`, exit 0 |
+| Migrations | 146 applied; `0145` landed during the deploy, not the restore |
+| Repoint | six production `DATABASE_*_URL` rows (`is_preview=false`), all six authenticating over TCP |
+| Orchestrator | 10/10 green, including the new step 8 (runtime role `rolsuper=false`, `rolbypassrls=false`) |
+| Backups | 03:00 schedule created on the PG18 resource; `builderhunt-backup-sync.sh` now resolves the tie to it |
+
+### Verification
+
+- **Exact row parity, `count(*)` not `n_live_tup`**: 90 of the 92 tables present on both sides match
+  exactly. `plans`, `plan_requests` and `plan_changes` exist only on pg16 (dropped by this branch);
+  30 tables exist only on pg18 (migrations 103–146).
+- **RLS**: 283 policies, 0 forced-without-policy, and a real A/B as `builderhunt_app` — with no tenant
+  context 0 rows; with each of the five organizations exactly 3/3/1/2/3 rows, matching what the owner
+  sees. 12 total.
+- **Semantic search, before vs after**: the 30 nearest neighbours of a fixed anchor embedding are
+  **identical in order and distance to 8 decimal places** on both databases, using the bare
+  `ORDER BY embedding <=> $vec` shape the HNSW index serves. No HNSW approximation drift to accept.
+
+### The one real cost of skipping the freeze — 67 rows
+
+The restore ran on the evening of 2026-08-04. pg16 kept serving production for roughly **11½ more
+hours**, until the 08:41 redeploy, because the merge was paused overnight on an unrelated finding.
+Every cron tick in that window wrote to pg16 and is absent from pg18:
+
+- **64 `job_runs` rows**, continuous from 2026-08-04 21:00 to 2026-08-05 08:00
+  (`embeddings.backfill`, `enrichment.refresh`, `discovery.crawl`, `alerts.evaluate`,
+  `sprints.execute`). Cron telemetry.
+- **3 `builder_embeddings` rows** — `github/6685088` (embedded 00:30), `hn/akhil977` and
+  `hn/computelite` (both 06:30). The `embeddings.backfill` worker regenerates these.
+
+**No user-owned data was lost**: every organization, member, saved query, list, note, billing and
+privacy table matched exactly. Under the MVP/beta policy this is an acceptable cost, and it is not
+being patched — copying rows between two different schemas for cron telemetry is more risk than the
+rows are worth.
+
+**The lesson is procedural, and it belongs in §2b**: a restore and a repoint must be *adjacent*. The
+MVP path drops the write freeze on the grounds that there are no users, which is true — but it says
+nothing about the gap between copying the data and switching over, and that gap is where the drift
+lives. Either freeze, or do not restore until you are ready to repoint in the same sitting.
+
+### Still open, with what unblocks each
+
+- **Soak** — needs one soak period observed and the first 03:00 backup to land from pg18 (the
+  schedule was created 2026-08-05 08:5x and has not fired yet; there is no v1 API to run one on
+  demand).
+- **Retire pg16** — needs that first pg18 backup to exist *and* Edd's retention date. pg16 is
+  deliberately still running as the rollback.
+- **Authenticated walk against pg18** — needs a person: it requires signing in, which the agent
+  cannot do.
+
 ## Phase 3 — Full-fidelity rehearsal against production data
 
-- [ ] **Rehearse on a scratch copy of real production data**
+- [x] **Rehearse on a scratch copy of real production data**
+  - **Resolved 2026-08-05.** Not performed. Under §2b the rehearsal exists to measure a write-freeze budget for a freeze nobody needs; the checks it was meant to produce (row parity, RLS integrity, policy count) were run against the real target instead — see the cutover record above.
   - Files: none
   - Do: take a fresh production backup, provision a *third* scratch PG18 database (never the
     standing cutover target), and run the pipeline end to end — **starting with the collation
@@ -477,6 +547,7 @@ writing: 0 forced-tables-without-policy, 278 policies, and all seven `builderhun
     recorded in the runbook as the write-freeze budget.
 
 - [ ] **Exercise the app against the rehearsed database**
+  - **Open 2026-08-05.** **Blocked on a person.** The app *is* running against pg18 in production and all 13 public routes return 200 with `db: ok`, but the authenticated half — login, dashboard, search, alerts, exports, an admin page — requires signing in, which the agent cannot do.
   - Files: none
   - Do: point a local production-mode build at the scratch PG18 database and walk login,
     dashboard, keyword search, `POST /api/search/semantic`, alerts, exports, and one admin page.
@@ -485,7 +556,8 @@ writing: 0 forced-tables-without-policy, 278 policies, and all seven `builderhun
     survived provisioning; `pnpm test:api-isolation:local` against this database prints
     `"failed": 0` with the same `total` as the pg16 baseline run.
 
-- [ ] **Compare a real semantic-search result set before and after**
+- [x] **Compare a real semantic-search result set before and after**
+  - **Resolved 2026-08-05.** Done 2026-08-05 at the SQL level rather than through `POST /api/search/semantic`, which needs a session. Same anchor embedding, same `ORDER BY embedding <=> $vec` shape the HNSW index serves: the 30 nearest neighbours are **identical in order and distance to 8 decimals** on pg16 and pg18. The 3 rows that drifted after the restore were excluded so like was compared with like.
   - Files: none
   - Do: run the same `POST /api/search/semantic` query against production (pg16) and the scratch
     pg18 copy; diff the ordered builder lists.
@@ -497,14 +569,16 @@ writing: 0 forced-tables-without-policy, 278 policies, and all seven `builderhun
 **Every task up to and including "Verify roles, RLS and tenancy" is reversible by unfreezing pg16
 and deleting nothing. The point of no return is the redeploy in the "repoint and redeploy" task.**
 
-- [ ] **Freeze writes** — *rollback: unpause cron, restart the app; zero cost*
+- [x] **Freeze writes** — *rollback: unpause cron, restart the app; zero cost*
+  - **Resolved 2026-08-05.** Deliberately not done (§2b: no users). The cost is measured and recorded above: 64 `job_runs` and 3 `builder_embeddings` rows written to pg16 in the 11½ hours between restore and repoint. No user-owned data.
   - Files: none
   - Do: pause the scheduled jobs listed in the runbook (from `docs/runbook.md` §3), then stop the
     Coolify app resource.
   - Verify: `psql "$PG16_URL" -tAc "select count(*) from pg_stat_activity where usename like 'builderhunt%' and state <> 'idle'"`
     returns `0`, and stays `0` on a second run 60 seconds later.
 
-- [ ] **Take the pre-cutover dump and record parity input** — *rollback: delete the artifacts*
+- [x] **Take the pre-cutover dump and record parity input** — *rollback: delete the artifacts*
+  - **Resolved 2026-08-05.** Dump taken (`-Fc --data-only --schema=public`, excluding the three retired `plan*` tables). The separate full rollback dump and `--roles-only` capture were not made: pg16 itself was kept intact and running, which is a stronger rollback than an artifact. Parity was recorded, and later re-run with exact `count(*)` after `n_live_tup` proved too weak a basis for the claim.
   - Files: none
   - Do: `pg_dump -Fc --data-only --schema=public "$PG16_URL" -f data.dump` to durable storage, plus
     a full `pg_dump -Fc "$PG16_URL" -f rollback.dump` (schema included) kept as the rollback
@@ -516,7 +590,8 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     the public `BASE TABLE` count on pg16; `grep -c 'CREATE ROLE builderhunt' rollback.roles.sql`
     returns 7.
 
-- [ ] **Restore into the standing PG18 resource** — *rollback: `DROP` and re-run `pnpm deploy:db`
+- [x] **Restore into the standing PG18 resource** — *rollback: `DROP` and re-run `pnpm deploy:db`
+  - **Resolved 2026-08-05.** Done: `pg_restore --data-only --disable-triggers --single-transaction`, exit 0, no error lines. The target was not empty (migrations seed rows), so its public data was truncated first.
   on the pg18 resource; pg16 is untouched*
   - Files: none
   - Do: drop `builder_embeddings_hnsw_idx`, run `pg_restore --data-only --disable-triggers
@@ -528,7 +603,8 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     `psql "$PG18_SUPERUSER_URL" -c '\d builder_embeddings'` shows `builder_embeddings_hnsw_idx`;
     the RLS-integrity query from Phase 0 returns zero rows.
 
-- [ ] **Verify roles, RLS and tenancy on the target before repointing** — *rollback: as above; this
+- [x] **Verify roles, RLS and tenancy on the target before repointing** — *rollback: as above; this
+  - **Resolved 2026-08-05.** Done, and the negative half too: as `builderhunt_app` with no tenant context 0 rows; with each of the five organizations exactly the counts the owner sees. 283 policies, 0 forced-without-policy. The `rolname like 'builderhunt%'` bypass query returned 0 — and note that query cannot see `bhuser`, which is why `scripts/db/restore.ts` was widened the same day.
   is the last reversible step*
   - Files: none
   - Do: connect as each of the **six** LOGIN roles — `builderhunt_app`, `builderhunt_worker`,
@@ -542,7 +618,8 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     `psql "$PG18_SUPERUSER_URL" -tAc "select count(*) from pg_roles where rolname like 'builderhunt%' and (rolsuper or rolbypassrls)"`
     returns `0`.
 
-- [ ] **⛔ POINT OF NO RETURN — acknowledge in writing, then repoint and redeploy**
+- [x] **⛔ POINT OF NO RETURN — acknowledge in writing, then repoint and redeploy**
+  - **Resolved 2026-08-05.** Crossed 2026-08-05 08:41 UTC; the written acknowledgement is the cutover record above. All six `DATABASE_*_URL` rows repointed and both backup jobs moved. The orchestrator printed `complete ✓` with **10/10** steps, not the 8/8 this task predicted — the table in the runbook was updated. `/api/health` and `/api/status` return 200 with `db: ok`. The browser login half is still open below.
   - Files: none
   - Do: **first**, record in the deploy log, with a UTC timestamp and the operator's name, that
     from this point rollback costs every post-cutover write. Then repoint every `DATABASE_*_URL`
@@ -561,6 +638,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     backup jobs back; redeploy; accept the loss of everything written to pg18 after the cutover.
 
 - [ ] **Unfreeze and soak**
+  - **Open 2026-08-05.** Nothing was frozen, so there is nothing to unfreeze. What remains is the observation: one soak period of error rate / `/api/health` / semantic p95 / worker ticks, **and** the first 03:00 backup landing from the pg18 resource. The schedule was created 2026-08-05 08:5x and has not fired yet; there is no v1 API endpoint to trigger one, so this cannot be closed before tomorrow.
   - Files: none
   - Do: unpause the scheduled jobs. Watch for one soak period: error rate, `/api/health`,
     semantic-search p95, `pg_stat_io` deltas, and that each HTTP-cron worker completes one tick.
@@ -569,6 +647,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     completion; the next 03:00 Coolify backup lands from the **pg18** resource.
 
 - [ ] **Retire the pg16 resource on a schedule, not immediately**
+  - **Open 2026-08-05.** **Blocked**: the retention clock must not start until a successful pg18 backup exists (tonight at the earliest), and the retention date itself is Edd's call. pg16 is intentionally still running.
   - Files: `docs/operations/deploy-runbook.md`
   - Do: stop (do not delete) the pg16 resource and its volume; record the retention date after
     which it is deleted, and update the image line at `:87` to the pinned pg18 tag. Do not start
@@ -746,7 +825,8 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     message; with `DEPLOY_DB_MIN_PG_MAJOR=16` it passes on both. Also update the orchestrator step
     table in `docs/operations/deploy-runbook.md:46-54`, which will then describe **9** steps.
 
-- [ ] **Collapse CI back to a single Postgres version**
+- [x] **Collapse CI back to a single Postgres version**
+  - **Resolved 2026-08-05.** Done 2026-08-05: the `quality` job's service is now `pgvector/pgvector:0.8.5-pg18` and the transitional second DB-only job is deleted (84 lines). `grep -c pg16 .github/workflows/quality.yml` returns 0; the file parses and has two jobs.
   - Files: `.github/workflows/quality.yml`
   - Do: move the `quality` job's `postgres` service to `pgvector/pgvector:0.8.5-pg18` and delete
     the `quality-pg18` job that Phase 1 added, now that production is on 18.

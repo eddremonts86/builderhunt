@@ -403,6 +403,22 @@ So, when scripting against this API:
 
 **This is the shorter procedure, and today it is the applicable one.** Added 2026-08-04.
 
+> **Restore and repoint must happen in the same sitting.** Added 2026-08-05, after doing it wrong.
+>
+> This path drops the write freeze on the grounds that there are no users, which is true, and says
+> nothing about the gap between copying the data and switching over. That gap is where the loss
+> lives. The restore ran on the evening of 2026-08-04; the repoint waited until 08:41 the next
+> morning because the merge was paused overnight on an unrelated finding. pg16 kept serving for 11½
+> hours, and every cron tick in that window landed only there: **64 `job_runs` rows and 3
+> `builder_embeddings` rows** never reached pg18. Nothing user-owned drifted — all 90 shared tables
+> with user data matched exactly — so under the MVP policy it was an acceptable cost, but it was not
+> a *chosen* one.
+>
+> If the two steps cannot be adjacent, pause the scheduled jobs for the interval (stopping the app
+> resource is the freeze, since all background work is HTTP-triggered) or re-dump immediately before
+> repointing. And measure parity with `count(*)`, not `n_live_tup` — the latter is a planner estimate
+> and it reported parity here while 67 rows were missing.
+
 Everything in §3 through §7 exists to move rows without losing or corrupting them: dump, restore,
 row-count parity, a write freeze measured against a rehearsed budget, a named point of no return, a
 rollback. All of it is insurance on data. This project has **no real users**, and the standing
