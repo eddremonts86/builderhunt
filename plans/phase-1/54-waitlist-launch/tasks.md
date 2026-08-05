@@ -14,6 +14,25 @@
 ## Phase 1 — Prerequisite gate
 
 - [ ] **Verify launch-blocking fixes from sibling plans are merged**
+  - **Checked against production 2026-08-05 (`builderhunt.eduardoinerarte.dk`, not the `.dev` host —
+    see the note on the task below). Four of the five pass; one is a decision, not a defect.**
+
+    | Item | Result |
+    | --- | --- |
+    | pricing price-field fix | **pass** — `/pricing` renders $19 (and $15/$45/$79/$199/$299/$0) |
+    | deletion purge worker | **pass** — `POST /api/admin/legal/run-worker` answers 401, so it exists and is guarded; plan 04's task is checked |
+    | backup cron verified | **pass** — verified the same day, and the 03:00 schedule was created on the *new* PG18 resource, which the cutover had left without one |
+    | 5th blog post published | **pass** — 30 posts live, well past 5 |
+    | sitemap contains `/pricing` **and** `/blog` | **`/pricing` yes, `/blog` no** |
+
+    `/blog` is absent from `/sitemap.xml` because `/blog`, `/changelog` and `/roadmap` are all
+    `noindex, nofollow` and `Disallow`ed in `robots.txt`. That is not a bug — `robots.txt` says the
+    per-surface rules come from the admin panel's indexing settings, and the sitemap correctly omits
+    what is marked noindex. **It is Edd's marketing decision**, and this checkbox cannot close until
+    it is made: either flip those three surfaces to indexable (then `/blog` appears and the gate
+    passes), or amend this task to stop requiring `/blog` in the sitemap. Submitting a sitemap
+    without deciding is the one option that is not defensible.
+
   - Files: none (review task)
   - Do: Confirm merged: pricing price-field fix (`pricing-and-billing` Phase 1), deletion
     purge worker (`legal-and-compliance` Phase 1), sitemap `/pricing`+`/blog` entries
@@ -92,7 +111,38 @@
     → verify it appears in `/admin/plan-requests` → delete the test account from
     `/settings/privacy` and cancel the deletion.
   - Verify: Every step succeeds; the plan request and deletion request rows appear and behave.
-  - ⚠️ **Stale as written, found 2026-08-04. Two of its steps go through a surface that no longer exists.**
+  - ⚠️ **Rewritten 2026-08-05. Two steps went through a surface that no longer exists; the
+    replacement is below and this task is now runnable as written.**
+
+    **Run this, in order.** Steps 1–5 and 8–9 are unchanged; 6–7 are the rewrite.
+
+    1. Fresh email → sign up.
+    2. Land on `/onboarding/welcome`; complete the 3-step tour.
+    3. Run a search.
+    4. Track 3 builders.
+    5. `/exports` → download a CSV.
+    6. **`/pricing` → "Subscribe to Pro" → tick the disclosure → Stripe Checkout opens.** Complete it
+       with a Stripe *test* card if the deployment is in test mode; otherwise cancel and stop at the
+       Checkout page. What is being verified is that a Checkout session is created and the return
+       lands on `/settings/billing/return`.
+    7. **`/settings/billing` shows the subscription as `active` and the organization's entitlement
+       changed** (plan tier and the monthly credit grant). There is no admin approval step any more.
+    8. `/settings/privacy` → request account deletion.
+    9. Cancel the deletion; confirm the account is usable again.
+
+    **Why 6–7 changed:** the legacy `plans`/`plan_requests` surface was retired on 2026-08-03/04
+    (commit `8c4b1e2` and its two predecessors). `/admin/plan-requests` is gone and `src/` holds zero
+    references to `plan_requests`, so "request upgrade → verify it appears in `/admin/plan-requests`"
+    cannot be performed at all. Upgrades go through Stripe Checkout and the billing surfaces, which
+    the billing E2E suite already covers in test mode — this task's value is the *human* pass over
+    the same path on the real deployment.
+
+    **Operator: this one needs a person, not the agent.** Step 1 requires creating an account and
+    entering a password on the live site, which the agent must not do. The unauthenticated
+    precursors were verified instead: all 13 public routes 200, `/api/status` reports
+    `db: ok, redis: ok`.
+
+  - ⚠️ **Original 2026-08-04 finding, kept for the record:**
     "request upgrade on `/pricing` → verify it appears in `/admin/plan-requests`" cannot be performed: the
     legacy `plans`/`plan_requests` surface was retired on 2026-08-03/04 (commits `8c4b1e2` and its two
     predecessors), the route is gone, and `src/` holds zero references to `plan_requests`. Upgrades now go
@@ -104,6 +154,26 @@
     its cancellation — is still exactly right.
 
 - [ ] **Submit sitemap and verify OG previews**
+  - **OG half done 2026-08-05; submission half needs you.**
+
+    The four URLs were fetched and their tags read directly rather than pasted into a validator,
+    which is the same evidence a validator reports:
+
+    - `/api/og/explore` and `/api/og/explore?q=react` both return **200, `image/png`, 1200×630**, and
+      the bytes differ per query, so the renderer really is query-aware.
+    - `/`, `/pricing`, `/explore?q=…` and a blog URL each carry `og:title`, `og:description`,
+      `og:image`, `og:url` and `twitter:card: summary_large_image`.
+
+    **Two defects were found and fixed in the process** (commit `fix(seo)`): `/pricing` and ten other
+    public routes were serving the *homepage's* `og:title`/`og:description`, so every shared link
+    previewed as the homepage; and the canonical URL dropped the query string, which made all ~50
+    `/explore?q=…` sitemap entries declare themselves duplicates of one page.
+
+    **Still yours:** adding the property in Google Search Console and Bing Webmaster Tools and
+    submitting the sitemap. That needs account access, and it is gated on the `/blog` indexing
+    decision in the Phase 1 task above — submitting a sitemap that omits `/blog` while `/blog` is
+    `noindex` is consistent, but it is a choice worth making deliberately.
+
   - Files: none (external tools)
   - Do: Add the property in Google Search Console + Bing Webmaster Tools, submit
     `/sitemap.xml`. Paste `/`, `/pricing`, `/explore?q=react`, and one blog URL into the
