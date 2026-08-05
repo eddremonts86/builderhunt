@@ -344,6 +344,18 @@ const classifications: Classification[] = [
   // are platform-owned subject-rights records, deliberately without user or organization scope:
   // a removal is initiated by a person who may not have a BuilderHunt account, and a suppression
   // is enforced across every consumer surface. Hashes only — no plaintext email or URL is stored.
+  // Invite-gated access (plan 54). `access_requests` is platform-owned and deliberately outside any
+  // organization: someone asking for access has no tenant yet, and an approved row IS the allowlist
+  // the sign-up gate reads.
+  //
+  // Unlike every other table in this block, it holds a **plaintext email**. That is not an oversight
+  // and it cannot be hashed: an operator has to read the address to decide, and approval sends mail
+  // to it. The consequence is that this is the one system-operational table containing unhashed
+  // personal data about non-users, so it owes a retention rule, a privacy-export entry and a line in
+  // /legal/privacy — none of which exists yet (tracked in the plan-54 task list, and this comment is
+  // deliberately blunt so the gap cannot be mistaken for a decision).
+  operational('access_requests', 'email (plaintext, platform-owned; no tenant scope)', ['waitlist-launch']),
+
   operational('profile_removal_requests', 'source + source_id (hashed challenge, no PII)', ['audit-trust']),
   operational('profile_suppressions', 'source + source_id (revoked/active, audited admin action)', ['audit-trust']),
 

@@ -14,6 +14,7 @@
 
 import {
   Activity, AlertTriangle, BadgeCheck, BookOpen, CalendarDays, CircleUser, Cog, Compass, CreditCard,
+  DoorOpen,
   Download, Gauge, Globe, History, Inbox, Layers, LayoutDashboard, Lightbulb, ListChecks, Mail, Map, Plug, Plus, RotateCcw,
   Mic, Send,
   Search, Shield, ShieldAlert, ShieldCheck, Siren, Users, FlaskConical,
@@ -146,6 +147,7 @@ export const NAV_AREAS: readonly NavArea[] = [
       { to: '/admin/users', label: 'Users', icon: Users, group: 'Operations' },
       { to: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, group: 'Operations' },
       { to: '/admin/claims', label: 'Claims', icon: BadgeCheck, group: 'Operations' },
+      { to: '/admin/access-requests', label: 'Access requests', icon: DoorOpen, group: 'Operations' },
       { to: '/admin/abuse', label: 'Abuse console', icon: Siren, group: 'Operations' },
       { to: '/admin/billing', label: 'Billing ops', icon: Gauge, group: 'Money' },
       { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw, group: 'Money' },

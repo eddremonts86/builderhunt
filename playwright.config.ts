@@ -116,6 +116,17 @@ export default defineConfig({
       // `src/shared/lib/rate-limit.ts` and is the marker the harness reads
       // via `e2eEnv()` to refuse to run in production mode.
       E2E_MODE: 'true',
+      // Invite-only sign-up is deliberately NOT pinned here.
+      //
+      // An earlier attempt set ACCESS_ALLOWLIST_ENABLED='false' in this block and it did nothing:
+      // dotenvx loads `.env` over `process.env` with `override: true`, so whatever a developer has in
+      // `.env` wins over anything passed here. Worth remembering before pinning any other flag this
+      // way.
+      //
+      // The suite therefore runs with the gate in whatever state the environment says, and the
+      // fixtures cope: `allowlistEmailForSignup` in harness/fixtures/principals.ts pre-approves each
+      // principal's address before sign-up. That keeps the gate under test in its real configuration
+      // instead of switching it off to make fixtures pass.
       REDIS_URL: redisURL,
       E2E_RUN_ID: e2eRunId,
     },

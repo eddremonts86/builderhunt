@@ -2203,6 +2203,75 @@ export const profileRemovalRequests = pgTable(
 )
 
 /**
+ * Invite-gated access: who has asked to use BuilderHunt, and who has been let in.
+ *
+ * An **approved row is the allowlist** — there is no second table. Sign-up is refused for any email
+ * without an `approved` row, so this one relation answers both "did this person ask?" and "may this
+ * person create an account?". Keeping them apart would let the two disagree.
+ *
+ * ## Why this table stores a plaintext email, unlike its neighbours above
+ *
+ * `profile_removal_requests` deliberately stores only a hash of the requester's email, and that is
+ * the right call there: the address is used once, to match a challenge. Here it cannot be hashed —
+ * an operator has to *read* the address to decide whether to approve it, and we have to *send mail*
+ * to it on approval. A hash supports neither.
+ *
+ * So this is a table of plaintext personal data about people who are not users yet, which has
+ * consequences that must not be forgotten when the rest of the feature is built:
+ *   - it belongs in the privacy export and in account deletion;
+ *   - it needs a real retention rule (an un-approved request should not sit here forever);
+ *   - `/legal/privacy` has to disclose it.
+ * None of those three is done yet — see the plan-54 task list.
+ *
+ * ## The token is not stored
+ *
+ * `inviteTokenHash` holds an HMAC of the invite token, never the token itself, following
+ * `profile-removal.ts`'s `generateRemovalChallenge`. The secret exists only in the approval email.
+ * A resend therefore mints a *new* token and invalidates the old one — there is no way to re-send
+ * the original, by construction.
+ *
+ * ## Revocation
+ *
+ * `status = 'revoked'` is a state, never a row delete, matching `profileSuppressions.revokedAt`:
+ * revoking access is an audited decision and the record of it has to survive.
+ */
+export const accessRequests = pgTable(
+  'access_requests',
+  {
+    id: text('id').primaryKey(),
+    /** Lowercased and trimmed by `normalizeAccessEmail` before it ever reaches here; unique so a
+     *  second request from the same person updates rather than duplicates. */
+    email: text('email').notNull().unique(),
+    status: text('status').notNull().default('pending'),
+    /** HMAC of the invite token. Null until approval, and re-minted on every resend. */
+    inviteTokenHash: text('invite_token_hash'),
+    inviteExpiresAt: timestamp('invite_expires_at', { withTimezone: true }),
+    /** Set when the invite is redeemed, so a token cannot be replayed after an account exists. */
+    inviteConsumedAt: timestamp('invite_consumed_at', { withTimezone: true }),
+    requestedAt: timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    /** The platform admin who approved or revoked. No FK: the decision outlives the operator's row. */
+    decidedByUserId: text('decided_by_user_id'),
+    /** Operator note — why this person was approved or revoked. Never shown to the requester. */
+    note: text('note'),
+  },
+  (table) => [
+    index('access_requests_status_requested_idx').on(table.status, table.requestedAt),
+    check('access_requests_status_check', sql`${table.status} in ('pending', 'approved', 'rejected', 'revoked')`),
+    // A decision must carry its timestamp, or the audit trail cannot say when access was granted.
+    check(
+      'access_requests_decided_at_check',
+      sql`(${table.status} = 'pending') = (${table.decidedAt} is null)`,
+    ),
+    // An invite hash without an expiry is a token that never dies.
+    check(
+      'access_requests_invite_expiry_check',
+      sql`(${table.inviteTokenHash} is null) = (${table.inviteExpiresAt} is null)`,
+    ),
+  ],
+)
+
+/**
  * A verified (or legal/abuse-driven) global suppression — enforced by
  * `profile-suppression.ts` across every consumer surface (search, cache,
  * tracking, public routes, exports, feeds, alerts). Retains only the

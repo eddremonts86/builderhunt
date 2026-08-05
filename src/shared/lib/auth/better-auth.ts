@@ -16,7 +16,8 @@ import { sendOrganizationInvitationEmail, sendResetPasswordEmail } from '~/share
 import { env } from '~/shared/lib/env'
 import { handleSessionAfter, handleSessionBefore, type SessionCookieAdapter, type SessionDeviceResult } from '~/shared/lib/abuse/session-hooks'
 import { resolveSessionTimeoutConfig } from '~/shared/lib/abuse/session-guard'
-import { checkSignupEmailGate, DisposableEmailRejectedError } from '~/shared/lib/abuse/email-hygiene'
+import { AccessNotAllowlistedError, checkSignupEmailGate, DisposableEmailRejectedError } from '~/shared/lib/abuse/email-hygiene'
+import { isEmailAllowed } from '~/shared/lib/access-requests'
 import { computeDeviceHash, detectUaFamily, DEVICE_COOKIE_NAME, issueDeviceCookieValue } from '~/shared/lib/abuse/device'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { organizationOptions } from './organization-options'
@@ -95,11 +96,38 @@ export const auth = betterAuth({
         // created. Same "before can block, after cannot" split as `session.create` (see the
         // cookie-write comment above `pendingSessionDevices`).
         before: async (user, context) => {
+          // Invite gate (waitlist-launch plan). Read here rather than inside `checkSignupEmailGate`
+          // so that function stays synchronous and pure. `authDb` is the right role: the sign-up path
+          // already runs as `builderhunt_auth`, and 0147 grants it SELECT on access_requests for
+          // exactly this question.
+          //
+          // Fail CLOSED on a query error. If the allowlist cannot be read while the gate is on, the
+          // safe answer is "not allowlisted" — a database hiccup must not reopen public sign-up,
+          // which is the whole thing this gate exists to prevent.
+          const allowlistEnabled = env.ACCESS_ALLOWLIST_ENABLED === 'true'
+          let emailAllowlisted = false
+          if (allowlistEnabled) {
+            try {
+              emailAllowlisted = await isEmailAllowed(authDb, user.email)
+            } catch (error) {
+              console.error('[access-allowlist] lookup failed; refusing sign-up (fail-closed)', error)
+              emailAllowlisted = false
+            }
+          }
+
           try {
-            checkSignupEmailGate({ email: user.email, blockDisposable: env.SIGNUP_BLOCK_DISPOSABLE_EMAILS === 'true' })
+            checkSignupEmailGate({
+              email: user.email,
+              blockDisposable: env.SIGNUP_BLOCK_DISPOSABLE_EMAILS === 'true',
+              allowlistEnabled,
+              emailAllowlisted,
+            })
           } catch (error) {
             if (error instanceof DisposableEmailRejectedError) {
               throw new APIError('BAD_REQUEST', { message: error.message, code: 'DISPOSABLE_EMAIL_NOT_ALLOWED' })
+            }
+            if (error instanceof AccessNotAllowlistedError) {
+              throw new APIError('FORBIDDEN', { message: error.message, code: 'ACCESS_NOT_ALLOWLISTED' })
             }
             throw error
           }

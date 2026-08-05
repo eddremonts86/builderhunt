@@ -140,6 +140,8 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'abuse/clusters.ts', method: 'GET', path: '/api/admin/abuse/clusters' },
   { file: 'abuse/index.ts', method: 'GET', path: '/api/admin/abuse' },
   { file: 'abuse/index.ts', method: 'POST', path: '/api/admin/abuse' },
+  { file: 'access-requests/index.ts', method: 'GET', path: '/api/admin/access-requests' },
+  { file: 'access-requests/index.ts', method: 'POST', path: '/api/admin/access-requests' },
   { file: 'activity/run-retention.ts', method: 'POST', path: '/api/admin/activity/run-retention' },
   { file: 'alerts/run-worker.ts', method: 'POST', path: '/api/admin/alerts/run-worker' },
   { file: 'analytics/run-retention.ts', method: 'POST', path: '/api/admin/analytics/run-retention' },

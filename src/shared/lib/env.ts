@@ -199,6 +199,15 @@ const zodEnv = z.object({
   SEAT_DAILY_MESSAGES: z.coerce.number().int().positive().default(100),
   SIGNUP_REQUIRE_VERIFIED_EMAIL: z.enum(['true', 'false']).default('false'),
   SIGNUP_BLOCK_DISPOSABLE_EMAILS: z.enum(['true', 'false']).default('false'),
+  /**
+   * Invite-only sign-up (waitlist-launch plan). When `true`, an email may create an account only if
+   * `access_requests` holds an `approved` row for it.
+   *
+   * Defaults to `false`, and that default is load-bearing rather than lazy: local development and the
+   * e2e harness create users constantly, and a default of `true` would break every fixture while
+   * looking like a test failure. Production opts in explicitly.
+   */
+  ACCESS_ALLOWLIST_ENABLED: z.enum(['true', 'false']).default('false'),
   // Comma-separated ASNs (e.g. known corporate/VPN egress ranges) to suppress IP-churn signals for —
   // per the OWASP NAT/proxy caveat, shared-IP alone must never be treated as suspicious on its own.
   ABUSE_ALLOWLIST_ASNS: z.string().default(''),

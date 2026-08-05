@@ -1,6 +1,7 @@
 import { test, expect } from 'playwright/test'
 import { loadHarnessEnv } from './harness/load-env'
 import { observerSql } from './harness/observer-sql'
+import { allowlistEmailForSignup } from './harness/fixtures/principals'
 
 // Same rationale as team-accounts.spec.ts: this file runs as a plain Node
 // process, not through vite/vitest, so nothing auto-loads `.env` here.
@@ -34,6 +35,9 @@ const PASSWORD = 'e2e-Test-Passw0rd!'
  */
 test('a fresh sign-up session has a non-null active organization immediately', async ({ request }) => {
   const email = uniqueEmail('signup-active-org')
+  // Invite-only sign-up: pre-approve this address so the real gate lets the account through. See the
+  // note on `allowlistEmailForSignup`.
+  await allowlistEmailForSignup(observerSql(), email)
   const response = await request.post('/api/auth/sign-up/email', {
     data: { email, name: 'Active Org Test', password: PASSWORD },
   })

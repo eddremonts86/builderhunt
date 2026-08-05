@@ -1023,6 +1023,34 @@
       "when": 1785863887404,
       "tag": "0145_narrow_public_select_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1785931230188,
+      "tag": "0146_access_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1785931245977,
+      "tag": "0147_access_requests_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1785932781833,
+      "tag": "0148_access_requests_rejected_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1785932969895,
+      "tag": "0149_access_requests_platform_insert",
+      "breakpoints": true
     }
   ]
 }

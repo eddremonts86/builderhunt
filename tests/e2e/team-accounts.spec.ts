@@ -2,6 +2,7 @@ import { test, expect, type Page, type BrowserContext } from 'playwright/test'
 import { loadHarnessEnv } from './harness/load-env'
 import { observerSql } from './harness/observer-sql'
 import { dismissOverlays, gotoHydrated, waitForHydration } from './harness/browser'
+import { allowlistEmailForSignup } from './harness/fixtures/principals'
 
 // This spec file runs as a plain Node process, not through vite/vitest —
 // nothing auto-loads `.env` here the way the app (and vitest.config.ts) do,
@@ -98,6 +99,11 @@ async function waitForActiveOrganization(page: Page) {
 }
 
 async function signUp(page: Page, email: string, name: string) {
+  // Invite-only sign-up (waitlist-launch): the real /api/auth/sign-up/email refuses any address
+  // without an approved access_requests row when ACCESS_ALLOWLIST_ENABLED=true, which a developer's
+  // `.env` may set (and dotenvx's override means webServer.env can't turn it off). Pre-approve the
+  // address so this helper keeps creating accounts with the gate in its real, production config.
+  await allowlistEmailForSignup(observerSql(), email)
   await goto(page, '/auth/sign-up')
   await page.locator('#name').fill(name)
   await page.locator('#email').fill(email)

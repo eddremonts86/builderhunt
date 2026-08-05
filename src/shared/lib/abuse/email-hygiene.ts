@@ -88,14 +88,52 @@ export class DisposableEmailRejectedError extends Error {
   }
 }
 
+/**
+ * Sign-up was refused because the address is not on the access allowlist.
+ *
+ * The message is deliberately the same for "never asked", "asked and still pending" and "was
+ * revoked". Distinguishing them would turn the sign-up form into an oracle: anyone could learn
+ * whether a given address has access by trying to register it. The person who genuinely asked and is
+ * waiting learns nothing they do not already know, and the operator can see the real state in the
+ * admin queue.
+ */
+export class AccessNotAllowlistedError extends Error {
+  constructor() {
+    super('BuilderHunt is currently invite-only. Request access and we will email you when your account is ready.')
+    this.name = 'AccessNotAllowlistedError'
+  }
+}
+
 export interface SignupEmailGateInput {
   email: string
   blockDisposable: boolean
+  /**
+   * Whether the invite gate is on, and whether this address passed it.
+   *
+   * The lookup itself is not done here: this module is synchronous and pure, which is what makes it
+   * cheap to test. The caller (`better-auth.ts`'s `user.create.before`) does the query and passes the
+   * answer down.
+   *
+   * `allowlistEnabled: false` means the gate is off entirely — that is the state local development
+   * and the e2e harness run in, and it must stay a complete no-op there or every fixture that creates
+   * a user starts failing.
+   */
+  allowlistEnabled?: boolean
+  emailAllowlisted?: boolean
 }
 
-/** Throws `DisposableEmailRejectedError` when disposable-domain blocking is on and the email matches. */
+/**
+ * The one place sign-up eligibility is decided.
+ *
+ * Order matters: the allowlist is checked **after** the disposable-domain rule, so an
+ * `AccessNotAllowlistedError` is never the reason a throwaway address is refused. Both are refusals,
+ * but they mean different things to whoever reads the logs.
+ */
 export function checkSignupEmailGate(input: SignupEmailGateInput): void {
   if (input.blockDisposable && isDisposableEmailDomain(input.email)) {
     throw new DisposableEmailRejectedError()
+  }
+  if (input.allowlistEnabled && !input.emailAllowlisted) {
+    throw new AccessNotAllowlistedError()
   }
 }

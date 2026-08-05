@@ -1559,6 +1559,10 @@
       "specs": [
         "tests/e2e/api/work-samples.spec.ts"
       ]
+    },
+    "/api/admin/access-requests": {
+      "status": "n/a",
+      "reason": "Platform-admin only, and the approve/reject/revoke journey it serves has no e2e spec yet because the public request form that feeds the queue is still unbuilt. Recorded as an exemption rather than a spec that only asserts 401s: the real proof is the request -> approve -> invite -> sign-up -> revoke journey, and that spec lands with the form. Unauthenticated 401/405 behaviour is covered by hand today (verified 2026-08-05) and the decision logic by unit tests in tests/unit/shared/lib/access-requests.test.ts."
     }
   }
 }

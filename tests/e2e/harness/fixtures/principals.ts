@@ -76,6 +76,7 @@ async function signUpPrincipal(
   label: string,
 ): Promise<{ principal: Principal; credentials: E2ECredentials }> {
   const credentials = credentialsFor(label, ctx.scope)
+  await allowlistEmailForSignup(ctx.sql, credentials.email)
   const api = await newApiContext(ctx.baseURL)
   const { userId } = await signUp(api, credentials)
   const session = await getSession(api)
@@ -105,6 +106,31 @@ export async function createUnverifiedPrincipal(ctx: FixtureContext, label = 'un
 }
 
 /** Direct DB write — the product has no email-verification flow to drive. */
+
+/**
+ * Pre-approve a fixture's address so invite-only sign-up lets it through.
+ *
+ * Every principal in this suite is created through the real
+ * `POST /api/auth/sign-up/email`, and with `ACCESS_ALLOWLIST_ENABLED=true` that route refuses any email
+ * without an `approved` row in `access_requests`. Pinning the flag off in `playwright.config.ts` does
+ * not work: dotenvx loads `.env` over `process.env` with `override: true`, so a developer whose `.env`
+ * turns the gate on gets 58 spec failures that all look like product bugs.
+ *
+ * Seeding the row is the better answer anyway — the suite keeps exercising the gate in its real
+ * configuration rather than switching it off to make the fixtures pass. A spec that wants to prove the
+ * *refusal* path uses an address this was never called for.
+ *
+ * `on conflict do nothing` keeps it idempotent across retries, and the decision columns are filled
+ * because the table's check constraint requires a non-pending row to carry a timestamp.
+ */
+export async function allowlistEmailForSignup(sql: Sql, email: string): Promise<void> {
+  await sql`
+    insert into access_requests (id, email, status, decided_at, decided_by_user_id, note)
+    values (${`access-e2e-${email}`}, ${email.trim().toLowerCase()}, 'approved', now(), 'e2e-harness', 'seeded by the e2e harness')
+    on conflict (email) do update set status = 'approved', decided_at = now()
+  `
+}
+
 export async function markEmailVerified(sql: Sql, userId: string): Promise<void> {
   await sql`update auth_users set email_verified = true, updated_at = now() where id = ${userId}`
 }

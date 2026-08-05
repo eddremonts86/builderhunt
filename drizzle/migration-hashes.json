@@ -584,6 +584,22 @@
     "0145_narrow_public_select_policies": {
       "sql": "4a51a480637fee34c2b859eef9968e4f36f93ec179574f2288eabfbbef4b7656",
       "snapshot": "940bb4a7b581503520533387f5e652c2da0c339edfb9fc8ecbceb7e10bf74794"
+    },
+    "0146_access_requests": {
+      "sql": "647fb55079581c484cfb7bbd06e074881883c16b8a843d0ee3db8aa02065ff54",
+      "snapshot": "bd7397085767d0fbefef1ae191d4d5ac093050ae7d77c5c5946f60c1a5ca0ba2"
+    },
+    "0147_access_requests_grants": {
+      "sql": "c2cb03108714e33c7b762ab351de54a1c4cb663242fec119187fb0d585ee76b2",
+      "snapshot": "dadc35f35e6f712fae20130f284e4ed134b1ad958f9ef39f0df2e8136d9ed99c"
+    },
+    "0148_access_requests_rejected_status": {
+      "sql": "11b555233b34d56beced8212303f07155b03843366fd9859bb0bf6a00c345868",
+      "snapshot": "a10173bdaa820881e6f15e976d9ee2e31436da6ba16018ae73ca124f38cade5f"
+    },
+    "0149_access_requests_platform_insert": {
+      "sql": "df53d3399a29bca0eb62219df0bf7a3a9846afed1bae60272932d00b062054c3",
+      "snapshot": "4aa3ee9aeffbb1574f87a2f0734aed0525a92e03ef5d783e7e47701d0408ec91"
     }
   }
 }

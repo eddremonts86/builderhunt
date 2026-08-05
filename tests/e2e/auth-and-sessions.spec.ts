@@ -53,6 +53,7 @@ import {
   type StrictBrowserGuard,
 } from './harness/browser'
 import {
+  allowlistEmailForSignup,
   createOwnerPrincipal,
   createUnverifiedPrincipal,
   createVerifiedPrincipal,
@@ -281,6 +282,8 @@ async function requestPasswordReset(email: string): Promise<string> {
 test('sign-up through the real UI creates a session already scoped to the personal workspace', async ({ page }) => {
   const guard = expectStrictBrowser(page)
   const credentials = credentialsFor('ui-signup', harness.ctx.scope)
+  // Invite-only sign-up: pre-approve so the real gate admits this UI sign-up. See `allowlistEmailForSignup`.
+  await allowlistEmailForSignup(harness.sql, credentials.email)
 
   await gotoHydrated(page, url('/auth/sign-up'))
   await page.locator('#name').fill(credentials.name)
