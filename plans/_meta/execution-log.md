@@ -768,3 +768,118 @@ for the scrapers, they all must work.*
   automated collection without written permission that is not on file, and no flag makes it lawful. A URL
   for one of them is still storable as `user-submitted` evidence and never fetched, which spec §5.3 allows
   and case 02 of the adversarial matrix verifies.
+
+## Session 2026-08-05 (close, part 3) — "what is left in phase-1?", audited rather than counted
+
+Edd asked what remained in phase-1 and to implement it. Phase-1 reported **0 open tasks**, and after a day
+of finding plan files that disagreed with reality, "no unchecked boxes" was not a good enough answer. So the
+audit looked for boxes that were checked without being true, and for markers the counts cannot see.
+
+**Nine tasks were marked `[~]`, which `grep -c '^- \[ \]'` does not match.** Every open-task count in this
+repository has been blind to them. Of the nine: one was a `[x]`-with-a-stale-title (36's profile-view
+analytics, which the same task's own Progress note records as wired on 2026-07-29), one was a decided
+won't-do (20), three were engineering and got implemented, and four were not ours and moved to phase-5.
+
+### Implemented
+
+- **The strict public-scheduling CSP** (44, "Implement capability exchange and session validation" — the
+  last open piece of an otherwise-done task). `server/security.mjs` now holds the base policy as a
+  directive **map** plus a named `publicSchedulingContentSecurityPolicy()`, because the plan said "do not
+  fork a second copy" and overriding keys cannot drift from a base while a forked string silently can.
+  `securityHeaderEntries()` takes a `pathname` and swaps it in for `/schedule/` and
+  `/api/public/scheduling/`, adding `no-referrer` and `no-store`.
+  **Two headers had to move out of the routes to work at all**: `server.prod.mjs` does
+  `Object.assign(resHeaders, securityHeaders())` *over* the route's own headers, so a per-route value is
+  overwritten in production and holds only in dev — a security header that passes local review and does
+  nothing.
+  **And one directive deliberately did not tighten.** `connect-src` keeps the object-storage origin,
+  because `DocumentUploader.tsx` PUTs the candidate's file to a presigned URL on another host: a policy
+  tightened to `'self'` would have passed every header assertion and broken candidate uploads in
+  production. 22 cases in `tests/unit/security/http-security.test.ts`, including a lookalike path that must
+  *not* get the strict policy.
+- **The interview operator dashboard** (44, "Add redacted metrics and operator dashboards"). `/admin/metrics`
+  renders a capability grid then nineteen counters in four groups. `GET /api/admin/metrics` omits `counters`
+  entirely while every interview flag is off — same lie-of-implication reasoning the `removals` block one
+  field above already documented, because "0 booking conflicts" reads as "no conflicts" when it means
+  "nobody can book". The mapping is **derived** (`interviewOperatorCounters`), not hand-listed: the first
+  version wrote out all nineteen keys in the route, which is precisely the bug `metrics.ts` already carried
+  a comment about for `reset()`. Also corrected: there are nineteen counters, not the twenty the plan noted.
+  Verified in a real signed-in browser session.
+- **The generic product-claims drift contract** (52, deferred since July as "real, valuable, future work").
+  Measured before building, because the obvious version is a rubber stamp: a detector that flags every
+  numeral drowns in `grid-cols-3` and `slice(0, 5)`, and its allowlist ends up longer than the rule. So it
+  inverts — declare the load-bearing claims, assert each still agrees with what implements it.
+  **It found a false statement in the live privacy policy on its first run**: "Storage: Cloudflare R2,
+  private buckets", a vendor the product does not use, in the section headed "Who else sees it". Documents
+  sit in self-hosted MinIO — the provider register, `env.ts`'s own comment and the running
+  `builderhunt-storage` container all agree. Corrected; the truth is the stronger claim, since for
+  documents nobody else sees it. Retention promises are checked against the schema's `.max()` rather than
+  its default, because a default passes while an operator could set a longer window tomorrow. Both
+  directions plant-tested.
+
+### Moved to phase-5 (four invisible partials)
+
+Docker log rotation on the VPS (02 → phase-5/01, root SSH); the live Denmark canary (30 → phase-5/01, real
+money); the browser-capture beta verification (44 → phase-5/01, hardware and human participants); the EU AI
+Act sign-off (44 → phase-5/02, a signature).
+
+### The one thing left, and it is a decision
+
+`44`'s **"Add calendar invitation email and ICS generation"** stays `[~]` on purpose. The ICS half is done;
+the templates cannot be written until Edd picks the resend semantics, because only the capability *hash* is
+persisted and a send therefore cannot reproduce a link it already issued. Either sends are once-only, or a
+resend rotates and kills the link already in the candidate's inbox. `invitation-service.ts`'s
+`markInvitationSent` comment currently describes one and the storage implements the other, so one of the two
+is wrong today whichever way it goes. Not moved to phase-5 — it is not a signature, a clock or a deploy,
+just a choice with real consequences for a candidate, and about a day of work once made.
+
+## Session 2026-08-05 (close, part 4) — option (a) shipped, and every feature audited for "on"
+
+Edd chose **option (a): no resend**, and asked what else was missing toward having *every* feature active —
+all scrapers, enrichment, transcription, and AI (embeddings, MiniMax, Mistral).
+
+### Option (a) is done
+
+**The service layer already implemented it, and its comment already said so** — the `[~]` note claiming
+`markInvitationSent` contradicted the storage was stale. What was genuinely missing was the other three
+notices: `sendCalendarEventEmail` existed and did the hard part (stable UID, increasing SEQUENCE, the
+`method=` parameter Outlook reads), and **not one of `book.ts`, `reschedule.ts` or `cancel.ts` called it**.
+A candidate could book an interview and neither party received a confirmation or a calendar entry.
+
+New `src/lib/scheduling/notifications.ts`, wired into the three routes. It runs in its own worker-role
+transaction after the request's, because the capability role holds SELECT and nothing else; its idempotency
+key includes `calendar_events.version`, so a reschedule is a new notice while a retry is not; and the emails
+carry **no portal link and no capability**, which is option (a) applied consistently. 10 cases, and the test
+header states what the mocks do not prove. `decline` and `expiry` still notify nobody and are recorded as
+open — neither has a calendar event, so neither can carry an ICS.
+
+### The feature audit
+
+**Every scraper that can lawfully exist is already on.** `search_sources` has all **13** implemented
+connectors `enabled = true`. The six that are off are external facts, not phase gates: `hashnode` (its
+GraphQL API moved behind a paid plan), `sourcehut` (its robots.txt disallows "anything used to feed a
+machine learning model", which is what this product does), and `linkedin`/`x`/`facebook`/`instagram`
+(`external_link_only`, terms prohibit automated collection without written permission that is not on file).
+There was nothing to build here.
+
+**AI is live, and now measured rather than assumed.** `pnpm test:ai-live` 3/3 — Mistral and MiniMax both
+answered a synthetic structured request. The embedding provider returns a 768-dimension vector from the
+local Ollama in ~1.6s, and `builder_embeddings` holds 301 rows. `AI_DISABLED=false`, so MiniMax was already
+active.
+
+**Four flags turned on locally**, after proving `env.ts` validates with all of them true using the keys
+already present: `INTERVIEW_TRANSCRIPTION_ENABLED`, `SENSITIVE_AI_ENABLED`, `CANDIDATE_WEB_IMPORT_ENABLED`,
+`CALENDAR_OPERATIONAL_LAYERS_ENABLED`. Full suite after: **5772 passed**, 0 failed.
+
+**`ENRICHMENT_ENABLED` stays `false` in `.env` on purpose**, and this is not caution — putting it true there
+breaks `tests/unit/lib/enrichment/worker.test.ts` *by design*: its second case calls the real worker and
+asserts a no-op shape, and the first pins the flag false so the suite fails loudly instead of doing real
+network and database work. `pnpm dev:enrichment` sets it for one process, which is the sanctioned path.
+
+### A connection leak, and why the suite briefly looked broken
+
+Running a 16-file subset of disposable-database tests in parallel exhausted Postgres — **206 connections
+against a max of 200** — and the next full run reported 104 failed files. None was a regression: the errors
+were `53300 too many clients` and `drop is not a function` from workers that died before cleanup. Terminated
+188 leaked idle connections, dropped 13 orphaned test databases, re-ran clean at 5762. Worth remembering
+before diagnosing a sudden mass failure: check `pg_stat_activity` first.

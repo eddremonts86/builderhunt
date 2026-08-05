@@ -179,7 +179,18 @@ const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
         <ul className="list-disc pl-6 mt-2 space-y-1">
           <li><strong>Transcription:</strong> Deepgram, EU endpoint (<code>api.eu.deepgram.com</code>). Audio in, text out, nothing retained.</li>
           <li><strong>AI:</strong> Mistral, EU (<code>api.mistral.ai</code>). Chosen for its region.</li>
-          <li><strong>Storage:</strong> Cloudflare R2, private buckets. No document is ever publicly reachable.</li>
+          {/*
+            Corrected 2026-08-05. This said "Cloudflare R2", a storage vendor the product does not use
+            and has never used: candidate documents sit in self-hosted MinIO on the same box the app
+            runs on. Three independent sources agree — `docs/operations/interview-provider-register.md`
+            §1 ("MinIO, self-hosted … Removes a paid vendor, a DPA, and a sub-processor entry"),
+            `env.ts`'s own comment on `INTERVIEW_R2_*` (the names were kept so a later switch to R2
+            would be env-only), and the running `builderhunt-storage` container.
+
+            Naming a sub-processor that does not exist is a false statement in the section headed "Who
+            else sees it", and the truth is the stronger claim: for documents, nobody else does.
+          */}
+          <li><strong>Storage:</strong> self-hosted, private buckets on our own infrastructure — no third-party storage provider. No document is ever publicly reachable.</li>
           <li><strong>Email:</strong> Resend, to send you the invitation.</li>
         </ul>
         <p className="mt-2">

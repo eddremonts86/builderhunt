@@ -132,12 +132,14 @@
   - Verify: `grep -ri sentry src/ .env.example` → only the privacy-page disclosure and the
     new explanatory comment, no env var, no code reference.
 
-- [~] **Docker log rotation on the VPS** — *documented in `docs/runbook.md` §5 (exact
-  `log-opts` JSON + verification command), not executed — requires production host access
-  this session doesn't have.* (Reality check 2026-07-31: checkbox was `[x]` despite this
-  task's own text saying "not executed" — corrected to `[~]`, matching this repo's
-  documented-but-not-executed convention used elsewhere, e.g. `44-calendar-scheduling-
-  interview-intelligence/tasks.md`.)
+### Docker log rotation on the VPS
+
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05** — it needs root SSH on the Hetzner VPS. The exact `log-opts` JSON and its verification
+command are already written into `docs/runbook.md` §5; what remains is running them on the host.
+
+Was `[~]` rather than `[ ]`, which is why every open-task count in this repository missed it: `grep -c
+'^- \[ \]'` does not see a tilde.
 
 ## Phase 3 — AI production groundwork (with `ai-expansion`)
 

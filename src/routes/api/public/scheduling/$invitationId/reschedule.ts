@@ -9,6 +9,7 @@ import {
   withCapabilityRequest,
   withPublicHeaders,
 } from '~/lib/scheduling/public-route-support'
+import { notifyAppointmentChange } from '~/lib/scheduling/notifications'
 import { bookSlotRequestSchema } from '~/shared/lib/interview-api'
 
 /**
@@ -40,8 +41,12 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/resch
         const slotStartsAt = new Date(parsed.data.slotStartsAt)
 
         try {
-          const result = await withCapabilityRequest(request, params.invitationId, ({ transaction, tenant }) =>
-            rescheduleBooking(transaction, {
+          // The organization id is only known inside the capability context, and the notification below
+          // runs after it closes — so it travels out with the result rather than being re-derived.
+          let organizationId: string | null = null
+          const result = await withCapabilityRequest(request, params.invitationId, ({ transaction, tenant }) => {
+            organizationId = tenant.organizationId
+            return rescheduleBooking(transaction, {
               organizationId: tenant.organizationId,
               ownerUserId: tenant.ownerUserId,
               invitationId: tenant.invitationId,
@@ -50,7 +55,8 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/resch
               requiredPurposes: BOOKING_REQUIRED_PURPOSES,
               noticeVersion: CANDIDATE_NOTICE,
               slotStartsAtHint: slotStartsAt,
-            }))
+            })
+          })
 
           if (!result.ok) return withPublicHeaders(publicError('invitation_unavailable'))
 
@@ -59,6 +65,16 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/resch
             return withPublicHeaders(publicError(moved.code, {
               ...(moved.missingPurposes ? { missingPurposes: moved.missingPurposes } : {}),
             }))
+          }
+
+          /*
+           * Both parties get the updated appointment with a fresh ICS. `calendar_events.version` has
+           * moved, which is what makes this a genuinely new notice rather than a suppressed duplicate
+           * (`notifications.ts`, decision 4) and what makes a calendar client update the entry in place
+           * instead of adding a second one.
+           */
+          if (organizationId) {
+            await notifyAppointmentChange({ organizationId, invitationId: params.invitationId, kind: 'reschedule' })
           }
 
           return withPublicHeaders(Response.json({

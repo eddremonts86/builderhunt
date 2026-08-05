@@ -5,8 +5,8 @@ has been deployed and has been running for a while — and nothing else.
 
 | # | Plan | Open | What it waits on |
 |--:|------|-----:|------------------|
-| 01 | [`production-readiness-audit`](./01-production-readiness-audit/spec.md) | 17 | a live deployment, then elapsed time and the decisions the waiting was for |
-| 02 | [`legal-and-commercial-approvals`](./02-legal-and-commercial-approvals/spec.md) | 4 | a signature, a licensed opinion, and prices a vendor has not quoted |
+| 01 | [`production-readiness-audit`](./01-production-readiness-audit/spec.md) | 21 | a live deployment, then elapsed time and the decisions the waiting was for |
+| 02 | [`legal-and-commercial-approvals`](./02-legal-and-commercial-approvals/spec.md) | 5 | a signature, a licensed opinion, and prices a vendor has not quoted |
 | 03 | [`launch-and-distribution`](./03-launch-and-distribution/spec.md) | 9 | the launch itself, then 30 days of it |
 | 04 | [`post-launch-discovery`](./04-post-launch-discovery/spec.md) | 5 | fifteen real users willing to be interviewed |
 
@@ -15,6 +15,13 @@ further items were added to plan 01, when Edd's instruction — *the product lau
 finishes, so there is no point worrying about legal in phase-1* — was applied to all 21 tasks phase-1
 still carried. Not one of them was engineering; the split into three plans is by **who owns the missing
 input**: production evidence and clocks (01), signatures and prices (02), the launch (03).
+
+**A later audit that evening found four more**, and how they had hidden is the lesson: they were marked
+`[~]` rather than `[ ]`, so `grep -c '^- \[ \]'` — the command every count in this repository uses — did not
+see them. Docker log rotation on the VPS, the live Denmark canary, the browser-capture beta verification and
+the EU AI Act sign-off. "Phase-1 has zero open tasks" was true and incomplete at the same time. The audit
+also found three items that *were* engineering and got implemented instead of moved; see
+`plans/_meta/execution-log.md`.
 
 **Phases 2-4 were reviewed the same day** under a second instruction — *move anything that stops me
 building the app; it is always better to have the feature and disable it for legal reasons than not to have

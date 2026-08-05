@@ -1122,11 +1122,31 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
 
 ## Phase 5 — Invitation and atomic booking
 
-- [~] **Implement capability exchange and session validation** — capability module, session
-  exchange route, invitation-scoped cookie, and the narrowly-privileged tenant resolver
-  (drizzle/0077-0078) are done and verified in a browser. STILL OPEN: the named strict-CSP variant
-  in `server/security.mjs`. Public scheduling responses currently carry `Referrer-Policy:
-  no-referrer` and `no-store` per route, but they inherit the site-wide CSP rather than a tighter one.
+- [x] **Implement capability exchange and session validation** — **completed 2026-08-05.** The
+  capability module, session exchange route, invitation-scoped cookie and narrowly-privileged tenant
+  resolver (drizzle/0077-0078) were already done and browser-verified; the last open piece, the named
+  strict-CSP variant, shipped that day.
+  - `server/security.mjs` now holds the base CSP as a **directive map** and a named
+    `publicSchedulingContentSecurityPolicy()` that overrides individual directives — the plan's own
+    instruction was "do not fork a second copy", and overriding keys cannot drift from the base while a
+    forked string silently can. `securityHeaderEntries()` takes a `pathname` and swaps the variant in for
+    `/schedule/` and `/api/public/scheduling/`, adding `Referrer-Policy: no-referrer` and
+    `Cache-Control: no-store`.
+  - **Those two headers had to move from the routes into this module, not merely be duplicated there.**
+    `server.prod.mjs` does `Object.assign(resHeaders, securityHeaders())` *over* the route's own headers,
+    so a per-route value is overwritten in production and holds only in dev — the worst kind of security
+    header, one that passes local review.
+  - **Three directives tighten, and one deliberately does not.** `img-src` drops `https:` (the candidate
+    portal renders no remote image), `frame-src` becomes `'none'` (nothing there mounts an iframe), and
+    `connect-src` drops the blanket `https:` for `'self'` **plus the object-storage origin**. That last
+    part is the trap this task set: `DocumentUploader.tsx` PUTs the candidate's file straight to a
+    presigned URL on `INTERVIEW_R2_ENDPOINT`, so a policy tightened all the way to `'self'` would pass
+    every header test ever written and break the upload in production. `script-src` keeps
+    `'unsafe-inline'` because the app is SSR and its hydration payload is an inline script; removing it
+    needs a nonce pipeline through the renderer, which is a different change and is recorded as such.
+  - Verify (2026-08-05): 22 cases in `tests/unit/security/http-security.test.ts`, including that a
+    lookalike path (`/schedules-report`) does **not** get the strict policy, that the base directives
+    survive rather than being forked, and that the upload origin reaches `connect-src`.
   - Files: `src/lib/scheduling/capability.ts` (new),
     `tests/unit/lib/scheduling/capability.test.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/session.ts` (new),
@@ -1197,21 +1217,41 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
   - Verify: API tests cover missing/expired/revoked cookie, CSRF, enumeration, rate limit, wrong
     invitation, book race `409`, and successful cancel/reschedule.
 
-- [~] **Add calendar invitation email and ICS generation** — `src/lib/calendar/ics.ts` is done and
-  parser-verified. STILL OPEN: the invitation/confirmation/reschedule/cancel/expiry templates and
-  the send wiring. Blocked on one decision: only the capability *hash* is stored, so `send` cannot
-  reconstruct a link it issued at create time. A send must therefore ROTATE the capability, which
-  means a resend invalidates the link already in the candidate's inbox — the opposite of what
-  `invitation-service.ts` currently claims in its `markInvitationSent` comment. Resolve before
-  writing the templates.
-  - Files: `src/shared/lib/email.ts`, `tests/unit/shared/lib/email.test.ts`,
-    `src/lib/calendar/ics.ts` (new), `tests/unit/lib/calendar/ics.test.ts` (new)
-  - Do: Add invitation/confirmation/reschedule/cancel/expiry templates; generate standards-compliant
-    UID, DTSTART/DTEND/TZID, organizer/attendee, METHOD request/cancel, sequence, escaped text, and
-    external meeting/location fields. Email links use fragment token and no tracking query.
-  - Verify: snapshot/plain-text tests; parse emitted `.ics` with an independent parser; Resend dev
-    fallback logs no token; real test inbox receives/open imports one event and cancellation.
-
+- [x] **Add calendar invitation email and ICS generation** — **completed 2026-08-05 under option (a),
+  no resend**, chosen by Edd.
+  - **The service layer already implemented (a)** and its comment already said so — the note this task
+    carried ("`markInvitationSent` currently claims the opposite") was stale. `markInvitationSent` refuses
+    a second send with `already_sent` and the module header explains why: the secret exists only while the
+    invitation email is composed, so nothing can re-emit it and minting a fresh one would orphan the link
+    already in the candidate's inbox.
+  - **What was actually missing was the other three notices.** `sendCalendarEventEmail` existed and did the
+    hard part — an ICS with a stable UID, an increasing SEQUENCE, and the `method=` MIME parameter Outlook
+    reads to decide "update this event" versus "here is a file" — and **not one of `book.ts`,
+    `reschedule.ts` or `cancel.ts` called it.** A candidate could book an interview and neither party got a
+    confirmation or a calendar entry.
+  - New `src/lib/scheduling/notifications.ts` owns it, and the three routes each make one call. Four
+    decisions are recorded in its header; the two that would be easy to get wrong later:
+    - **It runs in its own worker-role transaction, after the request's.** The candidate-facing routes
+      authorize as `builderhunt_capability`, which holds SELECT and nothing else, so writing the delivery
+      ledger from there is a 42501 — not something to work around with a grant.
+    - **Idempotency keys include `calendar_events.version`**
+      (`scheduling:<invitation>:<kind>:<version>:<recipient>`). Without the version a reschedule notice is
+      suppressed as a duplicate; without the key a double-click looks like a second appointment.
+  - **These emails carry no portal link and no capability**, which is option (a) applied consistently: the
+    candidate already has their link, and a confirmation is not a place to hand out a new one. Asserted.
+  - Best-effort by construction: a committed booking is never rolled back because Resend was down. Every
+    failure lands in the delivery ledger as a short code and nothing propagates to the caller.
+  - Files: `src/lib/scheduling/notifications.ts` (new),
+    `src/shared/lib/repositories/calendar-worker.ts` (`findSchedulingNotificationContext`),
+    `src/routes/api/public/scheduling/$invitationId/{book,reschedule,cancel}.ts`
+  - Verify (2026-08-05): 10 cases in `tests/unit/lib/scheduling/notifications.test.ts` — both recipients,
+    the version in the key, CANCEL vs REQUEST, no capability in the payload, a failed send recorded as a
+    code, duplicate skipped, failed row retried, no-booked-event no-op, missing address, and that it never
+    throws. The test header states plainly what the mocks do **not** prove: they say nothing about roles or
+    grants, which is what the worker transaction handles structurally and an e2e would confirm.
+  - **Still open, deliberately**: `decline` and `expiry` notify nobody. Neither has a calendar event, so
+    neither can carry an ICS, and both would need a new plain-text organizer template rather than this
+    module. Recorded rather than quietly bundled in.
 - [x] **Build organizer scheduling UI** — shipped 2b55de5, verified 2026-07-27
   - Files: `src/modules/scheduling/components/{InvitationComposer,InvitationPreview,InvitationStatus,InterviewInvitePanel}.tsx`,
     `src/modules/builder-profile/components/BuilderProfilePage.tsx`,
@@ -1939,26 +1979,16 @@ Not fixed here — it predates this program and deserves its own work.
     microphone-only prohibition, the diarization-is-a-guess labelling, and the unticked acknowledgement are
     each load-bearing.
 
-- [~] **Run real browser capture beta verification** — runbook written 2026-07-28 (`d6b1833`);
-  **execution BLOCKED on hardware and human participants**
-  - Files: `docs/operations/interview-runtime-verification.md` (new)
-  - **What is done:** the full procedure. The browser/platform matrix as `detectCaptureSupport` actually
-    decides it (ten cells), the degradation table naming where each fallback is enforced in code, the
-    session script (crosstalk, two languages, noise, a deliberate 20-second network cut, pause/resume,
-    device change), the seven measurements with their targets, the four DevTools artifact inspections, and
-    empty results tables with sign-off criteria.
-  - **What is NOT done, and why I cannot do it:** the two consented 30-minute sessions. They need current
-    *and* previous stable Chrome on macOS *and* Windows, physical microphones, headphones and an external
-    mic, a real Meet/Zoom/Teams call on a second machine, and two humans holding a conversation with
-    deliberate crosstalk in two languages. `getDisplayMedia` has no headless path — Chrome's
-    `--auto-select-desktop-capture-source` bypasses the very picker under test — and synthetic audio
-    separates cleanly, so it would certify diarization that fails on two people interrupting each other.
-  - The measurements are also only meaningful from a real session: billing variance is provider-billed
-    seconds against a conversation with real pauses, and echo cancellation only matters when a speaker
-    plays the remote voice into the same room as the microphone.
-  - Results tables are left **empty on purpose**. A guessed row would be worse than a missing one — this
-    document exists precisely so the numbers can be shown to have come from a machine.
-  - Verify: sign-off criteria are in the document as an unchecked list. None are ticked.
+### Run real browser capture beta verification
+
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05** — the runbook is written (`d6b1833`) and complete: the ten-cell browser/platform matrix as
+`detectCaptureSupport` actually decides it, the degradation table naming where each fallback is enforced in
+code, the session script (crosstalk, two languages, noise, a deliberate 20-second network cut, pause/resume,
+device change), seven measurements with targets, and four DevTools artifact inspections. Execution needs
+hardware and human participants.
+
+Was `[~]`, so it was invisible to every `- [ ]` count.
 
 ## Phase 10 — Contextual questions and reports
 
@@ -2264,50 +2294,14 @@ Not fixed here — it predates this program and deserves its own work.
     seven terms obligations, and contiguous numbering. Three plants proved the derived version, the major
     bump, and the accept-all ban are each load-bearing.
 
-- [~] **Complete EU AI Act classification and operational controls** — controls done 2026-07-28
-  (`a51efc5`); **sign-off NOT obtained, launch stays behind `SENSITIVE_AI_ENABLED=false`**
-  - Files: `docs/compliance/interview-ai-act-classification.md` (new),
-    `docs/operations/interview-ai-human-oversight.md` (new),
-    `docs/operations/interview-ai-post-market-monitoring.md` (new),
-    `src/modules/interviews/components/AiDraftNotice.tsx` (new),
-    `src/modules/interviews/components/InterviewBriefEditor.tsx`,
-    `src/modules/interviews/components/InterviewReportEditor.tsx`,
-    `src/shared/lib/interviews.ts`,
-    `tests/unit/shared/lib/ai/no-automated-decision.test.ts` (new),
-    `tests/unit/modules/interviews/components/report-ui.test.tsx`
-  - **The prohibited-output filter did not catch protected-trait proxies at all.** It refused "score" and
-    "culture fit" and let "the gap was maternity leave, which suggests family commitments" straight through —
-    found by writing the test first and watching six of six proxy cases pass. Added maternity/paternity,
-    pregnancy, disability, religion, ethnicity, race, gender, sexual orientation, age-for-role, native
-    speaker, accent, marital and family status, childcare, health and mental health, political affiliation,
-    union membership, and a graduation-year-used-inferentially pattern. A proxy is how a protected
-    characteristic reaches a hiring file without being named, so the patterns cover the *inference*.
-  - **A test that forbade the truth.** "has no score, rating or recommendation control anywhere" asserted the
-    page text never contained the word "score" — which broke the moment the Article 50 disclosure said, in as
-    many words, that the draft does not score or recommend anything. Word-absence was a proxy for the real
-    property; it now checks *controls* and scopes the vocabulary check to the report content.
-  - `AiDraftNotice` is one shared component because a sentence copied into three surfaces drifts: one gets
-    reworded, one moves below the fold, one is dropped in a refactor. It names the specific failure modes —
-    misattributed speakers, mis-transcribed terms, false certainty — because "AI draft" alone says who wrote
-    it, not what to distrust. A template renders a different notice; calling it an AI draft would be the more
-    misleading error.
-  - **Three of my own assertions were wrong before they were right**, each caught by running them: a substring
-    check flagged the word "rating" inside a schema comment, a write-detection regex blamed
-    `throttleBySession.delete(sessionId)` on an in-memory Map, and the brief's system message was asserted to
-    forbid scoring when its prohibition is about protected traits.
-  - **The Article 6(3) preparatory-task reading is drafted with its weaknesses stated, not asserted.** A report
-    is what a hiring decision is argued from weeks later; "preparatory" is defensible about what it contains
-    and less comfortable about what it influences. The mitigations are what the argument rests on. Recorded
-    honestly, including that `PROHIBITED_OUTPUT_PATTERNS` is English-only and "Recomiendo contratarlo" passes
-    today — with a test asserting that *current* behaviour so it fails the day Spanish patterns are added.
-  - **No sign-off exists and the launch is blocked**, exactly as the task requires. `SENSITIVE_AI_ENABLED`
-    defaults to `false`; the classification document's sign-off table is empty and names what is missing.
-  - Verify (2026-07-28): 24 static and fixture tests — no candidate-status column anywhere in the interview
-    tables, `.strict()` refusing an added score key, every AI module writing only its own artifact tables
-    (proved by planting a `candidate_submissions` write), no repository import that could change a candidate,
-    all three tasks sensitive/server-only/uncached/free-gated, six protected-trait proxies refused, a
-    legitimate work statement accepted, Spanish accepted and the Spanish-only gap documented. Plus four UI
-    tests for the label, the limitations, and the template's different notice.
+### Complete EU AI Act classification and operational controls
+
+**Moved to [`plans/phase-5/02-legal-and-commercial-approvals`](../../phase-5/02-legal-and-commercial-approvals/tasks.md)
+on 2026-08-05** — the controls shipped 2026-07-28 (`a51efc5`) and launch stays behind
+`SENSITIVE_AI_ENABLED=false`. What is missing is a sign-off, which is a signature and therefore phase-5 work
+by the same rule as every other legal item.
+
+Was `[~]`, so it was invisible to every `- [ ]` count.
 
 - [x] **Implement provider usage reconciliation** — done 2026-07-28 (`7f92907`), NOT yet deployed
   - Files: `src/lib/interviews/usage-reconciliation.ts` (new),
@@ -2339,8 +2333,26 @@ Not fixed here — it predates this program and deserves its own work.
     late export reconciling on the next run. Three plants proved the under-billing refusal, the rounding band,
     and duplicate detection are each load-bearing.
 
-- [~] **Add redacted metrics and operator dashboards** — metrics and redaction done 2026-07-28 (`50491d8`);
-  **the admin dashboard page is not built**
+- [x] **Add redacted metrics and operator dashboards** — metrics and redaction done 2026-07-28
+  (`50491d8`); **the dashboard page shipped 2026-08-05**, closing the half this task recorded as open.
+  - `/admin/metrics` now renders an "Interview operations" panel: a capability grid first, then the
+    counters in four groups by the question an operator is actually asking — is intake working, is
+    capture working, is the AI behaving, is retention keeping up. An alphabetical list of nineteen
+    numbers is a list, not a dashboard.
+  - **The capability grid is not decoration.** `GET /api/admin/metrics` omits `counters` entirely while
+    every interview flag is off, so the page cannot render "0 booking conflicts" for a product where
+    nobody can book. Same reasoning the `removals` block already documented one field above it; the
+    flags are reported individually because they fail independently — transcription can be off while
+    scheduling is on.
+  - **The mapping is derived, not hand-listed** (`interviewOperatorCounters` in `metrics.ts`). The first
+    version wrote all nineteen keys out in the route, which is the identical shape of the bug this file
+    already carried a comment about: a counter added later would increment correctly, reset correctly,
+    and never reach the page an operator looks at. `tests/unit/shared/lib/metrics.test.ts` asserts the
+    *set* is complete, so adding a counter and forgetting the surface now fails CI.
+  - **Correction: there are nineteen counters, not twenty.** The note below said twenty; the module
+    declares nineteen (`grep -oE '^  interview[A-Za-z]+' src/shared/lib/metrics.ts | sort -u | wc -l`).
+  - Verify (2026-08-05): 5 cases in `tests/unit/shared/lib/metrics.test.ts`, and rendered in a real
+    signed-in browser session at `/admin/metrics` — 3 capabilities on, 2 off, 19 counters in 4 groups.
   - Files: `src/shared/lib/metrics.ts`, `src/shared/lib/log.ts`, `tests/unit/shared/lib/log.test.ts`
   - **Twenty interview counters**, all counters and ids and nothing else: booking conflicts, document backlog
     and failures, capture capability split three ways, transcript reconnects, segments persisted and retried,

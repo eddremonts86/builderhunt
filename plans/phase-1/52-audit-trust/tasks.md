@@ -22,9 +22,29 @@
   - Verify: `rg -n "aggregateRating|420M|Join Alerts|personal access token|paid for itself" src` — clean. New `trust-claims.test.ts` (5 tests) source-asserts each of these can never reappear; `pnpm vitest run` — 2134/2144 passing (10 pre-existing skips), `tsc`/`eslint` clean. Live-verified the JSON-LD via the browser's own parsed `<script type="application/ld+json">` — no `aggregateRating` key, `featureList` lists all 15 sources.
   - Note: no `PROFILE_CLAIMS_ENABLED` kill switch was added under that exact name — `claimable-profiles`' `CLAIMABLE_PROFILES_ENABLED` (added this session) already serves the identical purpose for the same claim flow; adding a second, differently-named flag for the same gate would be redundant, not additive.
 
-- [~] **Create and enforce a single product-claims contract** — lighter substitute shipped, not the full abstraction
+- [x] **Create and enforce a single product-claims contract** — narrow guard 2026-07; the generic drift contract shipped 2026-08-05
   - Do: Instead of a new `product-claims.ts` indirection layer duplicating `billing-shared.ts`/`SOURCE_NAMES` (which already are the sources of truth and already feed `/pricing` per earlier `pricing-optimization` work), added the `trust-claims.test.ts` regression guard above directly against the landing components' source. It's narrower than a generic drift-detector for every possible claim, but it durably locks in the exact fixes this pass made.
-  - Deferred: a true generic "any displayed number that drifts from a shipped constant fails CI" contract is real, valuable, future work — not attempted here.
+  - **Built 2026-08-05: `tests/unit/security/published-claims.test.ts`.** The deferred generic contract, in
+    the only form that is not a rubber stamp. Measured first: a detector that flags every numeral in the UI
+    drowns in `grid-cols-3`, `slice(0, 5)` and `gap-2`, and the allowlist needed to quiet it ends up longer
+    than the rule. So it inverts — declare the claims that are load-bearing and assert each still agrees
+    with the thing that implements it.
+  - **It found a false statement in the live privacy policy on its first run.** "Storage: Cloudflare R2,
+    private buckets" — a storage vendor the product does not use and never has. Candidate documents sit in
+    self-hosted MinIO; three sources agree (`interview-provider-register.md` §1, `env.ts`'s own comment
+    that the `INTERVIEW_R2_*` names were kept so a later switch to R2 would be env-only, and the running
+    `builderhunt-storage` container). It sat in the section headed "Who else sees it", naming a
+    sub-processor that does not exist — and the truth is the stronger claim: for documents, nobody else
+    does. Corrected the same day.
+  - **Retention promises are checked against the schema's ceiling, not its default.** Comparing the
+    published 180/90 days against the env *default* would pass while an operator could set a longer window
+    tomorrow; asserting `.max()` is at or below the published number is the only version that makes the
+    sentence true for every deployment.
+  - Verify (2026-08-05): 10 cases pass, and both directions were plant-tested — loosening
+    `INTERVIEW_DOCUMENT_RETENTION_DAYS`'s `.max(180)` to `365` fails it, and reintroducing "Cloudflare R2"
+    into rendered copy fails it. The gate also ignores comments, because its own first run failed on the
+    JSX comment documenting this fix, and a gate that cannot tell rendered copy from an explanation of why
+    the copy changed forces the next person to delete the explanation to make CI pass.
 
 - [x] **Publish accurate security and removal guidance**
   - Files: `src/routes/_landing/security.tsx`, `src/routes/_landing/privacy/remove.tsx`, `src/shared/components/Footer.tsx`

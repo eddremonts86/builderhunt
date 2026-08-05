@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { evaluateBillingAlerts, getBillingOperationsMetrics } from '~/shared/lib/billing/operations-metrics'
-import { metrics } from '~/shared/lib/metrics'
+import { interviewOperatorCounters, metrics } from '~/shared/lib/metrics'
 import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '~/shared/lib/repositories/platform-billing'
 import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
 import { env } from '~/shared/lib/env'
@@ -44,6 +44,29 @@ export const Route = createFileRoute('/api/admin/metrics/')({
             ? await getRemovalRequestMetrics().catch(() => null)
             : null
 
+          /**
+           * The interview counters, with the capability flags that decide whether they mean anything.
+           *
+           * Same reasoning as `removals` above, one step further. `metrics.get()` already carried all
+           * nineteen interview counters, so a dashboard rendering `inProcess` could show
+           * "0 booking conflicts" — which reads as "no conflicts" when the truth is that
+           * `SCHEDULING_ENABLED=false` and nobody can book. The counters are only interpretable
+           * alongside the doors that are open, so they travel together and `counters` is absent, not
+           * zeroed, while every door is shut.
+           *
+           * The flags are reported individually rather than as one rolled-up boolean because they fail
+           * independently: transcription can be off while scheduling is on, and an operator looking at
+           * `interviewTranscriptReconnects: 0` needs to know which of those two it is.
+           */
+          const interviewCapabilities = {
+            calendar: env.CALENDAR_ENABLED === 'true',
+            scheduling: env.SCHEDULING_ENABLED === 'true',
+            candidateUploads: env.CANDIDATE_UPLOADS_ENABLED === 'true',
+            transcription: env.INTERVIEW_TRANSCRIPTION_ENABLED === 'true',
+            sensitiveAi: env.SENSITIVE_AI_ENABLED === 'true',
+          }
+          const anyInterviewCapability = Object.values(interviewCapabilities).some(Boolean)
+
           const activationRate7d = accountMetrics.newUsersLast7d > 0
             ? onboardingMetrics.onboardingCompletedLast7d / accountMetrics.newUsersLast7d
             : null
@@ -62,6 +85,13 @@ export const Route = createFileRoute('/api/admin/metrics/')({
             // plans/phase-1/52-audit-trust §"Add trust runtime gates and redacted metrics" — counts and
             // states only. See `getRemovalRequestMetrics` for what is deliberately absent and why.
             ...(removals ? { removals } : {}),
+            // plans/phase-1/44-calendar-scheduling-interview-intelligence §"Add redacted metrics and
+            // operator dashboards". Counters and flags only: every value here is a number or a boolean,
+            // which is what makes it safe to render on a page that must never approach a candidate's name.
+            interviews: {
+              capabilities: interviewCapabilities,
+              ...(anyInterviewCapability ? { counters: interviewOperatorCounters(inProcess) } : {}),
+            },
             discovery: discovery && {
               cursor: discovery.cursor,
               lastCellKey: discovery.lastCellKey,

@@ -43,6 +43,15 @@ loadHarnessEnv()
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace, redis } from './harness/cache'
 import { startWorkerServer, stopWorkerServer } from './harness/server'
+/**
+ * The onboarding tour's headings read their source count from this constant, so the expectation must
+ * too. It said `12` until 2026-08-05 and failed the whole `ci:local` e2e step: `sourcehut` and
+ * `hashnode` were retired on 2026-08-04, `welcome.tsx` renders `${SEARCH_SOURCE_COUNT} sources, one
+ * search` and moved with them, and this literal did not. Nine product surfaces were converted to the
+ * constant in that change and the assertion about them was missed — which is the whole argument for
+ * deriving it here rather than writing the new number.
+ */
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 import { e2eEnv } from './harness/env'
 import { ensureFixedTimeEnv } from './harness/clock'
 import { uniqueId } from './harness/ids'
@@ -345,7 +354,7 @@ test('full onboarding journey: welcome → starter query → three saves → suc
     await dismissOverlays(page)
     await step1Done
     await expect(page.getByRole('heading', { name: 'Welcome to BuilderHunt' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '12 sources, one search' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: `${SEARCH_SOURCE_COUNT} sources, one search` })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Save a search, get daily picks' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Claim your profile' })).toBeVisible()
     expect((await onboardingStatus(journey)).step).toBe(1)

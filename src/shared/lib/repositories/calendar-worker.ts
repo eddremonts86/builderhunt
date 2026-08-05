@@ -12,6 +12,7 @@ import {
   jobRuns,
   operationalSchedules,
   organizations,
+  schedulingInvitations,
 } from '../db/schema'
 
 /**
@@ -297,6 +298,50 @@ export async function findDeliveryByIdempotencyKey(transaction: WorkerTransactio
     .where(and(
       eq(calendarNotificationDeliveries.organizationId, organizationId),
       eq(calendarNotificationDeliveries.idempotencyKey, idempotencyKey),
+    ))
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * Everything needed to notify both parties about a booked interview, in one read.
+ *
+ * Worker-role, and that is not an optimisation. The candidate-facing routes authorize as
+ * `builderhunt_capability`, which holds SELECT and nothing else (drizzle/0078) — so writing the
+ * delivery ledger rows a notification needs is impossible in the transaction that served the request.
+ * The notification therefore runs afterwards in its own worker transaction and re-reads by invitation
+ * id rather than being handed rows across a role boundary.
+ *
+ * Returns null when the invitation has no booked event: a decline or an expiry has nothing to attach an
+ * ICS to, and a caller that treats "no event" as an error would log noise for the normal case.
+ */
+export async function findSchedulingNotificationContext(
+  transaction: WorkerTransaction,
+  organizationId: string,
+  invitationId: string,
+) {
+  const [row] = await transaction
+    .select({
+      invitationId: schedulingInvitations.id,
+      ownerUserId: schedulingInvitations.ownerUserId,
+      roleTitle: schedulingInvitations.roleTitle,
+      candidateEmail: schedulingInvitations.candidateEmailNormalized,
+      invitationTimezone: schedulingInvitations.timezone,
+      eventId: calendarEvents.id,
+      eventVersion: calendarEvents.version,
+      eventTitle: calendarEvents.title,
+      eventStatus: calendarEvents.status,
+      startsAt: calendarEvents.startsAt,
+      endsAt: calendarEvents.endsAt,
+      timezone: calendarEvents.timezone,
+      location: calendarEvents.location,
+      meetingUrl: calendarEvents.meetingUrl,
+    })
+    .from(schedulingInvitations)
+    .innerJoin(calendarEvents, eq(calendarEvents.id, schedulingInvitations.bookedEventId))
+    .where(and(
+      eq(schedulingInvitations.organizationId, organizationId),
+      eq(schedulingInvitations.id, invitationId),
     ))
     .limit(1)
   return row ?? null

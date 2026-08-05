@@ -239,6 +239,41 @@ them was verified as far as engineering can take it, and each note below says ex
     the last item of the interview plan by construction.
   - Moved from `plans/phase-1/44-calendar-scheduling-interview-intelligence` Phase 12 on 2026-08-05.
 
+## Phase 4d — invisible partials, found and moved in on 2026-08-05
+
+Three tasks that were marked `[~]` rather than `[ ]`, so **every open-task count in the repository missed
+them** — `grep -c '^- \[ \]'` does not see a tilde, and that is how "phase-1 has zero open tasks" was true
+and incomplete at the same time. Found by auditing for the marker instead of trusting the count.
+
+- [ ] **Configure Docker log rotation on the VPS**
+  - Files: `docs/runbook.md` §5 (the exact `log-opts` JSON and its verification command are already there)
+  - Do: apply the documented `log-opts` to the Docker daemon on the host and verify it took effect.
+  - Verify: the runbook's own verification command reports the configured limits on the running daemon.
+  - Operator: root SSH on the Hetzner VPS.
+  - Moved from `plans/phase-1/02-production-infrastructure` on 2026-08-05.
+
+- [ ] **Run the live Denmark canary and staged rollout**
+  - Files: `docs/operations/stripe-live-rollout.md`, `docs/operations/stripe-live-readiness.md`
+  - Do: verify the live catalog read-only, enable webhook ingestion, then an internal account, then one
+    voluntary Danish customer, then a percentage rollout. Observe a successful charge, a refund, and a
+    payout with FX.
+  - Verify: the readiness checklist and canary evidence are complete, and rollback disables new mutations
+    while reads, webhooks, refunds and reconciliation keep working.
+  - Operator: real money — a live catalog, a real customer, a real charge, a real refund, a real payout.
+    Seven of the original nine observations were split out and closed on 2026-08-04; these are the two no
+    engineering can produce.
+  - Moved from `plans/phase-1/30-stripe-billing-platform` on 2026-08-05.
+
+- [ ] **Run the real browser capture beta verification**
+  - Files: `docs/operations/interview-runtime-verification.md`
+  - Do: execute the written runbook — the ten-cell browser/platform matrix, the session script (crosstalk,
+    two languages, noise, a deliberate 20-second network cut, pause/resume, device change), the seven
+    measurements against their targets, and the four DevTools artifact inspections.
+  - Verify: every cell of the matrix has a result, every measurement a number, and each of the four
+    inspections a recorded observation.
+  - Operator: needs hardware and human participants. The procedure itself is complete (`d6b1833`).
+  - Moved from `plans/phase-1/44-calendar-scheduling-interview-intelligence` on 2026-08-05.
+
 ## Phase 4c — cohort rollouts moved in on 2026-08-05
 
 - [ ] **Roll out self-managed profiles by cohort**

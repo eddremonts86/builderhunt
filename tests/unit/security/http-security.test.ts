@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   applySecurityHeaders,
+  isPublicSchedulingPath,
   isTrustedMutationOrigin,
+  publicSchedulingContentSecurityPolicy,
   securityHeaderEntries,
+  uploadOriginFrom,
 } from '../../../server/security.mjs'
 
 /**
@@ -150,5 +153,93 @@ describe('CSRF mutation-origin gate', () => {
     expect(isTrustedMutationOrigin({ headers: new Headers({ cookie: 'session=x' }) }, TRUSTED)).toBe(
       true,
     )
+  })
+})
+
+/**
+ * The stricter policy for the candidate-facing scheduling surface
+ * (plans/phase-1/44-calendar-scheduling-interview-intelligence, "Implement capability exchange and
+ * session validation" — the one part of that task still open until 2026-08-05).
+ *
+ * The load-bearing case is the last one. `DocumentUploader.tsx` PUTs the candidate's file straight to
+ * a presigned URL on another origin, so a policy that tightened `connect-src` all the way to `'self'`
+ * would pass every test written about *headers* and break the upload in production. These assert the
+ * upload origin survives.
+ */
+describe('public scheduling CSP', () => {
+  const strict = (pathname: string, uploadOrigin?: string | null) =>
+    securityHeaderEntries({ production: true, secure: true, pathname, uploadOrigin })
+
+  it('matches the candidate page and the public API, and nothing that merely looks like them', () => {
+    expect(isPublicSchedulingPath('/schedule/inv_123')).toBe(true)
+    expect(isPublicSchedulingPath('/api/public/scheduling/inv_123/slots')).toBe(true)
+    // The trailing slash in the prefix is what makes these false.
+    expect(isPublicSchedulingPath('/schedules-report')).toBe(false)
+    expect(isPublicSchedulingPath('/api/scheduling/invitations')).toBe(false)
+    expect(isPublicSchedulingPath('/assets/index-a1b2c3d4.js')).toBe(false)
+    expect(isPublicSchedulingPath(undefined)).toBe(false)
+  })
+
+  it('leaves every other path on the site-wide policy', () => {
+    const site = securityHeaderEntries({ production: true, secure: true, pathname: '/dashboard' })
+    expect(site['Content-Security-Policy']).toContain("img-src 'self' data: https:")
+    expect(site['Content-Security-Policy']).toContain("connect-src 'self' https:")
+    expect(site['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
+    expect(site['Cache-Control']).toBeUndefined()
+  })
+
+  it('drops remote images and iframes on the candidate surface', () => {
+    const csp = strict('/schedule/inv_123')['Content-Security-Policy']
+    expect(csp).toContain("img-src 'self' data:")
+    expect(csp).not.toContain("img-src 'self' data: https:")
+    expect(csp).toContain("frame-src 'none'")
+  })
+
+  it('adds no-referrer and no-store, which a route header cannot do in production', () => {
+    const headers = strict('/api/public/scheduling/inv_123/slots')
+    expect(headers['Referrer-Policy']).toBe('no-referrer')
+    expect(headers['Cache-Control']).toBe('no-store')
+  })
+
+  it('keeps the shared base directives rather than forking them', () => {
+    const csp = strict('/schedule/inv_123')['Content-Security-Policy']
+    for (const directive of [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      // SSR inlines its hydration payload; removing this needs a nonce pipeline, not a CSP edit.
+      "script-src 'self' 'unsafe-inline'",
+      'upgrade-insecure-requests',
+    ]) {
+      expect(csp).toContain(directive)
+    }
+  })
+
+  it('names the object-storage origin in connect-src, so candidate uploads still work', () => {
+    const csp = strict('/schedule/inv_123', 'https://files.builderhunt.example')['Content-Security-Policy']
+    expect(csp).toContain("connect-src 'self' https://files.builderhunt.example")
+  })
+
+  it('falls back to \'self\' when no upload origin is configured, failing closed', () => {
+    const csp = strict('/schedule/inv_123', null)['Content-Security-Policy']
+    expect(csp).toContain("connect-src 'self';")
+    expect(csp).not.toContain('connect-src \'self\' https:')
+  })
+
+  it('reduces a full endpoint URL to its origin, and refuses a malformed one', () => {
+    expect(uploadOriginFrom('http://minio:9000/bucket/path')).toBe('http://minio:9000')
+    expect(uploadOriginFrom('https://x.eu.r2.cloudflarestorage.com')).toBe('https://x.eu.r2.cloudflarestorage.com')
+    expect(uploadOriginFrom('not a url')).toBeNull()
+    expect(uploadOriginFrom(undefined)).toBeNull()
+  })
+
+  it('emits a syntactically well-formed policy with no empty directive', () => {
+    const csp = publicSchedulingContentSecurityPolicy({ uploadOrigin: 'https://files.example' })
+    for (const directive of csp.split('; ')) {
+      expect(directive.trim()).not.toBe('')
+      expect(directive).not.toMatch(/ {2}/)
+    }
   })
 })

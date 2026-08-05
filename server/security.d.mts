@@ -10,7 +10,27 @@
 export interface SecurityHeaderOptions {
   production: boolean
   secure: boolean
+  /**
+   * Request path. When it matches `PUBLIC_SCHEDULING_PATH_PREFIXES`, the returned set carries the
+   * stricter scheduling CSP plus `Referrer-Policy: no-referrer` and `Cache-Control: no-store`.
+   * Omit it for responses that cannot be a scheduling surface, such as static assets.
+   */
+  pathname?: string
+  /** Browser-reachable origin of the object store, for the strict variant's `connect-src`. */
+  uploadOrigin?: string | null
 }
+
+/** Path prefixes whose responses belong to an account-less candidate holding a capability. */
+export const PUBLIC_SCHEDULING_PATH_PREFIXES: readonly string[]
+
+export function isPublicSchedulingPath(pathname: unknown): boolean
+
+export function publicSchedulingContentSecurityPolicy(
+  options?: { uploadOrigin?: string | null },
+): string
+
+/** `new URL(endpoint).origin`, or null for anything unparseable — never throws. */
+export function uploadOriginFrom(endpoint: string | undefined | null): string | null
 
 /** Header name → value, for `res.writeHead()`. */
 export function securityHeaderEntries(

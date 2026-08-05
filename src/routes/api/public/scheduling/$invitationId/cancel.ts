@@ -7,6 +7,7 @@ import {
   withCapabilityRequest,
   withPublicHeaders,
 } from '~/lib/scheduling/public-route-support'
+import { notifyAppointmentChange } from '~/lib/scheduling/notifications'
 
 /**
  * The candidate cancels a confirmed interview (plan:
@@ -30,15 +31,32 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/cance
         if (refused) return refused
 
         try {
-          const result = await withCapabilityRequest(request, params.invitationId, ({ transaction, tenant }) =>
-            cancelBooking(transaction, {
+          // The organization id is only known inside the capability context, and the notification below
+          // runs after it closes — so it travels out with the result rather than being re-derived.
+          let organizationId: string | null = null
+          const result = await withCapabilityRequest(request, params.invitationId, ({ transaction, tenant }) => {
+            organizationId = tenant.organizationId
+            return cancelBooking(transaction, {
               organizationId: tenant.organizationId,
               ownerUserId: tenant.ownerUserId,
               invitationId: tenant.invitationId,
-            }))
+            })
+          })
 
           if (!result.ok) return withPublicHeaders(publicError('invitation_unavailable'))
           if (!result.value.ok) return withPublicHeaders(publicError(result.value.code))
+
+          /*
+           * A CANCEL carrying the same UID and a higher SEQUENCE is what removes the entry from both
+           * calendars. Without it the interview stays in two calendars indefinitely and only the portal
+           * knows it is off — which is the failure mode a candidate experiences as being ghosted.
+           *
+           * Sent before the response for the same reason as the other two: awaited so a runtime cannot
+           * kill the process mid-send, and non-fatal because the cancellation has already committed.
+           */
+          if (organizationId) {
+            await notifyAppointmentChange({ organizationId, invitationId: params.invitationId, kind: 'cancellation' })
+          }
 
           return withPublicHeaders(Response.json({ status: 'cancelled', eventId: result.value.eventId }))
         } catch (error) {

@@ -10,6 +10,7 @@ import {
   withPublicHeaders,
 } from '~/lib/scheduling/public-route-support'
 import { bookSlotRequestSchema } from '~/shared/lib/interview-api'
+import { notifyAppointmentChange } from '~/lib/scheduling/notifications'
 
 /**
  * Confirms a slot (plan: calendar-scheduling-interview-intelligence, Phase 5).
@@ -42,8 +43,12 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/book'
         const slotStartsAt = new Date(parsed.data.slotStartsAt)
 
         try {
-          const result = await withCapabilityRequest(request, params.invitationId, ({ transaction, tenant }) =>
-            bookSlot(transaction, {
+          // The organization id is only known inside the capability context, and the notification below
+          // runs after it closes — so it travels out with the result rather than being re-derived.
+          let organizationId: string | null = null
+          const result = await withCapabilityRequest(request, params.invitationId, ({ transaction, tenant }) => {
+            organizationId = tenant.organizationId
+            return bookSlot(transaction, {
               organizationId: tenant.organizationId,
               ownerUserId: tenant.ownerUserId,
               invitationId: tenant.invitationId,
@@ -52,7 +57,8 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/book'
               requiredPurposes: BOOKING_REQUIRED_PURPOSES,
               noticeVersion: CANDIDATE_NOTICE,
               slotStartsAtHint: slotStartsAt,
-            }))
+            })
+          })
 
           if (!result.ok) return withPublicHeaders(publicError('invitation_unavailable'))
 
@@ -84,6 +90,22 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/book'
                   }
                 : {}),
             }))
+          }
+
+          /*
+           * Notify both parties, after the booking has committed and outside its transaction.
+           *
+           * Not awaited into the response contract: the booking is real whether or not the email
+           * arrives, and `notifyAppointmentChange` never throws. It is awaited at all only so a
+           * serverless-style runtime cannot kill the process mid-send — the alternative,
+           * fire-and-forget, loses notices on the deploy boundary and nobody would notice.
+           */
+          if (organizationId) {
+            await notifyAppointmentChange({
+              organizationId,
+              invitationId: params.invitationId,
+              kind: 'invitation',
+            })
           }
 
           return withPublicHeaders(Response.json({

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 // The single source of truth for security headers and the CSRF mutation-origin gate.
 // Plain ESM, and copied into the runtime image by the Dockerfile, precisely so this
 // entrypoint and the test suite share one implementation instead of drifting copies.
-import { isTrustedMutationOrigin, securityHeaderEntries } from './server/security.mjs';
+import { isTrustedMutationOrigin, securityHeaderEntries, uploadOriginFrom } from './server/security.mjs';
 
 // Load .env.docker before any other modules (must happen before the dynamic import)
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -37,10 +37,20 @@ const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
 const PUBLIC_ORIGIN = new URL(process.env.APP_URL ?? `http://localhost:${PORT}`);
 
-function securityHeaders() {
+// Resolved once: the endpoint cannot change without a restart, and parsing it per response would be
+// work repeated on every request to no purpose.
+const UPLOAD_ORIGIN = uploadOriginFrom(process.env.INTERVIEW_R2_ENDPOINT);
+
+// `pathname` selects the stricter public-scheduling variant. It is threaded through every call site
+// rather than applied in one place because this function's output is `Object.assign`ed *over* the
+// route's own headers — a per-route CSP set inside a handler is overwritten here in production and
+// would hold only in dev, which is the worst kind of security header: one that passes local review.
+function securityHeaders(pathname) {
   return securityHeaderEntries({
     production: process.env.NODE_ENV === 'production',
     secure: PUBLIC_ORIGIN.protocol === 'https:',
+    pathname,
+    uploadOrigin: UPLOAD_ORIGIN,
   });
 }
 
@@ -88,6 +98,8 @@ function tryServeStatic(pathname, res) {
   // must NOT be immutable, or a redeploy that changes them would be ignored.
   const isHashedAsset = /\/assets\/.*-[A-Za-z0-9_]{8,}\.[a-z0-9]+$/i.test(safePath);
   res.writeHead(200, {
+    // No pathname: a static asset is never a public-scheduling response, and passing one would
+    // only invite the stricter policy to land on `/assets/*`.
     ...securityHeaders(),
     'Content-Type': mime,
     'Content-Length': stat.size,
@@ -118,7 +130,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (!isTrustedMutationOrigin(req, PUBLIC_ORIGIN.href)) {
-    res.writeHead(403, { ...securityHeaders(), 'Content-Type': 'application/json' });
+    res.writeHead(403, { ...securityHeaders(url.pathname), 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 403, message: 'Forbidden' }));
     return;
   }
@@ -143,7 +155,7 @@ const server = createServer(async (req, res) => {
     webResponse = await app.fetch(webRequest);
   } catch (err) {
     console.error('[server] Handler error:', err instanceof Error ? err.name : 'UnknownError');
-    res.writeHead(500, { ...securityHeaders(), 'Content-Type': 'application/json' });
+    res.writeHead(500, { ...securityHeaders(url.pathname), 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 500, message: 'Internal server error' }));
     return;
   }
@@ -152,7 +164,7 @@ const server = createServer(async (req, res) => {
   for (const [k, v] of webResponse.headers.entries()) {
     resHeaders[k] = v;
   }
-  Object.assign(resHeaders, securityHeaders());
+  Object.assign(resHeaders, securityHeaders(url.pathname));
   res.writeHead(webResponse.status, resHeaders);
 
   if (webResponse.body) {

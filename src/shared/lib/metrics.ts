@@ -117,3 +117,28 @@ export const metrics = {
     for (const key of Object.keys(counters) as Array<keyof Counters>) counters[key] = 0
   },
 }
+
+/**
+ * The interview counters, re-keyed for the operator dashboard
+ * (`GET /api/admin/metrics` → `interviews.counters`).
+ *
+ * **Derived, for the same reason `reset()` is derived.** The first version of the dashboard mapping
+ * listed all nineteen keys by hand in the route, which is the identical shape of the bug this file
+ * already carries a comment about: a counter added later would increment correctly, reset correctly,
+ * and silently never reach the page an operator actually looks at. Nothing here needs maintaining when
+ * a counter is added.
+ *
+ * The `interview` prefix is dropped because the block it lands in is already named `interviews`, and
+ * `interviews.counters.interviewBookingConflicts` reads like a mistake.
+ */
+export function interviewOperatorCounters(
+  snapshot: Counters & { uptimeMs: number; uptimeSeconds: number },
+): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (!key.startsWith('interview') || typeof value !== 'number') continue
+    const withoutPrefix = key.slice('interview'.length)
+    result[withoutPrefix.charAt(0).toLowerCase() + withoutPrefix.slice(1)] = value
+  }
+  return result
+}

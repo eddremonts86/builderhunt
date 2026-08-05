@@ -74,6 +74,20 @@ improve a draft. It may not record an approval — see each `Operator:` line.
     availability only" table. A countersignature on an artifact does not change what the software does.
   - Moved from `plans/phase-1/44-calendar-scheduling-interview-intelligence` Phase 0 on 2026-08-05.
 
+- [ ] **Obtain the EU AI Act sign-off for interview AI**
+  - Files: `docs/compliance/interview-ai-act-classification.md`,
+    `docs/operations/interview-ai-human-oversight.md`,
+    `docs/operations/interview-ai-post-market-monitoring.md`
+  - Do: have the classification and its operational controls reviewed and signed.
+  - Verify: the classification document carries a dated, attributable sign-off, and
+    `SENSITIVE_AI_ENABLED` is only set `true` after it exists.
+  - Operator: a signature. An agent may prepare the evidence and must not record the approval.
+  - **The controls shipped 2026-07-28 (`a51efc5`)** — classification, human-oversight procedure,
+    post-market monitoring, the `AiDraftNotice` component and the brief editor's oversight surface. Launch
+    stays behind `SENSITIVE_AI_ENABLED=false` until the sign-off exists, so nothing is running unreviewed.
+  - Moved from `plans/phase-1/44-calendar-scheduling-interview-intelligence` on 2026-08-05, where it was
+    marked `[~]` and therefore invisible to every open-task count in the repository.
+
 ## Commercial facts
 
 - [ ] **Verify interview unit economics in test and limited live mode**

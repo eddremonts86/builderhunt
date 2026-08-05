@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Activity, AlertTriangle, Database, Cpu, ExternalLink, Filter, RefreshCw, Compass, ShieldCheck } from 'lucide-react'
+import { Activity, AlertTriangle, CalendarClock, Database, Cpu, ExternalLink, Filter, RefreshCw, Compass, ShieldCheck } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { Button } from '~/components/ui/button'
 
@@ -28,12 +28,32 @@ interface MetricsResponse {
     lastRunAt: string | null
     stats: { runs: number; upserted: number; errors: number }
   } | null
+  interviews: InterviewOperations
   server: {
     nodeVersion: string
     platform: string
     pid: number
     memoryUsage: { rss: number; heapTotal: number; heapUsed: number; external: number }
   }
+}
+
+/**
+ * plans/phase-1/44-calendar-scheduling-interview-intelligence, "Add redacted metrics and operator
+ * dashboards" — the half that was recorded as not built until 2026-08-05.
+ *
+ * `counters` is optional on purpose, and that is the whole design. The API omits it while every
+ * interview capability is off, so this page cannot render "0 booking conflicts" for a product where
+ * nobody can book. Read the flags first, then the numbers.
+ */
+interface InterviewOperations {
+  capabilities: {
+    calendar: boolean
+    scheduling: boolean
+    candidateUploads: boolean
+    transcription: boolean
+    sensitiveAi: boolean
+  }
+  counters?: Record<string, number>
 }
 
 interface ConversionRate {
@@ -245,6 +265,8 @@ export function AdminMetricsPage() {
         </div>
       </section>
 
+      <InterviewOperationsSection interviews={data.interviews} />
+
       <section className="card p-5 mb-6" data-testid="metrics-discovery">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Compass className="w-4 h-4 text-bh-accent" aria-hidden="true" />
@@ -442,6 +464,145 @@ function ConversionFunnelSection({
  * returns those fields (see `getRemovalOperationsMetrics`). A backlog of `pending` requests already
  * past their own `expiresAt` — work the scheduled sweep should have cleared — links to Operations.
  */
+/**
+ * Interview operations.
+ *
+ * Two rules this panel exists to obey, both inherited from the counters it renders:
+ *
+ * 1. **Never show a number as a fact when the door it counts is shut.** A capability grid comes first
+ *    and the counters are absent — not zero — while everything is off. The API enforces the same thing
+ *    by omitting `counters`, so this is not the only guard.
+ * 2. **Nothing but numbers.** Every value here is a counter and every label is static text. That is
+ *    what makes an interview dashboard safe to look at: a candidate's name, filename, transcript line
+ *    or capability secret has no path into this component, because it never receives one.
+ *
+ * The counters are grouped by the question an operator is actually asking, rather than in the order
+ * the metrics module declares them — "is intake working", "is capture working", "is the AI behaving",
+ * "is retention keeping up". An alphabetical list of nineteen numbers is a list, not a dashboard.
+ */
+const INTERVIEW_COUNTER_GROUPS: Array<{ title: string; keys: Array<[string, string]> }> = [
+  {
+    title: 'Scheduling and intake',
+    keys: [
+      ['bookingConflicts', 'Booking conflicts'],
+      ['staleReservations', 'Stale reservations'],
+      ['schedulesStale', 'Stale schedules'],
+      ['documentBacklog', 'Document backlog'],
+      ['documentFailures', 'Document failures'],
+    ],
+  },
+  {
+    title: 'Capture',
+    keys: [
+      ['captureRemote', 'Remote'],
+      ['captureInPerson', 'In person'],
+      ['captureUnsupported', 'Unsupported'],
+      ['transcriptReconnects', 'Reconnects'],
+      ['segmentsPersisted', 'Segments persisted'],
+      ['segmentRetries', 'Segment retries'],
+    ],
+  },
+  {
+    title: 'AI behaviour',
+    keys: [
+      ['providerErrors', 'Provider errors'],
+      ['aiParseFailures', 'Parse failures'],
+      ['templateFallbacks', 'Template fallbacks'],
+      ['prohibitedOutputRefusals', 'Refusals'],
+    ],
+  },
+  {
+    title: 'Retention and cost',
+    keys: [
+      ['retentionRowsDeleted', 'Rows deleted'],
+      ['retentionObjectsDeleted', 'Objects deleted'],
+      ['retentionObjectFailures', 'Object failures'],
+      ['usageVariances', 'Usage variances'],
+    ],
+  },
+]
+
+const CAPABILITY_LABELS: Array<[keyof InterviewOperations['capabilities'], string]> = [
+  ['calendar', 'Calendar'],
+  ['scheduling', 'Scheduling'],
+  ['candidateUploads', 'Candidate uploads'],
+  ['transcription', 'Transcription'],
+  ['sensitiveAi', 'Sensitive AI'],
+]
+
+function InterviewOperationsSection({ interviews }: { interviews: InterviewOperations | undefined }) {
+  if (!interviews) {
+    return (
+      <section className="card p-5 mb-6" data-testid="metrics-interviews">
+        <p className="text-sm text-bh-text-muted">Loading interview operations…</p>
+      </section>
+    )
+  }
+
+  const { capabilities, counters } = interviews
+  // Counters the module reports but no group claims. Rendered rather than dropped: a counter added to
+  // `metrics.ts` reaches the API automatically (`interviewOperatorCounters` derives its keys), so
+  // silently discarding the unknown ones here would reintroduce exactly the gap this task closed.
+  const grouped = new Set(INTERVIEW_COUNTER_GROUPS.flatMap((group) => group.keys.map(([key]) => key)))
+  const ungrouped = Object.entries(counters ?? {}).filter(([key]) => !grouped.has(key))
+
+  return (
+    <section className="card p-5 mb-6" data-testid="metrics-interviews">
+      <h2 className="font-semibold mb-3 flex items-center gap-2">
+        <CalendarClock className="w-4 h-4 text-bh-accent" aria-hidden="true" />
+        Interview operations
+      </h2>
+
+      <div className="flex flex-wrap gap-2 mb-4" data-testid="metrics-interviews-capabilities">
+        {CAPABILITY_LABELS.map(([key, label]) => (
+          <span
+            key={key}
+            data-testid={`interview-capability-${key}`}
+            className={`text-xs px-2 py-1 rounded border ${
+              capabilities[key]
+                ? 'border-bh-accent/40 text-bh-accent'
+                : 'border-bh-border text-bh-text-dim'
+            }`}
+          >
+            {label}: {capabilities[key] ? 'on' : 'off'}
+          </span>
+        ))}
+      </div>
+
+      {counters ? (
+        <div className="space-y-4">
+          {INTERVIEW_COUNTER_GROUPS.map((group) => (
+            <div key={group.title}>
+              <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-2">{group.title}</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {group.keys.map(([key, label]) => (
+                  <MetricCard key={key} label={label} value={counters[key] ?? null} />
+                ))}
+              </div>
+            </div>
+          ))}
+          {ungrouped.length > 0 && (
+            <div data-testid="metrics-interviews-ungrouped">
+              <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-2">Other counters</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {ungrouped.map(([key, value]) => (
+                  <MetricCard key={key} label={key} value={value} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-bh-text-muted" data-testid="metrics-interviews-disabled">
+          Every interview capability is disabled, so there is nothing to count. These counters are
+          deliberately absent rather than shown as zeros — a zero here would read as &ldquo;no problems&rdquo;
+          when it means &ldquo;no traffic is possible&rdquo;.
+        </p>
+      )}
+    </section>
+  )
+}
+
 function RemovalOperationsSection({
   removal,
   error,
