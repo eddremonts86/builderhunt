@@ -13,6 +13,7 @@ import { sourcingSprintAllowanceLabel } from '~/shared/lib/billing-shared'
 import { Button, Checkbox, Input, Label, LinkButton } from '~/components/ui'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { getAppOrganizationPlan } from '~/shared/lib/billing-session'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 export const Route = createFileRoute('/_landing/pricing')({
   beforeLoad: async () => {
@@ -23,11 +24,10 @@ export const Route = createFileRoute('/_landing/pricing')({
   loader: async ({ context }) => context,
   head: () => ({
     meta: [
-      { title: 'Pricing — BuilderHunt' },
-      {
-        name: 'description',
-        content: 'Simple, transparent pricing. Free forever, Pro and Pro Max for individuals, Team for sourcing teams. No credit card required to start.',
-      },
+      ...pageMeta({
+        title: 'Pricing — BuilderHunt',
+        description: 'Simple, transparent pricing. Free forever, Pro and Pro Max for individuals, Team for sourcing teams. No credit card required to start.',
+      }),
     ],
   }),
   component: PricingPage,

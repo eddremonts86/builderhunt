@@ -2,13 +2,16 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Scale } from 'lucide-react'
 import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 export const Route = createFileRoute('/_landing/legal/terms')({
   component: TermsPage,
   head: () => ({
     meta: [
-      { title: 'Terms of Service — BuilderHunt' },
-      { name: 'description', content: 'The terms and conditions for using BuilderHunt.' },
+      ...pageMeta({
+        title: 'Terms of Service — BuilderHunt',
+        description: 'The terms and conditions for using BuilderHunt.',
+      }),
     ],
   }),
 })

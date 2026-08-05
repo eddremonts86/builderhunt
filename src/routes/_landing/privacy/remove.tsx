@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { CheckCircle2, ShieldOff } from 'lucide-react'
 import { Button, Input, Label } from '~/components/ui'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 /**
  * Plan: audit-trust. Public, unauthenticated profile-removal request/verify flow — see
@@ -11,8 +12,10 @@ export const Route = createFileRoute('/_landing/privacy/remove')({
   component: RemoveProfilePage,
   head: () => ({
     meta: [
-      { title: 'Remove my profile — BuilderHunt' },
-      { name: 'description', content: 'Request removal of a GitHub, GitLab, Codeberg, or DEV.to profile from BuilderHunt.' },
+      ...pageMeta({
+        title: 'Remove my profile — BuilderHunt',
+        description: 'Request removal of a GitHub, GitLab, Codeberg, or DEV.to profile from BuilderHunt.',
+      }),
     ],
   }),
 })

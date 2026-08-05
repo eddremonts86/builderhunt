@@ -31,6 +31,7 @@ import { searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/pub
 import { Button, Input, LinkButton } from '~/components/ui'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
 import { SITE_URL } from '~/shared/lib/site-url'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 const SearchSchema = z.object({
   q: z.string().optional().default(''),
@@ -101,21 +102,21 @@ export const Route = createFileRoute('/_landing/explore/')({
       : 'Discover active developers and technical resources across the open web. Free during public beta.'
     // SITE_URL, not window.location.origin: this value is emitted into og:image
     // and must be byte-identical between the SSR render and hydration.
-    const ogUrl = q
+    const ogImage = q
       ? `${SITE_URL}/api/og/explore?q=${encodeURIComponent(q)}`
       : `${SITE_URL}/brand/og-image.png`
+
+    // No `og:url` and no canonical link here on purpose. The root route owns
+    // both, and since 2026-08-05 it derives them with `canonicalUrlFor`, which
+    // includes `?q=`. Emitting a second `<link rel="canonical">` from this route
+    // was the first attempt and it made things worse: the page shipped two
+    // canonical tags, which search engines discard entirely rather than choose
+    // between.
     return {
       meta: [
-        { title },
-        { name: 'description', content: description },
-        { property: 'og:title', content: title },
-        { property: 'og:description', content: description },
-        { property: 'og:image', content: ogUrl },
+        ...pageMeta({ title, description, image: ogImage }),
         { property: 'og:type', content: 'website' },
         { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:title', content: title },
-        { name: 'twitter:description', content: description },
-        { name: 'twitter:image', content: ogUrl },
       ],
     }
   },

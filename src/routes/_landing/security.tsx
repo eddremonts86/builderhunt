@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Lock, ShieldCheck } from 'lucide-react'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 /**
  * Plan: audit-trust. Every statement below must match shipped behavior — this page exists
@@ -13,8 +14,10 @@ export const Route = createFileRoute('/_landing/security')({
   component: SecurityPage,
   head: () => ({
     meta: [
-      { title: 'Security — BuilderHunt' },
-      { name: 'description', content: 'How BuilderHunt handles source credentials, data in transit, and public profile data.' },
+      ...pageMeta({
+        title: 'Security — BuilderHunt',
+        description: 'How BuilderHunt handles source credentials, data in transit, and public profile data.',
+      }),
     ],
   }),
 })

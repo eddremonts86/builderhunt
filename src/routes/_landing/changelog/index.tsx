@@ -4,6 +4,7 @@ import { ArrowRight, Tag, Calendar } from 'lucide-react'
 import { Button } from '~/components/ui'
 import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
 import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 interface ChangelogEntry {
   id: string
@@ -31,11 +32,10 @@ export const Route = createFileRoute('/_landing/changelog/')({
   loader: async () => ({ robots: await getSurfaceRobotsFn({ data: 'changelog' }) }),
   head: ({ loaderData }) => ({
     meta: [
-      { title: 'Changelog — BuilderHunt' },
-      {
-        name: 'description',
-        content: 'Everything we shipped, with the bugs we fixed and the claims we removed. Filter by feature, improvement, bugfix or breaking change.',
-      },
+      ...pageMeta({
+        title: 'Changelog — BuilderHunt',
+        description: 'Everything we shipped, with the bugs we fixed and the claims we removed. Filter by feature, improvement, bugfix or breaking change.',
+      }),
       ...robotsMetaTag(loaderData?.robots ?? DEFAULT_DIRECTIVES),
     ],
   }),

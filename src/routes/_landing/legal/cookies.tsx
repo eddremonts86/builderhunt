@@ -1,13 +1,16 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Cookie } from 'lucide-react'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 export const Route = createFileRoute('/_landing/legal/cookies')({
   component: CookiesPage,
   head: () => ({
     meta: [
-      { title: 'Cookie Policy — BuilderHunt' },
-      { name: 'description', content: 'Cookies we use and how to opt out.' },
+      ...pageMeta({
+        title: 'Cookie Policy — BuilderHunt',
+        description: 'Cookies we use and how to opt out.',
+      }),
     ],
   }),
 })

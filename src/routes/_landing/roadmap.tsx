@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, Loader2, ArrowUp, Calendar } from 'lucide-react'
 import { Button } from '~/components/ui'
 import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
 import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 interface RoadmapItem {
   id: string
@@ -28,8 +29,10 @@ export const Route = createFileRoute('/_landing/roadmap')({
   loader: async () => ({ robots: await getSurfaceRobotsFn({ data: 'roadmap' }) }),
   head: ({ loaderData }) => ({
     meta: [
-      { title: 'Roadmap — BuilderHunt' },
-      { name: 'description', content: 'What we are building, what is in progress, and what already shipped. Vote on what matters most to you.' },
+      ...pageMeta({
+        title: 'Roadmap — BuilderHunt',
+        description: 'What we are building, what is in progress, and what already shipped. Vote on what matters most to you.',
+      }),
       ...robotsMetaTag(loaderData?.robots ?? DEFAULT_DIRECTIVES),
     ],
   }),

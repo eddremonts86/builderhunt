@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Bot } from 'lucide-react'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 /**
  * The page `ENRICHMENT_USER_AGENT` points at.
@@ -18,12 +19,11 @@ export const Route = createFileRoute('/_landing/crawler')({
   component: CrawlerPage,
   head: () => ({
     meta: [
-      { title: 'BuilderHuntBot — our crawler — BuilderHunt' },
-      {
-        name: 'description',
-        content:
+      ...pageMeta({
+        title: 'BuilderHuntBot — our crawler — BuilderHunt',
+        description:
           'What BuilderHuntBot is, what it collects, how it identifies itself, and how to ask it to stop.',
-      },
+      }),
     ],
   }),
 })

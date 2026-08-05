@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { EXPORT_FORMATS, EXPORT_SCOPE_DEFINITIONS } from '~/shared/lib/exports/capability-registry'
+import { IMPLEMENTED_SEARCH_CONNECTORS } from '~/shared/lib/repositories/search-sources'
+import { SOURCE_PRESENTATION } from '~/shared/lib/source-presentation'
 
 /**
  * Regression guard for plans/phase-1/52-audit-trust: every one of these was a
@@ -123,5 +125,43 @@ describe('export capability claims — copy vs. the capability registry', () => 
     const result = unbackedExportClaims(featureListMatch![1])
     expect(result.scopes, `unbacked scopes in JSON-LD: ${result.scopes.join(', ')}`).toEqual([])
     expect(result.formats, `unbacked formats in JSON-LD: ${result.formats.join(', ')}`).toEqual([])
+  })
+
+  /**
+   * The same JSON-LD names the sources by hand, and that list went stale without
+   * anything failing: it advertised SourceHut and Hashnode until 2026-08-05,
+   * after both connectors had been retired (`drizzle/0143`, `drizzle/0144`) and
+   * removed from `IMPLEMENTED_SEARCH_CONNECTORS`. Structured data is read by
+   * search engines and AI crawlers, so a retired source stays a live public
+   * claim there long after the product stops honouring it.
+   *
+   * The check runs in both directions on purpose. Missing a source is a small
+   * marketing loss; claiming one that does not exist is the failure that
+   * matters, and only the "extra" direction catches a retirement.
+   */
+  it("the JSON-LD's source list is exactly the implemented connectors — both directions", () => {
+    const featureListMatch = ROOT_ROUTE.match(/featureList:\s*\[([\s\S]*?)\]/)
+    expect(featureListMatch, 'expected to find the featureList array').not.toBeNull()
+
+    const discovery = featureListMatch![1].match(/Multi-source builder discovery \(([^)]*)\)/)
+    expect(discovery, "expected the 'Multi-source builder discovery (...)' entry").not.toBeNull()
+    const claimed = new Set(discovery![1].split(',').map((s) => s.trim()).filter(Boolean))
+
+    const expected = new Set(
+      IMPLEMENTED_SEARCH_CONNECTORS.map((key) => SOURCE_PRESENTATION[key].label),
+    )
+
+    const extra = [...claimed].filter((label) => !expected.has(label))
+    const missing = [...expected].filter((label) => !claimed.has(label))
+
+    expect(
+      extra,
+      `the JSON-LD advertises source(s) with no implemented connector: ${extra.join(', ')}. `
+      + 'A retired source must be removed from this list in the same change that retires it.',
+    ).toEqual([])
+    expect(
+      missing,
+      `implemented connector(s) missing from the JSON-LD source list: ${missing.join(', ')}`,
+    ).toEqual([])
   })
 })

@@ -1,13 +1,16 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Building2 } from 'lucide-react'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 export const Route = createFileRoute('/_landing/legal/imprint')({
   component: ImprintPage,
   head: () => ({
     meta: [
-      { title: 'Imprint — BuilderHunt' },
-      { name: 'description', content: 'Legal entity and contact information for BuilderHunt.' },
+      ...pageMeta({
+        title: 'Imprint — BuilderHunt',
+        description: 'Legal entity and contact information for BuilderHunt.',
+      }),
     ],
   }),
 })

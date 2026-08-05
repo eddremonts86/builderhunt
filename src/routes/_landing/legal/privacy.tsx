@@ -2,13 +2,16 @@ import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Shield } from 'lucide-react'
 import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
+import { pageMeta } from '~/shared/lib/page-meta'
 
 export const Route = createFileRoute('/_landing/legal/privacy')({
   component: PrivacyPage,
   head: () => ({
     meta: [
-      { title: 'Privacy Policy — BuilderHunt' },
-      { name: 'description', content: 'How BuilderHunt collects, uses, and protects your data.' },
+      ...pageMeta({
+        title: 'Privacy Policy — BuilderHunt',
+        description: 'How BuilderHunt collects, uses, and protects your data.',
+      }),
     ],
   }),
 })

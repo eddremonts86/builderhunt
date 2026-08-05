@@ -3,6 +3,7 @@ import { RootDocument, RootErrorBoundary } from './-root-components'
 import { NotFoundPage } from '~/components/composite/NotFoundPage'
 import appCss from '~/shared/styles/globals.css?url'
 import { SITE_URL } from '~/shared/lib/site-url'
+import { canonicalUrlFor } from '~/shared/lib/page-meta'
 
 const SITE_NAME = 'BuilderHunt'
 const SITE_DESC = 'Discover active open-source builders across GitHub, Reddit, Hacker News, DEV.to and more. Save searches, get alerts, and track the people shipping the work — not just the repos.'
@@ -13,7 +14,13 @@ export const Route = createRootRoute({
   head: (ctx) => {
     const leafMatch = ctx.matches[ctx.matches.length - 1]
     const pathname = leafMatch?.pathname ?? '/'
-    const canonicalUrl = pathname === '/' ? SITE_URL : `${SITE_URL}${pathname}`
+    // The pathname alone is not the page's identity everywhere: `/explore` is a
+    // different page for every `?q=`. `canonicalUrlFor` appends the
+    // identity-bearing search params (allowlisted, so no tracking param can leak
+    // into a canonical) and is the single owner of this URL — a route that emits
+    // its own `<link rel="canonical">` produces *two* canonical tags, which
+    // search engines discard rather than reconcile.
+    const canonicalUrl = canonicalUrlFor(pathname, leafMatch?.search)
     return {
     meta: [
       { charSet: 'utf-8' },
@@ -123,7 +130,13 @@ export const Route = createRootRoute({
               availability: 'https://schema.org/InStock',
             },
             featureList: [
-              'Multi-source builder discovery (GitHub, GitLab, Codeberg, SourceHut, Hacker News, Reddit, DEV.to, Hashnode, Stack Overflow, npm, Hugging Face, Lobsters, Devpost, Product Hunt, Bluesky)',
+              // Exactly the keys in IMPLEMENTED_SEARCH_CONNECTORS, under the labels from
+              // `source-presentation.ts`. This listed SourceHut and Hashnode until 2026-08-05,
+              // months after both connectors were retired (drizzle/0143, drizzle/0144) — a public
+              // structured-data claim about a capability the product had removed. The test in
+              // tests/unit/modules/landing/components/trust-claims.test.ts now derives the expected
+              // set from the registry, so retiring a source fails the build until this line follows.
+              'Multi-source builder discovery (GitHub, GitLab, Codeberg, Hacker News, Reddit, DEV.to, Stack Overflow, npm, Hugging Face, Lobsters, Devpost, Product Hunt, Bluesky)',
               'Recency-weighted activity scoring',
               'Saved keyword searches',
               'Email alerts on new builder activity',
