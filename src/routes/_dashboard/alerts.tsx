@@ -57,11 +57,32 @@ interface AlertRow {
   }
 }
 
+/**
+ * These are **match labels, not detected events** — the exact wording of
+ * `plans/phase-1/34-smart-alerts/spec.md` §"Honest v1 semantics".
+ *
+ * The labels used to be event sentences: "A developer launches a new repo",
+ * "A watched builder ships a new project", "A candidate posts about looking for
+ * roles". Every one of those describes something the product does not observe.
+ * There is no per-builder activity stream; the worker runs the radar's keyword
+ * search and reports profiles it had not seen before
+ * (`src/lib/alerts/worker.ts`, which files every trigger as `keyword_match`
+ * for the same reason). Worse, the first option said "launches a new repo"
+ * while storing `any_activity`, which `evaluateMatch` treats as matching
+ * *everything* — so the one option a user would pick to get new-repo alerts was
+ * the one that could never be narrowed.
+ *
+ * Corrected 2026-08-05 to name the label rather than assert an event. The
+ * helper line under the select carries the caveat, so the honesty is on the
+ * screen and not only in the spec. Real event detection arrives with
+ * `plans/phase-1/33-unified-timeline`; when it does, these become real events
+ * and this comment can go.
+ */
 const EVENT_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'any_activity', label: 'A developer launches a new repo' },
-  { value: 'new_repo', label: 'A watched builder ships a new project' },
-  { value: 'keyword_match', label: 'A candidate posts about looking for roles' },
-  { value: 'new_product', label: 'A watched builder launches a product' },
+  { value: 'any_activity', label: 'Any match' },
+  { value: 'new_repo', label: 'New repository' },
+  { value: 'keyword_match', label: 'Keyword match' },
+  { value: 'new_product', label: 'New product launch' },
 ]
 
 const FREQUENCY_OPTIONS: Array<{ value: 'hourly' | 'daily' | 'weekly'; label: string }> = [
@@ -379,7 +400,7 @@ function AlertsInboxPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="alert-event-type" className="block text-sm font-medium mb-1">Notify me when…</label>
+              <label htmlFor="alert-event-type" className="block text-sm font-medium mb-1">File matches as…</label>
               <Select value={eventType} onValueChange={setEventType}>
                 <SelectTrigger id="alert-event-type" data-testid="alert-event-type-select">
                   <SelectValue />
@@ -390,6 +411,12 @@ function AlertsInboxPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {/* The caveat belongs next to the control, not only in the spec — see
+                  the comment on EVENT_TYPE_OPTIONS. */}
+              <p className="mt-1 text-xs text-bh-text-dim" data-testid="alert-event-type-caveat">
+                A label for your inbox, not a watched event. A radar runs your keywords and reports
+                profiles it has not shown you before.
+              </p>
             </div>
 
             <div>

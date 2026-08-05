@@ -223,6 +223,31 @@
   - Verify: authenticated browser member/admin flows and anonymous profile inspection.
 
 - [ ] **Update legal and product copy**
+  - **Drafted 2026-08-05, not published:
+    [`docs/operations/public-enrichment-privacy-copy-draft.md`](../../../docs/operations/public-enrichment-privacy-copy-draft.md).**
+    Paste-ready text for `/legal/privacy` (a new §1 bullet plus a full section on lawful basis,
+    retention and rights) and one line for `/crawler`.
+
+    It is a doc rather than an edit to the route on purpose: on this repository a commit to `master`
+    deploys, so writing legal copy into the page **is** publishing it, and this task requires a signed
+    human review first. Review there, then paste.
+
+    **The gap it fills is real, not cosmetic.** `/legal/privacy` §1 lists seven categories — account,
+    workspace, claim, usage, device, interview, cookies — and every one is about a *user*. Nothing
+    discloses the public developer profiles the product indexes, which are personal data belonging to
+    people who never signed up and mostly do not know the product exists. That is the category a
+    supervisory authority looks at first. `/crawler` covers it well already, but not in the document
+    that carries legal weight.
+
+    Two smaller findings recorded in the draft: the policy has **duplicate section numbers** (two
+    sections numbered 9 and two numbered 10, so citing "section 9" is ambiguous), and the copy has to
+    stay tense-honest now that `ENRICHMENT_ENABLED` is `false` — it describes a capability that is
+    built and disabled.
+
+    **Still yours**: the legitimate-interests balancing test, whether to commit publicly to the 180/30
+    day retention numbers, and recording the approval in the source register. An agent must not record
+    that approval.
+
   - Files: `src/routes/_landing/legal/privacy.tsx`, `src/routes/_landing/legal/terms.tsx`,
     `src/routes/_landing/crawler.tsx` (new — the public page the crawler's user agent points at),
     `README.md`, `src/shared/lib/legal-versions.ts` (only if the approved legal review requires a

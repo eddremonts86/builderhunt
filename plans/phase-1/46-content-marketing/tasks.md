@@ -87,24 +87,33 @@
 ## Phase 3 — Steady state (2 posts/month; one task per brief from the spec table)
 
 - [ ] **Write "The solo founder's guide to technical sourcing"**
+  - **Drafted, not published.** `content/posts/_draft-technical-sourcing-guide.md` (2026-08-04). Tool-agnostic process piece; the two BuilderHunt mentions are worked examples of a trade-off and both map to `src/lib/score.ts` and `src/lib/dedup.ts`.
+    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
   - Files: `content/posts/technical-sourcing-guide.md`
   - Do: Target "technical sourcing guide" with a tool-agnostic process piece using the
     validated post template and only evidence-backed BuilderHunt examples.
   - Verify: Post builds, renders at its slug, and completes the Phase 2 distribution check.
 
 - [ ] **Write "What I learned indexing 10,000 developer profiles"**
+  - **Drafted, not published.** `content/posts/_draft-lessons-indexing-developers.md` (2026-08-04). Note the title: it does **not** claim 10,000 profiles, because the corpus is nowhere near that and the brief says not to invent scale metrics. Dedup and scoring trade-offs cite real decisions.
+    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
   - Files: `content/posts/lessons-indexing-10k-developers.md`
   - Do: Target "developer data aggregation" and explain dedup/scoring trade-offs by citing
     real decisions in `src/lib/dedup.ts` and `src/lib/score.ts`; do not invent scale metrics.
   - Verify: Post builds, every quantitative statement has evidence, and Phase 2 distribution completes.
 
 - [ ] **Write "Saved searches as a hiring radar: a setup tutorial"**
+  - ⚠️ **Still needs three screenshots**, listed in an HTML comment at the top of the draft. They require a signed-in session, which the agent must not create. Everything else is verified.
+  - **Drafted, not published.** `content/posts/_draft-saved-search-hiring-radar.md` (2026-08-05). Every route, field label and dropdown option read out of `SearchPage.tsx` and `alerts.tsx` rather than remembered — and writing it is what surfaced the radar dropdown labelling four *events the product never detects*, fixed the same day. The post now describes the radar as the standing search it actually is.
+    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
   - Files: `content/posts/saved-search-hiring-radar.md`
   - Do: Target "developer hiring alerts" with current screenshots of search → save → alert;
     ensure every route and control label matches the running app.
   - Verify: Follow the published tutorial in a seeded account end to end, then complete Phase 2 distribution.
 
 - [ ] **Write "How the BuilderHunt activity score works"**
+  - **Drafted, not published.** `content/posts/_draft-how-activity-score-works.md` (2026-08-04). Every scoring statement maps to `src/lib/score.ts`; presented as a heuristic with named limitations, never as objective ability.
+    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
   - Files: `content/posts/how-activity-score-works.md`, `src/lib/score.ts`
   - Do: Target "measure developer activity" and explain the current scoring heuristics,
     limitations, and source differences without presenting the score as objective ability.
