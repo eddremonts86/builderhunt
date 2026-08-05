@@ -97,8 +97,12 @@ pnpm deploy:db:dry
 - Image **must** be a `pgvector/pgvector:*` image — semantic search needs the `vector` extension,
   and on a plain `postgres:*` image `drizzle/0013`'s `CREATE EXTENSION vector` rolls back the entire
   migration chain. See `database-migrations.md` → pgvector.
-- **Production currently runs `pgvector/pgvector:pg16`** (verified 2026-08-01 against the Coolify
-  `builderhunt-db` resource). Local dev and CI have already moved to `pgvector/pgvector:0.8.5-pg18`.
+- **Image for any new or replacement resource: `pgvector/pgvector:0.8.5-pg18`** — pinned, not the
+  floating `pg18` tag. Local dev and CI have been on it since 2026-07-28, and production was cut over
+  to it on **2026-08-05** (the record is §2b below and plan 03's Phase 4 tasks; the pg16 resource is
+  deliberately still running, un-repointed, as the rollback until its retention date). This line said
+  "production currently runs `pgvector/pgvector:pg16`, verified 2026-08-01" until 2026-08-05, which the
+  cutover made false — and it is the line someone provisioning a resource copies from.
 - ⚠️ **A 16 → 18 change is NOT a swap of this image.** Postgres major versions have incompatible
   on-disk formats, so the existing data volume is unreadable by 18 and there is no `pg_upgrade` path
   across the Docker volume boundary. Changing this line alone would start an empty database. The
@@ -233,7 +237,7 @@ IP ban of whichever host runs it. Before setting it `true` in production:
 | Docker build fails on `pnpm install` | lockfile drift | run `pnpm deploy:preflight` locally; commit the updated `pnpm-lock.yaml` |
 | Container runs but native module errors | host `node_modules` leaked into image | ensure `.dockerignore` is present (it excludes `node_modules`) |
 | `migration-hashes.json` mismatch in CI/preflight | new migration added without regenerating manifest | `node scripts/db/verify-migration-integrity.mjs --write`, bump the count in `migration-integrity.test.ts`, commit |
-| Semantic search returns 503 / keyword fallback | pgvector extension missing | switch the DB resource to `pgvector/pgvector:pg16`, re-run `pnpm deploy:db` |
+| Semantic search returns 503 / keyword fallback | pgvector extension missing | switch the DB resource to `pgvector/pgvector:0.8.5-pg18`, re-run `pnpm deploy:db` (this row said `pg16` until 2026-08-05 — on a pg18 data volume that image cannot start) |
 | Scrapers do nothing | `ENRICHMENT_ENABLED=false` or worker role can't log in | set enrichment env; confirm orchestrator step 6 green |
 
 ## PG18 observability — `pg_stat_io` and `pg_aios`
@@ -272,15 +276,21 @@ optimisation.
 
 ## PostgreSQL 16 → 18 cutover
 
-> **Status: not executed.** Production runs `pgvector/pgvector:pg16` (verified 2026-08-01 against the
-> Coolify `builderhunt-db` resource). Until this section has been executed and observed, the
-> "One-time Coolify setup" image line above stays `pg16` — do not pre-emptively change it.
+> **Status: executed 2026-08-05, via the §2b MVP path.** The dated account of what actually happened —
+> including the 11½-hour restore-to-repoint gap and the 67 rows it cost — is in §2b below; the
+> task-by-task record is `plans/phase-1/03-postgres-18-upgrade/tasks.md` Phase 4. Two items are still
+> open there and both are waits, not work: one soak period including the first 03:00 backup landing
+> from the pg18 resource, and stopping the pg16 resource seven days after that backup exists.
 >
-> **Why this is on the critical path.** Migrations `0102_uuidv7_pk`, `0107_organization_activity`
-> and `0122_canonical_human_identity` call `uuidv7()`, a PG18 built-in. They exist only on the
-> unmerged `phase-1-execution` branch, so production has never seen them and is not broken. But that
-> branch cannot ship until this cutover lands, and it fails in two different places depending on how
-> the migrations are applied:
+> Keep the rest of this section: it is the procedure, and it is what a restore onto a fresh resource or
+> a second environment will follow.
+>
+> **Why this was on the critical path** (kept in the past tense on purpose — this is why the cutover
+> had to happen before anything else could ship). Migrations `0102_uuidv7_pk`,
+> `0107_organization_activity` and `0122_canonical_human_identity` call `uuidv7()`, a PG18 built-in.
+> They existed only on the unmerged `phase-1-execution` branch, so production had never seen them and
+> was not broken. But that branch could not ship until the cutover landed, and it failed in two
+> different places depending on how the migrations were applied:
 >
 > - **`pnpm deploy:db` stops cleanly at orchestrator step 2**, before touching any migration:
 >   `PostgreSQL 16.x detected …, but this build requires >= 18.x` (`assertPostgresMajor`,

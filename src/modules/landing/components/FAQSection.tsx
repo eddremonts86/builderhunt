@@ -1,14 +1,15 @@
 import * as React from 'react'
-import { ChevronDown } from 'lucide-react'
+import { FaqPanel, type FaqEntry } from '~/shared/components/FaqPanel'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
-const FAQ_ITEMS = [
+const FAQ_ITEMS: FaqEntry[] = [
   {
     q: 'What is BuilderHunt, in one sentence?',
-    a: 'A radar for open-source builders: it aggregates public activity from GitHub, Reddit, Hacker News, DEV.to and a dozen other developer sources, scores it for recency, and lets you save searches, get alerts, and track the people behind the work.',
+    a: `A radar for open-source builders: it aggregates public activity from ${SEARCH_SOURCE_COUNT} public developer sources — GitHub, Reddit, Hacker News and DEV.to among them — scores it for recency, and lets you save searches, get alerts, and track the people behind the work.`,
   },
   {
     q: 'Is it really free?',
-    a: "Yes during public beta. We'll introduce a paid tier eventually for team features (shared shortlists, custom score weights, larger alert volumes) but the core product stays free for individual use.",
+    a: 'There is a Free plan that stays free: 3 saved searches, 50 saved builders, and full access to /explore and /blog, with no credit card and no expiry. Paid plans (Pro, Pro Max, Team) add smart alerts, semantic search, AI sourcing sprints and a monthly credit grant — see /pricing for what each one includes.',
   },
   {
     q: 'Do I need API tokens for the sources?',
@@ -28,23 +29,10 @@ const FAQ_ITEMS = [
   },
 ]
 
+/**
+ * No `title` — the `#faq` section on the home page already carries the eyebrow and the display
+ * heading that every other landing section uses, so the panel would repeat it.
+ */
 export function FAQSection() {
-  return (
-    <div className="space-y-3">
-      {FAQ_ITEMS.map((item) => (
-        <details key={item.q} className="group card hover:border-bh-border-strong mb-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between font-semibold text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent rounded-lg p-2">
-            <span>{item.q}</span>
-            <ChevronDown
-              className="w-5 h-5 text-bh-text-muted transition-transform duration-200 group-open:rotate-180"
-              aria-hidden="true"
-            />
-          </summary>
-          <p className="mt-2 pl-2 text-sm text-bh-text-muted leading-relaxed">
-            {item.a}
-          </p>
-        </details>
-      ))}
-    </div>
-  )
+  return <FaqPanel items={FAQ_ITEMS} testId="landing-faq" />
 }

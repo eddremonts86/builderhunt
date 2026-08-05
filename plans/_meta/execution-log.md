@@ -605,3 +605,53 @@ not improve the project.
   e2e spec + security isolation test + CI wiring are explicitly
   deferred to plan 53's local-e2e harness per the task's own
   in-place progress note.
+
+## Session 2026-08-05 (late) — the one genuinely open engineering task in phase-1
+
+Started from the question "what is left in phase-1, and what of it depends on the agent". Live counts
+at the start: **22 open tasks across 6 plans** (46-content-marketing 6, 54-waitlist-launch 5,
+44-calendar 4, 03-postgres-18 3, 42-stealth-scraping 3, 43-solutions-intelligence 1). Reading all 22
+showed 21 of them waiting on a person, a credential, a signature, or elapsed time — and exactly one
+that was engineering work nobody had done.
+
+- `42-stealth-scraping` — **"Run runtime adversarial matrix" closed.** New harness
+  `scripts/ops/verify-enrichment-adversarial-local.mjs` + `run-enrichment-matrix-local.sh`
+  (`pnpm test:enrichment-matrix:local`), modelled on `verify-api-isolation-local.mjs`: a disposable
+  `builderhunt_security_test_*` database, per-run login roles inheriting the four runtime roles, the
+  real route handlers and worker, a fetch recorder that both scripts the fault cases and proves the
+  contacted-host list, and a genuinely separate process for the kill switch. **17/17 checks, exit 0**,
+  twelve cases with job ids and log events summarized into
+  `docs/operations/public-enrichment-source-register.md`. Enrichment now has one unchecked task left
+  (the legal copy, which needs a person), not two.
+- **The matrix found a real defect and it was fixed.** `runEnrichmentRetentionPass`'s job sweep raised
+  `23503` against `enrichment_evidence_organization_job_fk` for any job older than 90 days that still
+  had accepted evidence (retained 180 days) — and since the sweep runs inside `runEnrichmentWorker`,
+  that exception failed the *entire* worker run: HTTP 500, `job_runs` `failed`, and the evidence half
+  of retention stopped too. Guaranteed, not edge-case: it is what every successful job does at day 90.
+  Fixed by retiring only jobs nothing references, **not** by cascading the FK (which would silently
+  shorten accepted retention to 90 days). Regression in
+  `tests/unit/shared/lib/repositories/enrichment-worker.test.ts` against a real database, since the
+  bug is a foreign key. Four further findings recorded open in the register, each a decision rather
+  than a typo — including that `deleteOrganizationEnrichmentData` has no caller and is refused
+  `42501` as the app role.
+- `46-content-marketing` — **the three missing screenshots for the hiring-radar draft were taken.**
+  The prior note said they needed a signed-in session the agent must not create; that prohibition is
+  about the live site, and `pnpm content:screenshots` is this repository's sanctioned local mechanism.
+  Three shot definitions added to `scripts/dev/capture-app-screenshots.ts`, images placed in the draft.
+  Shot 3's five matches are real alerts-worker output from Lobsters/HN/dev.to, not seeded rows.
+  Publishing remains the maintainer's (rename off the `_` prefix).
+- `03-postgres-18-upgrade` — **doc reconciliation only.** `deploy-runbook.md` still said "production
+  currently runs pgvector/pgvector:pg16" and "Status: not executed" after the 2026-08-05 cutover, and
+  its troubleshooting table told a reader to switch the resource to `pg16` — an image that cannot start
+  on a pg18 volume. All three corrected. The two open tasks there are waits (one soak period, then
+  seven days), not work.
+- Verification: `pnpm test` 5733 passed / 23 skipped, `type-check` 0, `lint` 0 errors (114 pre-existing
+  warnings), `security:boundaries`/`route-methods`/`route-client-boundary`/`provider-metering` and
+  `test:migration-integrity` all 0, matrix reproduced twice at 17/17. **A full `pnpm ci:local` was not
+  run**: a concurrent session was editing `src/` throughout (landing/FAQ/onboarding/search-connectors,
+  mtimes 17:24–17:44), and ci:local's e2e and accessibility steps cannot be trusted while source moves
+  underneath them.
+- Skipped, with the reason: every other open task in phase-1. Google Search Console and the launch
+  channels (54), the DPIA and finance sign-off (44), real provider pricing and human gold judgments
+  (43), the legal review and the production Coolify env (42), publishing and cross-posting (46), and
+  two elapsed-time waits (03).

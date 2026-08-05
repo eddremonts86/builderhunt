@@ -291,10 +291,15 @@ export function WorkSamplePanel({ builderId }: { builderId: string }) {
             <div className="rounded-lg border border-bh-accent/30 bg-bh-accent-soft p-4 space-y-3" data-testid="work-sample-upgrade">
               <p className="flex items-center gap-2 text-sm font-semibold text-bh-text">
                 <Lock className="w-4 h-4 text-bh-accent" aria-hidden="true" />
-                Work-sample analysis is a Team-plan feature
+                Work-sample analysis is a Pro Max and Team feature
               </p>
               <p className="text-xs text-bh-text-muted">
-                Upgrade to Team to get AI-reviewed work samples with level signals and interview questions.
+                {/* `work-sample-analyze`'s allowances are `{ free: 0, pro: 0, team: 10 }`, and
+                    `resolveLegacyPlanTier` maps Pro Max onto Team — so Pro Max is entitled and
+                    "upgrade to Team" was sending a Pro Max subscriber to a plan they don't need.
+                    `/pricing`'s comparison table already ticks both columns. */}
+                Upgrade to Pro Max or Team to get AI-reviewed work samples with level signals and
+                interview questions.
               </p>
               <PaidStateActions reason="not_entitled" className="justify-start" />
             </div>

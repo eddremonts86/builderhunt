@@ -20,10 +20,23 @@ author: edd
     delivery options  "Email digest + dashboard" | "Dashboard only"
     frequency options "Hourly" | "Daily digest" | "Weekly digest"
 
-  SCREENSHOTS STILL NEEDED (the plan asks for current ones, and they need a signed-in session):
-    1. /search with a query typed and the "Save search" control visible
-    2. /alerts with the "New radar" form open
-    3. /alerts showing one radar with matches in it
+  SCREENSHOTS: taken 2026-08-05, all three, and they are in the post below.
+    1. /images/blog/search-save-search.webp        — /search, query run, inline save bar open
+    2. /images/blog/alerts-new-radar.webp          — /alerts, "New radar" form with all six fields
+    3. /images/blog/alerts-radar-with-matches.webp — /alerts, one radar with five matches in it
+  Captured by `SHOTS_BASE_URL=http://localhost:3010 SHOTS_ONLY=search-save-search,alerts-new-radar,
+  alerts-radar-with-matches pnpm content:screenshots` against the local dev server, signed in as the
+  seeded admin. The three shot definitions live in scripts/dev/capture-app-screenshots.ts, so a
+  redesign refreshes them with every other blog image rather than leaving these three to rot.
+
+  Nothing in shot 3 is seeded. The radar was created through the real form (which needed a Pro
+  entitlement granted through the platform-admin endpoint — radar creation answers 402 on free), and
+  its five matches are rows `POST /api/admin/alerts/run-worker` produced by re-running the saved
+  search against the live sources: two from Lobsters, two from Hacker News, one from dev.to. Inserting
+  alert_triggers by hand to fill the frame would be exactly the fabricated evidence plan 05 spent a
+  plan removing. Those are real people's public handles — worth a deliberate decision before this
+  publishes, though it is the same standard as the existing search/explore images.
+
   Everything else in this post is verified against the code as of 2026-08-05.
 
   One thing this post deliberately does NOT do: sell the radar as event detection. It is not, and
@@ -60,6 +73,8 @@ save. It appears under your saved searches, and re-running it is one click.
 Name it after the *role*, not the query. "Rust async runtime builders" tells you what it is for six
 weeks from now; "rust async tokio" makes you re-read the keywords to remember why you saved it.
 
+![The search page with a rust async tokio query run across every source, and the inline save bar open with the search being named "Rust async runtime builders"](/images/blog/search-save-search.webp)
+
 ## Step 3 — turn it into a radar
 
 Go to **/alerts** and use **New radar**. The form has six fields, and two of them decide whether
@@ -75,6 +90,8 @@ this works:
   open-source has a low follower count and a strong profile.
 - **Delivery** — **Email digest + dashboard**, or **Dashboard only**.
 - **Digest frequency** — **Hourly**, **Daily digest**, or **Weekly digest**.
+
+![The New radar form with all six fields: radar name, "File matches as..." with its caveat that the label is not a watched event, the comma-separated keywords, a zero stars floor, delivery and digest frequency](/images/blog/alerts-new-radar.webp)
 
 **Pick Weekly digest first.** You can always tighten it. Hourly on a broad radar is how you end up
 with a filter rule that sends the whole thing to a folder you never open.
@@ -116,6 +133,8 @@ the change most likely to remove people you wanted.
 **Did anything in it surprise me?** If every match is someone you would have found anyway, the
 keywords are describing a category rather than a capability. "Senior backend" is a category.
 "Postgres locking" is a capability, and it will surface people no category search reaches.
+
+![The alerts inbox after a week: summary tiles for matches, unread, active and paused radars, the configured radar with its frequency and pause controls, and five matches from Lobsters, Hacker News and dev.to, each with an activity score and a Track & open action](/images/blog/alerts-radar-with-matches.webp)
 
 A radar you can **Paused** and come back to is better than one you delete: pausing keeps the dedupe
 history, so resuming does not re-show you everyone it already reported.

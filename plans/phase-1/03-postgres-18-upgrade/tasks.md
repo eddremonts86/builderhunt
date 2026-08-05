@@ -648,6 +648,13 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
 
 - [ ] **Retire the pg16 resource on a schedule, not immediately**
   - **Open 2026-08-05.** **Blocked on one fact, no longer on a decision.** Edd set the retention window on 2026-08-05: **stop (do not delete) pg16 seven days after the first successful pg18 backup lands**. That backup is the 03:00 schedule created on the PG18 resource the same day; it has not fired yet and there is no v1 API to trigger one, so the clock starts tomorrow at the earliest. When it does: stop the resource and its volume, write the delete-after date into the runbook, and confirm the volume still exists until then. pg16 is intentionally still running as the rollback.
+  - **Doc half done 2026-08-05.** The image line and the two "production runs pg16 / status: not
+    executed" statements in `deploy-runbook.md` were still describing the pre-cutover world, which is
+    the version someone provisioning a resource would have copied. They now name
+    `pgvector/pgvector:0.8.5-pg18` and point at §2b's executed record — including the troubleshooting
+    row that told a reader to switch the resource to `pg16`, an image that cannot start on a pg18 data
+    volume. What remains is not doc work: stopping the resource and writing a retention **date**,
+    which needs the first pg18 backup to exist.
   - Files: `docs/operations/deploy-runbook.md`
   - Do: stop (do not delete) the pg16 resource and its volume; record the retention date after
     which it is deleted, and update the image line at `:87` to the pinned pg18 tag. Do not start

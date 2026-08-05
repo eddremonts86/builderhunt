@@ -5,6 +5,7 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { STARTER_QUERIES } from '~/shared/lib/onboarding-shared'
 import { Button, Input, LinkButton } from '~/components/ui'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
 export const Route = createFileRoute('/onboarding/search')({
   beforeLoad: async () => {
@@ -58,7 +59,7 @@ function SearchStep() {
             What are you looking for?
           </h1>
           <p className="text-bh-text-muted">
-            Pick a starter query or type your own. We'll search 12 sources.
+            Pick a starter query or type your own. We'll search {SEARCH_SOURCE_COUNT} sources.
           </p>
         </div>
 

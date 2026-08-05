@@ -11,7 +11,21 @@ each plan's `NN-` directory prefix comes from, and its counts are newer than the
 `exhaustive-local-e2e-design` 10/3, not 12/0). Plan names below are written without their
 number prefix; the directories on disk carry it.
 
-**Snapshot: 2026-08-03.** 54 plans, 781 tasks, 723 done (93%), 58 open, 38 plans fully closed.
+**Snapshot: 2026-08-05 (late).** 54 plans, 780 tasks, 759 done (97%), **21 open across 6 plans**:
+`46-content-marketing` 6, `54-waitlist-launch` 5, `44-calendar-scheduling-interview-intelligence` 4,
+`03-postgres-18-upgrade` 3, `42-stealth-scraping` 2, `43-solutions-intelligence` 1.
+
+**All 21 are now waiting on a person, a credential, a signature, or elapsed time.** That claim was
+checked task by task on 2026-08-05, not inferred from the headers: the last open task that was
+engineering work — `42-stealth-scraping`'s runtime adversarial matrix — closed that day, and it found
+and fixed a defect that would have failed the enrichment worker every run from day 90 onward (see
+`execution-log.md`, session 2026-08-05 late, and the register's findings). Two open tasks in `03` are
+literally clock waits. So a session picking up phase-1 for code should expect to find none, and should
+read the four open findings in
+[`../../docs/operations/public-enrichment-source-register.md`](../../docs/operations/public-enrichment-source-register.md)
+instead — those are decisions waiting for the maintainer, deliberately not checkboxes.
+
+**Earlier snapshot: 2026-08-03.** 54 plans, 781 tasks, 723 done (93%), 58 open, 38 plans fully closed.
 
 Every table below this line is older than that count and disagrees with it. They are kept for the *ordering*
 rationale, which is still useful; take no number from them. Regenerate with the command below.

@@ -120,6 +120,56 @@ const SHOTS: Shot[] = [
     auth: true,
     waitFor: 'h1',
   },
+  // The three shots below belong to `content/posts/_draft-saved-search-hiring-radar.md`, whose steps
+  // they illustrate one-to-one. They photograph state, they never create it: `alerts-radar-list`
+  // needs one configured radar to exist, and creating one from here would make this script an actor
+  // in the product rather than a camera pointed at it. On a database with no radars that shot fails
+  // its `waitFor` and the run continues — a missing image, not a fabricated one.
+  {
+    name: 'search-save-search',
+    path: '/search',
+    auth: true,
+    waitFor: 'h1',
+    prepare: async (page) => {
+      const input = page.locator('input[type="search"], input[type="text"]').first()
+      await input.fill('rust async tokio')
+      await input.press('Enter')
+      // The federated search fans out to every source; shooting earlier catches a spinner, and the
+      // "Save search" button only renders once there are results (`searched && !showSave`).
+      await page.waitForTimeout(9000)
+      await page.getByRole('button', { name: 'Save search' }).click()
+      // Naming it after the role rather than the query is the tutorial's own advice; the screenshot
+      // should not contradict the paragraph next to it.
+      await page.getByPlaceholder('Name this search...').fill('Rust async runtime builders')
+    },
+  },
+  {
+    name: 'alerts-new-radar',
+    path: '/alerts',
+    auth: true,
+    waitFor: '[data-testid="alerts-inbox-page"]',
+    prepare: async (page) => {
+      await page.click('[data-testid="new-alert-button"]')
+      await page.waitForSelector('[data-testid="alert-create-form"]')
+      await page.fill('[data-testid="alert-name-input"]', 'Rust async runtime builders')
+      await page.fill('[data-testid="alert-keywords-input"]', 'rust, async, tokio')
+      // Filled but not submitted: the post's step 3 is the form, and a screenshot run should not
+      // leave a radar behind on whatever database it was pointed at.
+    },
+  },
+  {
+    name: 'alerts-radar-with-matches',
+    path: '/alerts',
+    auth: true,
+    // Needs one configured radar that has actually matched something. Locally: create the radar
+    // through the form (a Pro entitlement is required — the API answers 402 on free) and then
+    // `POST /api/admin/alerts/run-worker` with the CRON_SECRET, which re-runs the saved search
+    // against the live sources. The matches in the committed image are real rows the worker produced
+    // from HN, Lobsters and dev.to; inserting alert_triggers by hand to fill this frame would be the
+    // fabricated evidence `project-hygiene` spent a plan removing.
+    waitFor: '[data-testid="alerts-config-list"]',
+    fullPage: true,
+  },
   {
     name: 'sprints',
     path: '/sprints',

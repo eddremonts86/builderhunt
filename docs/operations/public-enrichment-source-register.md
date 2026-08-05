@@ -119,6 +119,107 @@
   future source whose key is optional.
 - **Review date**: 2026-08-04
 
+## Runtime adversarial matrix — run 2026-08-05
+
+Evidence for `plans/phase-1/42-stealth-scraping/task.md` Phase 7, "Run runtime adversarial matrix".
+Reproduce with `pnpm test:enrichment-matrix:local`
+([`scripts/ops/run-enrichment-matrix-local.sh`](../../scripts/ops/run-enrichment-matrix-local.sh) →
+[`scripts/ops/verify-enrichment-adversarial-local.mjs`](../../scripts/ops/verify-enrichment-adversarial-local.mjs)).
+**Result: 17/17 checks across all twelve cases, exit 0.**
+
+**Environment.** A disposable `builderhunt_security_test_*` Postgres 18 database with the full
+migration chain applied, connected through per-run login roles inheriting `builderhunt_app`, `_auth`,
+`_worker` and `_platform` — so grants and RLS are enforced, not bypassed by an owner connection.
+`ENRICHMENT_ENABLED=true`, `ENRICHMENT_ALLOWED_CONNECTORS=github`. Not production, and not the
+development database.
+
+**What was real and what was simulated**, stated because the distinction is the evidence's value:
+
+- Real: schema, roles, RLS, route handlers, worker loop, source-policy register, allowlist resolution,
+  resolver, retention SQL, restriction cascade, and the kill switch (a genuinely separate OS process
+  with the flag off).
+- Simulated: the **transport**, for the fault cases only. `globalThis.fetch` was replaced by a
+  recorder that logs every outbound request and answers the case's scripted status. No upstream can
+  be asked to return a challenge, a 429 and a hang on demand.
+- Real network, once: case 01b performed an actual HTTPS GET to `api.github.com` through the same
+  `safeFetch` envelope. Requests by transport across the run: **10 scripted, 1 real**.
+
+**Contacted-host list — the complete set of HTTP requests the process made**, from first import to
+exit: `api.github.com/users/{adv-scripted, octocat, adv-blocked, adv-challenge, adv-ratelimited,
+adv-timeout, adv-crash, adv-restricted}`, plus three scripted `robots.txt` reads
+(`api.github.com`, `github.com`, `raw.githubusercontent.com`) in case 03. **Zero requests to
+`linkedin.*`, `x.com`, `twitter.*`, `facebook.*` or `instagram.*`**, asserted over the whole run and
+not per case. Note the recorder counts HTTP requests: the SSRF guard still resolves an allowlisted
+host's DNS before a scripted response is returned.
+
+| # | Case | Outcome | Job / run id | First log event |
+|---|------|---------|--------------|-----------------|
+| 01a | allowlisted host succeeds (scripted) | 202 enqueue → job `succeeded`, one `review` evidence row at 7500 bps (`exact_username`, `exact_full_name`, `location_agreement`) | `03d6c7d29e930c00b3efdd49`, `job_runs:231c64e1-f800-46bd-a70a-9a99f41c985d` (`succeeded`, processed 1) | `enrichment_worker_run@2026-08-05T15:36:27.820Z` |
+| 01b | allowlisted host succeeds (real network) | real GET to `api.github.com/users/octocat`; response passed the envelope and persisted one evidence row; resolver `rejected` it at 4000 bps because the fixture is deliberately dissimilar — a resolver verdict, not a transport failure | `68698333da833a22441d345d` | `enrichment_worker_run@2026-08-05T15:36:27.863Z` |
+| 02 | blocked host | `linkedin` dropped into `blockedConnectors`; the pasted LinkedIn URL stored as `user_submitted` evidence; direct `safeFetch` refused `host_not_allowed` **without opening a socket**; zero blocked-host requests | `e8e77642b4375bb9783535bc` | `enrichment_worker_run@2026-08-05T15:36:28.092Z` |
+| 03 | robots.txt denial | `Disallow` → `disallowed`; longest-match `Allow` → `allowed`; 4xx → `no_robots_file` (RFC 9309 §2.3.1.3); 5xx → `unavailable` | n/a (library-level) | n/a |
+| 04 | challenge / auth wall | 403 → connector `stop`; job `failed` with `all_connectors_failed`, one attempt, zero evidence, no retry scheduled | `d76d65525a0f756ba5daea50` | `enrichment_worker_run@2026-08-05T15:36:28.135Z` |
+| 05 | 429 | requeued to `queued`, `last_error_code=rate_limited`, `available_at` +120s from the upstream `Retry-After`, lease released | `0ee7a00b235beaac713b2dd0` | `enrichment_worker_run@2026-08-05T15:36:28.159Z` |
+| 06 | timeout | hung upstream aborted after **10 031 ms**; requeued with `upstream_unavailable` | `191e5c6a9959f42fbfb4ef7e` | `enrichment_worker_run@2026-08-05T15:36:28.181Z` |
+| 07 | two overlapping jobs | first 202, second **200 with the same jobId**; exactly one job row | `4c7d406686306d6eb0363d50` | n/a (no connector ran) |
+| 08 | worker crash + reclaim | job left `running` with a live lease; next run reclaimed 1 lease and drove it to `succeeded` at attempt 2 with one evidence row | `0e043656cb2e5445fdfe46d8` | `enrichment_worker_run@2026-08-05T15:36:38.276Z` |
+| 09 | restriction mid-flight | restriction 200 → 1 job cancelled, 1 evidence row purged cross-org; a job enqueued *after* the restriction was cancelled with `processing_restricted` having contacted **0 hosts**; refresh route answers 409 `processing_restricted` | `9a237f1dfb71f1ef9cd8cab6`, `7deb9fd29d82c29367e4db05`, `adv-job-post-restriction` | `enrichment_subject_restriction@2026-08-05T15:36:38.347Z` |
+| 10 | retention expiry | pass 1: 3 expired rows deleted, live `accepted` row kept, 200-day-old job **kept** (see finding 1); pass 2 after that row expired: row deleted and job retired. Tenant API showed exactly the 1 live row | `adv-job-retention` | `enrichment_retention_run@2026-08-05T15:36:38.375Z` |
+| 11 | export and delete | subject provenance 200 with 1 entry, **field names only, no payload values**; organization export read 5 rows through the app role; organization delete **refused `42501`** (see finding 2); deleting the organization row cascaded its enrichment jobs and evidence to zero | n/a | n/a |
+| 12 | kill switch | separate process with `ENRICHMENT_ENABLED=false`: worker returned `disabled`, claimed 0, enqueue route answered 503 `enrichment_disabled`, **0 requests made**, and the queued job was still `queued` afterwards | `adv-job-killswitch` | n/a |
+
+### Findings
+
+1. **Fixed in this run — the retention pass could take the whole worker down.**
+   `enrichment_evidence_organization_job_fk` (drizzle/0016) is `ON DELETE NO ACTION`, accepted evidence
+   is retained 180 days, and jobs were retired at 90 — so the job sweep raised `23503` for every
+   successful job in that window, and because the sweep runs inside `runEnrichmentWorker` the
+   exception failed the *entire* run: HTTP 500, `job_runs` closed `failed`, and the evidence half of
+   retention stopped too. First reproduced by case 10 on this run. Fixed by only retiring jobs nothing
+   references (`src/shared/lib/repositories/enrichment-worker.ts`), deliberately **not** by cascading
+   the FK — that would delete accepted evidence at 90 days and silently shorten the retention promised
+   above. Regression pinned in `tests/unit/shared/lib/repositories/enrichment-worker.test.ts`.
+   No production data was affected: `ENRICHMENT_ENABLED` was `false` and no evidence row has ever
+   existed there.
+2. **Open, for a decision — the organization-level enrichment delete path does not work.**
+   `deleteOrganizationEnrichmentData` has **no caller anywhere in `src/`**, and calling it as the app
+   role is refused `42501`: `builderhunt_app` holds `SELECT, UPDATE` on `enrichment_evidence` and
+   `SELECT, INSERT` on `enrichment_jobs` (drizzle/0017). The same is true of
+   `listEnrichmentEvidenceForExport`. What does work today is the cascade — deleting the organization
+   removes both tables' rows — and the subject's own provenance/restriction path. The fix is a
+   worker-role deletion path, not a widened grant.
+3. **Open, minor — the strongest resolver signal can never fire.** `runEnrichmentWorker` calls
+   `resolveEnrichmentCandidate` without `candidateSourceRecordId`, so `exact_stable_source_id`
+   (10 000 bps, the signal that exists to auto-accept an exact ID match) is never scored. Case 01a
+   shows the candidate's `source_record_id` equal to the target's `source_id` and the row still
+   resolving to `review` at 7500 bps. Consequence: at this configuration nothing is ever
+   auto-accepted, everything queues for human review. That is the safe direction, which is why it is
+   recorded rather than changed — flipping it is a policy decision.
+4. **Open, minor — an organization-submitted URL is stored but never surfaces.** Case 02's LinkedIn
+   URL resolves to `rejected` (0 bps: `isVerifiedOwnerSubmitted` is only set for the verified profile
+   owner, and the worker has no way to set it), and `listEnrichmentEvidence` returns only
+   `accepted`/`review`. So the row is written, invisible, and deleted after 7 days. Spec §5.3 says
+   such a URL "may still be stored"; whether it should be *visible* to the submitting organization is
+   unresolved.
+5. **Open, minor observability — a privacy cancellation is counted as a worker failure.** A job
+   cancelled with `processing_restricted` increments `result.failed`, which the run-worker route maps
+   to `job_runs.state = 'failed'`. Case 09's otherwise-perfect run closed as failed. Any alert on
+   failed runs will fire on correct privacy behaviour.
+6. **Noted — the structured logger mints no event id.** `log.ts` writes `ts` + `event` per line and
+   nothing that identifies one emission. The task asked for a "log event ID" per case; this register
+   records `event@ts`, which is unique in a log stream, rather than inventing an id the code does not
+   produce.
+
+### Scope limits of this run
+
+- No enabled connector is in `authorized_crawl` mode (github is `official_api`, user-submitted makes
+  no request), so robots.txt is a library guarantee with no active caller at this configuration.
+  Case 03 asserts that too, rather than implying robots is gating live traffic.
+- The lease expiry in case 08 was advanced by SQL instead of waiting five minutes. Only the clock was
+  simulated; the reclaim path is the real one.
+- This is a functional matrix, not a load or canary test. The seven-day dark canary and its approval
+  remain in [`plans/phase-5/01-production-readiness-audit`](../../plans/phase-5/01-production-readiness-audit/tasks.md).
+
 ## Other existing BuilderHunt sources (reddit, hn, devto, npm, huggingface, gitlab,
 ## codeberg, lobsters, stackoverflow)
 

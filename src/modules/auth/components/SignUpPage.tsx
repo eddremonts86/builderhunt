@@ -79,7 +79,7 @@ export function SignUpPage() {
               <BrandLogoMark size={32} />
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
-                <p className="text-sm text-bh-text-muted">Free during public beta. No credit card.</p>
+                <p className="text-sm text-bh-text-muted">Starts on the Free plan. No credit card.</p>
               </div>
             </div>
 

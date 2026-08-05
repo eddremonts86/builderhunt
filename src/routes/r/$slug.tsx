@@ -5,6 +5,7 @@ import { resolvePublicRadar, searchPublicBuilders, type PublicSearchBuilder } fr
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
 import { LinkButton } from '~/components/ui/link'
 import { SITE_URL } from '~/shared/lib/site-url'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 const SITE_NAME = 'BuilderHunt'
 
 interface RadarLoaderData {
@@ -140,7 +141,7 @@ function PublicRadarPage() {
                 Build your own radar
               </h2>
               <p className="mt-1 text-sm text-bh-text-muted">
-                Search across 12 sources, save queries, and get alerts when new builders appear.
+                Search across {SEARCH_SOURCE_COUNT} sources, save queries, and get alerts when new builders appear.
               </p>
             </div>
             <LinkButton to="/auth/sign-up" variant="primary" className="whitespace-nowrap" data-testid="radar-cta-signup">

@@ -4,6 +4,7 @@ import { Sparkles, ArrowRight, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button, LinkButton } from '~/components/ui'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
 export const Route = createFileRoute('/onboarding/welcome')({
   beforeLoad: async () => {
@@ -18,7 +19,7 @@ export const Route = createFileRoute('/onboarding/welcome')({
 
 const VALUE_PROPS = [
   {
-    title: '12 sources, one search',
+    title: `${SEARCH_SOURCE_COUNT} sources, one search`,
     body: 'GitHub, Reddit, HN, DEV.to, Stack Overflow, npm, Hugging Face, GitLab, Codeberg, Lobsters, and more. All deduplicated.',
   },
   {
@@ -70,7 +71,7 @@ function WelcomeStep() {
             Welcome to BuilderHunt
           </h1>
           <p className="text-bh-text-muted text-lg max-w-xl mx-auto">
-            Find active developers across 12 sources. Save a search, get daily picks.
+            Find active developers across {SEARCH_SOURCE_COUNT} sources. Save a search, get daily picks.
           </p>
         </div>
 

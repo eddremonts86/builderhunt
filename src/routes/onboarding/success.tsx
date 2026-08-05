@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { Sparkles, ArrowRight, ListChecks } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { LinkButton } from '~/components/ui'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
 export const Route = createFileRoute('/onboarding/success')({
   beforeLoad: async () => {
@@ -26,7 +27,7 @@ function SuccessStep() {
           🎉 Your radar is live!
         </h1>
         <p className="text-bh-text-muted text-lg mb-8">
-          You'll get fresh picks in your dashboard every day. Your saved searches run continuously across 12 sources.
+          You'll get fresh picks in your dashboard every day. Your saved searches run continuously across {SEARCH_SOURCE_COUNT} sources.
         </p>
 
         <div className="card p-5 mb-6 text-left">

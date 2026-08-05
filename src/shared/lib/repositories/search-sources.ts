@@ -15,6 +15,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '~/shared/lib/db/client'
 import { platformDb } from '~/shared/lib/db/platform-db'
 import { searchSources } from '~/shared/lib/db/schema'
+import { IMPLEMENTED_SEARCH_CONNECTORS, type ImplementedSearchConnector } from '~/shared/lib/search-connectors'
 
 export type SearchSourceKind =
   | 'official_api' | 'feed' | 'licensed_dataset' | 'user_submission' | 'public_scrape' | 'external_link_only'
@@ -38,24 +39,11 @@ export interface SearchSourceRow {
 }
 
 /**
- * Connector keys the code can actually run, and the one place that list is written down.
- *
- * Must stay in step with `search_sources.connector_implemented`;
- * `assertSearchConnectorRegistryMatchesDatabase` is what proves it does. Duplicating the fact into the
- * database buys a CHECK constraint that refuses `enabled = true` with no connector — worth one
- * assertion to keep honest.
+ * Re-exported from `~/shared/lib/search-connectors`, where the list now lives so that client
+ * components can read `SEARCH_SOURCE_COUNT` without this module's `publicDb`/`platformDb` imports
+ * pulling `postgres` into the browser bundle. Server-side importers keep the original path.
  */
-export const IMPLEMENTED_SEARCH_CONNECTORS = [
-  // Two keys left this list on 2026-08-04 with their connectors, and `search_sources.connector_implemented` is
-  // false for both to match — `assertSearchConnectorRegistryMatchesDatabase` is what proves the two agree:
-  //   * `sourcehut` (drizzle/0143) — sr.ht's robots.txt disallows "anything used to feed a machine learning
-  //     model", which is what this product does, so no token could make the connector legitimate.
-  //   * `hashnode` (drizzle/0144) — Hashnode moved its public GraphQL API behind a paid plan.
-  'github', 'hn', 'devto', 'reddit', 'lobsters', 'stackoverflow', 'npm', 'huggingface',
-  'gitlab', 'codeberg', 'devpost', 'producthunt', 'bluesky',
-] as const
-
-export type ImplementedSearchConnector = (typeof IMPLEMENTED_SEARCH_CONNECTORS)[number]
+export { IMPLEMENTED_SEARCH_CONNECTORS, type ImplementedSearchConnector }
 
 export async function listSearchSources(db: PostgresJsDatabase = publicDb): Promise<SearchSourceRow[]> {
   const rows = await db.select().from(searchSources).orderBy(searchSources.key)

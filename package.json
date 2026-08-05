@@ -37,6 +37,7 @@
     "db:backfill:stripe-billing-legacy": "tsx --env-file=.env scripts/db/backfills/stripe-billing-legacy.ts",
     "test:rls:local": "node scripts/db/verify-rls-local.mjs",
     "test:api-isolation:local": "tsx scripts/db/verify-api-isolation-local.mjs",
+    "test:enrichment-matrix:local": "bash scripts/ops/run-enrichment-matrix-local.sh",
     "test:migrations:local": "node scripts/db/verify-migrations-local.mjs",
     "test:migration-integrity": "node scripts/db/verify-migration-integrity.mjs",
     "db:restore-test": "tsx scripts/db/restore-test.ts",

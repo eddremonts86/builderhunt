@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { searchBuilders } from '~/lib/search'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 import type { ScoredBuilder } from '~/lib/search'
 // `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
 // opens a real `postgres()` client at module scope — and the `postgres`
@@ -92,7 +93,7 @@ function renderOgsSvg(query: string, builders: ScoredBuilder[]): string {
 
   <!-- Footer -->
   <text x="80" y="600" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="500" fill="#71717a">
-    builderhunt.dev/explore — Find active builders across 12 sources
+    builderhunt.dev/explore — Find active builders across ${SEARCH_SOURCE_COUNT} sources
   </text>
 </svg>`
 }

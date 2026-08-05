@@ -17,7 +17,7 @@ export function Footer() {
               Find active open-source builders across the open web. Track GitHub stars, Hacker News comments, and Reddit velocity from one clean dashboard.
             </p>
             <span className="inline-flex items-center gap-1.5 text-xs bg-bh-accent-soft border border-bh-accent/25 text-bh-accent px-2.5 py-1 rounded-full font-bold">
-              Beta version · Free during beta
+              Beta version · Free plan, no credit card
             </span>
           </div>
 

@@ -28,7 +28,7 @@ export function HomePage() {
               <div>
                 <span className="eyebrow mb-6 inline-flex animate-fade-in">
                   <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-                  Public beta · Free during beta
+                  Public beta · Free plan, no credit card
                 </span>
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[1.05] mb-6 animate-fade-in-up">
                   Find <span className="text-bh-accent">builders</span>,<br />
@@ -598,8 +598,13 @@ export function HomePage() {
               Start hunting the right builders.
             </h2>
             <p className="text-lg text-bh-text-muted max-w-xl mx-auto mb-8">
-              Free during public beta. Set up your first hunt in under a minute — no credit card,
-              no demo call, no waiting list.
+              {/* This CTA used to promise that sign-up had no queue to wait in. Dropped rather
+                  than reworded: `ACCESS_ALLOWLIST_ENABLED` gates sign-up behind an
+                  `access_requests` approval queue, so the promise is false whenever production
+                  has the flag on — and the flag exists to be turned on. The regression guard in
+                  trust-claims.test.ts matches raw source, so don't restate the old phrasing. */}
+              Start on the Free plan — no credit card, no demo call. Set up your first hunt in
+              under a minute, and upgrade only when you outgrow the limits.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               {isAuthed ? (

@@ -6,6 +6,7 @@ import { LinkButton } from '~/components/ui/link'
 import { SITE_URL } from '~/shared/lib/site-url'
 import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
 import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
 export const Route = createFileRoute('/_landing/blog/$slug')({
   loader: async ({ params }) => {
@@ -106,7 +107,7 @@ function BlogPostPage() {
           <div className="card p-6 bg-gradient-to-br from-bh-accent/5 to-bh-cyan/5 border border-bh-accent/20 text-center rounded-xl">
             <h2 className="text-lg font-bold mb-1 text-bh-text">Find active developers</h2>
             <p className="text-sm text-bh-text-muted mb-4">
-              Search across 12 sources, save your queries, get daily alerts.
+              Search across {SEARCH_SOURCE_COUNT} sources, save your queries, get daily alerts.
             </p>
             <LinkButton to="/explore" variant="primary" className="inline-flex" data-testid="blog-cta-explore">
               Try the explorer

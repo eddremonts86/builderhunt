@@ -119,10 +119,13 @@ export function TeamFitCard({ builderId, trackedBuildersCount }: { builderId: st
             <div className="rounded-lg border border-bh-accent/30 bg-bh-accent-soft p-4 space-y-2" data-testid="team-fit-upgrade">
               <p className="flex items-center gap-2 text-sm font-semibold text-bh-text">
                 <Lock className="w-4 h-4 text-bh-accent" aria-hidden="true" />
-                Team fit analysis is a Team-plan feature
+                Team fit analysis is a Pro Max and Team feature
               </p>
               <p className="text-xs text-bh-text-muted">
-                Upgrade to Team to see how candidates complement the people you've already tracked.
+                {/* Same as work-sample analysis: `synergy-analysis` allows `{ free: 0, pro: 0,
+                    team: 25 }`, which Pro Max resolves into. */}
+                Upgrade to Pro Max or Team to see how candidates complement the people you&apos;ve
+                already tracked.
               </p>
             </div>
           )}

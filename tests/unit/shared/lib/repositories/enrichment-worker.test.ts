@@ -16,11 +16,12 @@ import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-
 import {
   authUsers,
   builderIdentities,
+  enrichmentEvidence,
   enrichmentJobs,
   organizationBuilders,
   organizations,
 } from '~/shared/lib/db/schema'
-import { claimDueEnrichmentJobs } from '~/shared/lib/repositories/enrichment-worker'
+import { claimDueEnrichmentJobs, runEnrichmentRetentionPass } from '~/shared/lib/repositories/enrichment-worker'
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -45,6 +46,10 @@ afterAll(async () => {
 })
 
 beforeEach(async () => {
+  // Evidence first: `enrichment_evidence_organization_job_fk` is ON DELETE NO ACTION, so clearing the
+  // jobs table while an evidence row still points at one raises 23503 — the same constraint the
+  // retention cases below exist for.
+  await db.delete(enrichmentEvidence)
   await db.delete(enrichmentJobs)
   await db.delete(organizationBuilders)
   await db.delete(builderIdentities)
@@ -125,5 +130,84 @@ describe('claimDueEnrichmentJobs is atomic', () => {
     const claimed = await claimDueEnrichmentJobs(2, 300, { db })
 
     expect(claimed).toHaveLength(2)
+  })
+})
+
+/**
+ * Same reason this file uses a real database: the bug these two cases pin was a foreign key, and a
+ * mock cannot hold one. `enrichment_evidence_organization_job_fk` (drizzle/0016) is ON DELETE NO
+ * ACTION, while accepted evidence is kept for 180 days and its job is retired after 90 — so the job
+ * sweep used to raise 23503 for every successful job in that 90-day window, and because the pass runs
+ * inside `runEnrichmentWorker`, one such row failed the entire worker run.
+ *
+ * Found 2026-08-05 by scripts/ops/verify-enrichment-adversarial-local.mjs (case 10 of the runtime
+ * adversarial matrix), against real rows rather than fixtures shaped to pass.
+ */
+describe('runEnrichmentRetentionPass', () => {
+  async function seedFinishedJobWithEvidence(suffix: string, evidence: Array<{ resolution: string; observedAt: Date; expiresAt: Date }>) {
+    const source = `ewr-ret-${suffix}`
+    await db.insert(builderIdentities).values({
+      id: `ewr-ret-identity-${suffix}`, source: 'github', sourceId: source, username: source, profileUrl: `https://github.com/${source}`,
+    })
+    await db.insert(organizationBuilders).values({
+      id: `ewr-ret-tracked-${suffix}`, organizationId: ORG, builderIdentityId: `ewr-ret-identity-${suffix}`, creatorUserId: OWNER,
+    })
+    await db.insert(enrichmentJobs).values({
+      id: `ewr-ret-job-${suffix}`,
+      organizationId: ORG,
+      builderIdentityId: `ewr-ret-identity-${suffix}`,
+      requestedConnectors: ['github'],
+      submittedUrls: [],
+      status: 'succeeded',
+      finishedAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+    })
+    for (const [index, row] of evidence.entries()) {
+      await db.insert(enrichmentEvidence).values({
+        organizationId: ORG,
+        jobId: `ewr-ret-job-${suffix}`,
+        builderIdentityId: `ewr-ret-identity-${suffix}`,
+        connector: 'github',
+        acquisitionMode: 'official_api',
+        sourceUrl: `https://github.com/${source}`,
+        contentHash: `ewr-ret-hash-${suffix}-${index}`,
+        payload: { profileUrl: `https://github.com/${source}`, topics: [] },
+        confidenceBps: 7500,
+        resolverVersion: 1,
+        scoreComponents: {},
+        matchSignals: [],
+        contradictions: [],
+        resolution: row.resolution,
+        observedAt: row.observedAt,
+        expiresAt: row.expiresAt,
+      })
+    }
+  }
+
+  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const daysAhead = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+
+  it('keeps a 90-day-old job alive while it still holds unexpired accepted evidence, instead of failing', async () => {
+    await seedFinishedJobWithEvidence('live', [{ resolution: 'accepted', observedAt: daysAgo(1), expiresAt: daysAhead(179) }])
+
+    const result = await runEnrichmentRetentionPass({ rawRetentionDays: 30, acceptedRetentionDays: 180, batchSize: 500 }, { db })
+
+    expect(result.evidenceDeleted).toBe(0)
+    expect(result.jobsDeleted, 'the job outlives its 90-day mark because its evidence has not expired').toBe(0)
+    const [job] = await db.select().from(enrichmentJobs).where(eq(enrichmentJobs.id, 'ewr-ret-job-live'))
+    expect(job).toBeTruthy()
+  })
+
+  it('deletes the job in the same pass that expires its last evidence row', async () => {
+    await seedFinishedJobWithEvidence('expired', [
+      { resolution: 'accepted', observedAt: daysAgo(200), expiresAt: daysAgo(1) },
+      { resolution: 'review', observedAt: daysAgo(40), expiresAt: daysAgo(1) },
+      { resolution: 'rejected', observedAt: daysAgo(10), expiresAt: daysAgo(1) },
+    ])
+
+    const result = await runEnrichmentRetentionPass({ rawRetentionDays: 30, acceptedRetentionDays: 180, batchSize: 500 }, { db })
+
+    expect(result.evidenceDeleted).toBe(3)
+    expect(result.jobsDeleted).toBe(1)
+    expect(await db.select().from(enrichmentJobs).where(eq(enrichmentJobs.id, 'ewr-ret-job-expired'))).toHaveLength(0)
   })
 })

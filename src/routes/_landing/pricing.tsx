@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Check, X, Mail, Sparkles, Zap, Rocket, Users, HelpCircle } from 'lucide-react'
+import { Check, X, Mail, Sparkles, Zap, Rocket, Users } from 'lucide-react'
 import {
   listActivePackCatalog,
   listActiveSubscriptionCatalog,
@@ -11,6 +11,7 @@ import {
 } from '~/shared/lib/billing/catalog'
 import { sourcingSprintAllowanceLabel } from '~/shared/lib/billing-shared'
 import { Button, Checkbox, Input, Label, LinkButton } from '~/components/ui'
+import { FaqPanel, type FaqEntry } from '~/shared/components/FaqPanel'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { getAppOrganizationPlan } from '~/shared/lib/billing-session'
 import { pageMeta } from '~/shared/lib/page-meta'
@@ -33,7 +34,7 @@ export const Route = createFileRoute('/_landing/pricing')({
   component: PricingPage,
 })
 
-const FAQ: Array<{ q: string; a: string }> = [
+const FAQ: FaqEntry[] = [
   {
     q: 'Can I use BuilderHunt for free?',
     a: 'Yes. The Free plan gives you 3 saved searches, 50 saved builders, and full access to /explore and /blog. No credit card required, no expiry.',
@@ -432,23 +433,12 @@ function PricingPage() {
         </div>
       </section>
 
-      <section className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl shadow-sm mb-12" data-testid="pricing-faq">
-        <h2 className="text-xl font-bold flex items-center gap-2 mb-6">
-          <HelpCircle className="w-5 h-5 text-bh-accent" aria-hidden="true" />
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-4">
-          {FAQ.map((f) => (
-            <details key={f.q} className="group border-b border-bh-border/40 last:border-0 pb-4 last:pb-0">
-              <summary className="cursor-pointer font-semibold text-bh-text hover:text-bh-accent transition-colors flex items-center gap-2 outline-none list-none [&::-webkit-details-marker]:hidden">
-                <span className="w-1.5 h-1.5 rounded-full bg-bh-accent opacity-0 group-open:opacity-100 transition-opacity" />
-                <span>{f.q}</span>
-              </summary>
-              <p className="text-sm text-bh-text-muted mt-2 pl-3 leading-relaxed">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+      <FaqPanel
+        items={FAQ}
+        title="Frequently Asked Questions"
+        testId="pricing-faq"
+        className="mb-12"
+      />
 
       <p className="text-center text-xs text-bh-text-dim mt-8">
         Questions? <a href="mailto:hello@builderhunt.dev" className="text-bh-accent hover:underline inline-flex items-center gap-1">

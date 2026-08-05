@@ -277,7 +277,45 @@
     NOT run: `pnpm test:rls:local` (needs new `RLS_TEST_*_URL` fixtures for
     enrichment_jobs/enrichment_evidence/builder_processing_restrictions — none exist yet).
 
-- [ ] **Run runtime adversarial matrix**
+- [x] **Run runtime adversarial matrix**
+  - **Done 2026-08-05. 17/17 checks across all twelve cases, exit 0.** Evidence in
+    [`docs/operations/public-enrichment-source-register.md`](../../../docs/operations/public-enrichment-source-register.md)
+    §"Runtime adversarial matrix — run 2026-08-05": one table row per case with its job id, first log
+    event and the hosts it contacted, plus the run's complete contacted-host list.
+    Reproduce with `pnpm test:enrichment-matrix:local`.
+
+    The harness is [`scripts/ops/verify-enrichment-adversarial-local.mjs`](../../../scripts/ops/verify-enrichment-adversarial-local.mjs),
+    driven by [`run-enrichment-matrix-local.sh`](../../../scripts/ops/run-enrichment-matrix-local.sh),
+    which provisions a disposable `builderhunt_security_test_*` database and per-run login roles
+    inheriting `builderhunt_app/_auth/_worker/_platform`. That role detail is the point: a matrix run
+    as the owner cannot fail a GRANT, and finding 2 below is a GRANT failure.
+
+    **Real vs simulated, because the honesty is the evidence:** schema, roles, RLS, route handlers,
+    worker loop, policy register, resolver, retention SQL, restriction cascade and the kill switch (a
+    separate OS process with the flag off) are all real. The *transport* is scripted for the fault
+    cases — no upstream returns a challenge, a 429 and a hang on request — and case 01b makes one
+    genuine HTTPS GET to `api.github.com` through the same `safeFetch` envelope. 10 scripted requests,
+    1 real. **Zero requests to any blocked host**, asserted over the whole run.
+
+    **It found a defect that would have failed the worker in production, and it was fixed here.**
+    `enrichment_evidence_organization_job_fk` is `ON DELETE NO ACTION`, accepted evidence is retained
+    180 days, jobs were retired at 90 — so the job sweep raised `23503` for every successful job in
+    that 90-day window, and since the sweep runs inside `runEnrichmentWorker`, one such row failed the
+    *entire* run: HTTP 500, `job_runs` closed `failed`, and the evidence half of retention stopped
+    with it. Fixed in `src/shared/lib/repositories/enrichment-worker.ts` by retiring only jobs nothing
+    references — not by cascading the FK, which would delete accepted evidence at 90 days and silently
+    shorten the retention this plan promises. Regression pinned in
+    `tests/unit/shared/lib/repositories/enrichment-worker.test.ts` (real database, because the bug is
+    a foreign key and a mock cannot hold one).
+
+    **Four findings left open on purpose**, all recorded in the register with their rationale: the
+    organization-level delete/export helpers have no caller and are refused `42501` as the app role
+    (the fix is a worker-role path, not a wider grant); the worker never passes
+    `candidateSourceRecordId`, so nothing is ever auto-accepted; an organization-submitted URL is
+    stored `rejected` and therefore never surfaces; and a privacy cancellation is counted as a worker
+    failure, so any alert on failed runs fires on correct behaviour. None of the four is a blocker for
+    the two tasks around this one, and each is a decision rather than a typo.
+
   - Files: `docs/operations/public-enrichment-source-register.md` (where the evidence is recorded —
     this task produces evidence, not code)
   - Do: Exercise each case against a running instance with enrichment enabled in a non-production
@@ -320,7 +358,10 @@
     instead — `pnpm dev:enrichment`, which sets the flag, the allowlist and the contact user agent for
     that one process.
 
-    **What still gates enabling it in production**: the two unchecked tasks above this one.
+    **What still gates enabling it in production**: one task, not two. The runtime adversarial matrix
+    above was closed 2026-08-05 (17/17, evidence in the source register), so the remaining gate is the
+    legally-reviewed copy — which needs a person, and is drafted and waiting in
+    `docs/operations/public-enrichment-privacy-copy-draft.md`.
 
   - Files: `.env.production.example` (`ENRICHMENT_ENABLED`), `docs/operations/public-enrichment-source-register.md`
   - Operator: needs a production deploy plus the Coolify environment. An agent must not enable this.

@@ -230,8 +230,9 @@ export async function runEnrichmentRetentionPass(input: {
   rawRetentionDays: number
   acceptedRetentionDays: number
   batchSize: number
-}): Promise<{ evidenceDeleted: number; jobsDeleted: number }> {
-  const expiredEvidence = await workerDb.execute(sql`
+}, options: { db?: PostgresJsDatabase } = {}): Promise<{ evidenceDeleted: number; jobsDeleted: number }> {
+  const db = options.db ?? workerDb
+  const expiredEvidence = await db.execute(sql`
     delete from enrichment_evidence
     where id in (
       select id from enrichment_evidence
@@ -243,12 +244,29 @@ export async function runEnrichmentRetentionPass(input: {
     returning id
   `) as unknown as Array<{ id: string }>
 
-  const oldJobs = await workerDb.execute(sql`
+  // A job is only removable once nothing references it. `enrichment_evidence_organization_job_fk`
+  // (drizzle/0016) is ON DELETE NO ACTION, and accepted evidence is retained for 180 days while a
+  // job is retired after 90 — so every successful job with accepted evidence has a 90-day window in
+  // which deleting it violates that constraint. Without this guard the statement raises 23503, and
+  // because the retention pass runs inside `runEnrichmentWorker`, the exception took the *whole
+  // worker run* down: the route answered 500, `job_runs` closed as failed, and the evidence half of
+  // retention stopped running too. Found 2026-08-05 by the runtime adversarial matrix
+  // (scripts/ops/verify-enrichment-adversarial-local.mjs case 10), which is the first thing to
+  // exercise this pass against real rows.
+  //
+  // Deliberately not fixed by cascading the FK: that would delete accepted evidence at 90 days and
+  // silently shorten the retention the source register promises. Jobs instead outlive the 90-day mark
+  // until their last evidence row expires, which is bounded by the accepted window and converges.
+  const oldJobs = await db.execute(sql`
     delete from enrichment_jobs
     where id in (
-      select id from enrichment_jobs
-      where status in ('succeeded', 'partial', 'failed', 'cancelled')
-        and finished_at < now() - interval '90 days'
+      select job.id from enrichment_jobs job
+      where job.status in ('succeeded', 'partial', 'failed', 'cancelled')
+        and job.finished_at < now() - interval '90 days'
+        and not exists (
+          select 1 from enrichment_evidence evidence
+          where evidence.organization_id = job.organization_id and evidence.job_id = job.id
+        )
       limit ${input.batchSize}
     )
     returning id

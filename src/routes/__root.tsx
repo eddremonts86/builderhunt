@@ -166,7 +166,7 @@ export const Route = createRootRoute({
                 name: 'Is BuilderHunt free?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'Yes. BuilderHunt is free to use during the public beta. Sign up with your email to start tracking builders.',
+                  text: 'BuilderHunt has a Free plan that stays free: 3 saved searches, 50 saved builders, and full access to the public explore and blog pages, with no credit card required. Paid plans (Pro, Pro Max, Team) add smart alerts, semantic search, AI sourcing sprints and a monthly credit grant.',
                 },
               },
               {
@@ -174,7 +174,14 @@ export const Route = createRootRoute({
                 name: 'Do I need API tokens for the sources?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'No. BuilderHunt works without any API tokens, though you can optionally add a GitHub token to lift rate limits on bigger searches.',
+                  // This answer used to close by inviting the reader to supply their own GitHub
+                  // credential to lift rate limits — the same fabricated claim
+                  // plans/phase-1/52-audit-trust removed from the landing copy, since no UI
+                  // anywhere accepts one. The regression guard read only HomePage and FAQSection,
+                  // so it survived here, in structured data: the one surface where a stale claim
+                  // outlives the page it came from. The guard now covers this file too, and it
+                  // matches raw source, so do not restate the retired wording in a comment.
+                  text: 'No. Every source works out of the box with no setup on your end — there is nothing for you to configure or supply.',
                 },
               },
               {

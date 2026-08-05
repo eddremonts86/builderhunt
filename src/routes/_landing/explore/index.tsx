@@ -99,7 +99,7 @@ export const Route = createFileRoute('/_landing/explore/')({
       : 'Explore — BuilderHunt'
     const description = q
       ? `Discover people and technical resources related to ${q} across GitHub, Hacker News, Reddit, DEV.to, npm and more.`
-      : 'Discover active developers and technical resources across the open web. Free during public beta.'
+      : 'Discover active developers and technical resources across the open web. Free plan available, no credit card required.'
     // SITE_URL, not window.location.origin: this value is emitted into og:image
     // and must be byte-identical between the SSR render and hydration.
     const ogImage = q
