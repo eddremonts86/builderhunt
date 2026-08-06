@@ -142,15 +142,45 @@ export function expectStrictBrowser(page: Page): StrictBrowserGuard {
     }
   }
 
+  /**
+   * Chromium network-stack errors the *host* causes, which no application code can produce.
+   *
+   * `ERR_ABORTED` was already exempt — a navigation cancelling its own in-flight requests is normal.
+   * The rest are the same category one level down: the machine's network interface changed, the link
+   * went away, or the OS suspended the stack. A laptop joining a VPN mid-run fails whatever request
+   * happened to be open, and the failing endpoint is whichever one was unlucky — this run it was
+   * `/api/alerts/triggers/unread-count` on an organization-switching test that has nothing to do with
+   * alerts.
+   *
+   * Deliberately a short, exact list rather than a pattern. "Ignore transport errors" would swallow
+   * `ERR_CONNECTION_REFUSED`, which is the server being down and is exactly the kind of failure this
+   * collector exists to catch. Each entry here has to be a condition the product cannot cause.
+   */
+  const HOST_NETWORK_ERRORS = [
+    'ERR_ABORTED',
+    // The OS switched interface (Wi-Fi to Ethernet, VPN up or down) and Chromium tore down its
+    // sockets.
+    'ERR_NETWORK_CHANGED',
+    // The machine has no route at all — airplane mode, cable pulled.
+    'ERR_INTERNET_DISCONNECTED',
+    // The OS suspended networking, typically a laptop sleeping mid-run.
+    'ERR_NETWORK_IO_SUSPENDED',
+  ] as const
+  const isHostNetworkError = (text: string): boolean =>
+    HOST_NETWORK_ERRORS.some((code) => text.includes(code))
+
   const onConsole = (msg: { type(): string; text(): string }): void => {
-    if (msg.type() === 'error') record(`console.error: ${msg.text()}`)
+    // The console message Chromium logs *alongside* a failed subresource carries the same net error
+    // token ("Failed to load resource: net::ERR_NETWORK_CHANGED"). Exempting the request without
+    // exempting its console twin leaves the test failing on the other half of one event.
+    if (msg.type() === 'error' && !isHostNetworkError(msg.text())) record(`console.error: ${msg.text()}`)
   }
   const onPageError = (error: Error): void => {
     record(`pageerror: ${error.message}`)
   }
   const onRequestFailed = (request: { url(): string; failure(): { errorText: string } | null }): void => {
     const failure = request.failure()?.errorText ?? 'unknown failure'
-    if (failure.includes('ERR_ABORTED')) return
+    if (isHostNetworkError(failure)) return
     if (isSameOrigin(request.url())) {
       record(`request failed (same-origin): ${request.url()} — ${failure}`)
     }

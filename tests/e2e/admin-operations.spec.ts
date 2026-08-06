@@ -69,6 +69,24 @@ test.beforeAll(async () => {
     const sync = await admin.api!.post('/api/admin/operations/sync-schedules')
     expect(sync.status()).toBe(200)
 
+    /*
+     * Push every schedule's next run out of reach, so "healthy" is a fact rather than a coin flip.
+     *
+     * `sprints.execute` runs on a ten-minute cron, which fires on the wall-clock boundaries :00,
+     * :10, :20… — not ten minutes after the sync. A sync at 11:39:50 sets `nextRunAt` to 11:40:00,
+     * ten seconds later, and `/api/admin/operations` marks a schedule overdue as soon as
+     * `nextRunAt <= now` because nothing advances it during a test (no worker runs). The pause/resume
+     * test then reads "Overdue" where it expected "healthy".
+     *
+     * It had been passing on where in the ten-minute cycle the suite happened to start, which is why
+     * it survived hundreds of green runs before failing on one that changed nothing near it.
+     *
+     * Pinned here rather than asserting `/healthy|overdue/` in the test: the point of that assertion
+     * is that the row is live *before* it gets paused, and a matcher that accepts both states would
+     * no longer check anything.
+     */
+    await sql`update operational_schedules set next_run_at = now() + interval '1 day'`
+
     harness = { workerIndex, databaseName: database.databaseName, redisPrefix: cache.prefix, baseURL: server.baseURL, sql, ctx, owner, organization, admin }
     await fetch(`${server.baseURL}/`).then((r) => r.text()).catch(() => undefined)
   } catch (error) {
