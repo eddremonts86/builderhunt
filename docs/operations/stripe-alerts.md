@@ -80,10 +80,24 @@ noise):
 | Organizations with auto-recharge paused due to failure | > 0 |
 | Most recent reconciliation run | not `clean` |
 
-`src/routes/api/admin/metrics/index.ts` (a pre-existing, non-billing-specific platform metrics route —
-distinct from `api/admin/billing/metrics.ts`, which wraps `getBillingOperationsMetrics()` 1:1 with no
-alert evaluation) now includes a `billing` key: the full metrics snapshot plus `alerts: string[]` from
-`evaluateBillingAlerts`.
+### Where an operator sees them
+
+`GET /api/admin/billing/metrics` returns the snapshot plus `alerts: string[]` from
+`evaluateBillingAlerts`, and **Admin → Billing ops** renders them as an alert region above the stat
+cards. That is the only surface. An empty list renders nothing at all: a standing "0 alerts" panel
+teaches an operator to skip the top of the page, which is the one place an alert can appear.
+
+The thresholds are evaluated server-side rather than in the page. Two clients applying their own
+`> 120` drift the first time one is updated, and the one that drifts low is silent about a real
+incident.
+
+**Changed 2026-08-06.** Until then the alerts were computed into a `billing` key on
+`GET /api/admin/metrics` — and `/admin/metrics` has never rendered that key, so no operator has ever
+seen a billing alert this product raised. The evaluation moved to the endpoint whose numbers it
+describes, and `/api/admin/metrics` no longer calls `getBillingOperationsMetrics` at all: that
+function sweeps every organization serially, and the metrics page put it on a 15-second timer for a
+field it did not display. If you are looking for billing figures on `/admin/metrics`, they are not
+there by design — go to Billing ops.
 
 ## Data model
 

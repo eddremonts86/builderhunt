@@ -615,8 +615,11 @@ enforceable gate is the existing `savedBuilders` limit.
    `builderhunt_platform` has **no grant and no policy** on that table, so a `platformDb` count
    returns `permission denied` — and if it were granted without a policy it would silently return
    zero rows, which is worse. The codebase already says this out loud:
-   `src/routes/api/admin/metrics/index.ts` hardcodes `totalSavedQueries: null, totalBuilders: null,
-   totalNotes: null` for exactly this reason. Granting the platform role a cross-tenant read of
+   `src/routes/api/admin/metrics/index.ts` hardcoded `totalSavedQueries: null, totalBuilders: null,
+   totalNotes: null` for exactly this reason. (Those three keys were removed on 2026-08-06 — a tile
+   that can never have a value is not an availability state — but the reasoning survives as a comment
+   on that same route, and the constraint it describes is unchanged.)
+   Granting the platform role a cross-tenant read of
    tenant tracking data for a growth metric is a security-policy §10 widening that needs an ADR, not
    a metrics task. So v1 ships metrics 1, 2 and 4 (all auth-role or in-process) and records this one
    as deferred with the target — ≥ 25% of new tracks from the extension within 60 days — measured

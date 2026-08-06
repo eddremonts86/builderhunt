@@ -262,10 +262,31 @@
     it was assembled from a compile-time registry nobody updated. Remaining work is therefore
     `GET /api/admin/overview` and the sections, folded into the Metrics rebuild below.
 
-- [ ] **Reconcile stale and future Admin destinations**
+- [~] **Reconcile stale and future Admin destinations**
   - Files: `src/modules/dashboard/ui/shell/nav-config.ts`, Admin routes, `plans/UI`, navigation tests
   - Do: Remove or redirect retired Plan requests instead of creating a widget for it; register Command Center, Operations, Integrations, Claims/Trust, and other destinations only when their canonical projections/pages ship. Keep one authoritative Admin route registry.
   - Verify: every visible Admin destination resolves for a platform admin, no retired/dependency-disabled item appears, direct unauthorized access fails, and route coverage reports no orphan Command Center continuation.
+  - **Surveyed 2026-08-06; the reconciliation itself is already true.** All 17 `/admin/*` destinations
+    answer 200 for a platform admin and `/admin` resolves to `/admin/metrics`. `nav-config.ts` lists
+    exactly the 16 non-index route files on disk — no nav entry without a route, no route without a
+    nav entry. Unauthorized access is covered per page by `tests/e2e/admin-journeys.spec.ts`, which
+    asserts the guard on each one rather than once, because the admin surface is reached by URL.
+  - **"Plan requests" was retired before this plan reached it.** The `plans`, `plan_changes` and
+    `plan_requests` tables were dropped on 2026-08-03 along with their routes and the admin queue that
+    reviewed them; no route, page or nav entry references them. Nothing to remove or redirect.
+  - **The reverse gate now exists.** `scripts/check-ui-route-graph.mjs` failed a navigation target with
+    no matching route; nothing failed the opposite — an Admin route on disk that nothing links to,
+    reachable only by someone who already knows the URL. `nav-config.ts` stated that rule in a comment
+    ("an admin page nobody can navigate to is a page nobody…"), and a comment is not a gate. It is one
+    now, and it runs in `ci:local` as `security-ui-route-graph`. Scoped to `/admin`: elsewhere an
+    unlinked route is often correct — a landing page arrives from search, `/schedule/$invitationId`
+    from an email, an OAuth callback from the provider — and widening it would need an allowlist
+    longer than the check.
+  - **Verified by breaking it.** The check passes today, so passing proves nothing on its own. Dropping
+    `/admin/abuse` from the link set made it report exactly that route and exit 1; restoring it
+    returned to green.
+  - **Still open:** the one authoritative registry the task also asks for. `nav-config.ts` and the
+    route files agree today and the gate now keeps them agreeing, but they remain two lists.
 
 - [ ] **Build the Platform Action Queue and service-health widgets**
   - Files: `src/modules/admin/dashboard/AdminDashboardPage.tsx`, `PlatformActionQueue.tsx`, `ServiceHealthWidget.tsx`, tests
@@ -291,20 +312,55 @@
 
 ### `/admin/metrics` optimization
 
-- [ ] **Measure the current Admin Metrics query and refresh cost**
-  - Files: `tests/performance/admin-metrics.spec.ts`, metrics test fixtures, performance notes
+- [x] **Measure the current Admin Metrics query and refresh cost**
+  - Files: `tests/unit/shared/lib/billing/operations-metrics.test.ts` ("cost shape"), `tests/unit/routes/api/admin/metrics/index.test.ts`, `tests/unit/routes/_dashboard/admin/metrics.test.tsx`
   - Do: Record endpoint duration, database query count, cross-organization billing reads, transferred bytes, client request overlap, and 15-second hidden-tab behavior for small and representative large fixtures. Identify which response fields the current page actually renders.
   - Verify: baseline proves whether one page load invokes `getBillingOperationsMetrics`, how cost grows with organizations/grants, and whether repeated polls overlap; fixture/results contain no production data.
+  - **No `tests/performance/` directory, deliberately.** Only `tests/unit/**` (vitest) and `tests/e2e/**`
+    (playwright) are wired into `ci:local`; `tests/regression/*.mjs` are standalone scripts and two of
+    the eleven are reachable from `package.json` at all. A third suite nothing runs is the failure
+    mode this plan keeps naming, so the baseline lives in the suites that gate.
+  - **Measured as shape, not duration.** A timing budget in a unit suite measures the machine, and it
+    would go green again the day somebody makes each query faster while leaving the structure — one
+    serial transaction per organization plus one query per active credit grant — exactly as it is.
+    The tests assert `withWorkerOrganization` is called once per organization with a concurrency peak
+    of 1, and that raw selects come to `orgs × (4 + grants)`.
+  - **What the measurement found.** The page rendered *none* of the `billing` block: `grep -n
+    "billing\|removals\|alerts"` over `metrics.tsx` returned nothing. So every load paid the full
+    cross-organization sweep — plus two full reads of `billing_webhook_events`, counted in JS — for a
+    response key nothing displayed, on a 15-second timer that did not stop for a hidden tab: roughly
+    240 sweeps an hour at nobody. `db.totalSavedQueries`, `db.totalBuilders` and `db.totalNotes` were
+    hardcoded `null` in the response literal and rendered as three permanent em-dashes.
 
 - [ ] **Define versioned Admin Metrics section contracts**
   - Files: `src/shared/lib/admin-metrics/contracts.ts`, contract tests
   - Do: Define Overview, Traffic, Search, Discovery, Activation, Conversion, Feature reliability, and Runtime section schemas with status, generated time, window/timezone, source scope, reset/process identity, units, thresholds, bounded series, and ranked rows.
   - Verify: tests reject missing units/scope, more than 90 buckets/10 ranked rows, arbitrary route labels, invalid thresholds, unknown variants, and process counters presented as persisted platform totals.
 
-- [ ] **Split the monolithic Admin Metrics API and remove frequent billing scans**
+- [~] **Split the monolithic Admin Metrics API and remove frequent billing scans**
   - Files: `src/routes/api/admin/metrics/index.ts`, `src/routes/api/admin/metrics/overview.ts`, section routes/repository, API/performance tests
   - Do: Make Overview lightweight; load analytical sections only by validated request. Remove `getBillingOperationsMetrics` from the frequent Metrics path and consume only a cached Admin-overview billing alert summary. Preserve detailed billing computation under `/api/admin/billing/metrics`. Migrate the UI/regression consumers, then retain only a bounded documented legacy compatibility response until removal.
   - Verify: initial Overview, 60-second refresh, and legacy compatibility request perform no organization billing sweep or conversion query; one section failure returns its state without failing ready sections; current route regression coverage is migrated; platform role remains required everywhere.
+  - **Done, 2026-08-06: the billing sweep is off the frequent path.** `/api/admin/metrics` no longer
+    imports `getBillingOperationsMetrics`; the remaining three reads run in one `Promise.all` instead
+    of four sequential awaits; the three hardcoded-`null` counts are gone from both the response and
+    the page. The refresh now clears its timer on `visibilitychange` and re-reads on return, so a
+    backgrounded tab costs nothing and a returning one is not showing numbers as old as its absence.
+    Guarded by an assertion that the scan function is *not called*, rather than by a latency budget.
+  - **No cached billing-alert summary, and the alerts moved instead.** The plan asked this endpoint to
+    keep "a cached Admin-overview billing alert summary". It never had one to cache: `evaluateBillingAlerts`
+    ran here into a `billing` block no page read, so no operator has ever seen a billing alert this
+    product raised. A cache would have preserved the delivery of nothing. The alerts now travel with
+    the metrics they are computed from, on `/api/admin/billing/metrics`, and render in the operations
+    console that already fetches it. Adding a cache to `/admin/metrics` later is a separate decision
+    that should start from a page that actually displays the value.
+  - **Still open:** the per-section split (`overview.ts` and friends), validated `section`/`range`
+    request state, and per-section failure isolation. Blocked on the section contracts task above.
+  - **`db.totalBuilders` is not merely deferred.** Making those three counts real needs
+    `builderhunt_platform` to hold unscoped SELECT on tenant tables — saved queries and notes being
+    private workflow content — which is the surveillance the Admin track's own rule forbids. If a
+    platform-wide builder count is wanted, it is its own task with its own policy migration, not a
+    line in this one.
 
 - [ ] **Add truthful historical service-metric storage or adapter**
   - Files: metrics repository/schema or observability adapter, retention/aggregation worker, tests and runbook

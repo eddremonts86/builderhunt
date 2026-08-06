@@ -18,9 +18,6 @@ interface MetricsResponse {
     totalUsers: number
     newUsersLast24h: number
     newUsersLast7d: number
-    totalSavedQueries: number | null
-    totalBuilders: number | null
-    totalNotes: number | null
   }
   discovery: {
     cursor: number
@@ -91,6 +88,9 @@ const METRIC_LABELS: Record<string, string> = {
   signup_completion: 'Signup submit → complete',
 }
 const METRIC_ORDER = Object.keys(METRIC_LABELS)
+
+/** How often the page re-reads `/api/admin/metrics` while it is the foreground tab. */
+const REFRESH_INTERVAL_MS = 15_000
 
 function formatRate(rate: number | null): string {
   return rate === null ? '—' : `${(rate * 100).toFixed(1)}%`
@@ -183,10 +183,43 @@ export function AdminMetricsPage() {
     }
   }, [])
 
+  /**
+   * Refreshes only while somebody is looking.
+   *
+   * The bare `setInterval` this replaces kept polling a backgrounded tab, so an operator who opened
+   * `/admin/metrics` on Friday and switched away spent the weekend issuing four platform-metrics
+   * queries a minute at nobody. Re-fetching on `visibilitychange` rather than just resuming the timer
+   * matters too: a tab returning to the foreground is showing numbers as old as the time it spent
+   * hidden, and waiting up to fifteen seconds to correct them is how an operator reads a stale count
+   * during an incident.
+   */
   React.useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined
+
+    const stop = () => {
+      if (timer === undefined) return
+      clearInterval(timer)
+      timer = undefined
+    }
+    const start = () => {
+      if (timer === undefined) timer = setInterval(load, REFRESH_INTERVAL_MS)
+    }
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        stop()
+        return
+      }
+      load()
+      start()
+    }
+
     load()
-    const id = setInterval(load, 15000)
-    return () => clearInterval(id)
+    if (!document.hidden) start()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [load])
 
   React.useEffect(() => {
@@ -221,7 +254,7 @@ export function AdminMetricsPage() {
             Metrics
           </h1>
           <p className="text-sm text-bh-text-muted mt-1">
-            In-process counters + DB aggregates. Auto-refreshes every 15s.
+            In-process counters + DB aggregates. Auto-refreshes every 15s while this tab is in view.
           </p>
         </div>
         <Button
@@ -255,13 +288,15 @@ export function AdminMetricsPage() {
           <Database className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Database
         </h2>
+        {/*
+          Three tiles used to sit here — Saved queries, Builders, Notes — reading response fields the
+          API hardcoded to `null`, so they rendered a permanent em-dash. See the route's comment for
+          why they are not being made real instead.
+        */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <MetricCard label="Total users" value={data.db.totalUsers} />
           <MetricCard label="New (24h)" value={data.db.newUsersLast24h} />
           <MetricCard label="New (7d)" value={data.db.newUsersLast7d} />
-          <MetricCard label="Saved queries" value={data.db.totalSavedQueries} />
-          <MetricCard label="Builders" value={data.db.totalBuilders} />
-          <MetricCard label="Notes" value={data.db.totalNotes} />
         </div>
       </section>
 

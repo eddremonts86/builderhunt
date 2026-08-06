@@ -358,3 +358,78 @@ describe('evaluateBillingAlerts', () => {
     expect(clean).toEqual([])
   })
 })
+
+/**
+ * The executable half of the plan's "Measure the current Admin Metrics query and refresh cost".
+ *
+ * These do not assert a duration. A timing budget in a unit suite measures the machine, and it would
+ * pass again the moment somebody made each query faster while leaving the shape — one serial
+ * transaction per organization, plus one query per active credit grant inside it — exactly as it is.
+ * The shape is the cost: it grows with tenant count and with grant count, and nothing about a faster
+ * query changes that.
+ *
+ * They are a baseline, not a prohibition. `/api/admin/billing/metrics` is allowed to be expensive;
+ * it is read on demand by the one console that needs it. What is not allowed is a page putting this
+ * on a timer, which is why `/api/admin/metrics` no longer calls it at all — see the guard in
+ * `tests/unit/routes/api/admin/metrics/index.test.ts`.
+ */
+describe('getBillingOperationsMetrics — cost shape', () => {
+  function organizations(count: number): Array<{ id: string }> {
+    return Array.from({ length: count }, (_, index) => ({ id: `cost-org-${index}` }))
+  }
+
+  it('opens exactly one worker transaction per organization, serially', async () => {
+    mocks.listWorkerOrganizationIds.mockResolvedValue(organizations(7))
+
+    let open = 0
+    let concurrentPeak = 0
+    mocks.withWorkerOrganization.mockImplementation(async (_orgId: string, fn: (tx: unknown) => unknown) => {
+      open += 1
+      concurrentPeak = Math.max(concurrentPeak, open)
+      try {
+        return await fn(fakeWorkerTransaction())
+      } finally {
+        open -= 1
+      }
+    })
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(mocks.withWorkerOrganization).toHaveBeenCalledTimes(7)
+    expect(metrics.organizationsScanned).toBe(7)
+    // Serial, so the endpoint's latency is the sum of every tenant's, not the slowest one's.
+    expect(concurrentPeak).toBe(1)
+  })
+
+  it('issues a further query per active credit grant, so cost grows with grants as well as tenants', async () => {
+    mocks.listWorkerOrganizationIds.mockResolvedValue(organizations(2))
+    mocks.listActiveBillingCreditGrants.mockResolvedValue([
+      { id: 'grant-a', remainingUnits: 0 },
+      { id: 'grant-b', remainingUnits: 0 },
+      { id: 'grant-c', remainingUnits: 0 },
+    ])
+
+    let rawSelects = 0
+    mocks.withWorkerOrganization.mockImplementation((_orgId: string, fn: (tx: unknown) => unknown) => fn({
+      select: () => {
+        rawSelects += 1
+        return { from: () => ({ where: () => whereResult([]) }) }
+      },
+    }))
+
+    await getBillingOperationsMetrics({ platform: db })
+
+    // 4 raw selects per organization (stale reservations, auto-recharge rules, blocked subscription,
+    // checkout attempts) + 1 ledger read per active grant.
+    expect(rawSelects).toBe(2 * (4 + 3))
+  })
+
+  it('scans nothing when there are no organizations — the fixed cost is the platform queries alone', async () => {
+    mocks.listWorkerOrganizationIds.mockResolvedValue([])
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(mocks.withWorkerOrganization).not.toHaveBeenCalled()
+    expect(metrics.organizationsScanned).toBe(0)
+  })
+})

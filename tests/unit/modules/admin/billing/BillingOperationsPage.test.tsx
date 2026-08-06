@@ -271,3 +271,48 @@ describe('BillingOperationsPage', () => {
     expect((testId('billing-export-json') as HTMLAnchorElement).getAttribute('href')).toBe('/api/admin/billing/accounting-export')
   })
 })
+
+/**
+ * The SLO alerts (`evaluateBillingAlerts`) used to be computed into `/api/admin/metrics`'s `billing`
+ * block, which no page has ever rendered — so this product could detect a stuck webhook backlog or a
+ * ledger invariant violation and show it to nobody. They arrive with the metrics now.
+ */
+describe('BillingOperationsPage — SLO alerts', () => {
+  it('renders each alert the server reported, as an alert region', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({
+      ...FULL_METRICS,
+      alerts: ['1 webhook event(s) permanently failed', 'Last reconciliation run was not clean (mismatches_found)'],
+    })
+    await render()
+
+    const banner = testId('billing-operations-alerts')
+    expect(banner).not.toBeNull()
+    expect(banner?.getAttribute('role')).toBe('alert')
+    expect(banner?.textContent).toContain('2 billing alerts')
+    expect(container!.querySelectorAll('[data-testid="billing-operations-alert"]')).toHaveLength(2)
+    expect(banner?.textContent).toContain('permanently failed')
+  })
+
+  it('renders nothing when the list is empty — a standing "0 alerts" panel teaches operators to skip it', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({ ...FULL_METRICS, alerts: [] })
+    await render()
+
+    expect(testId('billing-operations-alerts')).toBeNull()
+  })
+
+  /**
+   * A client on a stale bundle during a deploy gets a response without the field. Absent is not the
+   * same claim as empty, so the page says nothing rather than "all clear".
+   */
+  it('claims nothing when the response carries no alert field at all', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter(FULL_METRICS)
+    await render()
+
+    expect(testId('billing-operations-alerts')).toBeNull()
+    // Still rendered the page it could render.
+    expect(testId('billing-operations-mode')).not.toBeNull()
+  })
+})

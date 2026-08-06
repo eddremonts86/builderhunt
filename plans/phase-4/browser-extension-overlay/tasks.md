@@ -697,8 +697,10 @@ must be under `tests/`.
     `drizzle/0008_tenant_rls.sql:108-118` and a worker SELECT from
     `drizzle/0018_enrichment_worker_target_access.sql:6,11`, and the table is `FORCE ROW LEVEL
     SECURITY`, so even a bare grant would return zero rows rather than an error. The metrics route
-    already documents this outcome by hardcoding `totalSavedQueries: null, totalBuilders: null,
-    totalNotes: null` (`index.ts:39-41`). Adding a cross-tenant platform read of tenant tracking data
+    documented this outcome by hardcoding `totalSavedQueries: null, totalBuilders: null,
+    totalNotes: null`. Those keys were removed on 2026-08-06 and the reasoning moved into a comment on
+    the same route; the constraint is unchanged, only the evidence's location.
+    Adding a cross-tenant platform read of tenant tracking data
     for a growth number is a `security-policy.md` §10 widening that needs an ADR, not a metrics task.
     Instead, add a comment beside the two shipped aggregates naming the deferred third and this
     reason, so the next reader does not re-derive it.

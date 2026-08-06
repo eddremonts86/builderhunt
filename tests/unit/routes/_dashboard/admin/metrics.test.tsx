@@ -32,7 +32,7 @@ function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 500): Respon
 
 const METRICS_RESPONSE = {
   inProcess: { searches: 0, searchCacheHits: 0, apiRequests: 0, apiErrors: 0, signups: 0, signins: 0, uptimeSeconds: 10 },
-  db: { totalUsers: 1, newUsersLast24h: 0, newUsersLast7d: 1, totalSavedQueries: null, totalBuilders: null, totalNotes: null },
+  db: { totalUsers: 1, newUsersLast24h: 0, newUsersLast7d: 1 },
   discovery: null,
   server: { nodeVersion: 'v1', platform: 'darwin', pid: 1, memoryUsage: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0 } },
 }
@@ -230,5 +230,88 @@ describe('AdminMetricsPage — removal operations', () => {
 
     expect(testId('metrics-removal-error')).not.toBeNull()
     expect((testId('metrics-removal-operations-link') as HTMLAnchorElement).textContent).toContain('Check Operations')
+  })
+})
+
+/**
+ * plans/ui-dashboard, Admin track "`/admin/metrics` optimization".
+ *
+ * The refresh used to be an unconditional `setInterval`, so a tab left open in the background kept
+ * querying the platform every fifteen seconds at nobody. These pin both halves of the fix: no timer
+ * while hidden, and an immediate re-read on return rather than up to fifteen seconds of stale
+ * numbers.
+ */
+describe('AdminMetricsPage — refresh only while visible', () => {
+  function setHidden(hidden: boolean): void {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  function metricsFetchCount(): number {
+    return vi.mocked(fetch).mock.calls.filter(([input]) => {
+      const url = String(input)
+      return url.includes('/api/admin/metrics') && !url.includes('/conversion') && !url.includes('/trust')
+    }).length
+  }
+
+  afterEach(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+  })
+
+  it('schedules no refresh timer at all while the tab starts hidden', async () => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+
+    await render()
+
+    // The first read still happens — an operator opening the page in a background tab and switching
+    // to it should find numbers, not a spinner.
+    expect(metricsFetchCount()).toBe(1)
+    expect(setIntervalSpy.mock.calls.filter(([, delay]) => delay === 15_000)).toHaveLength(0)
+    setIntervalSpy.mockRestore()
+  })
+
+  it('clears the timer when the tab is hidden and re-reads immediately when it comes back', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+
+    await render()
+    const scheduled = setIntervalSpy.mock.calls.filter(([, delay]) => delay === 15_000)
+    expect(scheduled).toHaveLength(1)
+    expect(metricsFetchCount()).toBe(1)
+
+    await act(async () => { setHidden(true) })
+    expect(clearIntervalSpy).toHaveBeenCalled()
+
+    await act(async () => { setHidden(false) })
+    // Re-read on return, not on the next tick of a timer that has not fired yet.
+    expect(metricsFetchCount()).toBe(2)
+    expect(setIntervalSpy.mock.calls.filter(([, delay]) => delay === 15_000)).toHaveLength(2)
+
+    setIntervalSpy.mockRestore()
+    clearIntervalSpy.mockRestore()
+  })
+})
+
+/**
+ * Saved queries, Builders and Notes were tiles whose values the API hardcoded to `null`, so they
+ * rendered a permanent em-dash. See `src/routes/api/admin/metrics/index.ts` for why they were removed
+ * rather than made real.
+ */
+describe('AdminMetricsPage — no permanently empty tiles', () => {
+  it('renders no tile for a count the platform cannot compute', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+    await render()
+
+    expect(testId('metric-card-saved-queries')).toBeNull()
+    expect(testId('metric-card-builders')).toBeNull()
+    expect(testId('metric-card-notes')).toBeNull()
+    // The counts that are real are still there.
+    expect(testId('metric-card-total-users')?.textContent).toContain('1')
   })
 })

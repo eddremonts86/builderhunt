@@ -23,6 +23,15 @@ interface BillingOperationsMetrics {
   reconciliation: { lastRun: { windowEnd: string; result: string } | null }
   costMargin: { available: false }
   organizationsScanned: number
+  /**
+   * The critical SLO conditions among the numbers above, decided server-side by
+   * `evaluateBillingAlerts`.
+   *
+   * Optional because it is newer than the endpoint: a client held on a stale bundle during a deploy
+   * would otherwise render `undefined.length`. An absent list is not an empty one, so nothing is
+   * claimed when the field does not arrive — see the banner below.
+   */
+  alerts?: string[]
 }
 
 /**
@@ -460,6 +469,29 @@ export function BillingOperationsPage() {
             <p className="text-xs text-bh-text-dim mb-3" data-testid="billing-operations-loaded-at">
               As of {loadedAt.toLocaleTimeString()} · {metrics.organizationsScanned} organization{metrics.organizationsScanned === 1 ? '' : 's'} scanned
             </p>
+          )}
+
+          {/*
+            Rendered only when there is something to report. A permanent "0 alerts" panel trains an
+            operator to stop reading the top of the page, which is the one place an alert can appear.
+            An absent `alerts` field renders nothing at all rather than "all clear" — see the type.
+          */}
+          {metrics.alerts && metrics.alerts.length > 0 && (
+            <div
+              className="card border-bh-danger/40 bg-bh-danger/5 p-4 mb-6"
+              role="alert"
+              data-testid="billing-operations-alerts"
+            >
+              <h2 className="text-sm font-semibold text-bh-danger flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4" aria-hidden="true" />
+                {metrics.alerts.length} billing alert{metrics.alerts.length === 1 ? '' : 's'}
+              </h2>
+              <ul className="mt-2 space-y-1 text-sm text-bh-text">
+                {metrics.alerts.map((alert) => (
+                  <li key={alert} data-testid="billing-operations-alert">{alert}</li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

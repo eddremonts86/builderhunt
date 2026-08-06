@@ -254,8 +254,15 @@ The current page and `GET /api/admin/metrics` have several correctness and perfo
 4. The API returns billing operations metrics and alerts, but the page contract and UI ignore them.
    Producing those metrics performs a cross-organization sweep with nested billing reads on every
    request; the page polls the entire endpoint every 15 seconds.
+   **Resolved 2026-08-06.** `/api/admin/metrics` no longer calls `getBillingOperationsMetrics`; the
+   alerts moved to `/api/admin/billing/metrics` and render on Billing ops, which is the first time any
+   page has displayed one. The refresh now stops while the tab is hidden.
 5. `totalSavedQueries`, `totalBuilders`, and `totalNotes` are deliberately returned as `null`, creating
    dead metric cards instead of an explicit unavailable/removed state.
+   **Resolved 2026-08-06 by removal, not by an unavailable state.** A tile that can never have a value
+   is not information about availability — the counts need `builderhunt_platform` to read tenant
+   tables unscoped, and two of the three count private workflow content, so there is nothing for a
+   later deploy to fill in.
 6. The API already returns onboarding completion/skips and a 7-day activation rate, but the page
    contract omits and never renders them.
 7. Interview reliability counters exist in `metrics.ts`, but the page contract omits them and their

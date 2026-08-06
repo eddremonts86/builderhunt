@@ -23,6 +23,14 @@ async function callRoute(): Promise<Response> {
   return handler({ request: new Request('https://app.test/api/admin/billing/metrics') })
 }
 
+/**
+ * A clean snapshot — every field `evaluateBillingAlerts` reads, all below threshold.
+ *
+ * The alert fields are present rather than omitted because this route now runs the real
+ * `evaluateBillingAlerts` over whatever the composer returns. A fixture missing `webhookAge` would
+ * make the route throw on a shape the composer never actually produces, which tests the fixture
+ * instead of the route.
+ */
 const SAMPLE_METRICS = {
   liveMode: false,
   configuration: { version: 1, effectiveAt: '2026-01-01T00:00:00.000Z', statementDescriptor: 'BUILDERHUNT', supportEmail: 'support@test.com' },
@@ -34,6 +42,12 @@ const SAMPLE_METRICS = {
   creditInvariants: { staleReservations: 0 },
   reconciliation: { lastRun: null },
   costMargin: { available: false },
+  checkout: { open: 0, complete: 0, expired: 0, canceled: 0 },
+  recovery: { inGrace: 0, blocked: 0 },
+  webhookAge: { oldestPendingMinutes: null },
+  ledgerInvariant: { violations: 0 },
+  autoRecharge: { active: 0, pausedNeedsAuth: 0, pausedFailed: 0 },
+  countryGate: { rejectionsSinceStart: 0 },
   organizationsScanned: 3,
 }
 
@@ -50,7 +64,42 @@ describe('GET /api/admin/billing/metrics', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body).toEqual(SAMPLE_METRICS)
+    expect(body).toEqual({ ...SAMPLE_METRICS, alerts: [] })
+  })
+
+  /**
+   * These alerts used to be computed by `/api/admin/metrics` into a `billing` block that page never
+   * rendered — so no operator has ever seen one. They travel with the metrics they are drawn from
+   * now, on the endpoint the billing operations console actually reads.
+   */
+  it('carries the critical SLO alerts alongside the metrics they are drawn from', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.getBillingOperationsMetrics.mockResolvedValue({
+      ...SAMPLE_METRICS,
+      webhooks: { ...SAMPLE_METRICS.webhooks, failed: 2 },
+      ledgerInvariant: { violations: 1 },
+    })
+
+    const body = await (await callRoute()).json()
+
+    expect(body.alerts).toEqual([
+      '2 webhook event(s) permanently failed',
+      '1 credit ledger invariant violation(s) detected',
+    ])
+  })
+
+  /**
+   * An empty list, not an absent key. The page distinguishes them: absent means "this build did not
+   * tell me", which must render nothing, while empty means "checked, nothing wrong".
+   */
+  it('returns an empty alert list rather than omitting the field when nothing is wrong', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.getBillingOperationsMetrics.mockResolvedValue(SAMPLE_METRICS)
+
+    const body = await (await callRoute()).json()
+
+    expect(body).toHaveProperty('alerts')
+    expect(body.alerts).toEqual([])
   })
 
   it('rejects a non-admin caller before computing any metrics', async () => {

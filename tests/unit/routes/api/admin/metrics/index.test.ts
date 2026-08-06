@@ -69,14 +69,38 @@ beforeEach(() => {
 })
 
 describe('GET /api/admin/metrics', () => {
-  it('includes a billing section with computed alerts for a platform admin', async () => {
+  /**
+   * The regression guard for the cross-organization scan this endpoint used to run on every load.
+   *
+   * Asserted as *absence of the call*, not as response latency. A timing assertion would go green
+   * again the day somebody reintroduces the scan behind a faster query, and the point is not that
+   * the scan was slow — it is that this page never rendered its result. `/api/admin/billing/metrics`
+   * is where it belongs, and the test below proves it still answers there.
+   */
+  it('never runs the cross-organization billing scan — the page does not render it', async () => {
     mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
 
     const response = await callRoute()
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.billing).toMatchObject({ ...SAMPLE_BILLING_METRICS, alerts: ['1 webhook event(s) permanently failed'] })
+    expect(mocks.getBillingOperationsMetrics).not.toHaveBeenCalled()
+    expect(body).not.toHaveProperty('billing')
+  })
+
+  /**
+   * These three were hardcoded `null` in the response literal and rendered as em-dashes. Making them
+   * real would need `builderhunt_platform` to read tenant-private tables unscoped, so they are gone
+   * rather than faked; this pins that they do not quietly come back as nulls.
+   */
+  it('omits the counts it cannot compute rather than returning null placeholders', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+
+    const body = await (await callRoute()).json()
+
+    expect(body.db).not.toHaveProperty('totalSavedQueries')
+    expect(body.db).not.toHaveProperty('totalBuilders')
+    expect(body.db).not.toHaveProperty('totalNotes')
   })
 
   it('includes onboarding activation metrics, computing the 7d rate from completed/newUsersLast7d', async () => {
@@ -103,22 +127,13 @@ describe('GET /api/admin/metrics', () => {
     expect(body.db.activationRate7d).toBeNull()
   })
 
-  it('surfaces no alerts when the billing metrics are fully clean', async () => {
-    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
-    mocks.getBillingOperationsMetrics.mockResolvedValue({ ...SAMPLE_BILLING_METRICS, webhooks: { ...SAMPLE_BILLING_METRICS.webhooks, failed: 0 } })
-
-    const response = await callRoute()
-    const body = await response.json()
-
-    expect(body.billing.alerts).toEqual([])
-  })
-
   it('rejects a non-admin caller before computing any metrics', async () => {
     mocks.requirePlatformAdminPrincipal.mockRejectedValue(new PlatformAdminAuthorizationError('Forbidden', 403))
 
     const response = await callRoute()
 
     expect(response.status).toBe(403)
-    expect(mocks.getBillingOperationsMetrics).not.toHaveBeenCalled()
+    expect(mocks.getPlatformAccountMetrics).not.toHaveBeenCalled()
+    expect(mocks.getDiscoveryState).not.toHaveBeenCalled()
   })
 })

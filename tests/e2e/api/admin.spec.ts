@@ -306,4 +306,29 @@ test.describe('a platform admin', () => {
       expect([401, 403], `admin was refused with ${status}: ${text.slice(0, 120)}`).not.toContain(status)
     })
   }
+
+  /**
+   * plans/ui-dashboard, Admin track "`/admin/metrics` optimization".
+   *
+   * The unit guard for this mocks the composer, which proves the route does not *call* it. This one
+   * crosses the whole boundary against a real database, so it also proves the billing figures are
+   * still reachable — the risk of removing a sweep is not that it stays gone, it is that it stays
+   * gone everywhere.
+   */
+  test('the metrics page endpoint carries no billing sweep, and the billing endpoint carries the alerts', async () => {
+    const metrics = await harness.admin.api!.fetch('/api/admin/metrics')
+    expect(metrics.status()).toBe(200)
+    const metricsBody = await metrics.json()
+    expect(metricsBody).not.toHaveProperty('billing')
+    // Removed rather than nulled — see the route comment on why they are not made real.
+    expect(metricsBody.db).not.toHaveProperty('totalBuilders')
+    expect(metricsBody.db).not.toHaveProperty('totalNotes')
+    expect(metricsBody.db).not.toHaveProperty('totalSavedQueries')
+
+    const billing = await harness.admin.api!.fetch('/api/admin/billing/metrics')
+    expect(billing.status()).toBe(200)
+    const billingBody = await billing.json()
+    expect(Array.isArray(billingBody.alerts), 'alerts must be a list, so empty can mean "checked"').toBe(true)
+    expect(billingBody).toHaveProperty('organizationsScanned')
+  })
 })

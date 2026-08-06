@@ -105,10 +105,43 @@ function isKnownRoute(path, routes) {
   return routes.patterns.some((pattern) => pattern.test(path))
 }
 
+/**
+ * The reverse direction: an Admin page on disk that nothing links to
+ * (plans/ui-dashboard, Admin track "Reconcile stale and future Admin destinations").
+ *
+ * Everything above fails a link with no route. This fails a route with no link — a page reachable
+ * only by someone who already knows its URL. That matters more on `/admin` than anywhere else: the
+ * console has no public entry point, so the navigation registry *is* the discovery mechanism, and a
+ * page missing from it is a page an operator will not find during the incident it was built for.
+ *
+ * `nav-config.ts` already states the rule in a comment — "an admin page nobody can navigate to is a
+ * page nobody…" — next to the one destination that was nearly registered by URL alone. A comment is
+ * not a gate. This passes today; it exists so the next `/admin/*` route cannot ship orphaned.
+ *
+ * Scoped to `/admin` deliberately. Elsewhere a route with no in-app link is often correct: a public
+ * landing page arrives from search, a `/schedule/$invitationId` arrives from an email, and an OAuth
+ * callback is never linked at all. Widening this would mean an allowlist longer than the check.
+ */
+const ADMIN_INDEX = '/admin/'
+
+function findOrphanedAdminRoutes(routes, linkedPaths) {
+  const orphans = []
+  for (const fullPath of routes.exact) {
+    if (!fullPath.startsWith('/admin/') || fullPath === ADMIN_INDEX) continue
+    // `exact` holds both `/admin/users` and `/admin/users/`; judge the canonical form once.
+    if (fullPath.endsWith('/')) continue
+    if (fullPath.includes('$')) continue // parameterised detail routes are opened from their list page
+    if (!linkedPaths.has(fullPath)) orphans.push(fullPath)
+  }
+  return orphans
+}
+
 async function main() {
   const routes = await loadGeneratedRoutes()
   const files = await sourceFiles(sourceRoot)
   const findings = []
+  /** Every path this codebase actually hands to a browser — the input to the orphan check below. */
+  const linkedPaths = new Set()
 
   for (const absolutePath of files) {
     const relativePath = relative(root, absolutePath)
@@ -130,9 +163,15 @@ async function main() {
         }
         if (!isKnownRoute(candidate, routes)) {
           findings.push(`${relativePath}: ${raw} does not match any generated route`)
+          continue
         }
+        linkedPaths.add(candidate)
       }
     }
+  }
+
+  for (const orphan of findOrphanedAdminRoutes(routes, linkedPaths)) {
+    findings.push(`${orphan}: an Admin route nothing navigates to — register it in nav-config.ts or delete the route`)
   }
 
   if (findings.length > 0) {

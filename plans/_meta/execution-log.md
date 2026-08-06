@@ -1524,3 +1524,71 @@ same decisions a second time and worse — a widget hidden by persona default st
 workspace stops being new, which is exactly the bug the data-driven version does not have. The task
 stays partial rather than closed: the mechanism exists and is unused, and a real persona difference
 would belong there.
+
+## 2026-08-06 — `/admin/metrics`: measuring the refresh before rebuilding it
+
+plans/ui-dashboard, Admin track. The plan's next task is a rebuild; its prerequisite is a
+measurement, and the measurement changed what the rebuild should do.
+
+**The page paid for a cross-organization sweep it never rendered.** `getBillingOperationsMetrics`
+walks every organization serially — one worker transaction and nine queries each, plus one more per
+active credit grant — and reads the whole `billing_webhook_events` table twice to count statuses in
+JavaScript. `/api/admin/metrics` called it on every request. `grep -n "billing\|removals\|alerts"`
+over `metrics.tsx` returns nothing: the page has never referenced the field. With an unconditional
+15-second `setInterval`, a tab left open overnight ran the full sweep about 240 times an hour to
+populate a key nothing displayed.
+
+**The alerts were the real find.** `evaluateBillingAlerts` — the SLO conditions
+plans/phase-1/30 §10 asked for — was computed in exactly one place, into that same unrendered block.
+So this product could detect a dead-lettered webhook, a credit ledger invariant violation or a
+non-clean reconciliation run, and show it to nobody. Deleting the block as dead weight would have
+deleted the only place they were computed. They moved to `/api/admin/billing/metrics` instead, where
+the operations console that already fetches those numbers now renders them. Thresholds stay
+server-side: two clients applying their own `> 120` drift, and the one that drifts low is silent
+about a real incident.
+
+**The plan asked for a cached alert summary; there was nothing to cache.** A cache would have
+preserved the efficient delivery of a value no page displayed. Recorded against the task rather than
+silently substituted.
+
+**Measured as shape, not as duration.** A timing budget in a unit suite measures the machine, and it
+would pass again the moment somebody made each query faster while leaving the structure intact — and
+the structure is the cost. The tests assert one transaction per organization at a concurrency peak of
+1, raw selects at `orgs × (4 + grants)`, and that `/api/admin/metrics` does not call the scan at all.
+No `tests/performance/` directory was created: only `tests/unit/**` and `tests/e2e/**` are wired into
+`ci:local`, and a third suite nothing runs is the exact failure this plan keeps warning about.
+
+**Three tiles that never had a value.** `db.totalSavedQueries`, `db.totalBuilders` and `db.totalNotes`
+were hardcoded `null` in the response literal and rendered as permanent em-dashes. They were removed
+rather than implemented: making them real requires giving `builderhunt_platform` unscoped SELECT over
+tenant tables, and two of the three count private workflow content — the surveillance the Admin
+track's own rule forbids. A platform-wide builder count, if wanted, is its own task with its own
+policy migration.
+
+**Refresh pauses when nobody is looking, and catches up when they return.** Re-reading on
+`visibilitychange` rather than only resuming the timer matters: a tab coming back is showing numbers
+as old as the time it spent hidden, and waiting up to fifteen seconds to correct them is how an
+operator reads a stale count during an incident.
+
+## 2026-08-06 — the Admin route registry, gated in the direction nobody was checking
+
+plans/ui-dashboard, Admin track "Reconcile stale and future Admin destinations". The survey found the
+reconciliation already true: all 17 `/admin/*` destinations answer 200 for a platform admin, `/admin`
+resolves to `/admin/metrics`, `nav-config.ts` lists exactly the 16 non-index route files on disk, and
+the retired "Plan requests" destination went away on 2026-08-03 with its tables, routes and review
+queue. Nothing to remove.
+
+**What was missing was a direction.** `check-ui-route-graph.mjs` fails a link pointing at no route.
+Nothing failed a route nothing points at. That asymmetry matters more on `/admin` than anywhere else:
+the console has no public entry point, so the navigation registry *is* how a page is discovered, and
+an unregistered page is one an operator will not find during the incident it exists for. The rule was
+already written down — as a comment in `nav-config.ts`, beside the one destination that was nearly
+registered by URL alone. A comment is not a gate.
+
+**Scoped to `/admin` on purpose.** Elsewhere an unlinked route is usually correct: a landing page
+arrives from search, `/schedule/$invitationId` from an email, an OAuth callback from the provider.
+Widening the check would need an allowlist longer than the check.
+
+**A passing new check proves nothing, so I broke it.** Removing `/admin/abuse` from the link set made
+it name that exact route and exit 1; restoring returned it to green. Worth recording because this is
+a guard that will sit green for months — the only moment its wiring is observable is now.
