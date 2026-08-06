@@ -15,6 +15,7 @@ import { interviewFollowupSuggestionSchema } from '~/shared/lib/interviews'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { findSessionByEvent } from '~/shared/lib/repositories/interviews'
 import { assertJsonRequest, assertSameOrigin, CrossOriginError } from '~/shared/lib/security/same-origin'
+import { interviewIdGuard } from '~/shared/lib/api/interview-id'
 
 /**
  * Contextual follow-up questions (plan:
@@ -61,6 +62,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/suggestions')
       ANY: methodNotAllowed(['GET', 'POST', 'PATCH']),
 
       GET: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           const principal = await requireTenantPrincipal(request)
           const suggestions = await withTenantContext(principal, async (transaction) => {
@@ -92,6 +95,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/suggestions')
       },
 
       POST: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           assertSameOrigin(request)
           if (env.INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED !== 'true') {
@@ -137,6 +142,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/suggestions')
       },
 
       PATCH: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           assertSameOrigin(request)
           assertJsonRequest(request)

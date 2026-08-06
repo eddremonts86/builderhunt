@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useLocation, useNavigate } from '@tanstack/react-router'
+import { useLocation, useNavigate, useRouteContext } from '@tanstack/react-router'
 import { signOut } from '~/shared/lib/auth/client'
 import { BackToTop } from '~/shared/components/BackToTop'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
@@ -28,16 +28,16 @@ import { resolveActiveArea, visibleAreas } from './nav-config'
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useRouteContext({ from: '/_dashboard' })
+  // `isPlatformAdmin` is computed server-side in `beforeLoad` (see
+  // `getAppAuthSession` in auth-session.ts) and surfaced via route context.
+  // The previous version polled `/api/admin/incidents` from a `useEffect` to
+  // decide whether to render the admin nav — every non-admin hit logged a
+  // noisy 403 in the console and on the network panel (saas-review F6).
+  const isAdmin = user.isPlatformAdmin
   const [signingOut, setSigningOut] = React.useState(false)
-  const [isAdmin, setIsAdmin] = React.useState(false)
   const [navOpen, setNavOpen] = React.useState(false)
   const [unreadAlertsCount, setUnreadAlertsCount] = React.useState(0)
-
-  React.useEffect(() => {
-    fetch('/api/admin/incidents', { credentials: 'include' })
-      .then((r) => setIsAdmin(r.ok))
-      .catch(() => setIsAdmin(false))
-  }, [])
 
   React.useEffect(() => {
     // Signing out navigates away while this layout is still mounted, so the

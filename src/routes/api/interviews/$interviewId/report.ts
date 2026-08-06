@@ -19,6 +19,7 @@ import { assertJsonRequest, assertSameOrigin } from '~/shared/lib/security/same-
 // Outside `src/routes` on purpose — see the note in that file. Exporting these from here put the postgres
 // driver in the client bundle and killed every page.
 import { errorResponse, toReportDto } from '~/lib/interviews/report-http'
+import { interviewIdGuard } from '~/shared/lib/api/interview-id'
 
 /**
  * The interview report: read it, generate it, edit it (plan:
@@ -62,6 +63,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
       ANY: methodNotAllowed(['GET', 'POST', 'PATCH']),
 
       GET: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           const principal = await requireTenantPrincipal(request)
           const url = new URL(request.url)
@@ -117,6 +120,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
       },
 
       POST: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           assertSameOrigin(request)
           assertJsonRequest(request)
@@ -190,6 +195,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
       },
 
       PATCH: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           assertSameOrigin(request)
           assertJsonRequest(request)

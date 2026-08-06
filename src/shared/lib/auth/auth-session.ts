@@ -8,15 +8,22 @@ export const getAppAuthSession = createServerFn({ method: 'GET' }).handler(async
     const { getRequestHeaders } = await import('@tanstack/react-start/server')
     const headers = getRequestHeaders()
     const session = await auth.api.getSession({ headers })
+    const userId = session?.user?.id ?? null
+    let isPlatformAdmin = false
+    if (userId) {
+      const adminIds = parseAdminUserIds(process.env.ADMIN_USER_IDS)
+      isPlatformAdmin = adminIds.has(userId)
+    }
     return {
-      userId: session?.user?.id ?? null,
+      userId,
       email: session?.user?.email ?? null,
       name: session?.user?.name ?? null,
       image: session?.user?.image ?? null,
       activeOrganizationId: session?.session?.activeOrganizationId ?? null,
+      isPlatformAdmin,
     }
   } catch {
-    return { userId: null, email: null, name: null, image: null, activeOrganizationId: null }
+    return { userId: null, email: null, name: null, image: null, activeOrganizationId: null, isPlatformAdmin: false }
   }
 })
 
