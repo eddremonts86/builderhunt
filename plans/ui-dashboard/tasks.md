@@ -191,12 +191,20 @@
 ## Wave 5 — Dependency-gated widgets
 
 - [ ] **Integrate Saved-Search Health without fabricated history**
+  - **Blocked, verified 2026-08-06: `plans/phase-4/saved-search-health` is 0 of 22 tasks done.** Not
+    deferred by effort — there is no canonical health endpoint to reconcile against, and the task's own
+    verify line requires reconciling with one. Building the widget first would mean inventing the
+    health model in a dashboard adapter, which is the fabricated history the title forbids.
   - Files: saved-search health dashboard adapter, `SavedSearchHealthWidget.tsx`, contract tests
   - Depends on: `plans/phase-4/saved-search-health`
   - Do: Show current healthy/tune/kill/unmonitored/too-new counts and a bounded issue list with tune/inspect/retire continuations. Do not persist dashboard-owned snapshots or draw a trend.
   - Verify: dashboard totals reconcile with the canonical health endpoint and no trend/time-series UI exists.
 
 - [ ] **Integrate Pipeline Stage Distribution and aging**
+  - **Blocked, verified 2026-08-06: `plans/phase-4/hiring-pipeline-kanban` is 0 of 30 tasks done.**
+    There are no canonical stages, no stage-entry timestamps, and no Kanban to link the filtered view
+    to. Aging in particular cannot be approximated: the task says missing stage-entry timestamps must
+    *suppress* aging, and right now every timestamp is missing.
   - Files: pipeline dashboard adapter, `PipelineSnapshotWidget.tsx`, contract tests
   - Depends on: `plans/phase-4/hiring-pipeline-kanban`
   - Do: Show canonical stage counts and supported aging/stuck indicators with exact values. Use “distribution”; link to the filtered Kanban.
@@ -209,8 +217,20 @@
   - Verify: current-state counts reconcile, unauthorized candidate email is absent, and copy says snapshot/status rather than funnel/conversion.
 
 - [ ] **Add an optional verified-profile-owner summary**
+  - **Not blocked — the dependency shipped, verified 2026-08-06.** `GET /api/builders/$builderId/views`
+    exists, is gated on `isVerifiedBuilderClaimant` (an admin gets no back door), and returns counts
+    only: viewer identities never leave the server, by construction in the SQL. `builder_profile_views`
+    also de-duplicates one viewer per day, so a total is people-per-day rather than page loads. This
+    task was sitting behind a dependency note that is no longer true.
+  - **What the dependency does *not* have is the minimum-cohort floor this task's verify line requires.**
+    `listBuilderProfileViewCounts` returns exact per-day counts with no suppression, so a day with one
+    view is renderable. On `/me`, with a window control and a date axis, one view reads as one view. On
+    a dashboard tile, "1 view" beside an outreach the owner received the same morning invites them to
+    name the viewer. The floor belongs on the widget, and the honest reason is not only privacy: below
+    a handful of views there is no trend to summarise, so the tile should say there is too little to
+    summarise and link to `/me` rather than show a number that is an anecdote.
   - Files: claimed-profile dashboard adapter/widget, `/me` analytics contracts, tests
-  - Depends on: profile analytics in `plans/UI`
+  - Depends on: profile analytics in `plans/UI` — **satisfied**
   - Do: Register an opt-in widget for verified owners with publication state, privacy-safe aggregate views, and Manage profile continuation. Keep full analytics in `/me`.
   - Verify: non-owner/unverified/minimum-cohort cases reveal no analytics or widget eligibility; no viewer identities enter API or DOM.
 
@@ -399,10 +419,31 @@
   - Do: Group booking conflicts, document backlog/failure, transcript reconnect/retry, provider/parse/fallback/refusal, stale schedule/reservation, usage variance, and retention failure into actionable thresholds. Use persisted buckets when available; otherwise label the per-process reset scope.
   - Verify: no candidate/interview IDs or content enter DTO/DOM/logs; each breached threshold links to the correct feature/Operations runbook; unsupported capture is labeled a support signal rather than an error.
 
-- [ ] **Demote Runtime diagnostics and add Data Freshness**
+- [~] **Demote Runtime diagnostics and add Data Freshness**
   - Files: Admin Metrics runtime/freshness components and contracts, tests
   - Do: Move Node/platform/PID/memory/uptime into a collapsed per-instance diagnostic panel. Add a visible freshness matrix for each source, including generated time, last success, stale threshold, unavailable reason, process start/reset, and partial state.
   - Verify: Runtime is not presented as platform health; multiple-instance/reset fixtures are explicit; zero, stale, reset, unavailable, and error remain distinguishable without color.
+  - **Done: the counters now say what they count.** The six in-process tiles had an `sr-only` heading,
+    so a sighted operator saw six bare numbers, and the two facts that qualify them — uptime and pid —
+    were in the "Server" card at the bottom of the page. The section is now headed "This server
+    process, since it started" with a scope line naming the uptime, the pid, and the multi-instance
+    caveat; uptime and pid moved out of the diagnostics card, where they sat beside heap sizes as if
+    they were diagnostics rather than the counters' units.
+  - **The caveat is the part an operator cannot infer.** Behind more than one instance these describe
+    whichever process answered, so the next 15-second refresh can hit a different one and a counter
+    can *fall* with nothing behind it. Zero, quiet and just-restarted were indistinguishable before;
+    "Counting for 39s" separates them without a colour, a badge or a tooltip.
+  - **Uptime is stated, not thresholded.** No "stale" styling: the honest threshold for "these numbers
+    are too young to read" depends on traffic, and inventing one would be the fabrication this plan
+    keeps refusing. The elapsed time is the fact; the operator does the judging.
+  - **Freshness, partially.** `generatedAt` now travels with the response, so the header states when
+    the *server* read the numbers rather than when the page asked — the two diverge under exactly the
+    load where the difference matters. The per-source matrix (last success, stale threshold,
+    unavailable reason, partial state) is **still open**: it needs the per-section split, since with
+    one endpoint there is one success and one failure to report.
+  - **Not collapsed.** The task asks for a collapsed panel; the diagnostics card is four short rows
+    that no longer carry anything the rest of the page depends on. A disclosure widget over eight
+    values would add an interaction to save two centimetres.
 
 - [ ] **Add Admin Metrics accessibility, performance, and regression gates**
   - Files: Admin Metrics component/E2E/accessibility/visual/performance tests, CI configuration

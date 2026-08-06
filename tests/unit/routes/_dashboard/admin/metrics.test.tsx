@@ -31,10 +31,12 @@ function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 500): Respon
 }
 
 const METRICS_RESPONSE = {
-  inProcess: { searches: 0, searchCacheHits: 0, apiRequests: 0, apiErrors: 0, signups: 0, signins: 0, uptimeSeconds: 10 },
+  generatedAt: '2027-01-01T10:30:00.000Z',
+  // 3725s = 1h 2m 5s, so a test can tell a formatted uptime from a raw number of seconds.
+  inProcess: { searches: 0, searchCacheHits: 0, apiRequests: 0, apiErrors: 0, signups: 0, signins: 0, uptimeSeconds: 3725 },
   db: { totalUsers: 1, newUsersLast24h: 0, newUsersLast7d: 1 },
   discovery: null,
-  server: { nodeVersion: 'v1', platform: 'darwin', pid: 1, memoryUsage: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0 } },
+  server: { nodeVersion: 'v1', platform: 'darwin', pid: 4821, memoryUsage: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0 } },
 }
 
 interface TestConversionRate {
@@ -313,5 +315,71 @@ describe('AdminMetricsPage — no permanently empty tiles', () => {
     expect(testId('metric-card-notes')).toBeNull()
     // The counts that are real are still there.
     expect(testId('metric-card-total-users')?.textContent).toContain('1')
+  })
+})
+
+/**
+ * plans/ui-dashboard spec §7 ("restart-scoped semantics") and the Admin track's "Demote Runtime
+ * diagnostics" task.
+ *
+ * The six in-process tiles are counters cumulative since the server process started. Their heading
+ * was `sr-only` and the two facts that qualify them — uptime and pid — were in a card at the bottom
+ * of the page, so a sighted operator saw six bare numbers with no way to tell a quiet hour from a
+ * restart four minutes ago.
+ */
+describe('AdminMetricsPage — process-scoped counters say so', () => {
+  it('states the scope beside the counters, not in a card at the bottom of the page', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+    await render()
+
+    const scope = testId('metrics-inprocess-scope')
+    expect(scope).not.toBeNull()
+    // The formatted uptime, not the raw seconds — 3725s is 1h 2m 5s.
+    expect(scope?.textContent).toContain('1h 2m 5s')
+    expect(scope?.textContent).toContain('4821')
+    // The multi-instance caveat is the part an operator cannot infer: a refresh answered by another
+    // process shows that process's numbers, so a counter can fall with nothing behind it.
+    expect(scope?.textContent).toContain('not a platform total')
+
+    // And the scope sits inside the same section as the tiles it qualifies.
+    expect(testId('metrics-inprocess')?.contains(scope!)).toBe(true)
+  })
+
+  it('gives the section a visible heading rather than a screen-reader-only one', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+    await render()
+
+    const heading = testId('metrics-inprocess')?.querySelector('h2')
+    expect(heading?.className).not.toContain('sr-only')
+    expect(heading?.textContent).toContain('since it started')
+  })
+
+  it('no longer repeats uptime and pid in the runtime card they were moved out of', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+    await render()
+
+    const runtime = testId('metrics-server')
+    expect(runtime?.textContent).toContain('Runtime diagnostics')
+    expect(runtime?.textContent).not.toContain('Uptime')
+    expect(runtime?.textContent).not.toContain('PID')
+    // What it is actually for is still there.
+    expect(runtime?.textContent).toContain('Node')
+  })
+
+  /**
+   * The DB aggregates are computed per request. Without this the page could only say when it asked,
+   * which diverges from when the server answered under exactly the load where it matters.
+   */
+  it('reports when the server read the numbers, not when the page asked', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+    await render()
+
+    const asOf = testId('admin-metrics-generated-at')
+    expect(asOf).not.toBeNull()
+    expect(asOf?.textContent).toContain(new Date(METRICS_RESPONSE.generatedAt).toLocaleTimeString())
   })
 })

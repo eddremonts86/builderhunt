@@ -5,6 +5,8 @@ import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session
 import { Button } from '~/components/ui/button'
 
 interface MetricsResponse {
+  /** ISO timestamp of when the server read these numbers — see the route's comment. */
+  generatedAt: string
   inProcess: {
     searches: number
     searchCacheHits: number
@@ -256,6 +258,9 @@ export function AdminMetricsPage() {
           <p className="text-sm text-bh-text-muted mt-1">
             In-process counters + DB aggregates. Auto-refreshes every 15s while this tab is in view.
           </p>
+          <p className="text-xs text-bh-text-dim mt-1" data-testid="admin-metrics-generated-at">
+            As of {new Date(data.generatedAt).toLocaleTimeString()}
+          </p>
         </div>
         <Button
           type="button"
@@ -273,14 +278,44 @@ export function AdminMetricsPage() {
 
       <RemovalOperationsSection removal={removal} error={removalError} />
 
-      <section className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6" data-testid="metrics-inprocess">
-        <h2 className="sr-only">In-process metrics</h2>
-        <MetricCard label="Searches" value={data.inProcess.searches} />
-        <MetricCard label="Cache hits" value={data.inProcess.searchCacheHits} />
-        <MetricCard label="API requests" value={data.inProcess.apiRequests} />
-        <MetricCard label="API errors" value={data.inProcess.apiErrors} />
-        <MetricCard label="Signups" value={data.inProcess.signups} />
-        <MetricCard label="Signins" value={data.inProcess.signins} />
+      {/*
+        The scope line is not decoration on this section — it is the difference between the numbers
+        meaning something and meaning something else (plans/ui-dashboard spec §7, "restart-scoped
+        semantics"; Admin track "Demote Runtime diagnostics").
+
+        These six come from `metrics.get()`: counters cumulative since *this server process* started.
+        The heading used to be `sr-only`, so a sighted operator saw six bare numbers, and the two
+        facts that qualify them — uptime and pid — sat in a "Server" card at the very bottom of the
+        page. Three ways that misleads, worst last:
+
+          1. After a deploy, "API requests 0" means this process has served none, not that the
+             platform served none.
+          2. There is no way to tell a quiet hour from a restart four minutes ago.
+          3. With more than one instance behind the load balancer, these describe whichever process
+             answered — so the next refresh can hit a different one and a number can *go down* with
+             nothing behind it.
+
+        Uptime and pid moved here from the Server card because here they are qualifiers; there they
+        were diagnostics next to heap sizes.
+      */}
+      <section className="mb-6" data-testid="metrics-inprocess">
+        <h2 className="font-semibold mb-1 flex items-center gap-2">
+          <Cpu className="w-4 h-4 text-bh-accent" aria-hidden="true" />
+          This server process, since it started
+        </h2>
+        <p className="text-xs text-bh-text-dim mb-3" data-testid="metrics-inprocess-scope">
+          Counting for {formatUptime(data.inProcess.uptimeSeconds)} · pid {data.server.pid} · one
+          process, not a platform total — a refresh answered by another instance shows that
+          instance&rsquo;s numbers instead.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <MetricCard label="Searches" value={data.inProcess.searches} />
+          <MetricCard label="Cache hits" value={data.inProcess.searchCacheHits} />
+          <MetricCard label="API requests" value={data.inProcess.apiRequests} />
+          <MetricCard label="API errors" value={data.inProcess.apiErrors} />
+          <MetricCard label="Signups" value={data.inProcess.signups} />
+          <MetricCard label="Signins" value={data.inProcess.signins} />
+        </div>
       </section>
 
       <section className="card p-5 mb-6" data-testid="metrics-db">
@@ -327,16 +362,17 @@ export function AdminMetricsPage() {
         )}
       </section>
 
+      {/*
+        Runtime diagnostics, demoted deliberately: last on the page, and no longer holding the two
+        values the counters above depend on. Node version, platform and heap sizes answer "is this
+        process unhealthy" — a real question, but not one an operator opens this page to ask.
+      */}
       <section className="card p-5" data-testid="metrics-server">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Cpu className="w-4 h-4 text-bh-accent" aria-hidden="true" />
-          Server
+          Runtime diagnostics
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div>
-            <p className="text-bh-text-dim text-xs">Uptime</p>
-            <p className="font-semibold">{formatUptime(data.inProcess.uptimeSeconds)}</p>
-          </div>
           <div>
             <p className="text-bh-text-dim text-xs">Node</p>
             <p className="font-mono text-xs">{data.server.nodeVersion}</p>
@@ -344,10 +380,6 @@ export function AdminMetricsPage() {
           <div>
             <p className="text-bh-text-dim text-xs">Platform</p>
             <p className="font-mono text-xs">{data.server.platform}</p>
-          </div>
-          <div>
-            <p className="text-bh-text-dim text-xs">PID</p>
-            <p className="font-mono text-xs">{data.server.pid}</p>
           </div>
           <div>
             <p className="text-bh-text-dim text-xs">RSS</p>

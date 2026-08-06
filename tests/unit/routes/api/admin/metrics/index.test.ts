@@ -127,6 +127,20 @@ describe('GET /api/admin/metrics', () => {
     expect(body.db.activationRate7d).toBeNull()
   })
 
+  /**
+   * The DB aggregates are computed per request. Without a server-side timestamp the page could only
+   * report when it *asked*, which diverges from when the server answered under exactly the load
+   * where the difference is worth knowing.
+   */
+  it('stamps when the server read the numbers', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+
+    const body = await (await callRoute()).json()
+
+    expect(typeof body.generatedAt).toBe('string')
+    expect(Number.isNaN(Date.parse(body.generatedAt))).toBe(false)
+  })
+
   it('rejects a non-admin caller before computing any metrics', async () => {
     mocks.requirePlatformAdminPrincipal.mockRejectedValue(new PlatformAdminAuthorizationError('Forbidden', 403))
 

@@ -1592,3 +1592,38 @@ Widening the check would need an allowlist longer than the check.
 **A passing new check proves nothing, so I broke it.** Removing `/admin/abuse` from the link set made
 it name that exact route and exit 1; restoring returned it to green. Worth recording because this is
 a guard that will sit green for months — the only moment its wiring is observable is now.
+
+## 2026-08-06 — six numbers that did not say what they counted
+
+plans/ui-dashboard spec §7 and the Admin track's "Demote Runtime diagnostics and add Data Freshness".
+
+`/admin/metrics` opened with six tiles — Searches, Cache hits, API requests, API errors, Signups,
+Signins — under an `sr-only` heading. A sighted operator saw six bare numbers. They come from
+`metrics.get()`: counters cumulative since *this server process* started, and the two facts that
+qualify them, uptime and pid, were in a "Server" card at the very bottom of the page, beside heap
+sizes, as if they were diagnostics rather than the counters' units.
+
+**Three readings it invited, worst last.** After a deploy, "API requests 0" reads as "the platform
+served none" rather than "this process has". A quiet hour and a restart four minutes ago look
+identical. And behind more than one instance the numbers describe whichever process answered — so the
+next fifteen-second refresh can land on a different one and a counter can *fall* with nothing behind
+it. That last one is not something an operator can infer from the page; it is the one that turns a
+metric into a false incident.
+
+The section now reads "This server process, since it started", with a scope line naming the uptime,
+the pid and the caveat. Verified against a dev server that had restarted 39 seconds earlier — exactly
+the case the line exists for, with the counters near zero and the page finally saying why.
+
+**Uptime is stated, not thresholded.** No "stale" badge: the honest cutoff for "too young to read"
+depends on traffic, and picking one would be the fabrication this plan keeps refusing. The elapsed
+time is the fact; the judging is the operator's.
+
+**Freshness is half-done and marked as such.** `generatedAt` travels with the response, so the header
+says when the *server* read the numbers rather than when the page asked — they diverge under exactly
+the load where it matters. The per-source matrix the task also asks for needs the per-section split
+first: with one endpoint there is one success and one failure to report, and a matrix of one row is a
+sentence.
+
+**Declined: the collapsed diagnostics panel.** The task asks for one. What is left in that card is
+four short rows that nothing else on the page depends on; a disclosure widget over eight values adds
+an interaction to save two centimetres.

@@ -97,6 +97,15 @@ export const Route = createFileRoute('/api/admin/metrics/')({
             : null
 
           return Response.json({
+            /**
+             * When these numbers were read.
+             *
+             * The DB aggregates are computed per request, so without this the page can only say when
+             * it *asked*, which diverges from when the server answered under exactly the load where
+             * the difference matters. The billing operations console already states its own "As of";
+             * this is the same claim for this page.
+             */
+            generatedAt: now.toISOString(),
             inProcess,
             db: {
               ...accountMetrics,
