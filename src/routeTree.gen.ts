@@ -99,6 +99,7 @@ import { Route as ApiExportBuildersRouteImport } from './routes/api/export/build
 import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
 import { Route as ApiE2eBillingProviderRouteImport } from './routes/api/e2e/billing-provider'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
+import { Route as ApiDashboardPreferencesRouteImport } from './routes/api/dashboard/preferences'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiCalendarNotificationsRouteImport } from './routes/api/calendar/notifications'
@@ -746,6 +747,11 @@ const ApiE2eBillingProviderRoute = ApiE2eBillingProviderRouteImport.update({
 const ApiDashboardStatsRoute = ApiDashboardStatsRouteImport.update({
   id: '/api/dashboard/stats',
   path: '/api/dashboard/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardPreferencesRoute = ApiDashboardPreferencesRouteImport.update({
+  id: '/api/dashboard/preferences',
+  path: '/api/dashboard/preferences',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
@@ -1906,6 +1912,7 @@ export interface FileRoutesByFullPath {
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/e2e/billing-provider': typeof ApiE2eBillingProviderRoute
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
@@ -2187,6 +2194,7 @@ export interface FileRoutesByTo {
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/e2e/billing-provider': typeof ApiE2eBillingProviderRoute
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
@@ -2473,6 +2481,7 @@ export interface FileRoutesById {
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/e2e/billing-provider': typeof ApiE2eBillingProviderRoute
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
@@ -2758,6 +2767,7 @@ export interface FileRouteTypes {
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/overview'
+    | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
     | '/api/e2e/billing-provider'
     | '/api/e2e/outbox'
@@ -3039,6 +3049,7 @@ export interface FileRouteTypes {
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/overview'
+    | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
     | '/api/e2e/billing-provider'
     | '/api/e2e/outbox'
@@ -3324,6 +3335,7 @@ export interface FileRouteTypes {
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/overview'
+    | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
     | '/api/e2e/billing-provider'
     | '/api/e2e/outbox'
@@ -3563,6 +3575,7 @@ export interface RootRouteChildren {
   ApiCalendarNotificationsRoute: typeof ApiCalendarNotificationsRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
+  ApiDashboardPreferencesRoute: typeof ApiDashboardPreferencesRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
   ApiE2eBillingProviderRoute: typeof ApiE2eBillingProviderRoute
   ApiE2eOutboxRoute: typeof ApiE2eOutboxRoute
@@ -4347,6 +4360,13 @@ declare module '@tanstack/react-router' {
       path: '/api/dashboard/stats'
       fullPath: '/api/dashboard/stats'
       preLoaderRoute: typeof ApiDashboardStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/preferences': {
+      id: '/api/dashboard/preferences'
+      path: '/api/dashboard/preferences'
+      fullPath: '/api/dashboard/preferences'
+      preLoaderRoute: typeof ApiDashboardPreferencesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/dashboard/overview': {
@@ -6194,6 +6214,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCalendarNotificationsRoute: ApiCalendarNotificationsRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
+  ApiDashboardPreferencesRoute: ApiDashboardPreferencesRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
   ApiE2eBillingProviderRoute: ApiE2eBillingProviderRoute,
   ApiE2eOutboxRoute: ApiE2eOutboxRoute,

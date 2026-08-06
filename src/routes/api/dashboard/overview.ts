@@ -10,6 +10,8 @@ import { canReadBillingSummary } from '~/shared/lib/billing/permissions'
 // reduced version of it.
 import { getOrganizationBillingSummary } from '~/shared/lib/billing/contracts'
 import {
+  getDashboardAlertVolume,
+  getDashboardDiscoveryTrend,
   getDashboardRecency,
   getDashboardSourceCoverage,
   getDashboardSummary,
@@ -28,6 +30,10 @@ import { getOnboardingStatus } from '~/shared/lib/onboarding'
 import { listOrganizationTriggers } from '~/shared/lib/repositories/organization-alerts'
 import { listSprints } from '~/lib/sprints/service'
 import { listUpcomingAppointments } from '~/shared/lib/repositories/dashboard-upcoming'
+import { listReviewCandidates, listShortlistSummaries } from '~/shared/lib/repositories/dashboard-review'
+import { getInvitationDistribution } from '~/shared/lib/repositories/dashboard-invitations'
+import { listActivity } from '~/shared/lib/repositories/activity'
+import { resolveActorDisplayNames } from '~/shared/lib/auth/organization-lifecycle'
 import { listInvitationsForEmail } from '~/shared/lib/organizations/contracts'
 import { auth } from '~/shared/lib/auth/better-auth'
 
@@ -205,7 +211,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
           const now = new Date()
           const generatedAt = now.toISOString()
 
-          const [summary, recency, sourceCoverage] = await withTenantContext(principal, async (transaction) => Promise.all([
+          const [summary, recency, sourceCoverage, discoveryTrend, alertVolume] = await withTenantContext(principal, async (transaction) => Promise.all([
             section('summary', generatedAt,
               () => getDashboardSummary(transaction, principal.organizationId, now, range),
               // A workspace with nothing tracked and nothing saved has an empty summary, not a zeroed
@@ -217,6 +223,12 @@ export const Route = createFileRoute('/api/dashboard/overview')({
             section('sourceCoverage', generatedAt,
               () => getDashboardSourceCoverage(transaction, principal.organizationId),
               (value) => value.sources.length === 0),
+            section('discoveryTrend', generatedAt,
+              () => getDashboardDiscoveryTrend(transaction, principal.organizationId, now, range),
+              (value) => value.buckets.every((bucket) => bucket.count === 0)),
+            section('alertVolume', generatedAt,
+              () => getDashboardAlertVolume(transaction, principal.organizationId, now, range),
+              (value) => value.buckets.every((bucket) => bucket.count === 0)),
           ]))
 
           const usage = await section<DashboardUsage>('usage', generatedAt, async () => {
@@ -285,6 +297,34 @@ export const Route = createFileRoute('/api/dashboard/overview')({
                 meetingUrl: isSafeMeetingUrl(item.meetingUrl) ? item.meetingUrl : null,
                 hasActiveBrief: item.hasActiveBrief,
                 invitationId: item.invitationId,
+              })),
+            }
+          }, (value) => value.items.length === 0)
+
+          /*
+           * Candidates to review. Its own section for the same reason as the agenda: it reads a
+           * different subsystem, and a broken join in alerts or sprints must not take the counts
+           * with it.
+           *
+           * Deliberately does *not* include live recommendations — `GET /api/recommendations`
+           * re-runs the saved queries through the federated search pipeline, and folding that into a
+           * projection read on every dashboard load would put thirteen connectors behind every page
+           * view. See the note in `dashboard-review.ts`.
+           */
+          const review = await section('review', generatedAt, async () => {
+            const items = await withTenantContext(principal, (transaction) =>
+              listReviewCandidates(transaction, principal.organizationId, DASHBOARD_ROW_LIMITS.review))
+            return {
+              items: items.map((item) => ({
+                key: item.key,
+                source: item.source,
+                username: item.username,
+                displayName: item.displayName,
+                provenance: item.provenance,
+                reason: item.reason,
+                score: item.score,
+                tracked: item.tracked,
+                organizationBuilderId: item.organizationBuilderId,
               })),
             }
           }, (value) => value.items.length === 0)
@@ -372,6 +412,71 @@ export const Route = createFileRoute('/api/dashboard/overview')({
             }
           }, (value) => value.items.length === 0)
 
+          /*
+           * Shortlists the caller may see: their own, plus anything shared with the organization.
+           * Scoped by `principal.userId` as well as the tenant, because a colleague's *private*
+           * shortlist is a list of people they are considering and does not belong on someone else's
+           * dashboard.
+           */
+          const shortlists = await section('shortlists', generatedAt, async () => {
+            const items = await withTenantContext(principal, (transaction) =>
+              listShortlistSummaries(
+                transaction,
+                principal.organizationId,
+                principal.userId,
+                DASHBOARD_ROW_LIMITS.shortlists,
+              ))
+            return {
+              items: items.map((item) => ({
+                id: item.id,
+                name: item.name,
+                visibility: item.visibility === 'organization' ? 'organization' as const : 'private' as const,
+                itemCount: item.itemCount,
+                updatedAt: item.updatedAt.toISOString(),
+              })),
+            }
+          }, (value) => value.items.length === 0)
+
+          /*
+           * Invitations the caller sent. Owner-scoped by `principal.userId`, not by organization: an
+           * invitation names a candidate a specific person is interviewing, and a colleague's belong
+           * on a colleague's dashboard.
+           */
+          const invitations = await section('invitations', generatedAt, async () => {
+            return withTenantContext(principal, (transaction) =>
+              getInvitationDistribution(transaction, principal.organizationId, principal.userId))
+          }, (value) => value.total === 0)
+
+          /*
+           * Recent team activity, bounded to five. Not paginated and not counted: the plan is
+           * explicit that event volume must not be framed as employee performance, and the cheapest
+           * way to honour that is to send nothing anyone could chart. The full log is `/team/activity`.
+           *
+           * `listActivity` already formats each line and resolves its target link against the real
+           * row, so a deleted target arrives as plain text rather than as a link to a 404. The actor
+           * name is resolved separately because `auth_users` is auth-broker-owned and the tenant
+           * repository has no grant on it — the same two-step the activity route does.
+           */
+          const activity = await section('activity', generatedAt, async () => {
+            const result = await withTenantContext(principal, (transaction) =>
+              listActivity(transaction, principal, { limit: DASHBOARD_ROW_LIMITS.activity }))
+            const actorIds = result.rows
+              .map((row) => row.actorUserId)
+              .filter((id): id is string => id !== null)
+            const namesByUserId = await resolveActorDisplayNames(principal.organizationId, actorIds)
+            return {
+              items: result.rows.map((row) => ({
+                id: row.id,
+                display: row.display,
+                // `null` means "unknown or no longer a member", which the UI renders as
+                // *Former member* — never a blank and never a raw user id.
+                actorDisplayName: row.actorUserId ? namesByUserId.get(row.actorUserId) ?? null : null,
+                occurredAt: row.occurredAt,
+                targetHref: row.targetHref,
+              })),
+            }
+          }, (value) => value.items.length === 0)
+
           const payload: DashboardOverview = {
             schemaVersion: DASHBOARD_SCHEMA_VERSION,
             organizationId: principal.organizationId,
@@ -383,6 +488,12 @@ export const Route = createFileRoute('/api/dashboard/overview')({
               actionQueue,
               sourceCoverage,
               upcoming,
+              review,
+              shortlists,
+              invitations,
+              activity,
+              discoveryTrend,
+              alertVolume,
               ...(roleClass === 'billing-reader' ? { usage } : {}),
             },
           }

@@ -447,6 +447,47 @@ export const builderSourceSnapshots = pgTable(
 // builder the organization has not tracked.
 // ---------------------------------------------------------------------------
 
+/**
+ * Dashboard layout preferences, per (organization, user).
+ *
+ * plans/ui-dashboard Wave 6, and structural problem 10: density was stored only in local storage and
+ * scoped to nothing. Local storage is per *browser*, so one person got a different dashboard on their
+ * laptop and their phone; and keyed by nothing, so switching organizations carried one workspace's
+ * layout into another — someone who hid Billing in their personal workspace found it hidden in the
+ * team's.
+ *
+ * The primary key is the pair: a preference belongs to a person *in a workspace*.
+ *
+ * RLS and grants are added by `drizzle/0152_dashboard_preferences_grants.sql`, not here — drizzle-kit
+ * does not emit policies, and a table that lost its RLS on a regenerate is a cross-tenant read.
+ */
+export const dashboardPreferences = pgTable(
+  'dashboard_preferences',
+  {
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    /** `bento` (each widget at its declared width) or `sections` (all full width). */
+    density: text('density').notNull().default('bento'),
+    /**
+     * Widget ids the user hid. Ids only, never component references.
+     *
+     * `criticality: 'critical'` widgets ignore this entirely (`orderedWidgets`): a payment failure is
+     * not a preference. An id that no longer exists is dropped silently on read — a preference
+     * outliving its widget is expected, not exceptional.
+     */
+    hiddenWidgetIds: jsonb('hidden_widget_ids').$type<string[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ name: 'dashboard_preferences_pkey', columns: [table.organizationId, table.userId] }),
+    check('dashboard_preferences_density_check', sql`${table.density} in ('bento', 'sections')`),
+    // A jsonb column typed `string[]` in TypeScript can still hold an object. This is what makes the
+    // read side's `Array.isArray` a formality rather than a guard.
+    check('dashboard_preferences_hidden_is_array_check', sql`jsonb_typeof(${table.hiddenWidgetIds}) = 'array'`),
+  ],
+)
+
 export const builderLists = pgTable(
   'builder_lists',
   {

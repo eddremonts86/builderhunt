@@ -114,6 +114,13 @@ const classifications: Classification[] = [
   tenant('feed_capabilities', 'organization_id + query_id (capability_hash is the only bearer secret, never the id)', ['shared-resources'], { organizationColumn: true }),
   tenant('organization_activity', 'organization_id + actor_user_id (append-only event log)', ['activity-feed'], { organizationColumn: true }),
 
+  // `dashboard_preferences` is tenant-private and keyed on the (organization, user) pair rather than
+  // on either alone: a layout belongs to a person *in a workspace*, which is the whole reason it
+  // moved off a browser-wide `localStorage` key. It holds no subject data at all — a density string
+  // and a list of widget ids — so its retention is the membership's, and deleting either the
+  // organization or the user cascades it away.
+  tenant('dashboard_preferences', 'organization_id + user_id (composite primary key)', ['ui-dashboard'], { organizationColumn: true }),
+
   // Status subscribers (plan 47-status-and-trust, Phase 2). System-operational, no owning subject —
   // same anti-enumeration shape as `feed_capabilities`: the row is keyed by the SHA-256 of a random
   // unsubscribe token, the raw token only ever appears once, in the unsubscribe URL.

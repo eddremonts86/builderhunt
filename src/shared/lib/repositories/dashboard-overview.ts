@@ -1,6 +1,6 @@
 import { and, count, eq, gte, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
-import { builderIdentities, organizationBuilders, savedQueries } from '../db/schema'
+import { alertTriggers, builderIdentities, organizationBuilders, savedQueries } from '../db/schema'
 import type {
   DashboardRange,
   DashboardRecency,
@@ -113,10 +113,26 @@ export async function getDashboardRecency(
     ))
     .groupBy(sql`date_trunc('day', ${builderIdentities.lastSeenAt} at time zone 'UTC')`)
 
+  return { buckets: fillDays(rows, now, days), timezone: 'UTC' }
+}
+
+/**
+ * Turns grouped rows into one bucket per day of the window, zeros included.
+ *
+ * Shared by all three day-bucketed charts so they cannot disagree about the boundary rule. Empty days
+ * are filled here rather than in the client: a chart that omits them silently compresses a quiet week
+ * into a busy-looking one.
+ *
+ * `Date.UTC` arithmetic, not `setDate`, which mutates in local time — west of UTC that produces the
+ * same ISO key twice and drops another day entirely.
+ */
+function fillDays(
+  rows: ReadonlyArray<{ day: string; value: number }>,
+  now: Date,
+  days: number,
+): Array<{ date: string; count: number }> {
   const counts = new Map(rows.map((row) => [row.day, Number(row.value)]))
-  const buckets = Array.from({ length: days }, (_, index) => {
-    // `Date.UTC` arithmetic, not `setDate`, which mutates in local time — west of UTC that produces
-    // the same ISO key twice and drops another day entirely.
+  return Array.from({ length: days }, (_, index) => {
     const date = new Date(Date.UTC(
       now.getUTCFullYear(),
       now.getUTCMonth(),
@@ -125,8 +141,70 @@ export async function getDashboardRecency(
     const key = date.toISOString().slice(0, 10)
     return { date: key, count: counts.get(key) ?? 0 }
   })
+}
 
-  return { buckets, timezone: 'UTC' }
+/**
+ * Builders this workspace started tracking, by UTC day.
+ *
+ * The counterpart to `getDashboardRecency`, and the two answer genuinely different questions that a
+ * reader will confuse if either is mislabelled: recency buckets *everyone tracked* by when a source
+ * last saw them, so its bars sum to the tracked roster; this buckets *new arrivals* by when this
+ * workspace added them, so its bars sum to `newlyTrackedInRange`. One is a distribution, the other
+ * is a rate.
+ *
+ * No quality or conversion is implied and the copy must not imply one: `organization_builders` records
+ * that somebody pressed Track, not that a hire followed.
+ */
+export async function getDashboardDiscoveryTrend(
+  transaction: TenantTransaction,
+  organizationId: string,
+  now: Date,
+  range: DashboardRange,
+): Promise<DashboardRecency> {
+  const days = Math.min(RANGE_DAYS[range], DASHBOARD_ROW_LIMITS.recencyBuckets)
+  const since = rangeStart(now, range)
+
+  const rows = await transaction.select({
+    day: sql<string>`to_char(date_trunc('day', ${organizationBuilders.createdAt} at time zone 'UTC'), 'YYYY-MM-DD')`,
+    value: sql<number>`count(*)::int`,
+  }).from(organizationBuilders)
+    .where(and(
+      eq(organizationBuilders.organizationId, organizationId),
+      gte(organizationBuilders.createdAt, since),
+    ))
+    .groupBy(sql`date_trunc('day', ${organizationBuilders.createdAt} at time zone 'UTC')`)
+
+  return { buckets: fillDays(rows, now, days), timezone: 'UTC' }
+}
+
+/**
+ * Alert triggers by UTC day.
+ *
+ * Counted from `matched_at`, never filtered by `read_at`: **acknowledging a trigger does not unmake
+ * it.** A volume chart that shrank as someone worked through their inbox would answer "what have I
+ * not read" while looking like it answers "how much fired", and the two diverge exactly when the
+ * chart matters.
+ */
+export async function getDashboardAlertVolume(
+  transaction: TenantTransaction,
+  organizationId: string,
+  now: Date,
+  range: DashboardRange,
+): Promise<DashboardRecency> {
+  const days = Math.min(RANGE_DAYS[range], DASHBOARD_ROW_LIMITS.recencyBuckets)
+  const since = rangeStart(now, range)
+
+  const rows = await transaction.select({
+    day: sql<string>`to_char(date_trunc('day', ${alertTriggers.matchedAt} at time zone 'UTC'), 'YYYY-MM-DD')`,
+    value: sql<number>`count(*)::int`,
+  }).from(alertTriggers)
+    .where(and(
+      eq(alertTriggers.organizationId, organizationId),
+      gte(alertTriggers.matchedAt, since),
+    ))
+    .groupBy(sql`date_trunc('day', ${alertTriggers.matchedAt} at time zone 'UTC')`)
+
+  return { buckets: fillDays(rows, now, days), timezone: 'UTC' }
 }
 
 /**

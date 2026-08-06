@@ -133,6 +133,11 @@ export const DASHBOARD_ROW_LIMITS = {
   recencyBuckets: 31,
   /** A week's agenda, bounded. Past six rows the widget is a calendar and should link to one. */
   upcoming: 6,
+  /** A review queue nobody finishes is not a queue. Six is a sitting, not a backlog. */
+  review: 6,
+  shortlists: 5,
+  /** Recent, not paginated. The full log lives on `/team/activity`. */
+  activity: 5,
 } as const
 
 // ── Sections ──────────────────────────────────────────────────────────────────────────────────
@@ -228,6 +233,90 @@ export const dashboardUpcomingItemSchema = z.object({
 })
 export type DashboardUpcomingItem = z.infer<typeof dashboardUpcomingItemSchema>
 
+/** Where a review candidate came from. Rendered as the row's reason, never inferred by the client. */
+export const DASHBOARD_REVIEW_PROVENANCE = ['alert-match', 'sprint-result'] as const
+
+export const dashboardReviewItemSchema = z.object({
+  /** `<source>:<sourceId>`. The identity the projection deduplicated on, and the React key. */
+  key: z.string().min(1).max(128),
+  source: z.string().min(1).max(32),
+  username: z.string().min(1).max(120),
+  displayName: z.string().max(200).nullable(),
+  provenance: z.enum(DASHBOARD_REVIEW_PROVENANCE),
+  /** Already-resolved text. A row that cannot say why it is here does not belong in a review queue. */
+  reason: z.string().min(1).max(160),
+  score: z.number().int().nullable(),
+  tracked: z.boolean(),
+  /**
+   * Present only when tracked. It is what decides the continuation: a tracked person opens in the
+   * internal builder workspace, an untracked one has no internal page to open yet.
+   */
+  organizationBuilderId: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/).nullable(),
+})
+export type DashboardReviewItem = z.infer<typeof dashboardReviewItemSchema>
+
+export const dashboardShortlistSchema = z.object({
+  id: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
+  name: z.string().min(1).max(120),
+  /**
+   * `private` or `organization`. Rendered as a badge, because a shortlist is a list of people
+   * someone is considering and whether a colleague can see it is the first thing its owner needs to
+   * know at a glance.
+   */
+  visibility: z.enum(['private', 'organization']),
+  itemCount: z.number().int().nonnegative(),
+  updatedAt: z.iso.datetime(),
+})
+export type DashboardShortlist = z.infer<typeof dashboardShortlistSchema>
+
+/**
+ * Interview invitations by state.
+ *
+ * A distribution, not a funnel. The seven states are the table's own CHECK list and they are not a
+ * pipeline: `expired` and `revoked` are terminal, `declined` is an answer rather than a failure, and
+ * an invitation can reach `booked` without ever being recorded as `opened`. Sending percentages
+ * would invite a conversion rate computed from a denominator that does not mean what it looks like.
+ */
+export const dashboardInvitationDistributionSchema = z.object({
+  /** Every status, always, including the zeros — an omitted category changes the shape's meaning. */
+  counts: z.array(z.object({
+    status: z.enum(['draft', 'sent', 'opened', 'booked', 'declined', 'expired', 'revoked']),
+    count: z.number().int().nonnegative(),
+  })).length(7),
+  /** `declined` + `expired`: the two waiting on the organizer rather than on the candidate. */
+  needsAction: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+})
+export type DashboardInvitationDistribution = z.infer<typeof dashboardInvitationDistributionSchema>
+
+/**
+ * One line of team activity.
+ *
+ * The server sends **resolved text**, not a template plus ids for the client to interpolate. Two
+ * reasons: the formatting rules already live server-side in `ACTIVITY_EVENTS`, so a second copy in
+ * the browser is a second thing to keep in step with every new event type; and `metadata` carries
+ * ids and free text that have no business crossing the wire when the sentence is all a reader needs.
+ *
+ * `actorDisplayName` is nullable and that is meaningful: `null` is "unknown or no longer a member",
+ * which the UI renders as *Former member* rather than as a blank or a raw user id.
+ *
+ * There is no count and no rate. The plan is explicit that event volume must not be framed as
+ * employee performance, and the cheapest way to honour that is to send nothing anyone could chart.
+ */
+export const dashboardActivityItemSchema = z.object({
+  id: z.string().min(1).max(64),
+  /** Already-formatted, already-redacted. */
+  display: z.string().min(1).max(200),
+  actorDisplayName: z.string().max(120).nullable(),
+  occurredAt: z.iso.datetime(),
+  /**
+   * A same-origin path this app owns, or null. Resolved server-side against the real row, so a
+   * deleted or inaccessible target arrives as plain text rather than as a link to a 404.
+   */
+  targetHref: z.string().max(200).regex(/^\/[A-Za-z0-9/_\-?=&.]*$/).nullable(),
+})
+export type DashboardActivityItem = z.infer<typeof dashboardActivityItemSchema>
+
 /**
  * The role-minimized usage view.
  *
@@ -274,6 +363,25 @@ export const dashboardOverviewSchema = z.object({
     upcoming: sectionEnvelope(
       z.object({ items: z.array(dashboardUpcomingItemSchema).max(DASHBOARD_ROW_LIMITS.upcoming) }),
     ),
+    review: sectionEnvelope(
+      z.object({ items: z.array(dashboardReviewItemSchema).max(DASHBOARD_ROW_LIMITS.review) }),
+    ),
+    /*
+     * Both reuse `dashboardRecencySchema` — the same `{ buckets, timezone }` shape — because they are
+     * the same *kind* of thing rendered by the same primitive. What differs is entirely in the copy,
+     * and the copy is the part that has to be right: recency is a distribution over the roster,
+     * discovery is a rate of arrivals, and alert volume counts events. Three charts, one wire shape,
+     * three sentences that must not be swapped.
+     */
+    shortlists: sectionEnvelope(
+      z.object({ items: z.array(dashboardShortlistSchema).max(DASHBOARD_ROW_LIMITS.shortlists) }),
+    ),
+    invitations: sectionEnvelope(dashboardInvitationDistributionSchema),
+    activity: sectionEnvelope(
+      z.object({ items: z.array(dashboardActivityItemSchema).max(DASHBOARD_ROW_LIMITS.activity) }),
+    ),
+    discoveryTrend: sectionEnvelope(dashboardRecencySchema),
+    alertVolume: sectionEnvelope(dashboardRecencySchema),
     // Absent entirely for a role that may not see it — see the note on `forbidden` above.
     usage: sectionEnvelope(dashboardUsageSchema).optional(),
   }),

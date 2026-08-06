@@ -41,6 +41,12 @@ function overview(overrides: Record<string, unknown> = {}) {
       actionQueue: { status: 'empty', generatedAt: GENERATED_AT },
       sourceCoverage: { status: 'unavailable', code: 'section_failed' },
       upcoming: { status: 'empty', generatedAt: GENERATED_AT },
+      review: { status: 'empty', generatedAt: GENERATED_AT },
+      shortlists: { status: 'empty', generatedAt: GENERATED_AT },
+      invitations: { status: 'empty', generatedAt: GENERATED_AT },
+      activity: { status: 'empty', generatedAt: GENERATED_AT },
+      discoveryTrend: { status: 'empty', generatedAt: GENERATED_AT },
+      alertVolume: { status: 'empty', generatedAt: GENERATED_AT },
     },
     ...overrides,
   }
@@ -274,5 +280,118 @@ describe('the upcoming agenda', () => {
       eventId: `evt-${index}`,
     }))
     expect(withUpcoming(many).ok).toBe(false)
+  })
+})
+
+describe('candidates to review', () => {
+  /**
+   * plans/ui-dashboard Wave 4. Two fields carry the widget's whole claim to trustworthiness — the
+   * provenance and the reason — so both are required and the provenance is a closed enum. A row that
+   * cannot say why it is in a review queue is asking for trust it has not earned.
+   */
+  const item = {
+    key: 'github:12345',
+    source: 'github',
+    username: 'octocat',
+    displayName: 'The Octocat',
+    provenance: 'sprint-result',
+    reason: 'Found by your "Rust backend" sprint',
+    score: 87,
+    tracked: false,
+    organizationBuilderId: null,
+  }
+
+  function withReview(items: unknown[]) {
+    const base = overview()
+    return parseDashboardOverview({
+      ...base,
+      sections: { ...base.sections, review: { status: 'ready', generatedAt: GENERATED_AT, data: { items } } },
+    })
+  }
+
+  it('accepts a well-formed candidate', () => {
+    expect(withReview([item]).ok).toBe(true)
+  })
+
+  it('refuses an unknown provenance', () => {
+    // The client picks an icon and a continuation from this value; an unrecognised one would render
+    // as neither, which is worse than refusing the payload.
+    expect(withReview([{ ...item, provenance: 'vibes' }]).ok).toBe(false)
+  })
+
+  it('refuses a row with no reason', () => {
+    expect(withReview([{ ...item, reason: '' }]).ok).toBe(false)
+  })
+
+  it('refuses an organizationBuilderId shaped like a path', () => {
+    // It is interpolated into a route param. The pattern is what keeps that safe by construction.
+    expect(withReview([{ ...item, tracked: true, organizationBuilderId: '../../admin' }]).ok).toBe(false)
+  })
+
+  it('refuses more rows than a sitting', () => {
+    const many = Array.from({ length: DASHBOARD_ROW_LIMITS.review + 1 }, (_, index) => ({
+      ...item,
+      key: `github:${index}`,
+    }))
+    expect(withReview(many).ok).toBe(false)
+  })
+})
+
+describe('invitation distribution', () => {
+  /**
+   * plans/ui-dashboard Wave 5. The shape enforces the design decision: it is a distribution, not a
+   * funnel, so every state is always present and no percentage is transmitted. A client that wanted
+   * a conversion rate would have to invent the denominator, and inventing it is the mistake — an
+   * invitation reaches `booked` without necessarily passing through `opened`.
+   */
+  const counts = [
+    { status: 'draft', count: 1 },
+    { status: 'sent', count: 4 },
+    { status: 'opened', count: 2 },
+    { status: 'booked', count: 1 },
+    { status: 'declined', count: 1 },
+    { status: 'expired', count: 0 },
+    { status: 'revoked', count: 0 },
+  ]
+
+  function withInvitations(data: unknown) {
+    const base = overview()
+    return parseDashboardOverview({
+      ...base,
+      sections: { ...base.sections, invitations: { status: 'ready', generatedAt: GENERATED_AT, data } },
+    })
+  }
+
+  it('accepts a full distribution', () => {
+    expect(withInvitations({ counts, needsAction: 1, total: 9 }).ok).toBe(true)
+  })
+
+  it('refuses a distribution missing a state', () => {
+    // Omitting the empty ones would change the shape's meaning between two workspaces, and a reader
+    // comparing them learns something false.
+    expect(withInvitations({ counts: counts.slice(0, 6), needsAction: 1, total: 9 }).ok).toBe(false)
+  })
+
+  it('refuses a state that is not one the table can hold', () => {
+    const invented = [...counts.slice(0, 6), { status: 'ghosted', count: 0 }]
+    expect(withInvitations({ counts: invented, needsAction: 0, total: 9 }).ok).toBe(false)
+  })
+
+  it('carries no percentages', () => {
+    // Structural, not stylistic: a rate computed from these states would use a denominator that does
+    // not mean what it looks like, so the wire format gives a client nothing to compute one from
+    // except the raw counts it would have to justify itself.
+    const parsed = withInvitations({ counts, needsAction: 1, total: 9 })
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok && parsed.overview.sections.invitations.status === 'ready') {
+      // Asserted on the *keys*, not on the serialized string. The first version matched
+      // `/rate|percent/` against the JSON and failed on "gene**rate**dAt" — a substring check
+      // looking for a field name is a check that fails for the wrong reason.
+      const data = parsed.overview.sections.invitations.data as Record<string, unknown>
+      expect(Object.keys(data).sort()).toEqual(['counts', 'needsAction', 'total'])
+      for (const entry of data.counts as Array<Record<string, unknown>>) {
+        expect(Object.keys(entry).sort()).toEqual(['count', 'status'])
+      }
+    }
   })
 })

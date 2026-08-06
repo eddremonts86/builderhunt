@@ -26,6 +26,12 @@
   - Files: `src/modules/dashboard/lib/widget-registry.ts`, `src/modules/dashboard/lib/contracts.ts`, registry unit tests
   - Do: Give every widget a stable ID, criticality, role eligibility, dependency gate, default order, default visibility, allowed spans, and state capabilities. Reject duplicate IDs and unsafe arbitrary component registration.
   - Verify: table-driven tests cover each persona, missing dependency, new workspace, and unknown/retired widget ID.
+  - **Wired into the page on 2026-08-06, which it had not been.** The registry shipped with twenty
+    tests and no consumer: `DashboardPage` still rendered a raw array, so role eligibility,
+    dependency gating and hidden widgets did nothing. `orderedWidgets` now resolves the list before
+    the layout sees it, `SHIPPED_CAPABILITIES` names the capabilities that actually exist (pipeline
+    and saved-search health are not among them), and the e2e proves a hidden standard widget
+    disappears while a critical one refuses to.
 
 - [x] **Correct the current activity visualization**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, `src/routes/api/dashboard/stats.ts`, activity widget tests
@@ -139,17 +145,25 @@
 
 ## Wave 4 — Current-data widgets and charts
 
-- [ ] **Build Candidates to Review as a unified projection**
+- [~] **Build Candidates to Review as a unified projection**
   - Files: dashboard review projection/contracts, `CandidatesToReviewWidget.tsx`, tests
   - Do: Combine bounded recommendations, unread alert matches, completed sprint results, and recent tracked builders while preserving provenance and deduplicating identities. Rank with deterministic product rules, not unexplained generated prose.
   - Verify: one candidate is not repeated, the reason/source remains visible, and primary navigation enters the internal builder workspace with safe origin context.
+  - **Partial: live recommendations stay out, deliberately.** `GET /api/recommendations` re-runs the
+    saved queries through the federated pipeline — thirteen connectors, an 8 s per-connector budget,
+    its own rate limit. The overview is cached 30 s and read on every dashboard load, so folding that
+    in would put the pipeline behind every page view for rows that change on the timescale of a saved
+    search. The projection merges unread alert matches and untracked results from completed sprints,
+    deduplicated by `(source, sourceId)` with the more actionable provenance winning. A person can
+    still appear once here and once in the recommendations widget; closing that needs recommendations
+    to become a cached projection of its own.
 
-- [ ] **Add newly tracked discovery trend**
+- [x] **Add newly tracked discovery trend**
   - Files: dashboard aggregate repository, `DiscoveryTrendWidget.tsx`, chart tests
   - Do: Aggregate organization-builder creation by local day for the selected range; render daily bars/line, exact summary, and data disclosure.
   - Verify: exact totals match the table, missing days render zero, timezone boundaries pass, and copy does not imply quality or hiring conversion.
 
-- [ ] **Add alert-trigger volume**
+- [x] **Add alert-trigger volume**
   - Files: dashboard aggregate repository, `AlertVolumeWidget.tsx`, chart tests
   - Do: Aggregate trigger timestamps by day and allowlisted type; stack only when types are understandable/actionable. Link to Alerts with validated filters.
   - Verify: acknowledgement state does not change historical volume, type totals reconcile, high-volume data remains bounded, and exact values are keyboard accessible.
@@ -159,7 +173,7 @@
   - Do: Choose and label one denominator: all tracked builders or configured saved-search sources. Render ranked bars/100% stack plus exact values and source-filtered Search continuation.
   - Verify: percentage rounding reconciles, unknown sources have safe metadata, empty denominator is explicit, and recent-sample data is no longer presented as workspace coverage.
 
-- [ ] **Build the Shortlists summary**
+- [x] **Build the Shortlists summary**
   - Files: dashboard overview adapter, `ShortlistsWidget.tsx`, list routes/tests
   - Do: Show recent/top lists, exact counts, updated time, and uncategorized work only when the source definition is reliable. Link to list detail and All Shortlists.
   - Verify: private/organization visibility, deleted list, zero list, equal timestamps, and foreign list fixtures pass.
@@ -188,7 +202,7 @@
   - Do: Show canonical stage counts and supported aging/stuck indicators with exact values. Use “distribution”; link to the filtered Kanban.
   - Verify: counts reconcile, missing stage-entry timestamps suppress aging, and no funnel/conversion language exists without transition cohorts.
 
-- [ ] **Integrate Invitation Status Distribution**
+- [x] **Integrate Invitation Status Distribution**
   - Files: invitation dashboard adapter, `InvitationStatusWidget.tsx`, tests
   - Depends on: central invitation management in `plans/UI`
   - Do: Show current draft/sent/opened/booked/declined/revoked counts and organizer follow-ups; link to filtered invitation management.
@@ -203,6 +217,13 @@
 - [ ] **Add contextual service degradation only**
   - Files: dashboard shell/status adapter, tests
   - Do: Show a compact notice and Status link when a user-facing dependency is degraded. Keep worker, integration, trust, billing operations, and platform metrics in their dedicated Admin pages.
+  - **Built and reverted, 2026-08-06.** The only degradation signal is `GET /api/status`, which
+    answers **503** when degraded — correctly, for monitors. A browser logs every non-2xx subresource
+    to the console, so polling it from the dashboard put two console errors on every load during an
+    incident, which the sign-in e2e's strict collector caught immediately. It also adds a real
+    health-check poll per session. Blocked on a 200-answering degradation signal; `/api/health` is a
+    liveness probe that deliberately touches no dependency, so it cannot serve. The value in the
+    meantime is small: `/status` is already in the navigation.
   - Verify: healthy state renders no permanent status widget; degraded copy matches measured checks and never fabricates a healthy/failed component.
 
 ## Admin track — Specialized organization and platform widgets
@@ -346,15 +367,25 @@
 
 ## Wave 6 — Personalization
 
-- [ ] **Persist versioned per-user/per-organization preferences**
+- [~] **Persist versioned per-user/per-organization preferences**
   - Files: database schema/migration, preferences repository, `src/routes/api/dashboard/preferences.ts`, security tests
   - Do: Store version, density, range, ordered/hidden/pinned stable widget IDs with optimistic versioning and bounded payload size. Migrate local density once without cross-user leakage.
   - Verify: user/org isolation, stale update, unknown ID, duplicate ID, required-widget hiding, size limit, and schema migration tests pass.
+  - **Density and hidden ids persist per (organization, user)**; `dashboard_preferences` with RLS and
+    grants in `0151`/`0152`, `GET`/`PUT /api/dashboard/preferences`, and an optimistic client. The
+    e2e proves the round trip through `builderhunt_app` with RLS on rather than through a superuser
+    connection, which is what three earlier defects in this repository needed and did not have.
+    **Not done:** an explicit `version` field with optimistic concurrency, pinned and ordered ids, and
+    the one-time migration of the existing `localStorage` value. Last-write-wins is the right merge
+    rule for density and hides — there is nothing to reconcile between two versions of "which widgets
+    I hid" — but ordering will want the version.
 
-- [ ] **Build accessible dashboard customization controls**
+- [~] **Build accessible dashboard customization controls**
   - Files: `DashboardCustomizeDialog.tsx`, widget registry/page, component/E2E tests
   - Do: Implement Pin/Unpin, Hide/Show, Move up/down, density, range, and Reset. Restore focus on close and announce reorder results. Drag, if present, invokes the same commands and is never required.
   - Verify: keyboard/touch/screen-reader flows pass; unsaved/error/offline recovery preserves the last valid layout.
+  - **Partial.** The density control persists through the new store and `toggleHidden` exists on the
+    hook. The dialog with Pin/Hide/Move/Reset is not built.
 
 - [ ] **Apply persona defaults and safe preference migration**
   - Files: widget registry defaults/migration, tests

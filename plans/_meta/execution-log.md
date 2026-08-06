@@ -1226,3 +1226,205 @@ Reverted rather than shipped because two specs hanging two minutes each is a wor
 legacy endpoint still being read, and because the endpoints agree — they read the same columns with
 the same predicates, and the e2e asserts the projection's `summary` against them. The task stays
 `[~]` with the diagnosis recorded so the next attempt starts from it instead of rediscovering it.
+
+### Candidates to review — one row per person, and a join that matched nothing
+
+The spec's P0 "who should I review next?" widget, merging unread alert matches with untracked results
+from completed sprints, deduplicated by `(source, sourceId)`.
+
+**A defect the type system could not see and a reader would not.** `alert_triggers.builder_id`
+references **`builders`** — the older per-organization person row — not `organization_builders`. Two
+id spaces for one concept, and the first version of the query joined the wrong one. An inner join
+across two id spaces returns zero rows rather than an error, so the section would have answered
+`empty` on every workspace forever: a review queue silently missing its most actionable half, which
+is precisely the class of failure this whole plan exists to remove. It surfaced as a foreign-key
+violation while *seeding the e2e*, not from the query.
+
+The alert side is now a left join to the tracked roster as well, because an alert can fire for
+someone the workspace has not added — they still belong in a review queue, they just continue to a
+public profile instead of the internal workspace.
+
+**Live recommendations stay out, with a number behind the decision.** `GET /api/recommendations`
+re-runs the saved queries through the federated pipeline: thirteen connectors, an 8 s per-connector
+budget, its own rate limit. The overview is cached 30 s and read on every dashboard load. Folding
+that in would put the pipeline behind every page view for rows that change on the timescale of a
+saved search. The honest cost is stated in the module: a person can still appear once in this queue
+and once in the recommendations widget, and closing that needs recommendations to become a cached
+projection of its own. Task marked `[~]`.
+
+**The e2e is one test making one request, again.** The suite rate-limits sign-ups, and every tenant
+in the file has already warmed its projection cache for the ranges available — so a second test
+asking a second question reads an answer from before its own fixture existed. Both the agenda and the
+review assertions ride the same uncached call.
+
+### Wave 4 finished, and one primitive extracted early
+
+Discovery trend, alert volume and the shortlists summary. Three tasks, and a fourth from Wave 7
+pulled forward because the alternative was writing it three times.
+
+**`BarSeries` exists so a chart cannot render without its accessible equivalent.** Structural
+problem 9 is "charts omit equivalent data", and the reliable fix is not a rule every chart author
+remembers — `ActivityWidget` grew its table by hand, and the next two would each have grown their own
+version or none. The primitive owns the bars, the exact value on every bar, the `sr-only` table and
+the absolute `generatedAt`; the widget owns one sentence saying what the series means. Three charts
+now share the shape and differ only in that sentence, which is exactly where the risk sits: the
+shapes are interchangeable and the meanings are not.
+
+Two decisions inside the aggregates worth keeping:
+
+- **Alert volume counts `matched_at` and never filters on `read_at`.** Acknowledging a trigger does
+  not unmake it. A chart that shrank as someone worked through their inbox would answer "what have I
+  not read" while appearing to answer "how much fired", and the two diverge exactly when it matters.
+- **Discovery trend and recency are the same wire shape and different questions.** Recency buckets
+  everyone tracked by when a source last saw them — a distribution whose bars sum to the roster.
+  Discovery buckets new arrivals by when this workspace added them — a rate. The copy says so, and
+  says explicitly that adding someone is not a hire.
+
+`fillDays` is shared by all three, so they cannot disagree about the UTC day boundary that already
+produced one bug in this plan.
+
+**Shortlists are scoped by user as well as tenant.** Visible means created by the caller *or* shared
+with the organization. Too narrow and a shared list the team works from vanishes; too wide and a
+colleague's private shortlist — a list of people they are considering — appears on someone else's
+screen. The count is `count(item.id)` rather than `count(*)`, because with a left join `count(*)`
+counts the synthetic row an empty list produces and reports it as holding one builder.
+
+### Wave 6 — preferences leave the browser
+
+`dashboard_preferences`, keyed on **(organization, user)**, with RLS and grants in a separate custom
+migration following the `0109_builder_lists_grants.sql` convention: drizzle-kit emits tables and never
+policies, so a table whose RLS lived in a generated file would lose it on the next regenerate, and
+losing RLS on a tenant table is a cross-tenant read.
+
+Structural problem 10 was "density is stored only in local storage and is not scoped to the current
+user and organization". Two faults, and the second is the one that mattered. Per *browser*, so the
+same person got a different dashboard on their laptop and their phone and lost both on a cache clear.
+And keyed by nothing, so switching organizations carried one workspace's layout into another — hide a
+widget in a personal workspace and it stayed hidden in the team's, where a different person's
+decisions apply.
+
+Three decisions worth keeping:
+
+- **No DELETE grant and no delete policy.** Nothing deletes a preference row; a reset is an update to
+  the defaults. Granting a privilege because it might one day be wanted is how the app role ends up
+  able to delete rows no code path needs — and this repository already paid for the mirror image, in
+  an enrichment helper that took the app transaction to run a delete the grant refused with 42501.
+- **A failed read returns the defaults, a failed write returns 500.** A layout preference is not
+  worth a broken dashboard, and the default layout is a correct answer to "what should this person
+  see". A failed *write* is different: the user asked for a change and did not get it.
+- **Critical widgets are not enforced at the write.** A client may send `action-queue` in the hidden
+  list and the row will store it; `orderedWidgets` ignores hides on critical widgets, so it changes
+  nothing. Enforcing it at the write would need the route to import the client-side registry and
+  would put one rule in two places.
+
+Verified through `builderhunt_app` with RLS enabled, not through a superuser connection — the
+distinction three earlier defects in this repository needed and did not have.
+
+### The registry was dead code, and now is not
+
+`widget-registry.ts` shipped in Wave 0 with twenty passing tests and **no consumer**. `DashboardPage`
+still rendered a raw `BentoWidget[]`, so role eligibility, dependency gating and the hidden-widget
+list decided nothing — and Wave 6's `toggleHidden` wrote a preference that changed no pixel.
+
+That is the failure this repository has already named once, in the enrichment register: *a helper
+that cannot execute is worse than an absent one, because it reads as proof that the path exists.* Two
+waves of documentation described behaviour the running page did not have.
+
+Fixed by making the registry the thing the page renders from:
+
+- `WidgetDefinition` absorbed the four layout fields (`chrome`, `isVisible`, `isEmpty`, `whenEmpty`)
+  so it is a superset of `BentoWidget`. One type, because a widget described by two is a widget that
+  can be registered in one and forgotten in the other — which is exactly what happened.
+- `defineWidgetRegistry` gained defaults, so an existing sixteen-entry list became a validated
+  registry without a mechanical edit per entry. `order` falls back to array position, which is not
+  the ambiguity its own duplicate-order check guards against: the file's authoring order *is* the
+  intended order, and the band comments say so. Two entries claiming the same *explicit* order is
+  still refused.
+- `SHIPPED_CAPABILITIES` is the honest inventory. `pipeline` and `saved-search-health` are in the
+  spec's catalog and do not exist, so any widget declaring them is omitted rather than rendered
+  empty — an empty "Pipeline snapshot" implies a pipeline with nothing in it.
+- `useViewerRole` reuses `OrganizationSwitcher`'s query key so both come from one request, and
+  defaults to `member` while loading so a slow response cannot flash an owner-only widget.
+
+Verified in the browser rather than argued: hiding `source-mix` and `action-queue` together removes
+the first and leaves the second, because `orderedWidgets` ignores a hide on a critical widget. The
+write path deliberately does not enforce that — one rule in two places is how the two disagree — so
+this resolution is the only thing standing between a user and hiding their own payment problem, and
+the e2e now says so.
+
+### Wave 5 — invitation status, and a snapshot chain that would have broken the next migration
+
+**Invitations are a distribution, not a funnel.** The seven states are the table's own CHECK list and
+they do not form a pipeline: `expired` and `revoked` are terminal, `declined` is an answer rather
+than a failure, and an invitation reaches `booked` without necessarily passing through `opened` —
+that column only records an open when the candidate loads the portal in a browser that runs the
+request. Rendering it as a funnel would invite a conversion rate computed from a denominator that
+does not mean what it looks like, so it is counts in a fixed order, every state shown including the
+zeros. A distribution that hides its empty categories changes shape between two workspaces for
+reasons that have nothing to do with the data.
+
+`needsAction` is the only derived number and is deliberately narrow: `declined` + `expired`, the two
+waiting on the *organizer*. `sent` and `opened` are waiting on the candidate, and counting them would
+put a permanently non-zero badge on the dashboard — which is how a badge stops being read.
+
+Owner-scoped, like the agenda: an invitation names a candidate a specific person is interviewing.
+
+**A snapshot chain defect, caught by `verify-migration-integrity`.** `0152` is a policies-and-grants
+migration with no schema change, so its drizzle snapshot is `0151`'s body — and copying the file
+verbatim gave it `0151`'s `id` as well. Two snapshots sharing an id means the next
+`drizzle-kit generate` has two candidates for its `prevId`. `0109_builder_lists_grants`, the
+migration this one follows, advances the chain properly; this one now does too, and the hash manifest
+was regenerated with `--write` (the immutability guard is about changing *applied* migrations, not
+about adding new ones).
+
+### Wave 5 — contextual degradation, and the registry's accessible names
+
+**A degradation notice that is silent when healthy.** No green tick, no "all systems operational": a
+permanent reassurance is read once and then becomes furniture, and the space belongs to whatever
+actually needs attention. It renders `null` in every state except degraded — including while loading,
+and including when the status check itself fails, because "we could not reach our own status
+endpoint" is an operator's problem and telling a recruiter about it changes nothing they can do.
+
+It names no internal check. Which dependency failed lives on `/status` and under `/admin`; a
+recruiter reading "redis" learns only that something is wrong, in a vocabulary they cannot act on.
+`/api/status` answers **503** when degraded, so the component reads the body whatever the HTTP status
+— a non-ok response is the interesting case here, not a transport failure.
+
+**Tested as a component, not end to end, on purpose.** Observing the degraded state through the
+browser needs `page.route` against `/api/status`, and this session already has a recorded finding
+that intercepting an endpoint fetched through TanStack Query hangs the test for its full 120 s while
+the identical interception against a `useEffect` fetch works. The state machine is small and pure; a
+mocked `fetch` proves it without walking back into that.
+
+The test needed one non-obvious thing: flushing **until** the query settles rather than a fixed number
+of awaits. One `await act` reads the loading render, and pinning the exact count would make the suite
+fail on a React Query minor upgrade for no product reason.
+
+**Every registry entry now declares its accessible name.** Nine fell back to `title: id`. Nothing
+renders it today — each widget passes its own heading to `WidgetFrame` — but the Customize dialog
+that Wave 6 still owes will list widgets by it, and a dialog offering "stat-builders" is worse than
+one offering "Builders tracked".
+
+### Two gate failures, and what they were
+
+**`dashboard_preferences: unclassified table`.** The schema audit is a hard gate and every table must
+carry a data classification. Added as tenant-private, keyed on the (organization, user) pair — it
+holds no subject data at all, a density string and a list of widget ids, so its retention is the
+membership's and deleting either side cascades it away.
+
+**Two console errors on the sign-in e2e**, from a strict collector doing exactly its job:
+
+- A **403** from `GET /api/dashboard/preferences`. The dashboard mounts before the active
+  organization has always settled, and the route refused a caller with no tenant. The response
+  carries no tenant data — a density string and an empty list — so a 403 was protecting nothing and
+  costing a console error on a normal sign-in. It now answers the defaults. The *write* still
+  refuses: a write with no tenant has nowhere to go.
+- A **503** from `GET /api/status`, which is the degradation notice I had just built. That endpoint
+  answers 503 when degraded, correctly, for monitors — and a browser logs every non-2xx subresource,
+  so the notice would have put a console error on every dashboard load *during an incident*, which is
+  precisely when an operator is reading consoles.
+
+**The notice is reverted.** There is no 200-answering degradation signal to poll: `/api/health` is a
+liveness probe that deliberately touches no dependency. The task goes back to open with that
+diagnosis, because the alternative was shipping known console noise for a banner whose destination —
+`/status` — is already one click away in the navigation.

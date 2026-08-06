@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, ExternalLink,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock, Gauge,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock, Gauge, UserSearch, UserPlus, Bell, ListChecks, Send, History,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
@@ -17,10 +17,15 @@ import { WidgetFrame } from '~/modules/dashboard/ui/WidgetFrame'
 import { ActionQueueWidget } from './ActionQueueWidget'
 import { UpcomingWidget } from './UpcomingWidget'
 import { WorkspaceUsageWidget } from './WorkspaceUsageWidget'
+import { CandidatesToReviewWidget } from './CandidatesToReviewWidget'
+import { InvitationStatusWidget } from './InvitationStatusWidget'
+import { BarSeries, utcWeekdayLabel } from '~/modules/dashboard/ui/BarSeries'
 import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/dashboard/lib/use-dashboard-overview'
 import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
-import { useBentoDensity } from '~/modules/dashboard/ui/bento/useBentoDensity'
-import type { BentoWidget } from '~/modules/dashboard/ui/bento/layout'
+import { useDashboardPreferences } from '~/modules/dashboard/ui/bento/useBentoDensity'
+import { useViewerRole } from '~/modules/dashboard/lib/use-viewer-role'
+import { defineWidgetRegistry, orderedWidgets } from '~/modules/dashboard/lib/widget-registry'
+import type { WidgetDependency } from '~/modules/dashboard/lib/contracts'
 import { ActivityWidget } from '~/modules/dashboard/ui/home/ActivityWidget'
 import { MetricWidget, type MetricWidgetProps } from '~/modules/dashboard/ui/home/MetricWidget'
 import { RecentBuildersWidget } from '~/modules/dashboard/ui/home/RecentBuildersWidget'
@@ -122,9 +127,29 @@ interface HomeContext {
  * became sparse a short band leaves a real gap rather than pulling a later tile
  * up into it — which is the trade that bought a stable reading order.
  */
-const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
+/**
+ * Capabilities that have actually shipped.
+ *
+ * A widget declaring a dependency absent from this set is omitted entirely rather than rendered
+ * empty. `pipeline` and `saved-search-health` are named in the spec's widget catalog and do not
+ * exist; listing them here before they do would put two permanently blank tiles on every dashboard.
+ */
+const SHIPPED_CAPABILITIES: ReadonlySet<WidgetDependency> = new Set<WidgetDependency>([
+  'shortlists',
+  'invitations',
+  'calendar',
+  'team-activity',
+  'source-coverage',
+])
+
+/** Headline-metric labels, so the registry's accessible name matches the tile's own. */
+const STAT_TITLES = ['Builders tracked', 'Seen active', 'Saved searches'] as const
+const ctxTitle = (index: number) => STAT_TITLES[index] ?? 'Metric'
+
+const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
   {
     id: 'first-hunt',
+    title: 'Run your first hunt',
     span: 'full',
     chrome: 'glow',
     // The empty-state CTA outranks everything when there is nothing to show.
@@ -154,6 +179,10 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
    */
   {
     id: 'action-queue',
+    title: 'Needs your attention',
+    // A payment failure or a blocked interview is not a preference. `orderedWidgets` ignores a hide
+    // on a critical widget.
+    criticality: 'critical',
     span: 'full',
     isEmpty: (ctx) => {
       const state = ctx.overview.section('actionQueue')
@@ -181,6 +210,11 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   // answering no question; the survivors widen rather than leaving a quarter-width hole.
   ...(['builders', 'active', 'searches'] as const).map((key, index) => ({
     id: `stat-${key}`,
+    // The registry's `title` is the accessible name a future Customize dialog lists a widget under.
+    // Nothing renders it today — each widget passes its own heading to `WidgetFrame` — but the
+    // fallback is the id, and a dialog offering "stat-builders" is worse than one offering the label
+    // the tile actually shows.
+    title: ctxTitle(index),
     span: 'third' as const,
     minSpan: 'quarter' as const,
     // `MetricWidget` reveals its hint and badge only when the tile can hold
@@ -196,6 +230,8 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
    */
   {
     id: 'upcoming',
+    title: 'Today and upcoming',
+    dependsOn: ['calendar'],
     span: 'full',
     isEmpty: (ctx) => ctx.overview.section('upcoming').kind === 'empty',
     whenEmpty: 'hide',
@@ -212,9 +248,33 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     ),
   },
 
+  /*
+   * Third: "who should I review next?" — the spec's P0 widget between the queue and the analytics.
+   * Placed above the metrics because a person waiting on a decision outranks a count.
+   */
+  {
+    id: 'review',
+    title: 'Candidates to review',
+    span: 'full',
+    isEmpty: (ctx) => ctx.overview.section('review').kind === 'empty',
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Candidates to review"
+        icon={UserSearch}
+        state={ctx.overview.section('review')}
+        onRetry={ctx.overview.refetch}
+        emptyMessage="Nothing waiting on a decision."
+      >
+        {(review) => <CandidatesToReviewWidget items={review.items} />}
+      </WidgetFrame>
+    ),
+  },
+
   // Band 2 — two halves. 6 + 6 = 12.
   {
     id: 'activity',
+    title: 'Builder recency',
     span: 'half',
     minSpan: 'third',
     render: (ctx) => (
@@ -242,14 +302,90 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   },
   {
     id: 'sprints',
+    title: 'Sourcing sprints',
     span: 'half',
     minSpan: 'third',
     render: (ctx) => <SprintsWidget sprints={ctx.sprints} />,
   },
 
+  /*
+   * Band 2b — the two rate charts, beside each other because they are read together: "we added five
+   * people this week and the alerts fired forty times" is one thought. Both hide when flat, so a
+   * workspace with no activity is not handed two empty axes.
+   *
+   * They share `BarSeries` with the recency chart above, which is what keeps the accessible table
+   * from being three hand-written copies — or two, and one forgotten.
+   */
+  {
+    id: 'discovery-trend',
+    title: 'Newly tracked',
+    span: 'half',
+    minSpan: 'third',
+    isEmpty: (ctx) => ctx.overview.section('discoveryTrend').kind === 'empty',
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Newly tracked"
+        icon={UserPlus}
+        state={ctx.overview.section('discoveryTrend')}
+        onRetry={ctx.overview.refetch}
+      >
+        {(trend) => (
+          <>
+            <p className="-mt-2 mb-3 text-xs font-light text-bh-text-muted">
+              Builders this workspace started tracking, by day. Adding someone is not a hire.
+            </p>
+            <BarSeries
+              points={trend.buckets.map((bucket) => ({ key: bucket.date, label: utcWeekdayLabel(bucket.date), value: bucket.count }))}
+              caption="Builders newly tracked per day."
+              valueLabel="Builders tracked"
+              generatedAt={ctx.overview.overview?.generatedAt}
+            />
+          </>
+        )}
+      </WidgetFrame>
+    ),
+  },
+  {
+    id: 'alert-volume',
+    title: 'Alert volume',
+    span: 'half',
+    minSpan: 'third',
+    isEmpty: (ctx) => ctx.overview.section('alertVolume').kind === 'empty',
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Alert volume"
+        icon={Bell}
+        state={ctx.overview.section('alertVolume')}
+        onRetry={ctx.overview.refetch}
+        action={(
+          <Link to="/alerts" className="text-xs text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+            Open alerts
+          </Link>
+        )}
+      >
+        {(volume) => (
+          <>
+            <p className="-mt-2 mb-3 text-xs font-light text-bh-text-muted">
+              Triggers per day. Reading one does not remove it from the count.
+            </p>
+            <BarSeries
+              points={volume.buckets.map((bucket) => ({ key: bucket.date, label: utcWeekdayLabel(bucket.date), value: bucket.count }))}
+              caption="Alert triggers per day."
+              valueLabel="Triggers"
+              generatedAt={ctx.overview.overview?.generatedAt}
+            />
+          </>
+        )}
+      </WidgetFrame>
+    ),
+  },
+
   // Band 3 — the picks grid plus the alert feed beside it. 8 + 4 = 12.
   {
     id: 'recommendations',
+    title: 'For you',
     // The widest widget on the page because it is the only one holding a card
     // grid. Below a half its cards cannot show a name and a bio at once.
     span: 'twoThirds',
@@ -258,6 +394,7 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   },
   {
     id: 'alerts',
+    title: 'Alerts',
     span: 'third',
     minSpan: 'quarter',
     render: (ctx) => <AlertsWidget triggers={ctx.triggers} />,
@@ -266,6 +403,7 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   // Band 4 — saved searches need width for their four row actions. 8 + 4 = 12.
   {
     id: 'saved-searches',
+    title: 'Saved searches',
     span: 'twoThirds',
     minSpan: 'half',
     isEmpty: (ctx) => ctx.queries.length === 0,
@@ -308,6 +446,7 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   },
   {
     id: 'recent-builders',
+    title: 'Recent builders',
     span: 'third',
     minSpan: 'third',
     isEmpty: (ctx) => ctx.recent.length === 0,
@@ -344,8 +483,15 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   // left beside an 8-column tile rather than starting a band of their own.
   {
     id: 'plan-usage',
+    title: 'Workspace usage',
     span: 'half',
     minSpan: 'quarter',
+    /*
+     * Owner/admin only. The projection already omits the `usage` section for anyone else, so this is
+     * belt and braces — but declaring it here is what stops the tile being *offered back* to a member
+     * as a hideable widget they could "restore", which would confirm the workspace has billing.
+     */
+    roles: ['owner', 'admin'],
     /*
      * Reads the projection's `usage` section, which the server computes from the canonical billing
      * summary. It read `/api/plans/me` — the legacy endpoint `/api/billing/summary` replaced — and
@@ -375,7 +521,125 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     ),
   },
   {
+    id: 'team-activity',
+    title: 'Team activity',
+    dependsOn: ['team-activity'],
+    span: 'half',
+    minSpan: 'third',
+    isEmpty: (ctx) => ctx.overview.section('activity').kind === 'empty',
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Team activity"
+        icon={History}
+        state={ctx.overview.section('activity')}
+        onRetry={ctx.overview.refetch}
+        action={(
+          <Link to="/team/activity" className="text-xs text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+            All activity
+          </Link>
+        )}
+      >
+        {(activity) => (
+          <ul className="-mx-6 -mb-6 divide-y divide-bh-border border-t border-bh-border">
+            {activity.items.map((item) => (
+              <li key={item.id} className="px-6 py-2.5">
+                <p className="truncate text-sm text-bh-text">
+                  {item.targetHref ? (
+                    // Server-resolved against the real row, so a deleted target arrives as `null`
+                    // and renders as plain text instead of a link to a 404.
+                    <Link to={item.targetHref} className="hover:text-bh-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded">
+                      {item.display}
+                    </Link>
+                  ) : item.display}
+                </p>
+                <p className="mt-0.5 text-xs font-light text-bh-text-dim">
+                  {/* "Former member" rather than a blank or a raw id: `null` here means the actor is
+                      unknown or has left, which is a fact worth stating. */}
+                  {item.actorDisplayName ?? 'Former member'}
+                  {' · '}
+                  <time dateTime={item.occurredAt} title={new Date(item.occurredAt).toLocaleString()}>
+                    {formatDistanceToNow(new Date(item.occurredAt))}
+                  </time>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </WidgetFrame>
+    ),
+  },
+  {
+    id: 'invitations',
+    title: 'Invitation status',
+    dependsOn: ['invitations'],
+    span: 'half',
+    minSpan: 'third',
+    isEmpty: (ctx) => ctx.overview.section('invitations').kind === 'empty',
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Invitation status"
+        icon={Send}
+        state={ctx.overview.section('invitations')}
+        onRetry={ctx.overview.refetch}
+      >
+        {(distribution) => <InvitationStatusWidget distribution={distribution} />}
+      </WidgetFrame>
+    ),
+  },
+  {
+    id: 'shortlists',
+    title: 'Shortlists',
+    dependsOn: ['shortlists'],
+    span: 'half',
+    minSpan: 'third',
+    isEmpty: (ctx) => ctx.overview.section('shortlists').kind === 'empty',
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Shortlists"
+        icon={ListChecks}
+        state={ctx.overview.section('shortlists')}
+        onRetry={ctx.overview.refetch}
+        action={(
+          <Link to="/lists" className="text-xs text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+            All lists
+          </Link>
+        )}
+      >
+        {(shortlists) => (
+          <ul className="-mx-6 -mb-6 divide-y divide-bh-border border-t border-bh-border">
+            {shortlists.items.map((list) => (
+              <li key={list.id} className="flex items-center gap-3 px-6 py-2.5">
+                <Link
+                  to="/lists/$listId"
+                  params={{ listId: list.id }}
+                  className="min-w-0 flex-1 truncate text-sm text-bh-text hover:text-bh-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded"
+                >
+                  {list.name}
+                </Link>
+                {/* Whether a colleague can see it is the first thing a shortlist's owner needs at a
+                    glance — it is a list of people they are considering. */}
+                {list.visibility === 'organization' && (
+                  <span className="shrink-0 rounded border border-bh-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-bh-text-dim">
+                    Shared
+                  </span>
+                )}
+                <span className="shrink-0 font-mono text-xs tabular-nums text-bh-text-dim">
+                  {list.itemCount}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </WidgetFrame>
+    ),
+  },
+  {
     id: 'source-mix',
+    title: 'Source coverage',
+    dependsOn: ['source-coverage'],
     span: 'half',
     minSpan: 'quarter',
     render: (ctx) => (
@@ -391,11 +655,13 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
       </WidgetFrame>
     ),
   },
-]
+])
 
 export function DashboardPage() {
   const reduceMotion = useReducedMotion()
-  const [density, setDensity] = useBentoDensity()
+  const { preferences, setDensity } = useDashboardPreferences()
+  const density = preferences.density
+  const viewerRole = useViewerRole()
   // The versioned core projection. Sections it owns (recency, source coverage) read their state
   // from here; the remaining endpoints migrate in Wave 4.
   const overview = useDashboardOverview()
@@ -536,6 +802,31 @@ export function DashboardPage() {
     ]
   }, [stats, queries])
 
+  /*
+   * Role eligibility, dependency gates and the user's hidden list, resolved in one pass before the
+   * layout sees anything (`orderedWidgets`).
+   *
+   * This is what makes `widget-registry.ts` load-bearing rather than a validated module nothing
+   * imported — which is what it was until now, and which this repository has a name for: a helper
+   * that cannot execute reads as proof the path exists.
+   *
+   * Three reasons are kept distinct on purpose. "Your role may not see this" is permanent for that
+   * role and must never be offered back as a restorable widget; "the capability has not shipped" is
+   * about the deployment; "you hid it" is the only one a user can undo.
+   *
+   * `SHIPPED_CAPABILITIES` is the honest inventory: `pipeline` and `saved-search-health` are named in
+   * the spec and do not exist yet, so any widget declaring them is omitted rather than rendered
+   * empty — an empty "Pipeline snapshot" implies a pipeline with nothing in it.
+   */
+  const visibleWidgets = React.useMemo(
+    () => orderedWidgets(HOME_WIDGETS, {
+      role: viewerRole,
+      available: SHIPPED_CAPABILITIES,
+      hidden: new Set(preferences.hiddenWidgetIds),
+    }).visible,
+    [viewerRole, preferences.hiddenWidgetIds],
+  )
+
   // One object for the whole registry. Memoised on the data it closes over, so
   // `BentoRegion`'s layout memo doesn't recompute on every parent render.
   const widgetContext = React.useMemo<HomeContext>(
@@ -638,7 +929,7 @@ export function DashboardPage() {
 
       <BentoRegion
         label="Resumen"
-        widgets={HOME_WIDGETS}
+        widgets={visibleWidgets}
         ctx={widgetContext}
         density={density}
       />

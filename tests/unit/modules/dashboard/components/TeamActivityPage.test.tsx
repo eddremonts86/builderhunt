@@ -9,6 +9,7 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const navigateSpy = vi.hoisted(() => vi.fn())
@@ -64,9 +65,32 @@ function row(overrides: Partial<ActivityRowDTO> = {}): ActivityRowDTO {
   }
 }
 
+/**
+ * Calls to the activity endpoint only.
+ *
+ * The page also reads the dashboard's density preference now, which is a second `fetch` this test
+ * does not care about. Counting *all* calls would make these assertions fail whenever an unrelated
+ * hook on the page starts fetching — which is exactly what happened when density moved off
+ * `localStorage`.
+ */
+function activityCalls(): unknown[][] {
+  return fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/organizations/activity'))
+}
+
 async function render() {
   await act(async () => {
-    root.render(<TeamActivityPage initialRows={[]} initialCursor={null} />)
+    /*
+     * The page reads the dashboard's density, which now comes from a server-persisted preference
+     * (`useDashboardPreferences`) rather than from `localStorage` — so it needs a QueryClient the way
+     * it needs one at runtime under `_dashboard`. A fresh client per render, with retries off, so a
+     * failed preference read cannot make an unrelated assertion wait.
+     */
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <TeamActivityPage initialRows={[]} initialCursor={null} />
+      </QueryClientProvider>,
+    )
   })
 }
 
@@ -77,8 +101,8 @@ describe('TeamActivityPage', () => {
       json: async () => ({ rows: [row()], nextCursor: null }),
     })
     await render()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url] = fetchMock.mock.calls[0]
+    expect(activityCalls()).toHaveLength(1)
+    const [url] = activityCalls()[0]
     expect(String(url)).not.toContain('before=')
     expect(host.textContent).toContain('Created search "rust"')
     expect(host.textContent).toContain('Ada Lovelace')
@@ -87,7 +111,7 @@ describe('TeamActivityPage', () => {
   it('shows the empty state only after a real fetch confirms there is nothing', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ rows: [], nextCursor: null }) })
     await render()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(activityCalls()).toHaveLength(1)
     expect(host.textContent).toContain('No activity yet')
   })
 
@@ -98,23 +122,34 @@ describe('TeamActivityPage', () => {
   })
 
   it('"Load more" appends the next page using the server-issued cursor, not a client-derived one', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ rows: [row({ id: 'row-1' })], nextCursor: { before: '2026-07-31T12:00:00.000Z', id: 'row-1' } }),
+    /*
+     * Keyed by URL rather than by call order. The page now also reads the density preference, and an
+     * ordered `mockResolvedValueOnce` chain hands that request the activity response meant for the
+     * first page — the failure looks like a broken cursor and is a mocking artefact.
+     */
+    const pages = [
+      { rows: [row({ id: 'row-1' })], nextCursor: { before: '2026-07-31T12:00:00.000Z', id: 'row-1' } },
+      { rows: [row({ id: 'row-2', display: 'Created search "go"' })], nextCursor: null },
+    ]
+    let page = 0
+    fetchMock.mockImplementation(async (url: unknown) => {
+      if (!String(url).includes('/api/organizations/activity')) {
+        return { ok: true, json: async () => ({ density: 'bento', hiddenWidgetIds: [] }) }
+      }
+      const body = pages[Math.min(page, pages.length - 1)]
+      page += 1
+      return { ok: true, json: async () => body }
     })
+
     await render()
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ rows: [row({ id: 'row-2', display: 'Created search "go"' })], nextCursor: null }),
-    })
     const button = host.querySelector('[data-testid="team-activity-load-more"]') as HTMLButtonElement
     expect(button).toBeTruthy()
     await act(async () => {
       button.click()
       await Promise.resolve()
     })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    const [secondUrl] = fetchMock.mock.calls[1]
+    expect(activityCalls()).toHaveLength(2)
+    const [secondUrl] = activityCalls()[1]
     expect(String(secondUrl)).toContain('before=2026-07-31T12%3A00%3A00.000Z')
     expect(String(secondUrl)).toContain('id=row-1')
     expect(host.textContent).toContain('Created search "rust"')

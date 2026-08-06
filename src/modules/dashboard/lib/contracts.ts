@@ -22,7 +22,7 @@
  */
 
 import type { ReactNode } from 'react'
-import type { BentoSpan } from '~/modules/dashboard/ui/bento/layout'
+import type { BentoChrome, BentoSpan, WhenEmpty } from '~/modules/dashboard/ui/bento/layout'
 import type { OrganizationRole } from '~/shared/lib/authorization/permissions'
 
 /**
@@ -161,6 +161,31 @@ export interface WidgetDefinition<Ctx> {
   /** Merged into one full-width tile per group in `sections` density. */
   sectionGroup?: string
   render: (ctx: Ctx) => ReactNode
+
+  /*
+   * ── The layout half, so this type is a superset of `BentoWidget` ──────────────────────────────
+   *
+   * One type, not two. A widget described by a `WidgetDefinition` for eligibility and a `BentoWidget`
+   * for layout is a widget that can be registered in one and forgotten in the other, which is how
+   * `widget-registry.ts` ended up validated by twenty tests and consumed by nothing.
+   *
+   * The split of responsibility stays clear even in one type: `roles`, `dependsOn`, `criticality` and
+   * `defaultVisible` decide **whether** a widget is rendered at all, and are resolved by
+   * `orderedWidgets`. The four below decide **how** it is rendered once it is eligible, and are
+   * resolved by `resolveBentoLayout` against the data.
+   */
+  /** Who paints the bubble. `bubble` is the default; `bare` is for content bringing its own card. */
+  chrome?: BentoChrome
+  /**
+   * Data-driven visibility, distinct from role and dependency eligibility above.
+   *
+   * "This person may not see it" and "there is nothing to see" are different facts with different
+   * consequences: one is permanent for that role, the other changes with the next request, and only
+   * the second may ever be offered back to the user as a restorable widget.
+   */
+  isVisible?: (ctx: Ctx) => boolean
+  isEmpty?: (ctx: Ctx) => boolean
+  whenEmpty?: WhenEmpty
 }
 
 /**

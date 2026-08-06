@@ -40,6 +40,18 @@ export class WidgetRegistryError extends Error {
   }
 }
 
+/** Every role, for a widget that does not restrict itself. */
+const ALL_ORGANIZATION_ROLES: readonly OrganizationRole[] = ['owner', 'admin', 'member']
+
+/**
+ * What an author writes. Everything except identity and rendering has a default, so an existing
+ * widget list becomes a validated registry without a mechanical edit per entry — and a widget that
+ * *does* need a role restriction or a dependency gate says so, where the reader is looking.
+ */
+export type WidgetRegistryEntry<Ctx> =
+  Pick<WidgetDefinition<Ctx>, 'id' | 'span' | 'render'>
+  & Partial<Omit<WidgetDefinition<Ctx>, 'id' | 'span' | 'render'>>
+
 /**
  * Validates a registry once, at module load, and returns it frozen in order.
  *
@@ -53,8 +65,29 @@ export class WidgetRegistryError extends Error {
  * widget silently wrong is worse than a dashboard that fails its own unit test.
  */
 export function defineWidgetRegistry<Ctx>(
-  widgets: ReadonlyArray<WidgetDefinition<Ctx>>,
+  input: ReadonlyArray<WidgetRegistryEntry<Ctx>>,
 ): ReadonlyArray<WidgetDefinition<Ctx>> {
+  /*
+   * Defaults, so an existing widget list becomes a registry without sixteen mechanical edits.
+   *
+   * `order` falls back to array position. That looks like the thing this function's duplicate-order
+   * check exists to prevent, and is not: the file's authoring order **is** the intended order — the
+   * band comments in `DashboardPage` describe it — so position is the source of truth rather than an
+   * accident. What the check still forbids is two entries claiming the *same explicit* order, which
+   * is the case where the author believed they had specified something.
+   *
+   * The gap of 10 leaves room to insert an explicit order between two positional ones later without
+   * renumbering the file.
+   */
+  const widgets: WidgetDefinition<Ctx>[] = input.map((entry, index) => ({
+    title: entry.title ?? entry.id,
+    criticality: entry.criticality ?? 'standard',
+    roles: entry.roles ?? ALL_ORGANIZATION_ROLES,
+    defaultVisible: entry.defaultVisible ?? true,
+    order: entry.order ?? index * 10,
+    ...entry,
+  }))
+
   const seenIds = new Set<string>()
   const seenOrders = new Map<number, string>()
 

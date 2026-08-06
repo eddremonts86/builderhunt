@@ -1259,7 +1259,7 @@ test.describe('today and upcoming', () => {
    * fixture existed — which is exactly how the split version of this failed: green alone, red in the
    * file. Everything is seeded first and asserted from a single uncached response.
    */
-  test('the agenda merges, excludes and sanitises in one projection', async () => {
+  test('the agenda and the review queue merge, exclude and sanitise in one projection', async () => {
     const { principal, organization } = await ensureSecondTenant()
     // Calendar and event ids are uuid columns, so the run-unique string ids used elsewhere in this
     // file will not do.
@@ -1294,12 +1294,63 @@ test.describe('today and upcoming', () => {
       `
     }
 
+    /*
+     * The review fixtures ride the same seeding pass. One person is seeded twice — as an unread
+     * alert match on a builder this workspace tracks, and as a result of a completed sprint — so the
+     * single request below can assert that the projection merges them into one row.
+     *
+     * `alert_triggers.builder_id` references `builders`, the older per-organization person row, not
+     * `organization_builders`. Two id spaces for one concept, and the first version of the projection
+     * joined the wrong one: an inner join across them returns zero rows rather than an error, so the
+     * review section would have reported `empty` on every workspace forever.
+     */
+    const dupSourceId = uniqueId('dup').toLowerCase()
+    const identityId = `ident-${dupSourceId}`
+    const trackedId = `ob-${dupSourceId}`
+    const alertId = `alert-${dupSourceId}`
+    const dupSprintId = `sprint-${dupSourceId}`
+
+    await harness.sql`
+      insert into builder_identities (id, source, source_id, username, display_name, profile_url)
+      values (${identityId}, 'github', ${dupSourceId}, ${dupSourceId}, 'Dup Person', ${`https://github.com/${dupSourceId}`})
+    `
+    await harness.sql`
+      insert into organization_builders (id, organization_id, builder_identity_id, creator_user_id, visibility, status)
+      values (${trackedId}, ${organization.organizationId}, ${identityId}, ${principal.userId}, 'private', 'tracked')
+    `
+    await harness.sql`
+      insert into builders (id, organization_id, user_id, source, source_id, username, display_name, profile_url, topics)
+      values (${`bld-${dupSourceId}`}, ${organization.organizationId}, ${principal.userId}, 'github', ${dupSourceId},
+              ${dupSourceId}, 'Dup Person', ${`https://github.com/${dupSourceId}`}, ${harness.sql.json([])})
+    `
+    await harness.sql`
+      insert into alerts (id, organization_id, user_id, name, keywords)
+      values (${alertId}, ${organization.organizationId}, ${principal.userId}, 'Dup alert', ${harness.sql.json(['rust'])})
+    `
+    await harness.sql`
+      insert into alert_triggers (id, organization_id, alert_id, user_id, builder_id, event_type, payload)
+      values (${`trig-${dupSourceId}`}, ${organization.organizationId}, ${alertId}, ${principal.userId},
+              ${`bld-${dupSourceId}`}, 'keyword_match', '{}'::jsonb)
+    `
+    await harness.sql`
+      insert into sourcing_sprints (id, organization_id, creator_user_id, name, criteria, variants, status, quota, cursor)
+      values (${dupSprintId}, ${organization.organizationId}, ${principal.userId}, 'Dup sprint',
+              '{}'::jsonb, '[]'::jsonb, 'completed', 10, '{}'::jsonb)
+    `
+    await harness.sql`
+      insert into sprint_results (id, organization_id, sprint_id, source, source_id, profile, matched_variant, score)
+      values (${`res-${dupSourceId}`}, ${organization.organizationId}, ${dupSprintId}, 'github', ${dupSourceId},
+              ${harness.sql.json({ username: dupSourceId, profileUrl: `https://github.com/${dupSourceId}`, topics: [] })},
+              'v1', 90)
+    `
+
     const response = await principal.api!.get('/api/dashboard/overview?range=24h')
     expect(response.status(), await response.text()).toBe(200)
     const body = await response.json() as {
       sections: {
         upcoming: { status: string; data?: { items: Array<{ eventId: string; timezone: string; hasActiveBrief: boolean; meetingUrl: string | null }> } }
         actionQueue: { status: string; data?: { items: Array<{ action: { kind: string; resourceId: string | null } }> } }
+        review: { status: string; data?: { items: Array<{ key: string; provenance: string; reason: string; tracked: boolean }> } }
       }
     }
 
@@ -1330,5 +1381,158 @@ test.describe('today and upcoming', () => {
       .filter((item) => item.action.kind === 'open-interview')
     expect(interviewItems).toHaveLength(1)
     expect(interviewItems[0].action.resourceId).toBe(soonId)
+
+    /*
+     * And the review queue merges the duplicated identity into one row, keeping the more actionable
+     * provenance. Before the projection these were two rows in two competing widgets.
+     */
+    const reviewItems = body.sections.review.data?.items ?? []
+    const matching = reviewItems.filter((entry) => entry.key === `github:${dupSourceId}`)
+    expect(matching, JSON.stringify(body.sections.review)).toHaveLength(1)
+    // The alert match wins: the person is already tracked and something just happened to them, which
+    // is a sharper call to action than "a sprint found someone".
+    expect(matching[0].provenance).toBe('alert-match')
+    expect(matching[0].tracked).toBe(true)
+    expect(matching[0].reason).toMatch(/alert/i)
   })
+})
+
+test.describe('dashboard preferences', () => {
+  /**
+   * plans/ui-dashboard Wave 6, and structural problem 10: density lived in `localStorage` under one
+   * key, so it was per *browser* and scoped to nothing — the same person got a different dashboard on
+   * their laptop and their phone, and switching organizations carried one workspace's layout into
+   * another.
+   *
+   * End to end rather than as a repository test, deliberately: the row is written through
+   * `builderhunt_app` with RLS on, and this repository has three recorded defects that a superuser
+   * unit test hid. What is being proved is that the app role can actually read and write it.
+   */
+  test('a layout round-trips through the app role, and is scoped to the organization', async () => {
+    const saved = await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: { density: 'sections', hiddenWidgetIds: ['source-mix'] },
+    })
+    expect(saved.status(), await saved.text()).toBe(200)
+
+    const read = await harness.owner.api!.get('/api/dashboard/preferences')
+    expect(await read.json()).toEqual({ density: 'sections', hiddenWidgetIds: ['source-mix'] })
+
+    // A second save overwrites rather than appending. There is no merge worth doing between two
+    // versions of "which widgets I hid", and an appending client would grow the row without limit.
+    await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: { density: 'bento', hiddenWidgetIds: [] },
+    })
+    expect(await (await harness.owner.api!.get('/api/dashboard/preferences')).json())
+      .toEqual({ density: 'bento', hiddenWidgetIds: [] })
+
+    // The other tenant's owner never sees it: the key is the (organization, user) pair, which is the
+    // whole reason this moved off a single browser-wide storage key.
+    const { principal: other } = await ensureSecondTenant()
+    expect(await (await other.api!.get('/api/dashboard/preferences')).json())
+      .toEqual({ density: 'bento', hiddenWidgetIds: [] })
+  })
+
+  test('an untenanted read gets the defaults rather than a 403', async () => {
+    /*
+     * The dashboard mounts before the active organization has always settled, and a browser logs
+     * every non-2xx subresource to the console — which is how this showed up: two new console errors
+     * in the sign-in e2e, from a strict collector doing its job. The response carries no tenant data,
+     * so there is nothing a 403 would be protecting.
+     *
+     * The write still refuses; a write with no tenant has nowhere to go.
+     */
+    const anonymous = await playwrightRequest.newContext({ baseURL: harness.baseURL })
+    try {
+      const read = await anonymous.get('/api/dashboard/preferences')
+      expect(read.status()).toBe(200)
+      expect(await read.json()).toEqual({ density: 'bento', hiddenWidgetIds: [] })
+
+      const write = await anonymous.put('/api/dashboard/preferences', {
+        data: { density: 'sections', hiddenWidgetIds: [] },
+      })
+      expect(write.status()).toBeGreaterThanOrEqual(400)
+    } finally {
+      await anonymous.dispose()
+    }
+  })
+
+  test('an unknown density is refused rather than stored', async () => {
+    // The column has a CHECK, so an invalid value cannot be written by any path — but a 400 tells the
+    // caller, where a constraint violation would be a 500 that looks like an outage.
+    const response = await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: { density: 'compact', hiddenWidgetIds: [] },
+    })
+    expect(response.status()).toBe(400)
+  })
+
+  test('refuses a malformed payload rather than storing it', async () => {
+    // Playwright's `test` has no `each`; a loop inside one test keeps the cases together and still
+    // names the failing one through the assertion message.
+    const cases: Array<[string, unknown]> = [
+      ['a widget id shaped like a path', { density: 'bento', hiddenWidgetIds: ['../../admin'] }],
+      ['more hidden widgets than the dashboard has', { density: 'bento', hiddenWidgetIds: Array.from({ length: 41 }, (_, index) => `w${index}`) }],
+      ['a missing density', { hiddenWidgetIds: [] }],
+    ]
+    for (const [label, data] of cases) {
+      const response = await harness.owner.api!.put('/api/dashboard/preferences', { data: data as Record<string, unknown> })
+      expect(response.status(), label).toBe(400)
+    }
+  })
+
+  test('an unknown widget id is accepted and simply does nothing', async () => {
+    /*
+     * Expected during a deploy: a preference for a widget this build does not have. `orderedWidgets`
+     * drops it silently on read, so storing it is harmless — and refusing it would make a rolling
+     * deploy start rejecting saves from whichever clients were still on the previous bundle.
+     */
+    const response = await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: { density: 'bento', hiddenWidgetIds: ['a-widget-that-never-existed'] },
+    })
+    expect(response.status()).toBe(200)
+    await harness.owner.api!.put('/api/dashboard/preferences', { data: { density: 'bento', hiddenWidgetIds: [] } })
+  })
+
+  test('every method other than GET and PUT is sealed', async () => {
+    const response = await harness.owner.api!.post('/api/dashboard/preferences', { data: {} })
+    expect(response.status()).toBe(405)
+    expect(response.headers()['allow']).toContain('PUT')
+  })
+})
+
+test('hiding a widget removes it, and a critical widget refuses to be hidden', async ({ browser }) => {
+  /**
+   * plans/ui-dashboard Wave 0 (the registry) and Wave 6 (preferences), asserted together because
+   * neither is observable without the other: the registry decides what a hide means, and the
+   * preference is where the hide lives.
+   *
+   * The critical half is the one worth an e2e. `orderedWidgets` ignores a hide on a
+   * `criticality: 'critical'` widget, and the write path deliberately does *not* enforce that —
+   * putting the rule in the route as well would be one rule in two places. So the only thing standing
+   * between "a user hides their payment problem" and it working is this resolution, and the only way
+   * to prove it is to store the hide and look at the page.
+   */
+  await seedOwnerDashboard()
+  await harness.owner.api!.put('/api/dashboard/preferences', {
+    data: { density: 'bento', hiddenWidgetIds: ['source-mix', 'action-queue'] },
+  })
+
+  const sp = await openStrictPage(browser, harness.owner)
+  try {
+    const { page } = sp
+    await go(page, '/dashboard')
+    await dismissOverlays(page)
+    await page.locator('[data-dashboard-state="ready"]').waitFor()
+
+    const rendered = await page.locator('[data-widget]').evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('data-widget')))
+
+    expect(rendered, 'a hidden standard widget still rendered').not.toContain('source-mix')
+    // Still present: a payment failure or a blocked workflow is not a preference.
+    expect(rendered, 'a critical widget was hidden by a user preference').toContain('action-queue')
+  } finally {
+    await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: { density: 'bento', hiddenWidgetIds: [] },
+    })
+    await closeStrictPage(sp)
+  }
 })
