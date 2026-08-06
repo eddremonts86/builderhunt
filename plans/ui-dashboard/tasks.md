@@ -387,10 +387,25 @@
   - Do: Persist bounded time buckets or integrate a real metrics backend for request counts, errors, latency histograms, search/cache outcomes, and allowlisted route families. Record instance/deployment/reset identity and retention. Do not infer history from cumulative process counters.
   - Verify: rates and p50/p95/p99 reconcile with fixture observations across process restart and multiple instances; high-cardinality URLs/IDs are normalized or rejected; retention is bounded.
 
-- [ ] **Rebuild `/admin/metrics` as a route-driven lazy widget shell**
+- [~] **Rebuild `/admin/metrics` as a route-driven lazy widget shell**
   - Files: `src/routes/_dashboard/admin/metrics.tsx`, `src/modules/admin/metrics/AdminMetricsPage.tsx`, query hooks, UI tests
   - Do: Add Overview, Traffic, Search/Discovery, Activation, Conversion, Feature reliability, and Runtime sections with validated `section`, `range`, `variant`, and comparison URL state. Fetch only the visible section; cancel/dedupe overlap, pause polling in hidden tabs, and show last success/stale/retry state.
   - Verify: direct/bookmarked filters restore correctly; invalid values normalize safely; hidden section requests do not fire; organization admins/non-admins remain denied; manual refresh has an accessible result announcement.
+  - **Done: the page moved to `AdminMetricsPage.tsx`, and that alone was a bundle fix.** It had been
+    *defined* in the route file and exported so the unit test could import it. TanStack Router will not
+    code-split a route file that exports anything but its `Route`, so ~780 lines of admin-only UI —
+    conversion funnel, removal matrix, interview counter groups, runtime diagnostics — compiled into
+    the bundle every visitor downloads, for a page only platform admins can open. It was the only route
+    file in the codebase doing this: the build warned about this file and no other, twenty times a run,
+    and nobody had read it.
+  - **Evidence:** after the move the warning count is 0, the page's strings are absent from the entry
+    bundle, and there is a lazily-referenced `metrics-*.js` chunk of 32K. Found by reading a passing
+    gate's log rather than by a failing check — nothing was broken, the page worked perfectly, and only
+    the bundle grew.
+  - **Polling already pauses in hidden tabs** (previous task in this track).
+  - **Still open:** the section split itself — validated `section`/`range`/`variant` URL state, fetching
+    only the visible section, per-section last-success/stale/retry. Blocked on the section contracts
+    task, which is where those states get defined.
 
 - [ ] **Build Request Health and bottleneck widgets**
   - Files: Admin Metrics traffic components/repository, tests

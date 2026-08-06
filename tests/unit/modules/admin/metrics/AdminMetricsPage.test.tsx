@@ -9,7 +9,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createRouter, createRootRoute, createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { AdminMetricsPage } from '~/routes/_dashboard/admin/metrics'
+import { AdminMetricsPage } from '~/modules/admin/metrics/AdminMetricsPage'
 
 beforeAll(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true

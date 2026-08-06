@@ -1627,3 +1627,30 @@ sentence.
 **Declined: the collapsed diagnostics panel.** The task asks for one. What is left in that card is
 four short rows that nothing else on the page depends on; a disclosure widget over eight values adds
 an interaction to save two centimetres.
+
+## 2026-08-06 — the one route file that was not code-split
+
+Found in the log of a **passing** gate. Twenty times per run, the build printed that
+`src/routes/_dashboard/admin/metrics.tsx` exports something besides its `Route` and therefore "will
+not be code-split". No step failed. Nothing was broken. The page worked perfectly.
+
+`AdminMetricsPage` was defined in the route file and exported so the unit test could import it.
+TanStack Router refuses to split a route file with extra exports, so roughly 780 lines of admin-only
+UI — the conversion funnel, the removal matrix, the interview counter groups, the runtime diagnostics
+— were compiled into the bundle **every visitor downloads**, for a page only a platform admin can
+open. It was the only route file in the codebase doing it; the warning named this file and no other.
+
+Moving the component to `~/modules/admin/metrics/AdminMetricsPage` — the path this plan's rebuild task
+already names — is the entire fix. Afterwards: zero warnings, none of the page's strings in the entry
+bundle, and a lazily-referenced 32K `metrics-*.js` chunk that loads when an admin opens the page.
+
+**The lesson is about where this hid, not what it was.** The repository already has a memory about
+route-file exports, and it is about the dangerous case: exporting a helper that touches the server
+layer ships `postgres` to the browser and every page dies. That failure is loud. This one is the same
+mistake with a quiet failure mode — a bigger bundle for everyone, forever, reported only as a warning
+inside a step that passed. A green gate is not the same as a clean one, and the difference is only
+visible if somebody reads the output of the steps that succeeded.
+
+The test moved with the component, to `tests/unit/modules/admin/metrics/`, so the mirror between
+source and test paths still holds — and so the next person who needs to import a page component finds
+it somewhere it is safe to import from.
