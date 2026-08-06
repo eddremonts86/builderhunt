@@ -208,10 +208,19 @@
   - Do: Prohibit individual productivity, search/note/activity rankings, private workflow content, candidate emails, session detail, and member-level adoption scores. Keep coordination object-based and adoption organization-aggregated.
   - Verify: DTO/DOM/telemetry snapshots reject member score/rank fields and seeded sensitive strings; small-team states do not expose inferable individual activity.
 
-- [ ] **Create the Platform Admin Command Center route and projection**
+- [~] **Create the Platform Admin Command Center route and projection**
   - Files: `src/routes/_dashboard/admin/index.tsx`, `src/routes/api/admin/overview.ts`, `src/shared/lib/repositories/admin-overview.ts`, navigation/route registry, API/E2E tests
   - Do: Add `/admin` as the Admin landing page and `GET /api/admin/overview?range=24h|7d|30d`. Return a platform action queue plus independent redacted section states for incidents, operations, billing, abuse/trust, user anomalies, growth, and public content.
   - Verify: platform admin can load/reload/deep-link; organization admins, members, signed-out users, and guessed resource IDs fail without confirming existence.
+  - **Scope changed by the maintainer, 2026-08-06: "índice = metrics".** `/admin` is no longer a new
+    destination; it is an index that resolves to `/admin/metrics`, which is the page operators
+    already read. Shipped in `src/routes/_dashboard/admin/index.tsx` — before it, the bare `/admin`
+    URL answered **404** even though `nav-config.ts` registers the area at that prefix.
+    The attention summary this task describes still gets built, but *on* the Metrics page rather than
+    beside it: a separate summary whose every tile mirrors a page it summarises rots first, and this
+    repository has the receipt — `/admin/integrations` showed two retired sources as ACTIVE because
+    it was assembled from a compile-time registry nobody updated. Remaining work is therefore
+    `GET /api/admin/overview` and the sections, folded into the Metrics rebuild below.
 
 - [ ] **Reconcile stale and future Admin destinations**
   - Files: `src/modules/dashboard/ui/shell/nav-config.ts`, Admin routes, `plans/UI`, navigation tests

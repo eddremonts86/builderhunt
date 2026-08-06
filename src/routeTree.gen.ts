@@ -62,6 +62,7 @@ import { Route as DashboardInterviewsIndexRouteImport } from './routes/_dashboar
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as DashboardCalendarIndexRouteImport } from './routes/_dashboard/calendar/index'
+import { Route as DashboardAdminIndexRouteImport } from './routes/_dashboard/admin/index'
 import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
 import { Route as ApiWorkSamplesAnalyzeRouteImport } from './routes/api/work-samples/analyze'
 import { Route as ApiWorkSamplesIdRouteImport } from './routes/api/work-samples/$id'
@@ -554,6 +555,11 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
 const DashboardCalendarIndexRoute = DashboardCalendarIndexRouteImport.update({
   id: '/calendar/',
   path: '/calendar/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminIndexRoute = DashboardAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
@@ -1936,6 +1942,7 @@ export interface FileRoutesByFullPath {
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
+  '/admin/': typeof DashboardAdminIndexRoute
   '/calendar/': typeof DashboardCalendarIndexRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
@@ -2216,6 +2223,7 @@ export interface FileRoutesByTo {
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
+  '/admin': typeof DashboardAdminIndexRoute
   '/calendar': typeof DashboardCalendarIndexRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
@@ -2501,6 +2509,7 @@ export interface FileRoutesById {
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
+  '/_dashboard/admin/': typeof DashboardAdminIndexRoute
   '/_dashboard/calendar/': typeof DashboardCalendarIndexRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
@@ -2785,6 +2794,7 @@ export interface FileRouteTypes {
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
+    | '/admin/'
     | '/calendar/'
     | '/dashboard/'
     | '/exports/'
@@ -3065,6 +3075,7 @@ export interface FileRouteTypes {
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
+    | '/admin'
     | '/calendar'
     | '/dashboard'
     | '/exports'
@@ -3349,6 +3360,7 @@ export interface FileRouteTypes {
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
+    | '/_dashboard/admin/'
     | '/_dashboard/calendar/'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
@@ -4076,6 +4088,13 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar/'
       preLoaderRoute: typeof DashboardCalendarIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/': {
+      id: '/_dashboard/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof DashboardAdminIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/team/invite/$invitationId': {
@@ -5726,6 +5745,7 @@ interface DashboardRouteRouteChildren {
   DashboardSettingsTeamRoute: typeof DashboardSettingsTeamRoute
   DashboardSprintsNewRoute: typeof DashboardSprintsNewRoute
   DashboardTeamActivityRoute: typeof DashboardTeamActivityRoute
+  DashboardAdminIndexRoute: typeof DashboardAdminIndexRoute
   DashboardCalendarIndexRoute: typeof DashboardCalendarIndexRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
@@ -5767,6 +5787,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardSettingsTeamRoute: DashboardSettingsTeamRoute,
   DashboardSprintsNewRoute: DashboardSprintsNewRoute,
   DashboardTeamActivityRoute: DashboardTeamActivityRoute,
+  DashboardAdminIndexRoute: DashboardAdminIndexRoute,
   DashboardCalendarIndexRoute: DashboardCalendarIndexRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,

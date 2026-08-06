@@ -1207,3 +1207,42 @@ test.describe('the action queue', () => {
   })
 
 })
+
+test('the Admin area has an index, and it is Metrics', async ({ browser }) => {
+  /**
+   * plans/ui-dashboard admin track, with the maintainer's ruling of 2026-08-06: "índice = metrics".
+   *
+   * `nav-config.ts` registers the Admin area with `routes: ['/admin']` — the prefix the rail
+   * highlights and every breadcrumb resolves against — and no route existed at that path, so the
+   * bare URL answered **404**. An administrator who clicked the area icon, edited the address bar or
+   * followed a stale link landed on a not-found page inside an area they own.
+   *
+   * Asserted for both audiences, because the interesting half is the refusal: the redirect must not
+   * become a cheaper oracle than the page it points at. A tenant probing `/admin` has to learn
+   * nothing a tenant probing `/admin/metrics` would not.
+   */
+  const adminPage = await openStrictPage(browser, harness.platformAdmin)
+  try {
+    const { page } = adminPage
+    await go(page, '/admin')
+    await page.waitForURL(/\/admin\/metrics/)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+
+    // `replace`, so the 404-shaped URL is not a back-button stop on the way out of the area.
+    await page.goBack()
+    expect(new URL(page.url()).pathname).not.toBe('/admin')
+  } finally {
+    await closeStrictPage(adminPage)
+  }
+
+  const tenantPage = await openStrictPage(browser, harness.owner)
+  try {
+    const { page, guard } = tenantPage
+    guard.allowExpectedFailure(/Forbidden/)
+    await go(page, '/admin')
+    // Whatever the shell renders for a refused route, it must not be the metrics page.
+    await expect(page.getByText(/Uptime|Total users/)).toHaveCount(0)
+  } finally {
+    await closeStrictPage(tenantPage)
+  }
+})

@@ -1106,3 +1106,35 @@ banners.
 **Evidence:** 39 unit tests across the rules and the contract, 6 on the cache key, 25 e2e in
 `dashboard-and-navigation.spec.ts`, and a browser check of the rendered queue — three rows, alerts
 above billing, one action each.
+
+### Admin track — `/admin` had no index at all
+
+The maintainer's ruling was "índice = metrics", and acting on it surfaced something the plan had not
+recorded: **`/admin` answered 404.** `nav-config.ts` registers the Admin area with
+`routes: ['/admin']` — the prefix the rail highlights and every breadcrumb resolves against — and no
+route existed there. An administrator who clicked the area icon, edited the address bar, or followed
+a stale link landed on a not-found page inside an area they own.
+
+`src/routes/_dashboard/admin/index.tsx` resolves it to `/admin/metrics`. Authorization is checked
+*before* the redirect and again on the destination: redirecting an unauthorized caller to a page that
+will refuse them answers "there is something here" first, and a redirect is a cheaper oracle to probe
+than a page.
+
+Scoping the Command Center onto Metrics rather than beside it is also the safer design. A summary
+page whose every tile mirrors a page it summarises has to be maintained in step with all of them, and
+the first to rot is the one nobody opens — this repository already has the receipt, in an
+`/admin/integrations` projection that showed two retired sources as ACTIVE because it was built from
+a compile-time registry nobody updated. The remaining `GET /api/admin/overview` work is folded into
+the Metrics rebuild; the task is marked `[~]` with that reasoning.
+
+### One flake, recorded rather than fixed
+
+`public-content.spec.ts` "at 320px, the mobile drawer reaches every destination without the page
+footer" failed once in six full gate runs, at its *second* close — the overlay click, not the Escape
+that precedes it. It passes 4/4 in isolation and passed on the immediate re-run of the whole gate.
+
+The shape is a race with Radix's overlay fade-in: the test reopens the drawer and immediately clicks
+a raw coordinate, so under the contention of two vite dev servers the click can land before the
+dismiss handler is live. Not caused by any change in this session, and not fixed here because the
+repair is a guess at someone else's spec — but a test that fails one run in six costs the same as a
+real failure under a "green before deploy" rule, so it is written down rather than forgotten.
