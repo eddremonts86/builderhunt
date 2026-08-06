@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   defineWidgetRegistry,
+  moveWidgetInOrder,
   orderedWidgets,
   registryColumnsUsed,
   WidgetRegistryError,
@@ -189,5 +190,141 @@ describe('registryColumnsUsed', () => {
       widget({ id: 'b', order: 20, span: 'third' }),
     ])
     expect(registryColumnsUsed(registry) % 12).toBe(0)
+  })
+})
+
+/**
+ * plans/ui-dashboard Wave 6, "Persist versioned per-user/per-organization preferences" and "Build
+ * accessible dashboard customization controls".
+ *
+ * The arrangement rules are worth their own tests because each of them protects a property that is
+ * invisible until it breaks: a critical widget that a user has pushed below the charts, a pin that
+ * lands in the middle of the page, a widget added by a deploy that appears at the bottom of every
+ * existing user's dashboard.
+ */
+describe('orderedWidgets — arrangement', () => {
+  const ARRANGEABLE = defineWidgetRegistry<Ctx>([
+    widget({ id: 'queue', order: 10, criticality: 'critical' }),
+    widget({ id: 'alpha', order: 20 }),
+    widget({ id: 'beta', order: 30 }),
+    widget({ id: 'gamma', order: 40 }),
+  ])
+  const ALL_SHIPPED = new Set<WidgetDependency>()
+
+  it('applies the user sequence to everything that is not critical', () => {
+    const { visible } = orderedWidgets(ARRANGEABLE, {
+      role: 'owner',
+      available: ALL_SHIPPED,
+      order: ['gamma', 'alpha', 'beta'],
+    })
+    expect(visible.map((entry) => entry.id)).toEqual(['queue', 'gamma', 'alpha', 'beta'])
+  })
+
+  it('refuses to move a critical widget out of the lead, however the order asks', () => {
+    /*
+     * `contracts.ts` says a critical widget cannot be hidden *or reordered*. Honouring only the first
+     * half would let a user push the action queue below three charts, which is the one arrangement a
+     * queue of blocked work must never be in — and unlike a hide, they would not have had to confirm
+     * anything to get there.
+     */
+    const { visible } = orderedWidgets(ARRANGEABLE, {
+      role: 'owner',
+      available: ALL_SHIPPED,
+      order: ['alpha', 'beta', 'gamma', 'queue'],
+    })
+    expect(visible[0].id).toBe('queue')
+  })
+
+  it('floats pinned widgets to the front, in the order they were pinned', () => {
+    const { visible } = orderedWidgets(ARRANGEABLE, {
+      role: 'owner',
+      available: ALL_SHIPPED,
+      pinned: ['gamma', 'beta'],
+    })
+    // After the critical one: a pin means "where I will see it", and the queue is not negotiable.
+    expect(visible.map((entry) => entry.id)).toEqual(['queue', 'gamma', 'beta', 'alpha'])
+  })
+
+  it('ignores a pin on a critical widget rather than double-counting it', () => {
+    const { visible } = orderedWidgets(ARRANGEABLE, {
+      role: 'owner',
+      available: ALL_SHIPPED,
+      pinned: ['queue', 'beta'],
+    })
+    expect(visible.map((entry) => entry.id)).toEqual(['queue', 'beta', 'alpha', 'gamma'])
+  })
+
+  it('places a widget the saved order has never seen at its registry position, not at the end', () => {
+    /*
+     * The saved order predates `gamma`. Appending it — the obvious reading of "append newly required
+     * widgets" — puts every new widget below everything, which is wrong the first time one is meant
+     * to be near the top.
+     */
+    const { visible } = orderedWidgets(ARRANGEABLE, {
+      role: 'owner',
+      available: ALL_SHIPPED,
+      order: ['beta', 'alpha'],
+    })
+    expect(visible.map((entry) => entry.id)).toEqual(['queue', 'beta', 'alpha', 'gamma'])
+  })
+
+  it('leaves no gap where an ineligible widget would have been', () => {
+    // Ordering runs after eligibility on purpose: a saved position for a widget this role may not see
+    // must not reserve a slot, and must not be evidence the widget exists.
+    const gated = defineWidgetRegistry<Ctx>([
+      widget({ id: 'alpha', order: 10 }),
+      widget({ id: 'billing', order: 20, roles: ['owner'] }),
+      widget({ id: 'beta', order: 30 }),
+    ])
+    const { visible, omitted } = orderedWidgets(gated, {
+      role: 'member',
+      available: ALL_SHIPPED,
+      order: ['billing', 'beta', 'alpha'],
+    })
+    expect(visible.map((entry) => entry.id)).toEqual(['beta', 'alpha'])
+    expect(omitted).toEqual([{ id: 'billing', reason: 'role' }])
+  })
+})
+
+describe('moveWidgetInOrder', () => {
+  const movable = (id: string) => id !== 'queue'
+
+  it('swaps a widget with its neighbour', () => {
+    expect(moveWidgetInOrder(['a', 'b', 'c'], 'b', 'up', () => true)).toEqual(['b', 'a', 'c'])
+    expect(moveWidgetInOrder(['a', 'b', 'c'], 'b', 'down', () => true)).toEqual(['a', 'c', 'b'])
+  })
+
+  it('steps over an immovable neighbour in one press, without disturbing it', () => {
+    /*
+     * Two presses to achieve one visible step is the kind of control a keyboard user gives up on, and
+     * the intermediate state — a widget sitting *above* the action queue — is not one the page would
+     * ever render. The queue keeps index 1 either way.
+     */
+    expect(moveWidgetInOrder(['a', 'queue', 'b'], 'b', 'up', movable)).toEqual(['b', 'queue', 'a'])
+  })
+
+  it('returns the same array when the move is impossible, so a no-op costs nothing', () => {
+    const order = ['a', 'b']
+    expect(moveWidgetInOrder(order, 'a', 'up', () => true)).toBe(order)
+    expect(moveWidgetInOrder(order, 'b', 'down', () => true)).toBe(order)
+    expect(moveWidgetInOrder(order, 'queue', 'up', movable)).toBe(order)
+  })
+})
+
+describe('defineWidgetRegistry — titles', () => {
+  it('refuses two widgets that share a title', () => {
+    /*
+     * Harmless until something lists them side by side, which the Customize dialog does: one row per
+     * widget, every control labelled with the title ("Move Saved searches up"), and none of the
+     * context that told a metric tile from a list of saved searches on the page. Someone navigating
+     * by name gets two of everything.
+     *
+     * This shipped for a day as two identical rows and was caught by reading the rendered dialog, not
+     * by a test — hence the throw rather than a note.
+     */
+    expect(() => defineWidgetRegistry<Ctx>([
+      widget({ id: 'stat-searches', order: 10, title: 'Saved searches' }),
+      widget({ id: 'saved-searches', order: 20, title: 'Saved searches' }),
+    ])).toThrow(/share the title/)
   })
 })

@@ -612,6 +612,10 @@
     "0152_dashboard_preferences_grants": {
       "sql": "12ddff48f2048b95da04f475ef69ee55f481ca27989de9f055623c3092602644",
       "snapshot": "3407de3e48a6eb76aa6d5d639b25143a65bfaf28801e6746ebd48ca6e8ec57ba"
+    },
+    "0153_dashboard_preferences_order": {
+      "sql": "bab271b8f138f82af48457d7b1a7ca7ac5a81017fd5614d94dce059ee00d44f0",
+      "snapshot": "16611bc1e19fb2723e5eb2921d475d30be798914477e68dabd4f85a921a0c220"
     }
   }
 }

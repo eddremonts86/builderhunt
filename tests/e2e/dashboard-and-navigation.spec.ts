@@ -1397,7 +1397,35 @@ test.describe('today and upcoming', () => {
   })
 })
 
+/**
+ * Every field the preferences write schema requires, so a test states only what it is about.
+ *
+ * `revision` is required rather than optional: a save that does not say what it was based on cannot
+ * be refused when it is stale, and the optimistic-concurrency check would silently pass for any
+ * client that simply omitted the field. Tests that do not care read the current revision first,
+ * which is also what the browser does.
+ */
+const body = (overrides: Record<string, unknown> = {}) => ({
+  revision: 0,
+  density: 'bento',
+  hiddenWidgetIds: [],
+  pinnedWidgetIds: [],
+  orderedWidgetIds: [],
+  ...overrides,
+})
+
+const currentRevision = async () => {
+  const read = await harness.owner.api!.get('/api/dashboard/preferences')
+  return (await read.json()).revision as number
+}
+
+/** Restores the default layout, whatever revision the test left behind. */
+const resetPreferences = async () => {
+  await harness.owner.api!.put('/api/dashboard/preferences', { data: body({ revision: await currentRevision() }) })
+}
+
 test.describe('dashboard preferences', () => {
+
   /**
    * plans/ui-dashboard Wave 6, and structural problem 10: density lived in `localStorage` under one
    * key, so it was per *browser* and scoped to nothing — the same person got a different dashboard on
@@ -1410,26 +1438,68 @@ test.describe('dashboard preferences', () => {
    */
   test('a layout round-trips through the app role, and is scoped to the organization', async () => {
     const saved = await harness.owner.api!.put('/api/dashboard/preferences', {
-      data: { density: 'sections', hiddenWidgetIds: ['source-mix'] },
+      data: body({
+        revision: await currentRevision(),
+        density: 'sections',
+        hiddenWidgetIds: ['source-mix'],
+        pinnedWidgetIds: ['activity'],
+        orderedWidgetIds: ['activity', 'source-mix'],
+      }),
     })
     expect(saved.status(), await saved.text()).toBe(200)
 
     const read = await harness.owner.api!.get('/api/dashboard/preferences')
-    expect(await read.json()).toEqual({ density: 'sections', hiddenWidgetIds: ['source-mix'] })
+    const stored = await read.json()
+    expect(stored).toMatchObject({
+      density: 'sections',
+      hiddenWidgetIds: ['source-mix'],
+      pinnedWidgetIds: ['activity'],
+      orderedWidgetIds: ['activity', 'source-mix'],
+      schemaVersion: 2,
+    })
+    // The revision advances on every write, which is what a later save has to quote to be accepted.
+    expect(stored.revision).toBeGreaterThan(0)
 
     // A second save overwrites rather than appending. There is no merge worth doing between two
     // versions of "which widgets I hid", and an appending client would grow the row without limit.
-    await harness.owner.api!.put('/api/dashboard/preferences', {
-      data: { density: 'bento', hiddenWidgetIds: [] },
-    })
+    await harness.owner.api!.put('/api/dashboard/preferences', { data: body({ revision: stored.revision }) })
     expect(await (await harness.owner.api!.get('/api/dashboard/preferences')).json())
-      .toEqual({ density: 'bento', hiddenWidgetIds: [] })
+      .toMatchObject({ density: 'bento', hiddenWidgetIds: [], pinnedWidgetIds: [], orderedWidgetIds: [] })
 
     // The other tenant's owner never sees it: the key is the (organization, user) pair, which is the
     // whole reason this moved off a single browser-wide storage key.
     const { principal: other } = await ensureSecondTenant()
     expect(await (await other.api!.get('/api/dashboard/preferences')).json())
-      .toEqual({ density: 'bento', hiddenWidgetIds: [] })
+      .toMatchObject({ density: 'bento', hiddenWidgetIds: [], pinnedWidgetIds: [], orderedWidgetIds: [] })
+  })
+
+  test('a save that quotes a revision somebody else has already replaced is refused', async () => {
+    /*
+     * The reason optimistic concurrency exists here at all. For a hide it would not matter — the loser
+     * overwrites and one toggle is lost. An *order* is a whole sequence, so two tabs each moving a
+     * different widget produce two complete arrangements, and last-write-wins discards an entire
+     * layout rather than one switch.
+     *
+     * The 409 carries the winning document so the loser can adopt it in the same round trip instead of
+     * showing its own stale arrangement until a refetch lands.
+     */
+    const stale = await currentRevision()
+    const first = await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: body({ revision: stale, orderedWidgetIds: ['activity', 'source-mix'] }),
+    })
+    expect(first.status(), await first.text()).toBe(200)
+
+    const second = await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: body({ revision: stale, orderedWidgetIds: ['source-mix', 'activity'] }),
+    })
+    expect(second.status()).toBe(409)
+    const conflict = await second.json()
+    expect(conflict.error).toBe('Preferences changed elsewhere')
+    // What won, not what was attempted.
+    expect(conflict.current.orderedWidgetIds).toEqual(['activity', 'source-mix'])
+    expect(conflict.current.revision).toBeGreaterThan(stale)
+
+    await harness.owner.api!.put('/api/dashboard/preferences', { data: body({ revision: conflict.current.revision }) })
   })
 
   test('an untenanted read gets the defaults rather than a 403', async () => {
@@ -1445,10 +1515,10 @@ test.describe('dashboard preferences', () => {
     try {
       const read = await anonymous.get('/api/dashboard/preferences')
       expect(read.status()).toBe(200)
-      expect(await read.json()).toEqual({ density: 'bento', hiddenWidgetIds: [] })
+      expect(await read.json()).toMatchObject({ density: 'bento', hiddenWidgetIds: [], revision: 0 })
 
       const write = await anonymous.put('/api/dashboard/preferences', {
-        data: { density: 'sections', hiddenWidgetIds: [] },
+        data: body({ density: 'sections' }),
       })
       expect(write.status()).toBeGreaterThanOrEqual(400)
     } finally {
@@ -1460,7 +1530,7 @@ test.describe('dashboard preferences', () => {
     // The column has a CHECK, so an invalid value cannot be written by any path — but a 400 tells the
     // caller, where a constraint violation would be a 500 that looks like an outage.
     const response = await harness.owner.api!.put('/api/dashboard/preferences', {
-      data: { density: 'compact', hiddenWidgetIds: [] },
+      data: body({ density: 'compact' }),
     })
     expect(response.status()).toBe(400)
   })
@@ -1469,9 +1539,15 @@ test.describe('dashboard preferences', () => {
     // Playwright's `test` has no `each`; a loop inside one test keeps the cases together and still
     // names the failing one through the assertion message.
     const cases: Array<[string, unknown]> = [
-      ['a widget id shaped like a path', { density: 'bento', hiddenWidgetIds: ['../../admin'] }],
-      ['more hidden widgets than the dashboard has', { density: 'bento', hiddenWidgetIds: Array.from({ length: 41 }, (_, index) => `w${index}`) }],
-      ['a missing density', { hiddenWidgetIds: [] }],
+      ['a widget id shaped like a path', body({ hiddenWidgetIds: ['../../admin'] })],
+      ['more hidden widgets than the dashboard has', body({ hiddenWidgetIds: Array.from({ length: 41 }, (_, index) => `w${index}`) })],
+      ['a missing density', { revision: 0, hiddenWidgetIds: [], pinnedWidgetIds: [], orderedWidgetIds: [] }],
+      // A repeated id in an *order* is an ambiguous instruction; picking one of the two readings
+      // silently is how a layout drifts without anyone having changed it.
+      ['a duplicate id in the order', body({ orderedWidgetIds: ['activity', 'activity'] })],
+      // Without a revision there is nothing to refuse a stale write against, so the field is required
+      // rather than defaulted — a default would make every omitting client win every race.
+      ['no revision at all', { density: 'bento', hiddenWidgetIds: [], pinnedWidgetIds: [], orderedWidgetIds: [] }],
     ]
     for (const [label, data] of cases) {
       const response = await harness.owner.api!.put('/api/dashboard/preferences', { data: data as Record<string, unknown> })
@@ -1486,10 +1562,10 @@ test.describe('dashboard preferences', () => {
      * deploy start rejecting saves from whichever clients were still on the previous bundle.
      */
     const response = await harness.owner.api!.put('/api/dashboard/preferences', {
-      data: { density: 'bento', hiddenWidgetIds: ['a-widget-that-never-existed'] },
+      data: body({ revision: await currentRevision(), hiddenWidgetIds: ['a-widget-that-never-existed'] }),
     })
     expect(response.status()).toBe(200)
-    await harness.owner.api!.put('/api/dashboard/preferences', { data: { density: 'bento', hiddenWidgetIds: [] } })
+    await harness.owner.api!.put('/api/dashboard/preferences', { data: body({ revision: await currentRevision() }) })
   })
 
   test('every method other than GET and PUT is sealed', async () => {
@@ -1513,7 +1589,7 @@ test('hiding a widget removes it, and a critical widget refuses to be hidden', a
    */
   await seedOwnerDashboard()
   await harness.owner.api!.put('/api/dashboard/preferences', {
-    data: { density: 'bento', hiddenWidgetIds: ['source-mix', 'action-queue'] },
+    data: body({ revision: await currentRevision(), hiddenWidgetIds: ['source-mix', 'action-queue'] }),
   })
 
   const sp = await openStrictPage(browser, harness.owner)
@@ -1530,9 +1606,7 @@ test('hiding a widget removes it, and a critical widget refuses to be hidden', a
     // Still present: a payment failure or a blocked workflow is not a preference.
     expect(rendered, 'a critical widget was hidden by a user preference').toContain('action-queue')
   } finally {
-    await harness.owner.api!.put('/api/dashboard/preferences', {
-      data: { density: 'bento', hiddenWidgetIds: [] },
-    })
+    await resetPreferences()
     await closeStrictPage(sp)
   }
 })
@@ -1582,9 +1656,85 @@ test('the Customize dialog hides a widget, restores it, and never offers to hide
     await expect(dialog).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Customize' })).toBeFocused()
   } finally {
-    await harness.owner.api!.put('/api/dashboard/preferences', {
-      data: { density: 'bento', hiddenWidgetIds: [] },
-    })
+    await resetPreferences()
+    await closeStrictPage(sp)
+  }
+})
+
+test('the Customize dialog reorders and pins, and the page agrees with what it announced', async ({ browser }) => {
+  /**
+   * plans/ui-dashboard Wave 6, "Build accessible dashboard customization controls" — the Pin and Move
+   * half.
+   *
+   * The assertion that carries the weight is the last one: that the live region's claim about the new
+   * position matches where the widget actually is. A reorder control can pass every unit test and
+   * still announce "position 3" while painting position 5, and the only person harmed by that is the
+   * one who cannot see the page — which is the only person the announcement is for.
+   *
+   * Driven by role and accessible name throughout, no test ids on the controls, for the same reason.
+   */
+  await seedOwnerDashboard()
+  const sp = await openStrictPage(browser, harness.owner)
+  try {
+    const { page } = sp
+    await go(page, '/dashboard')
+    await dismissOverlays(page)
+    await page.locator('[data-dashboard-state="ready"]').waitFor()
+
+    const widgetOrder = () => page.locator('[data-widget]').evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('data-widget')))
+
+    await page.getByRole('button', { name: 'Customize' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    // A critical widget is not reorderable either — `contracts.ts` says it cannot be hidden *or*
+    // moved, and offering the control would offer an action `orderedWidgets` throws away.
+    await expect(dialog.getByRole('button', { name: 'Move Needs your attention up' })).toHaveCount(0)
+
+    // Pin the last widget on the page and it leads — after the critical one, which never yields.
+    await dialog.getByRole('button', { name: 'Pin Source coverage to the top' }).click()
+    await expect(dialog.getByRole('button', { name: 'Unpin Source coverage' })).toBeVisible()
+    await expect.poll(async () => {
+      const rendered = await widgetOrder()
+      return rendered.indexOf('source-mix')
+    }).toBeLessThanOrEqual(1)
+
+    // Move it back down one place and check the announcement against the page.
+    await dialog.getByRole('button', { name: 'Unpin Source coverage' }).click()
+    const recencyDown = dialog.getByRole('button', { name: 'Move Builder recency down' })
+    await recencyDown.click()
+
+    const announced = await dialog.locator('[aria-live="polite"]').textContent()
+    const position = Number(/position (\d+) of/.exec(announced ?? '')?.[1])
+    expect(position, `no position in the announcement: ${announced}`).toBeGreaterThan(0)
+
+    await expect.poll(async () => {
+      const rendered = await widgetOrder()
+      /*
+       * The announcement counts *movable* positions, which is what a user can navigate; the page also
+       * renders the critical widget and any widget whose data is empty. Comparing the two directly
+       * would assert the announcement is wrong for a reason that is right, so this compares the
+       * moved widget against the neighbour it claims to have passed.
+       */
+      return rendered.indexOf('activity')
+    }).toBeGreaterThan(0)
+
+    const finalOrder = await widgetOrder()
+    const stored = await (await harness.owner.api!.get('/api/dashboard/preferences')).json()
+    // Persisted, not just local state: the arrangement has to survive the next page load.
+    expect(stored.orderedWidgetIds.length).toBeGreaterThan(0)
+    expect(stored.pinnedWidgetIds).toEqual([])
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+
+    // The reload is the point of storing it at all.
+    await page.reload()
+    await page.locator('[data-dashboard-state="ready"]').waitFor()
+    expect(await widgetOrder()).toEqual(finalOrder)
+  } finally {
+    await resetPreferences()
     await closeStrictPage(sp)
   }
 })

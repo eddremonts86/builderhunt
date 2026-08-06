@@ -36,12 +36,14 @@ const WIDGETS: CustomizableWidget[] = [
 
 interface Handlers {
   onToggleHidden?: (id: string) => void
+  onTogglePinned?: (id: string) => void
+  onMove?: (id: string, direction: 'up' | 'down') => void
   onDensityChange?: (density: 'bento' | 'sections') => void
   onReset?: () => void
   onClose?: () => void
 }
 
-function render(hiddenWidgetIds: string[] = [], handlers: Handlers = {}) {
+function render(hiddenWidgetIds: string[] = [], handlers: Handlers = {}, pinnedWidgetIds: string[] = []) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -52,8 +54,11 @@ function render(hiddenWidgetIds: string[] = [], handlers: Handlers = {}) {
         onClose={handlers.onClose ?? (() => {})}
         widgets={WIDGETS}
         hiddenWidgetIds={hiddenWidgetIds}
+        pinnedWidgetIds={pinnedWidgetIds}
         density="bento"
         onToggleHidden={handlers.onToggleHidden ?? (() => {})}
+        onTogglePinned={handlers.onTogglePinned ?? (() => {})}
+        onMove={handlers.onMove ?? (() => {})}
         onDensityChange={handlers.onDensityChange ?? (() => {})}
         onReset={handlers.onReset ?? (() => {})}
       />,
@@ -124,6 +129,76 @@ describe('DashboardCustomizeDialog', () => {
       .find((input) => input.value === 'sections')
     act(() => { sections!.click() })
     expect(onDensityChange).toHaveBeenCalledWith('sections')
+  })
+
+  it('never offers to move or pin a critical widget', () => {
+    // `orderedWidgets` keeps a critical widget at the front regardless of the saved order, so a Move
+    // button here would be a control that visibly does nothing.
+    const body = render()
+    expect(body.querySelector('[aria-label="Move Needs your attention up"]')).toBeNull()
+    expect(body.querySelector('[aria-label="Pin Needs your attention to the top"]')).toBeNull()
+  })
+
+  it('disables the move that would run off the end instead of removing the button', () => {
+    /*
+     * A control that vanishes at the boundary moves every button after it under the user's cursor and
+     * out from under their focus — a keyboard user who has pressed "Move up" four times finds the
+     * fifth press landing on a different control entirely.
+     *
+     * The two movable widgets are `activity` and `source-mix`; the critical one is not counted, which
+     * is why "Move Builder recency up" is the disabled end and not the second position.
+     */
+    const body = render()
+    const first = body.querySelector('[aria-label="Move Builder recency up"]') as HTMLButtonElement
+    const last = body.querySelector('[aria-label="Move Source coverage down"]') as HTMLButtonElement
+    expect(first.disabled).toBe(true)
+    expect(last.disabled).toBe(true)
+    expect((body.querySelector('[aria-label="Move Builder recency down"]') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('announces a move by widget and destination, counting only movable positions', () => {
+    /*
+     * This live region is the *entire* feedback channel for a screen-reader user: focus stays on a
+     * button whose label has not changed, inside a list whose order they cannot perceive. "Moved" on
+     * its own tells them nothing they can act on.
+     *
+     * "2 of 2" rather than "3 of 3": the locked widget occupies a row but not a position anyone can
+     * move through, and counting it would describe a list the user cannot navigate.
+     */
+    const onMove = vi.fn()
+    const body = render([], { onMove })
+    const down = body.querySelector('[aria-label="Move Builder recency down"]') as HTMLElement
+    act(() => { down.click() })
+
+    expect(onMove).toHaveBeenCalledWith('activity', 'down')
+    const live = body.querySelector('[aria-live="polite"]')
+    expect(live?.textContent).toBe('Builder recency moved to position 2 of 2.')
+  })
+
+  it('labels the pin control by what pressing it does, and reports state separately', () => {
+    // "Pinned" as a label leaves a screen-reader user guessing whether pressing it pins or unpins;
+    // `aria-pressed` is where the state belongs.
+    const onTogglePinned = vi.fn()
+    const body = render([], { onTogglePinned }, ['source-mix'])
+
+    const pinned = body.querySelector('[aria-label="Unpin Source coverage"]')
+    expect(pinned?.getAttribute('aria-pressed')).toBe('true')
+
+    const unpinned = body.querySelector('[aria-label="Pin Builder recency to the top"]') as HTMLElement
+    expect(unpinned.getAttribute('aria-pressed')).toBe('false')
+    act(() => { unpinned.click() })
+    expect(onTogglePinned).toHaveBeenCalledWith('activity')
+    expect(body.querySelector('[aria-live="polite"]')?.textContent)
+      .toBe('Builder recency pinned to the top of the dashboard.')
+  })
+
+  it('keeps the live region mounted before it has anything to say', () => {
+    // A live region inserted into the DOM at the moment it gets content is not announced by most
+    // screen readers — it has to be there, and empty, when the dialog opens.
+    const body = render()
+    const live = body.querySelector('[aria-live="polite"]')
+    expect(live).not.toBeNull()
+    expect(live?.textContent).toBe('')
   })
 
   it('offers a reset', () => {

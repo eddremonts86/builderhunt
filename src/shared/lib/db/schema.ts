@@ -476,6 +476,26 @@ export const dashboardPreferences = pgTable(
      * outliving its widget is expected, not exceptional.
      */
     hiddenWidgetIds: jsonb('hidden_widget_ids').$type<string[]>().notNull().default([]),
+    /**
+     * Widget ids the user pinned, in the order they pinned them. Pinned widgets lead the sequence,
+     * after any `critical` one — see `arrange` in `widget-registry.ts`.
+     */
+    pinnedWidgetIds: jsonb('pinned_widget_ids').$type<string[]>().notNull().default([]),
+    /**
+     * The full sequence the user last saw, hidden widgets included, so unhiding one restores it to
+     * where they put it. Reconciled against the build's registry on read by `mergeWidgetOrder`.
+     */
+    orderedWidgetIds: jsonb('ordered_widget_ids').$type<string[]>().notNull().default([]),
+    /**
+     * The shape of this row, for read-time migration. Distinct from `revision` below: this changes
+     * when a *deploy* changes the document, that changes when a *user* saves.
+     */
+    schemaVersion: integer('schema_version').notNull().default(1),
+    /**
+     * Incremented on every write. A save carries the revision it read and is refused when they differ,
+     * which is what keeps two tabs from silently discarding each other's whole arrangement.
+     */
+    revision: integer('revision').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -485,6 +505,15 @@ export const dashboardPreferences = pgTable(
     // A jsonb column typed `string[]` in TypeScript can still hold an object. This is what makes the
     // read side's `Array.isArray` a formality rather than a guard.
     check('dashboard_preferences_hidden_is_array_check', sql`jsonb_typeof(${table.hiddenWidgetIds}) = 'array'`),
+    check('dashboard_preferences_pinned_is_array_check', sql`jsonb_typeof(${table.pinnedWidgetIds}) = 'array'`),
+    check('dashboard_preferences_ordered_is_array_check', sql`jsonb_typeof(${table.orderedWidgetIds}) = 'array'`),
+    // The bound the route enforces, enforced again where it cannot be bypassed. A client that appended
+    // instead of replacing would otherwise grow the row until somebody noticed the payload was slow.
+    check('dashboard_preferences_list_bounds_check', sql`
+      jsonb_array_length(${table.hiddenWidgetIds}) <= 40
+      and jsonb_array_length(${table.pinnedWidgetIds}) <= 40
+      and jsonb_array_length(${table.orderedWidgetIds}) <= 40
+    `),
   ],
 )
 

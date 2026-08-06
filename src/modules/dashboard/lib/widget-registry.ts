@@ -30,6 +30,7 @@
  */
 
 import { RETIRED_WIDGET_IDS, type WidgetDefinition, type WidgetDependency, type WidgetOmissionReason } from './contracts'
+import { mergeWidgetOrder } from '~/shared/lib/dashboard/preferences-contract'
 import { SPAN_COLUMNS, type BentoSpan } from '~/modules/dashboard/ui/bento/layout'
 import type { OrganizationRole } from '~/shared/lib/authorization/permissions'
 
@@ -89,6 +90,7 @@ export function defineWidgetRegistry<Ctx>(
   }))
 
   const seenIds = new Set<string>()
+  const seenTitles = new Map<string, string>()
   const seenOrders = new Map<number, string>()
 
   for (const widget of widgets) {
@@ -101,6 +103,22 @@ export function defineWidgetRegistry<Ctx>(
     if (RETIRED_WIDGET_IDS.includes(widget.id)) {
       throw new WidgetRegistryError(
         `widget id "${widget.id}" is retired and must not be reused — a saved hide for it would apply to unrelated content`,
+      )
+    }
+    /*
+     * Two widgets sharing a title is only harmless while nothing lists them side by side. The
+     * Customize dialog does: it renders one row per widget, labels every control with the title
+     * ("Move Saved searches up"), and strips away the context that told them apart on the page — a
+     * count in a metric tile and a list of saved searches were obviously different things there, and
+     * are two identical rows here. Someone navigating by name gets two of everything and no way to
+     * tell which is which.
+     *
+     * Caught in review of the rendered dialog rather than by a test, which is why it is now a throw.
+     */
+    const titleClash = seenTitles.get(widget.title)
+    if (titleClash !== undefined) {
+      throw new WidgetRegistryError(
+        `widgets "${titleClash}" and "${widget.id}" share the title "${widget.title}"; the Customize dialog labels its controls by title, so the two would be indistinguishable`,
       )
     }
     if (widget.roles.length === 0) {
@@ -121,6 +139,7 @@ export function defineWidgetRegistry<Ctx>(
       )
     }
     seenIds.add(widget.id)
+    seenTitles.set(widget.title, widget.id)
     seenOrders.set(widget.order, widget.id)
   }
 
@@ -137,6 +156,21 @@ export interface WidgetEligibilityInput {
    * expected, not exceptional.
    */
   hidden?: ReadonlySet<string>
+  /**
+   * The user's saved sequence, reconciled against this build's registry by `mergeWidgetOrder`.
+   *
+   * A *partial* instruction: ids it does not mention keep their registry position, so a widget added
+   * by a deploy lands where its author put it rather than at the bottom of everyone's page.
+   */
+  order?: readonly string[]
+  /**
+   * Widget ids the user pinned, in the order they pinned them. Pinned widgets lead the sequence.
+   *
+   * Ignored for `critical` widgets for the same reason a hide is: their position is the product's
+   * decision, not a preference, and a queue of blocked work that a user has pushed below three charts
+   * is not a queue.
+   */
+  pinned?: readonly string[]
 }
 
 export interface EligibleWidget<Ctx> {
@@ -156,17 +190,67 @@ export interface ResolvedRegistry<Ctx> {
 }
 
 /**
+ * Applies the user's arrangement to widgets that are already eligible.
+ *
+ * Three bands, in this order: **critical**, then **pinned**, then everything else in the user's
+ * merged sequence.
+ *
+ * Critical leads because its position is not a preference — `contracts.ts` says a critical widget
+ * cannot be hidden *or reordered*, and honouring only the first half would let a user push the action
+ * queue below the charts, which is the one arrangement the queue must never be in. Pins come next
+ * because "pin" means "I want this where I will see it", and a pin that lands in the middle of the
+ * page has not done what its name says.
+ *
+ * Within each band the relative order is the user's, not the registry's; `mergeWidgetOrder` has
+ * already reconciled that sequence with the widgets this build actually has.
+ */
+function arrange<Ctx>(
+  eligible: ReadonlyArray<WidgetDefinition<Ctx>>,
+  order: readonly string[] | undefined,
+  pinned: readonly string[] | undefined,
+): Array<WidgetDefinition<Ctx>> {
+  if (!order?.length && !pinned?.length) return [...eligible]
+
+  const byId = new Map(eligible.map((widget) => [widget.id, widget]))
+  const rank = new Map<string, number>()
+  if (order) {
+    // Only ids that survived eligibility get a rank; the rest fall back to registry position below.
+    mergeWidgetOrder(order, eligible.map((widget) => widget.id))
+      .forEach((id, index) => rank.set(id, index))
+  }
+
+  const sequence = (widgets: ReadonlyArray<WidgetDefinition<Ctx>>) =>
+    [...widgets].sort((a, b) => (rank.get(a.id) ?? a.order) - (rank.get(b.id) ?? b.order))
+
+  const critical = sequence(eligible.filter((widget) => widget.criticality === 'critical'))
+  const pinnedSet = new Set((pinned ?? []).filter((id) => byId.get(id)?.criticality !== 'critical'))
+  // Pin order is the order the user pinned in, which is what the dialog's list shows them.
+  const pinnedWidgets = (pinned ?? [])
+    .filter((id) => pinnedSet.has(id))
+    .map((id) => byId.get(id))
+    .filter((widget): widget is WidgetDefinition<Ctx> => widget !== undefined)
+  const rest = sequence(eligible.filter(
+    (widget) => widget.criticality !== 'critical' && !pinnedSet.has(widget.id),
+  ))
+
+  return [...critical, ...pinnedWidgets, ...rest]
+}
+
+/**
  * Resolves a registry for one viewer.
  *
  * Reasons are checked in a fixed order — role, then dependency, then preference — because the answer
  * shown to the user differs. "You cannot see this" must never be presented as "you hid this", and
  * offering to restore a widget the role may not see would confirm it exists.
+ *
+ * Ordering happens after eligibility, never before: a widget the viewer may not see must not leave a
+ * gap in the sequence, and a saved order that mentions it must not be read as evidence it exists.
  */
 export function orderedWidgets<Ctx>(
   registry: ReadonlyArray<WidgetDefinition<Ctx>>,
   input: WidgetEligibilityInput,
 ): ResolvedRegistry<Ctx> {
-  const visible: Array<WidgetDefinition<Ctx>> = []
+  const eligible: Array<WidgetDefinition<Ctx>> = []
   const omitted: OmittedWidget[] = []
 
   for (const widget of registry) {
@@ -187,10 +271,45 @@ export function orderedWidgets<Ctx>(
         continue
       }
     }
-    visible.push(widget)
+    eligible.push(widget)
   }
 
-  return { visible, omitted }
+  return { visible: arrange(eligible, input.order, input.pinned), omitted }
+}
+
+/**
+ * Moves one widget one place through a sequence, skipping anything that may not be reordered.
+ *
+ * Returns the same array reference when the move is impossible — the widget is already at its end of
+ * the list, or is not movable — so a caller can refuse without comparing contents, and a no-op never
+ * costs a write or an announcement.
+ *
+ * "One place" is measured in *movable* positions, not array indices. A widget sitting below a pinned
+ * or critical one must move past it in a single press: two presses to achieve one visible step is the
+ * kind of control a keyboard user gives up on, and the intermediate state is not one the page would
+ * ever render.
+ */
+export function moveWidgetInOrder(
+  order: readonly string[],
+  widgetId: string,
+  direction: 'up' | 'down',
+  isMovable: (id: string) => boolean,
+): readonly string[] {
+  if (!isMovable(widgetId)) return order
+
+  const movable = order.filter(isMovable)
+  const from = movable.indexOf(widgetId)
+  const to = direction === 'up' ? from - 1 : from + 1
+  if (from < 0 || to < 0 || to >= movable.length) return order
+
+  const swapped = [...movable]
+  ;[swapped[from], swapped[to]] = [swapped[to], swapped[from]]
+
+  // Rebuild in place: immovable entries keep their exact index, and the movable ones are dealt back
+  // into the gaps in their new order. Splicing the moved widget directly would drag it past an
+  // immovable neighbour and change that neighbour's position too.
+  let next = 0
+  return order.map((id) => (isMovable(id) ? swapped[next++] : id))
 }
 
 /**

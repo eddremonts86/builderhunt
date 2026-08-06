@@ -119,6 +119,22 @@ function atLeast(span: BentoSpan, min: BentoSpan | undefined): BentoSpan {
 }
 
 /**
+ * Whether a widget puts anything on the page for this data.
+ *
+ * Exported because the Customize dialog has to ask the same question. Its list is what "Move up"
+ * moves through and what the live region counts positions in, so a widget the layout dropped for
+ * having nothing to say must not occupy a position there — the announcement would name a place that
+ * does not exist, and the user it exists for is the one who cannot check.
+ *
+ * One predicate rather than two copies of two conditions: the copies would agree until the day
+ * somebody adds a third reason a tile is skipped.
+ */
+export function rendersForData<Ctx>(widget: BentoWidget<Ctx>, ctx: Ctx): boolean {
+  if (widget.isVisible && !widget.isVisible(ctx)) return false
+  return !((widget.isEmpty?.(ctx) ?? false) && widget.whenEmpty === 'hide')
+}
+
+/**
  * Resolve a registry against the current data.
  *
  * `sections` density collapses every widget to full width and drops `rows`,
@@ -133,11 +149,10 @@ export function resolveBentoLayout<Ctx>(
   const tiles: Array<ResolvedTile<Ctx>> = []
 
   for (const widget of widgets) {
-    if (widget.isVisible && !widget.isVisible(ctx)) continue
+    if (!rendersForData(widget, ctx)) continue
 
     const isEmpty = widget.isEmpty?.(ctx) ?? false
     const whenEmpty = widget.whenEmpty
-    if (isEmpty && whenEmpty === 'hide') continue
 
     // Narrowed via the local rather than `widget.whenEmpty`: the `continue`
     // above only rules out `'hide'` when `isEmpty` is also true, which the

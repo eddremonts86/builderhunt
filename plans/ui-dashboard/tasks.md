@@ -367,18 +367,32 @@
 
 ## Wave 6 — Personalization
 
-- [~] **Persist versioned per-user/per-organization preferences**
+- [x] **Persist versioned per-user/per-organization preferences**
   - Files: database schema/migration, preferences repository, `src/routes/api/dashboard/preferences.ts`, security tests
   - Do: Store version, density, range, ordered/hidden/pinned stable widget IDs with optimistic versioning and bounded payload size. Migrate local density once without cross-user leakage.
   - Verify: user/org isolation, stale update, unknown ID, duplicate ID, required-widget hiding, size limit, and schema migration tests pass.
-  - **Density and hidden ids persist per (organization, user)**; `dashboard_preferences` with RLS and
-    grants in `0151`/`0152`, `GET`/`PUT /api/dashboard/preferences`, and an optimistic client. The
-    e2e proves the round trip through `builderhunt_app` with RLS on rather than through a superuser
-    connection, which is what three earlier defects in this repository needed and did not have.
-    **Not done:** an explicit `version` field with optimistic concurrency, pinned and ordered ids, and
-    the one-time migration of the existing `localStorage` value. Last-write-wins is the right merge
-    rule for density and hides — there is nothing to reconcile between two versions of "which widgets
-    I hid" — but ordering will want the version.
+  - **Shipped.** `dashboard_preferences` holds density, hidden, pinned and ordered ids per
+    (organization, user), with RLS and grants in `0151`/`0152` and the ordering columns in `0153`.
+    `GET`/`PUT /api/dashboard/preferences`, one Zod contract parsed on both sides, and an optimistic
+    client. The e2e proves the round trip through `builderhunt_app` with RLS on rather than through a
+    superuser connection, which is what three earlier defects in this repository needed and did not
+    have.
+  - **Two version numbers, because they answer different questions.** `schemaVersion` describes the
+    document's shape and changes when a deploy changes it; `revision` counts writes and changes on
+    every save. Collapsing them — the first thing I tried — makes "does this need migrating?" and "did
+    somebody else save while I was editing?" the same question, and they have different remedies.
+  - **Optimistic concurrency exists for ordering, not for hides.** For a hide, last-write-wins loses
+    one toggle and there is nothing to reconcile. A move is expressed as a whole sequence, so two tabs
+    each moving a different widget produce two complete arrangements and the loser's *entire layout*
+    is discarded. The `WHERE revision = ?` rides on the upsert rather than following a `SELECT`,
+    because a check between a read and a write has a window in which the other tab commits — the exact
+    race the revision exists to close. The 409 carries the winning document so the loser can adopt it
+    in the same round trip instead of showing a stale arrangement until a refetch lands.
+  - **No `range` and no `localStorage` import.** The dashboard has no user-selectable range to store —
+    every projection window is fixed by its own contract — so a `range` column would be a field
+    nothing writes and nothing reads. The one-time import is deliberately skipped: the value it would
+    carry over is a single density flag on whichever browser the user happens to open next, and the
+    code to read it would have to survive forever to be worth anything.
 
 - [x] **Build accessible dashboard customization controls**
   - Files: `DashboardCustomizeDialog.tsx`, widget registry/page, component/E2E tests
@@ -389,13 +403,48 @@
     cannot find "Needs your attention" concludes the dialog is broken, and offering a switch would
     offer an action `orderedWidgets` silently ignores. Nothing is a form: every change applies through
     the optimistic store, so there is no unsaved state and no way for the dialog and the page behind
-    it to disagree. **Pin and Move are not built** — ordering wants the `version` field the
-    preferences task still owes, and there is nothing to reorder against until then.
+    it to disagree.
+  - **Pin, Unpin and Move up/down ship with it.** Every reorder announces itself through a live region
+    that names the widget and its new position, counting only positions a user can actually move
+    through — that region is the entire feedback channel for someone who cannot see the row move, and
+    "moved" on its own tells them nothing. Boundary controls are disabled rather than removed, because
+    a control that vanishes slides every button after it out from under the pointer and the focus.
+    Critical widgets are locked against all four operations: `contracts.ts` says they cannot be hidden
+    *or reordered*, and honouring only the first half would let a user push the action queue below the
+    charts without confirming anything.
+  - **No range control, for the reason above.** Drag is still absent, still deliberately: the commands
+    exist first, and a drag affordance can invoke them later.
+  - **Two defects the rendered dialog exposed and no test would have.** It listed "Run your first
+    hunt" — the empty-workspace CTA that `isVisible` had already dropped from a workspace with
+    builders — so every announced position after it was one out; the layout's own predicate is now
+    exported as `rendersForData` and asked by both. And "Saved searches" appeared twice, the metric
+    tile and the widget, indistinguishable once the dialog strips the context that told them apart;
+    `defineWidgetRegistry` now throws on a duplicate title the way it already threw on a duplicate id.
 
-- [ ] **Apply persona defaults and safe preference migration**
+- [~] **Apply persona defaults and safe preference migration**
   - Files: widget registry defaults/migration, tests
   - Do: Define deterministic defaults for new user, recruiter/member, owner/admin, verified profile owner, and platform admin. Append newly required widgets and ignore retired IDs without scrambling user order.
   - Verify: golden preference fixtures migrate across versions and organization switches never reuse another organization's layout.
+  - **The migration half is done.** `mergeWidgetOrder` drops ids with no widget behind them and places
+    a widget the saved order has never seen **after every widget it follows in the registry** — not
+    appended, which is the obvious reading of "append newly required widgets" and is wrong the first
+    time a new widget belongs near the top. "After every predecessor" rather than "after the nearest
+    one" was a unit test's correction of my first rule: the two differ exactly when the user has
+    reordered, and the nearest-predecessor version contradicted registry relations the user had never
+    touched. No saved pair ever swaps, checked as a relation over every pair rather than against one
+    expected array. `migratePreferenceDocument` covers the version axis, including a document from a
+    *newer* build, which is read for what this build understands rather than discarded — a rollback
+    should not hand somebody the default layout.
+  - **The persona-defaults half is deliberately empty, and that is the finding.** Every difference the
+    spec's persona list names is already expressed somewhere better: role differences by `roles` on
+    the widget, so a member never sees Workspace usage and is never offered it back; the new-workspace
+    case by `isVisible` and `whenEmpty: 'hide'`, so an empty chart is absent while it is empty and
+    returns the day there is data. A persona hide table would encode the same decisions a second time
+    and *worse* — a widget hidden by persona default stays hidden after the workspace stops being new,
+    which is precisely the bug the data-driven version does not have. Verified-profile-owner and
+    platform-admin defaults are absent because neither persona has shipped widgets on this route to
+    have defaults about. Left partial rather than closed: the mechanism to apply a default set exists
+    and is unused, and if a real persona difference appears it belongs here.
 
 ## Wave 7 — Shared visualization, quality, and release
 

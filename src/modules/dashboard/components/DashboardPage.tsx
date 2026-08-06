@@ -13,6 +13,7 @@ import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
 import { Button, LinkButton } from '~/components/ui'
 import { BentoRegion, BentoTileHeader, BentoTileList } from '~/modules/dashboard/ui/bento/Bento'
+import { rendersForData } from '~/modules/dashboard/ui/bento/layout'
 import { WidgetFrame } from '~/modules/dashboard/ui/WidgetFrame'
 import { ActionQueueWidget } from './ActionQueueWidget'
 import { UpcomingWidget } from './UpcomingWidget'
@@ -25,7 +26,7 @@ import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/da
 import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
 import { useDashboardPreferences } from '~/modules/dashboard/ui/bento/useBentoDensity'
 import { useViewerRole } from '~/modules/dashboard/lib/use-viewer-role'
-import { defineWidgetRegistry, orderedWidgets } from '~/modules/dashboard/lib/widget-registry'
+import { defineWidgetRegistry, moveWidgetInOrder, orderedWidgets } from '~/modules/dashboard/lib/widget-registry'
 import type { WidgetDependency } from '~/modules/dashboard/lib/contracts'
 import { ActivityWidget } from '~/modules/dashboard/ui/home/ActivityWidget'
 import { MetricWidget, type MetricWidgetProps } from '~/modules/dashboard/ui/home/MetricWidget'
@@ -143,8 +144,16 @@ const SHIPPED_CAPABILITIES: ReadonlySet<WidgetDependency> = new Set<WidgetDepend
   'source-coverage',
 ])
 
-/** Headline-metric labels, so the registry's accessible name matches the tile's own. */
-const STAT_TITLES = ['Builders tracked', 'Seen active', 'Saved searches'] as const
+/**
+ * Headline-metric labels, so the registry's accessible name matches the tile's own.
+ *
+ * "Saved searches count" rather than "Saved searches", which is what the tile shows: the
+ * `saved-searches` widget below already owns that title, and `defineWidgetRegistry` refuses a
+ * duplicate. The two were distinguishable on the page — a number in a metric tile, a list of searches
+ * — and identical in the Customize dialog, which lists titles in a flat column and labels every
+ * control with them ("Move Saved searches up", twice).
+ */
+const STAT_TITLES = ['Builders tracked', 'Seen active', 'Saved searches count'] as const
 const ctxTitle = (index: number) => STAT_TITLES[index] ?? 'Metric'
 
 const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
@@ -660,7 +669,7 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
 
 export function DashboardPage() {
   const reduceMotion = useReducedMotion()
-  const { preferences, setDensity, toggleHidden, resetPreferences } = useDashboardPreferences()
+  const { preferences, setDensity, toggleHidden, togglePinned, setOrder, resetPreferences } = useDashboardPreferences()
   const density = preferences.density
   const viewerRole = useViewerRole()
   const [customizeOpen, setCustomizeOpen] = React.useState(false)
@@ -833,30 +842,12 @@ export function DashboardPage() {
       role: viewerRole,
       available: SHIPPED_CAPABILITIES,
       hidden: new Set(preferences.hiddenWidgetIds),
+      order: preferences.orderedWidgetIds,
+      pinned: preferences.pinnedWidgetIds,
     }),
-    [viewerRole, preferences.hiddenWidgetIds],
+    [viewerRole, preferences.hiddenWidgetIds, preferences.orderedWidgetIds, preferences.pinnedWidgetIds],
   )
   const visibleWidgets = resolved.visible
-
-  /*
-   * What the Customize dialog may list: everything rendered, plus everything the *user* hid.
-   *
-   * Not the widgets omitted for `role` or `dependency`. Offering a member the chance to "restore"
-   * Billing would confirm the workspace has billing and that they are outside it — the same
-   * disclosure the projection avoids by omitting the section entirely — and offering to restore a
-   * widget whose capability has not shipped promises a feature that does not exist.
-   *
-   * Sorted back into registry order so the dialog reads in the same sequence as the page, which is
-   * how someone finds the widget they are looking for.
-   */
-  const customizableWidgets = React.useMemo(() => {
-    const hiddenByUser = new Set(
-      resolved.omitted.filter((entry) => entry.reason === 'hidden').map((entry) => entry.id),
-    )
-    return HOME_WIDGETS
-      .filter((widget) => visibleWidgets.includes(widget) || hiddenByUser.has(widget.id))
-      .map((widget) => ({ id: widget.id, title: widget.title, criticality: widget.criticality }))
-  }, [resolved.omitted, visibleWidgets])
 
   // One object for the whole registry. Memoised on the data it closes over, so
   // `BentoRegion`'s layout memo doesn't recompute on every parent render.
@@ -875,6 +866,62 @@ export function DashboardPage() {
     }),
     [stats, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
   )
+
+  /*
+   * What the Customize dialog may list: everything rendered, plus everything the *user* hid.
+   *
+   * Not the widgets omitted for `role` or `dependency`. Offering a member the chance to "restore"
+   * Billing would confirm the workspace has billing and that they are outside it — the same
+   * disclosure the projection avoids by omitting the section entirely — and offering to restore a
+   * widget whose capability has not shipped promises a feature that does not exist.
+   *
+   * Sorted back into registry order so the dialog reads in the same sequence as the page, which is
+   * how someone finds the widget they are looking for.
+   */
+  const customizableWidgets = React.useMemo(() => {
+    const hiddenByUser = new Set(
+      resolved.omitted.filter((entry) => entry.reason === 'hidden').map((entry) => entry.id),
+    )
+    /*
+     * Rendered widgets first, in the page's own order, then the ones the user hid.
+     *
+     * The dialog's list is the thing "Move up" moves through, so it has to agree with the page or the
+     * announcement lies. A hidden widget has no position on the page to agree with, so it goes after
+     * everything visible — in registry order, which is where it will reappear if the user restores it
+     * without also moving it.
+     */
+    const hiddenWidgets = HOME_WIDGETS.filter((widget) => hiddenByUser.has(widget.id))
+    /*
+     * `rendersForData` is the layout's own predicate, asked again here.
+     *
+     * Eligibility says a widget *may* be shown; the layout decides whether it has anything to say.
+     * Without this filter the dialog listed "Run your first hunt" — the empty-workspace CTA, which
+     * `isVisible` had already dropped from a workspace with builders in it — and every announced
+     * position after it was one place out. Found by reading the rendered dialog, not by a test.
+     */
+    return [...visibleWidgets.filter((widget) => rendersForData(widget, widgetContext)), ...hiddenWidgets]
+      .map((widget) => ({ id: widget.id, title: widget.title, criticality: widget.criticality }))
+  }, [resolved.omitted, visibleWidgets, widgetContext])
+
+  /*
+   * A move rewrites the whole saved sequence, not just the pair that swapped.
+   *
+   * The sequence sent is the dialog's list — visible widgets plus the user's hidden ones — so a hidden
+   * widget keeps its place in the order and reappears where the user left it rather than wherever the
+   * registry happens to put it. Widgets omitted for role or dependency are deliberately absent: this
+   * viewer cannot see them, and writing a position for one would let a saved order carry a fact about
+   * a capability the workspace has not been told it has.
+   */
+  const moveWidget = React.useCallback((widgetId: string, direction: 'up' | 'down') => {
+    const criticality = new Map(HOME_WIDGETS.map((widget) => [widget.id, widget.criticality]))
+    const next = moveWidgetInOrder(
+      customizableWidgets.map((widget) => widget.id),
+      widgetId,
+      direction,
+      (id) => criticality.get(id) !== 'critical',
+    )
+    setOrder(next)
+  }, [customizableWidgets, setOrder])
 
   React.useEffect(() => {
     // Secondary panels load independently of the primary three. Each failure is
@@ -973,8 +1020,11 @@ export function DashboardPage() {
         returnFocusRef={customizeTriggerRef}
         widgets={customizableWidgets}
         hiddenWidgetIds={preferences.hiddenWidgetIds}
+        pinnedWidgetIds={preferences.pinnedWidgetIds}
         density={density}
         onToggleHidden={toggleHidden}
+        onTogglePinned={togglePinned}
+        onMove={moveWidget}
         onDensityChange={setDensity}
         onReset={resetPreferences}
       />

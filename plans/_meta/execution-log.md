@@ -1462,3 +1462,65 @@ screen-reader user could operate.
 **Team activity** also landed on the dashboard: resolved text, no counts, `null` actor rendered as
 *Former member*, and a server-resolved target link so a deleted target arrives as plain text rather
 than a link to a 404.
+
+## 2026-08-06 — ui-dashboard Wave 6: versioned preferences, pin and order
+
+The dialog shipped without Pin or Move because ordering wanted a version field the preferences task
+still owed. Both halves land here.
+
+**Two version numbers, not one.** `schemaVersion` describes the document's shape and changes when a
+deploy changes it; `revision` counts writes and changes on every save. Collapsing them into one
+integer was the first thing I wrote, and it makes "is this old enough to need migrating?" and "did
+somebody else save while I was editing?" the same question — they have different answers and different
+remedies, one a read-time transform and one a 409.
+
+**Optimistic concurrency is for ordering, not for hides.** For a hide, last-write-wins loses one
+toggle and there is genuinely nothing to reconcile. A move is expressed as a whole sequence, so two
+tabs each moving a different widget produce two complete arrangements and the loser's *entire layout*
+is discarded silently. The check rides on the upsert's `WHERE revision = ?` rather than following a
+`SELECT`: between a read and a write there is a window in which the other tab commits, and a check
+performed in that window passes and then overwrites — the exact race the revision exists to close. The
+409 carries the winning document, so the losing tab adopts it in the same round trip rather than
+showing its own stale arrangement until a refetch lands. The client adopts rather than rolls back for
+the same reason: rolling back would show a third arrangement that is neither what it tried nor what is
+stored.
+
+**No grants migration beside `0153`, unlike `0152`.** `GRANT ... ON dashboard_preferences` is a
+table-level privilege and covers columns added later, and the policies key on `organization_id`, which
+has not changed. The convention `0152` records is that RLS and grants never live in a *generated*
+file — not that every generated file needs a companion.
+
+**"After every predecessor", not "after the nearest one".** `mergeWidgetOrder` places a widget the
+saved order has never seen so that no registry relation the user has not overridden is contradicted.
+My first rule used the nearest registry predecessor, and a unit test caught the difference: with a
+saved sequence of `[beta, alpha]` and a new `gamma` following both, the nearest-predecessor rule puts
+gamma above alpha, reversing a pair about which the user said nothing. The property "no saved pair
+ever swaps" is asserted as a relation over every pair rather than against one expected array, so it
+holds for insertions the test did not imagine.
+
+**The reorder announcement is the whole feature for one kind of user.** A sighted user sees the row
+move; a screen-reader user pressing "Move up" gets silence, because focus stays on a button whose
+label has not changed inside a list whose order they cannot perceive. The live region names the widget
+and its new position, and counts only positions a user can actually move through — a locked widget
+occupies a row but not a position anyone can reach, and counting it would describe a list nobody can
+navigate. Verified in the browser rather than only in a test: "Sourcing sprints moved to position 4 of
+13", against a page where sprints was the fourth of thirteen movable widgets.
+
+**Two defects the rendered dialog exposed and no test I wrote would have.** The dialog listed "Run
+your first hunt" — the empty-workspace CTA that `isVisible` had already dropped from a workspace with
+builders in it — so every announced position after it was one place out. Eligibility says a widget
+*may* be shown; the layout decides whether it has anything to say, and the dialog was only asking the
+first question. The layout's predicate is now exported as `rendersForData` and both ask it.
+
+And "Saved searches" appeared twice: the metric tile's count and the widget's list, obviously
+different things on the page and two identical rows in a flat column where every control is labelled
+by title ("Move Saved searches up", twice). `defineWidgetRegistry` now throws on a duplicate title the
+way it already threw on a duplicate id, and the metric is titled "Saved searches count".
+
+**Persona defaults are deliberately empty, and that is the finding.** Every difference the spec's
+persona list names is already expressed better elsewhere: role differences by `roles` on the widget,
+the new-workspace case by `isVisible` and `whenEmpty: 'hide'`. A persona hide table would encode the
+same decisions a second time and worse — a widget hidden by persona default stays hidden after the
+workspace stops being new, which is exactly the bug the data-driven version does not have. The task
+stays partial rather than closed: the mechanism exists and is unused, and a real persona difference
+would belong there.
