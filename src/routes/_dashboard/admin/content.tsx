@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
+import { requirePlatformAdminPage } from '~/shared/lib/auth/auth-session'
 import { getBlogPosts } from '~/shared/lib/blog-data'
 import {
   CONTENT_TABS,
@@ -19,12 +19,7 @@ export const Route = createFileRoute('/_dashboard/admin/content')({
     tab: parseTab(search.tab),
   }),
   beforeLoad: async () => {
-    const user = await getAppAuthSession()
-    if (!user.userId) throw new Error('Unauthorized')
-    if (!(await getIsAppAdmin())) {
-      throw new Error('Forbidden')
-    }
-    return { user }
+    await requirePlatformAdminPage()
   },
   // Changelog and roadmap load from their own admin APIs inside their
   // components; posts come from the filesystem, which only the server can read.

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, Plus, Save, X } from 'lucide-react'
-import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
+import { requirePlatformAdminPage } from '~/shared/lib/auth/auth-session'
 import { Button, Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
@@ -23,12 +23,7 @@ const COMPONENTS = ['app', 'api', 'search', 'database', 'redis', 'email', 'auth'
 
 export const Route = createFileRoute('/_dashboard/admin/incidents')({
   beforeLoad: async () => {
-    const user = await getAppAuthSession()
-    if (!user.userId) throw new Error('Unauthorized')
-    if (!(await getIsAppAdmin())) {
-      throw new Error('Forbidden')
-    }
-    return { user }
+    await requirePlatformAdminPage()
   },
   component: AdminIncidentsPage,
 })
