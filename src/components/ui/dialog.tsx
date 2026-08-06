@@ -14,6 +14,19 @@ interface DialogProps {
    * not just "the first one in DOM order" — is the intentional starting
    * point (e.g. a search input rather than a leading close/icon button). */
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  /**
+   * Where focus goes when the dialog closes.
+   *
+   * Radix restores to whatever held focus when the dialog opened — which works when it was opened by
+   * `DialogPrimitive.Trigger`, and does not when it was opened by a state change from a button
+   * elsewhere in the tree. In that case there is no recorded trigger, and a keyboard user closing
+   * with Escape lands on `<body>` with no visible focus. `PublicNavDrawer` hit the same thing and
+   * solves it the same way; this makes the fix available to every caller instead of one.
+   *
+   * Focusing the trigger from the caller's `onClose` is *not* equivalent: Radix's own
+   * `onCloseAutoFocus` runs afterwards and moves focus again.
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>
 }
 
 /**
@@ -27,7 +40,7 @@ interface DialogProps {
  * close/unmount — `initialFocusRef` only overrides *where* focus lands on
  * open.
  */
-export function Dialog({ open, onClose, title, children, className, initialFocusRef }: DialogProps) {
+export function Dialog({ open, onClose, title, children, className, initialFocusRef, returnFocusRef }: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) onClose() }}>
       <DialogPrimitive.Portal>
@@ -39,6 +52,14 @@ export function Dialog({ open, onClose, title, children, className, initialFocus
               ? (event) => {
                   event.preventDefault()
                   initialFocusRef.current?.focus()
+                }
+              : undefined
+          }
+          onCloseAutoFocus={
+            returnFocusRef
+              ? (event) => {
+                  event.preventDefault()
+                  returnFocusRef.current?.focus()
                 }
               : undefined
           }

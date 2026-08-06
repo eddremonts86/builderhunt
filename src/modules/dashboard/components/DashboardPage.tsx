@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, ExternalLink,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock, Gauge, UserSearch, UserPlus, Bell, ListChecks, Send, History,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock, Gauge, UserSearch, UserPlus, Bell, ListChecks, Send, History, SlidersHorizontal,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
@@ -19,6 +19,7 @@ import { UpcomingWidget } from './UpcomingWidget'
 import { WorkspaceUsageWidget } from './WorkspaceUsageWidget'
 import { CandidatesToReviewWidget } from './CandidatesToReviewWidget'
 import { InvitationStatusWidget } from './InvitationStatusWidget'
+import { DashboardCustomizeDialog } from './DashboardCustomizeDialog'
 import { BarSeries, utcWeekdayLabel } from '~/modules/dashboard/ui/BarSeries'
 import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/dashboard/lib/use-dashboard-overview'
 import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
@@ -659,9 +660,18 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
 
 export function DashboardPage() {
   const reduceMotion = useReducedMotion()
-  const { preferences, setDensity } = useDashboardPreferences()
+  const { preferences, setDensity, toggleHidden, resetPreferences } = useDashboardPreferences()
   const density = preferences.density
   const viewerRole = useViewerRole()
+  const [customizeOpen, setCustomizeOpen] = React.useState(false)
+  /*
+   * Radix restores focus to whatever held it when the dialog opened — but this dialog is opened by a
+   * state change rather than by `DialogPrimitive.Trigger`, so it has no recorded trigger to restore
+   * to and a keyboard user lands on `<body>` with no visible focus. `PublicNavDrawer` documents the
+   * same case and solves it the same way.
+   */
+  const customizeTriggerRef = React.useRef<HTMLButtonElement>(null)
+  const closeCustomize = React.useCallback(() => setCustomizeOpen(false), [])
   // The versioned core projection. Sections it owns (recency, source coverage) read their state
   // from here; the remaining endpoints migrate in Wave 4.
   const overview = useDashboardOverview()
@@ -818,14 +828,35 @@ export function DashboardPage() {
    * the spec and do not exist yet, so any widget declaring them is omitted rather than rendered
    * empty — an empty "Pipeline snapshot" implies a pipeline with nothing in it.
    */
-  const visibleWidgets = React.useMemo(
+  const resolved = React.useMemo(
     () => orderedWidgets(HOME_WIDGETS, {
       role: viewerRole,
       available: SHIPPED_CAPABILITIES,
       hidden: new Set(preferences.hiddenWidgetIds),
-    }).visible,
+    }),
     [viewerRole, preferences.hiddenWidgetIds],
   )
+  const visibleWidgets = resolved.visible
+
+  /*
+   * What the Customize dialog may list: everything rendered, plus everything the *user* hid.
+   *
+   * Not the widgets omitted for `role` or `dependency`. Offering a member the chance to "restore"
+   * Billing would confirm the workspace has billing and that they are outside it — the same
+   * disclosure the projection avoids by omitting the section entirely — and offering to restore a
+   * widget whose capability has not shipped promises a feature that does not exist.
+   *
+   * Sorted back into registry order so the dialog reads in the same sequence as the page, which is
+   * how someone finds the widget they are looking for.
+   */
+  const customizableWidgets = React.useMemo(() => {
+    const hiddenByUser = new Set(
+      resolved.omitted.filter((entry) => entry.reason === 'hidden').map((entry) => entry.id),
+    )
+    return HOME_WIDGETS
+      .filter((widget) => visibleWidgets.includes(widget) || hiddenByUser.has(widget.id))
+      .map((widget) => ({ id: widget.id, title: widget.title, criticality: widget.criticality }))
+  }, [resolved.omitted, visibleWidgets])
 
   // One object for the whole registry. Memoised on the data it closes over, so
   // `BentoRegion`'s layout memo doesn't recompute on every parent render.
@@ -906,6 +937,15 @@ export function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <DensityToggle density={density} onChange={setDensity} />
+            <Button
+              ref={customizeTriggerRef}
+              variant="secondary"
+              size="sm"
+              onClick={() => setCustomizeOpen(true)}
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+            >
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /> Customize
+            </Button>
             {/*
               One primary action, not two. "Search" and "New hunt" were separate buttons pointing at
               the same `/search` route — a choice with no consequence, which costs a reader a decision
@@ -926,6 +966,18 @@ export function DashboardPage() {
         <PendingInvitationsBanner />
         <OnboardingBanner />
       </div>
+
+      <DashboardCustomizeDialog
+        open={customizeOpen}
+        onClose={closeCustomize}
+        returnFocusRef={customizeTriggerRef}
+        widgets={customizableWidgets}
+        hiddenWidgetIds={preferences.hiddenWidgetIds}
+        density={density}
+        onToggleHidden={toggleHidden}
+        onDensityChange={setDensity}
+        onReset={resetPreferences}
+      />
 
       <BentoRegion
         label="Resumen"

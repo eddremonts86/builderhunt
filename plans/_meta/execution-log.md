@@ -1428,3 +1428,37 @@ membership's and deleting either side cascades it away.
 liveness probe that deliberately touches no dependency. The task goes back to open with that
 diagnosis, because the alternative was shipping known console noise for a banner whose destination —
 `/status` — is already one click away in the navigation.
+
+### Wave 6 — the Customize dialog, and a focus bug the e2e refused to let through
+
+Built the commands before any drag affordance, deliberately: the spec says drag, *if present*, invokes
+the same commands and is never required, and a list of labelled switches is complete on a keyboard, on
+a phone and to a screen reader on the day it ships. Built the other way round, the accessible path is
+always the thing still to do.
+
+Critical widgets are listed, locked and explained rather than omitted. Someone who cannot find "Needs
+your attention" among the toggles concludes the dialog is incomplete; someone who finds it locked with
+a reason learns the rule. And there is no switch to offer, because `orderedWidgets` would ignore it.
+
+Nothing is a form. Every change applies through the optimistic store, so there is no unsaved state, no
+dirty-close warning, and no way for the dialog and the page behind it to disagree about the layout.
+"Done", not "Save" — naming it Save would imply the switches had been provisional.
+
+**Focus did not return to the trigger, and the fix was not where it looked.** Radix restores focus to
+whatever held it when the dialog opened, which works for `DialogPrimitive.Trigger` and not for a
+dialog opened by a state change — there is no recorded trigger, so Escape drops a keyboard user on
+`<body>` with no visible focus. Focusing the button from the caller's `onClose` is **not** equivalent
+and was the first attempt: Radix's own `onCloseAutoFocus` runs afterwards and moves focus again. The
+shared `Dialog` now takes a `returnFocusRef` and wires it through `onCloseAutoFocus` with
+`preventDefault`, which is what `PublicNavDrawer` had already worked out for itself — the fix is now
+available to every caller instead of one. `Button` gained a `ref` prop to go with it; React 19 passes
+it as an ordinary prop, but `ButtonHTMLAttributes` does not declare it, so callers got a type error
+for something that worked at runtime.
+
+The e2e drives the dialog entirely by role and accessible name — no test ids on the controls — because
+that is the property under test. A test clicking `[data-testid]` would pass on a dialog no
+screen-reader user could operate.
+
+**Team activity** also landed on the dashboard: resolved text, no counts, `null` actor rendered as
+*Former member*, and a server-resolved target link so a deleted target arrives as plain text rather
+than a link to a 404.

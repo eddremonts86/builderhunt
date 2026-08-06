@@ -41,6 +41,8 @@ export interface CustomizableWidget {
 export interface DashboardCustomizeDialogProps {
   open: boolean
   onClose: () => void
+  /** Focused on close. Required in practice: this dialog is opened by state, not by a Radix trigger. */
+  returnFocusRef?: React.RefObject<HTMLElement | null>
   widgets: readonly CustomizableWidget[]
   hiddenWidgetIds: readonly string[]
   density: BentoDensity
@@ -55,13 +57,13 @@ const DENSITY_LABEL: Record<BentoDensity, string> = {
 }
 
 export function DashboardCustomizeDialog({
-  open, onClose, widgets, hiddenWidgetIds, density, onToggleHidden, onDensityChange, onReset,
+  open, onClose, returnFocusRef, widgets, hiddenWidgetIds, density, onToggleHidden, onDensityChange, onReset,
 }: DashboardCustomizeDialogProps) {
   const hidden = React.useMemo(() => new Set(hiddenWidgetIds), [hiddenWidgetIds])
   const densityGroupId = React.useId()
 
   return (
-    <Dialog open={open} onClose={onClose} title="Customize dashboard" className="max-w-lg">
+    <Dialog open={open} onClose={onClose} returnFocusRef={returnFocusRef} title="Customize dashboard" className="max-w-lg">
       <fieldset className="mb-6">
         <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-bh-text-dim">
           Density

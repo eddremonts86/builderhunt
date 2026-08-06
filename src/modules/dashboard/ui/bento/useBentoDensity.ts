@@ -49,6 +49,14 @@ export interface UseDashboardPreferences {
   setDensity: (next: BentoDensity) => void
   /** Adds or removes a widget id. Critical widgets ignore the list — see `orderedWidgets`. */
   toggleHidden: (widgetId: string) => void
+  /**
+   * Back to the defaults.
+   *
+   * A write of the default document, not a delete: the row's absence and the row holding the
+   * defaults mean the same thing to every reader, and there is no DELETE grant on the table
+   * precisely because nothing needs one.
+   */
+  resetPreferences: () => void
 }
 
 export function useDashboardPreferences(): UseDashboardPreferences {
@@ -110,7 +118,11 @@ export function useDashboardPreferences(): UseDashboardPreferences {
     mutation.mutate({ ...preferences, hiddenWidgetIds: [...hidden] })
   }, [mutation, preferences])
 
-  return { preferences, setDensity, toggleHidden }
+  const resetPreferences = React.useCallback(() => {
+    mutation.mutate(DEFAULTS)
+  }, [mutation])
+
+  return { preferences, setDensity, toggleHidden, resetPreferences }
 }
 
 /**

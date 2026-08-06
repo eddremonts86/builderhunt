@@ -1536,3 +1536,55 @@ test('hiding a widget removes it, and a critical widget refuses to be hidden', a
     await closeStrictPage(sp)
   }
 })
+
+test('the Customize dialog hides a widget, restores it, and never offers to hide a critical one', async ({ browser }) => {
+  /**
+   * plans/ui-dashboard Wave 6, "Build accessible dashboard customization controls".
+   *
+   * Driven entirely by role and accessible name — no test ids on the controls — because that is the
+   * property under test: the dialog has to be operable by someone who navigates by name. A test that
+   * clicked `[data-testid]` would pass on a dialog no screen-reader user could use.
+   */
+  await seedOwnerDashboard()
+  const sp = await openStrictPage(browser, harness.owner)
+  try {
+    const { page } = sp
+    await go(page, '/dashboard')
+    await dismissOverlays(page)
+    await page.locator('[data-dashboard-state="ready"]').waitFor()
+
+    await page.getByRole('button', { name: 'Customize' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    // The critical widget is listed and locked. Omitting it would read as an incomplete dialog;
+    // offering a switch would offer an action `orderedWidgets` silently ignores.
+    await expect(dialog.getByText('Needs your attention')).toBeVisible()
+    await expect(dialog.getByRole('switch', { name: 'Show Needs your attention' })).toHaveCount(0)
+
+    const recency = dialog.getByRole('switch', { name: 'Show Builder recency' })
+    await expect(recency).toBeVisible()
+    await recency.click()
+
+    // Applied immediately — there is no Save, so there is no unsaved state and no way for the dialog
+    // and the page behind it to disagree.
+    await expect(page.locator('[data-widget="activity"]')).toHaveCount(0)
+    // Still listed, so it can be restored. A hidden widget the user cannot find is one they cannot
+    // bring back.
+    await expect(recency).toBeVisible()
+
+    await recency.click()
+    await expect(page.locator('[data-widget="activity"]')).toHaveCount(1)
+
+    // Escape closes and Radix restores focus to the trigger — a keyboard user is never dropped on
+    // <body> with no visible focus.
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Customize' })).toBeFocused()
+  } finally {
+    await harness.owner.api!.put('/api/dashboard/preferences', {
+      data: { density: 'bento', hiddenWidgetIds: [] },
+    })
+    await closeStrictPage(sp)
+  }
+})

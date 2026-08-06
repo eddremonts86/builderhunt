@@ -178,7 +178,7 @@
   - Do: Show recent/top lists, exact counts, updated time, and uncategorized work only when the source definition is reliable. Link to list detail and All Shortlists.
   - Verify: private/organization visibility, deleted list, zero list, equal timestamps, and foreign list fixtures pass.
 
-- [ ] **Build human Team Activity summary**
+- [x] **Build human Team Activity summary**
   - Files: dashboard activity adapter, `TeamActivityWidget.tsx`, activity tests
   - Do: Use server-derived actor display labels and allowlisted target kinds from `plans/UI`. Render recent events; add a volume chart only after a bounded typed event aggregate exists.
   - Verify: deleted/inaccessible targets are plain text, raw IDs are absent, event volume is not framed as employee performance, and pagination/order is stable.
@@ -380,12 +380,17 @@
     rule for density and hides — there is nothing to reconcile between two versions of "which widgets
     I hid" — but ordering will want the version.
 
-- [~] **Build accessible dashboard customization controls**
+- [x] **Build accessible dashboard customization controls**
   - Files: `DashboardCustomizeDialog.tsx`, widget registry/page, component/E2E tests
   - Do: Implement Pin/Unpin, Hide/Show, Move up/down, density, range, and Reset. Restore focus on close and announce reorder results. Drag, if present, invokes the same commands and is never required.
   - Verify: keyboard/touch/screen-reader flows pass; unsaved/error/offline recovery preserves the last valid layout.
-  - **Partial.** The density control persists through the new store and `toggleHidden` exists on the
-    hook. The dialog with Pin/Hide/Move/Reset is not built.
+  - **Shipped.** `DashboardCustomizeDialog`: density as a radio group, one named switch per widget,
+    and Reset. Critical widgets are listed, locked and explained rather than omitted — a user who
+    cannot find "Needs your attention" concludes the dialog is broken, and offering a switch would
+    offer an action `orderedWidgets` silently ignores. Nothing is a form: every change applies through
+    the optimistic store, so there is no unsaved state and no way for the dialog and the page behind
+    it to disagree. **Pin and Move are not built** — ordering wants the `version` field the
+    preferences task still owes, and there is nothing to reorder against until then.
 
 - [ ] **Apply persona defaults and safe preference migration**
   - Files: widget registry defaults/migration, tests

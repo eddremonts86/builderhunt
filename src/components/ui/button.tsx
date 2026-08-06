@@ -30,6 +30,18 @@ interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
   loading?: boolean
+  /**
+   * Forwarded to the underlying element.
+   *
+   * React 19 passes `ref` to a function component as an ordinary prop, so no `forwardRef` wrapper is
+   * needed — but `ButtonHTMLAttributes` does not declare it, so it has to be named here or callers
+   * get a type error for something that works at runtime.
+   *
+   * Needed by any dialog opened from a button through state rather than through
+   * `DialogPrimitive.Trigger`: Radix has no recorded trigger to restore focus to on close, and a
+   * keyboard user lands on `<body>` with no visible focus.
+   */
+  ref?: React.Ref<HTMLButtonElement>
 }
 
 export function Button({
