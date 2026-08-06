@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, ExternalLink,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock, Gauge, UserSearch, UserPlus, Bell, ListChecks, Send, History, SlidersHorizontal,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock, Gauge, UserSearch, UserPlus, Bell, ListChecks, Send, History, SlidersHorizontal, BadgeCheck,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
@@ -20,6 +20,7 @@ import { UpcomingWidget } from './UpcomingWidget'
 import { WorkspaceUsageWidget } from './WorkspaceUsageWidget'
 import { CandidatesToReviewWidget } from './CandidatesToReviewWidget'
 import { InvitationStatusWidget } from './InvitationStatusWidget'
+import { ProfileOwnerWidget } from './ProfileOwnerWidget'
 import { DashboardCustomizeDialog } from './DashboardCustomizeDialog'
 import { BarSeries, utcWeekdayLabel } from '~/modules/dashboard/ui/BarSeries'
 import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/dashboard/lib/use-dashboard-overview'
@@ -595,6 +596,44 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
         onRetry={ctx.overview.refetch}
       >
         {(distribution) => <InvitationStatusWidget distribution={distribution} />}
+      </WidgetFrame>
+    ),
+  },
+  /*
+   * Only for someone who has verified a claim on their own builder profile (plans/ui-dashboard
+   * Wave 5). Everyone else never learns the tile exists.
+   *
+   * There is no `roles` entry because ownership is not a role — it is a fact about the person, and the
+   * same person owns the same profile in every workspace. What keeps the tile out of the Customize
+   * dialog for a non-owner is `isEmpty` + `whenEmpty: 'hide'` plus `rendersForData`, which the dialog
+   * now filters through: a widget the layout dropped for having nothing to say occupies no position
+   * there either. The section key is simply absent for a non-owner, so `WidgetFrame` sees `forbidden`
+   * and renders nothing at all.
+   */
+  {
+    id: 'profile-owner',
+    title: 'Your builder profile',
+    /*
+     * No `dependsOn`. That field gates on a *product capability* having shipped — "the pipeline Kanban
+     * exists" — and profile ownership is neither shipped nor unshipped, it is a fact about this
+     * person. Declaring it there would put the widget in the "waiting on a feature" bucket for every
+     * user who simply does not own a builder profile, which is a different sentence.
+     */
+    span: 'third',
+    minSpan: 'third',
+    isEmpty: (ctx) => {
+      const state = ctx.overview.section('profileOwner')
+      return state.kind === 'empty' || state.kind === 'forbidden'
+    },
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Your builder profile"
+        icon={BadgeCheck}
+        state={ctx.overview.section('profileOwner')}
+        onRetry={ctx.overview.refetch}
+      >
+        {(profile) => <ProfileOwnerWidget profile={profile} />}
       </WidgetFrame>
     ),
   },

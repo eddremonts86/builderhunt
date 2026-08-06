@@ -102,6 +102,7 @@ export const DASHBOARD_SECTION_UNAVAILABLE_CODES = [
   'dependency_unavailable',
   'range_unsupported',
 ] as const
+export type DashboardSectionUnavailableCode = (typeof DASHBOARD_SECTION_UNAVAILABLE_CODES)[number]
 
 const generatedAt = z.iso.datetime()
 
@@ -340,6 +341,52 @@ export const dashboardUsageSchema = z.object({
 })
 export type DashboardUsage = z.infer<typeof dashboardUsageSchema>
 
+/**
+ * Below this many views in the window, the server sends no number at all.
+ *
+ * Not a rounding rule — the count genuinely does not cross the wire. A floor that transmits the
+ * small number and asks the client to hide it is a floor that leaks the moment anyone reads a
+ * response body, and the response body is the one place a privacy promise has to hold.
+ *
+ * Five, for two reasons that agree. A profile owner who sees "2 views" beside an approach they
+ * received the same morning is one inference from naming the person who looked — and this is a
+ * glanceable tile, not the dated series on `/me` where a small number reads as what it is. And below
+ * a handful there is no trend to summarise: reporting "3" as a 30-day figure dresses an anecdote as a
+ * measurement.
+ */
+export const PROFILE_VIEW_COHORT_FLOOR = 5
+
+/**
+ * The verified-profile-owner summary (plans/ui-dashboard Wave 5).
+ *
+ * Present only for a user who holds a **verified** claim on a builder identity. Absent — the whole
+ * section key missing, exactly like `usage` for a non-billing role — for everybody else, which is the
+ * same reasoning the `forbidden` note above gives: an `unavailable` status would confirm that the
+ * feature applies to this account, and the point is that it discloses nothing.
+ *
+ * Two publication states, not one, because the codebase keeps them independent and conflating them
+ * would misreport both: `directoryPublished` is a `published_builder_profiles` row, the public
+ * directory listing; `portfolioPublished` is the portfolio builder's own flag. A profile can be
+ * either without the other.
+ */
+export const dashboardProfileOwnerSchema = z.object({
+  builderId: z.string().min(1).max(64),
+  directoryPublished: z.boolean(),
+  portfolioPublished: z.boolean(),
+  windowDays: z.number().int().positive().max(365),
+  /**
+   * How many people looked, or `null` for "fewer than the floor".
+   *
+   * `null` is unambiguous here, which is the only reason a bare nullable is enough: a section that
+   * could not be read is `unavailable` at the envelope, so inside a `ready` payload there is exactly
+   * one thing an absent count can mean. A discriminated union would restate what the envelope already
+   * says — and, tried first, it also pushed `SectionData<K>` past TypeScript's union-complexity limit,
+   * which is the type system noticing the same redundancy.
+   */
+  viewsInWindow: z.number().int().nonnegative().nullable(),
+})
+export type DashboardProfileOwner = z.infer<typeof dashboardProfileOwnerSchema>
+
 // ── The response ──────────────────────────────────────────────────────────────────────────────
 
 export const dashboardOverviewSchema = z.object({
@@ -384,6 +431,8 @@ export const dashboardOverviewSchema = z.object({
     alertVolume: sectionEnvelope(dashboardRecencySchema),
     // Absent entirely for a role that may not see it — see the note on `forbidden` above.
     usage: sectionEnvelope(dashboardUsageSchema).optional(),
+    // Absent entirely for anyone without a verified builder claim, same reasoning.
+    profileOwner: sectionEnvelope(dashboardProfileOwnerSchema).optional(),
   }),
 })
 export type DashboardOverview = z.infer<typeof dashboardOverviewSchema>

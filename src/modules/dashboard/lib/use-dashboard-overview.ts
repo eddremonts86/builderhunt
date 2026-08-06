@@ -6,6 +6,7 @@ import {
   parseDashboardOverview,
   type DashboardOverview,
   type DashboardRange,
+  type DashboardSectionUnavailableCode,
   type DashboardSections,
 } from '~/shared/lib/dashboard/contracts'
 import type { WidgetState } from './contracts'
@@ -57,8 +58,35 @@ export interface DashboardOverviewResult {
   section: <K extends keyof DashboardSections>(id: K) => WidgetState<SectionData<K>>
 }
 
-type SectionEnvelope<K extends keyof DashboardSections> = NonNullable<DashboardSections[K]>
-type SectionData<K extends keyof DashboardSections> = Extract<SectionEnvelope<K>, { status: 'ready' }>['data']
+/**
+ * Every section's `ready` payload, resolved per concrete key.
+ *
+ * `-?` because `usage` and `profileOwner` are optional keys: without it their payload type carries
+ * `undefined` through to every consumer of a section the `if (!envelope)` guard has already proved
+ * present.
+ */
+type SectionDataMap = {
+  [K in keyof DashboardSections]-?: Extract<NonNullable<DashboardSections[K]>, { status: 'ready' }>['data']
+}
+type SectionData<K extends keyof DashboardSections> = SectionDataMap[K]
+
+/**
+ * The envelope shape with its payload left `unknown`, used for the narrowing below.
+ *
+ * Narrowing a `K`-specific envelope type instead meant discriminating a union of every section's
+ * three states at once — thirteen sections by three states, each carrying a full payload object. That
+ * compiled until the thirteenth section was added and then produced `TS2590: union type too complex`,
+ * reported against this function rather than against the section that had just been declared, which
+ * is a long way from the cause.
+ *
+ * The envelope's *structure* is identical for every section — that is the whole point of
+ * `sectionEnvelope()` in the contract — so only the payload needs the generic, and it gets it at the
+ * two places that return one.
+ */
+type UntypedSectionEnvelope =
+  | { status: 'ready'; generatedAt: string; data: unknown }
+  | { status: 'empty'; generatedAt: string }
+  | { status: 'unavailable'; code: DashboardSectionUnavailableCode }
 
 export function useDashboardOverview(range: DashboardRange = DEFAULT_DASHBOARD_RANGE): DashboardOverviewResult {
   const organizationId = useActiveOrganizationId()
@@ -98,7 +126,7 @@ export function useDashboardOverview(range: DashboardRange = DEFAULT_DASHBOARD_R
       if (fatal) return { kind: 'error', retryable: true }
       if (!overview) return { kind: 'error', retryable: true }
 
-      const envelope = overview.sections[id] as SectionEnvelope<K> | undefined
+      const envelope = overview.sections[id] as UntypedSectionEnvelope | undefined
       // Absent means the role may not see it. The registry already knows; the frame renders nothing.
       if (!envelope) return { kind: 'forbidden' }
 

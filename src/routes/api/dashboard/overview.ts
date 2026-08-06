@@ -22,6 +22,7 @@ import {
   DEFAULT_DASHBOARD_RANGE,
   dashboardOverviewSchema,
   dashboardRangeSchema,
+  PROFILE_VIEW_COHORT_FLOOR,
   type DashboardOverview,
   type DashboardUsage,
 } from '~/shared/lib/dashboard/contracts'
@@ -33,6 +34,7 @@ import { listUpcomingAppointments } from '~/shared/lib/repositories/dashboard-up
 import { listReviewCandidates, listShortlistSummaries } from '~/shared/lib/repositories/dashboard-review'
 import { getInvitationDistribution } from '~/shared/lib/repositories/dashboard-invitations'
 import { listActivity } from '~/shared/lib/repositories/activity'
+import { getVerifiedProfileOwnerSummary } from '~/shared/lib/repositories/builder-profile-views'
 import { resolveActorDisplayNames } from '~/shared/lib/auth/organization-lifecycle'
 import { listInvitationsForEmail } from '~/shared/lib/organizations/contracts'
 import { auth } from '~/shared/lib/auth/better-auth'
@@ -96,6 +98,14 @@ import { auth } from '~/shared/lib/auth/better-auth'
  * shared an entry.
  */
 const CACHE_TTL_SECONDS = 30
+
+/**
+ * The window the owner tile reports over.
+ *
+ * Thirty days, matching `GET /api/builders/$builderId/views` — the tile is a glance at the same
+ * number `/me` shows in detail, and two different windows would make them look like they disagree.
+ */
+const PROFILE_VIEW_WINDOW_DAYS = 30
 
 type RoleClass = 'billing-reader' | 'member'
 
@@ -477,6 +487,52 @@ export const Route = createFileRoute('/api/dashboard/overview')({
             }
           }, (value) => value.items.length === 0)
 
+          /*
+           * The verified-profile-owner summary (plans/ui-dashboard Wave 5).
+           *
+           * Included only when the repository found a verified claim; for anybody else the key is
+           * absent entirely, exactly like `usage` for a non-billing role.
+           *
+           * Not built with `section()`, which is the point worth reading. That helper's three outcomes
+           * are ready / empty / unavailable, and this section needs a fourth it cannot express:
+           * *absent*. `empty` would tell someone who owns no profile that they own one with nothing to
+           * show, and `unavailable` would tell them their summary failed. Both answer a question that
+           * was never asked of this account.
+           *
+           * Scoped by user, not by organization. `builder_claims` RLS keys on `app.user_id` alone
+           * because a claim is a fact about a person, so the same tile appears in every workspace they
+           * belong to — right, and worth saying out loud because every other section here is tenant
+           * data that must not.
+           */
+          const profileOwner = await (async () => {
+            try {
+              const from = new Date(now.getTime() - PROFILE_VIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+              const summary = await withTenantContext(principal, (transaction) =>
+                getVerifiedProfileOwnerSummary(
+                  transaction,
+                  principal.userId,
+                  from,
+                  now,
+                  PROFILE_VIEW_COHORT_FLOOR,
+                ))
+              if (!summary) return null
+              return {
+                status: 'ready' as const,
+                generatedAt,
+                data: { ...summary, windowDays: PROFILE_VIEW_WINDOW_DAYS },
+              }
+            } catch (error) {
+              // Logged like any other section, but still omitted rather than reported as unavailable:
+              // a failure message would tell a non-owner that something applies to them.
+              metrics.increment('dashboardOverviewSectionFailures')
+              log.error('dashboard_overview_section_failed', {
+                section: 'profileOwner',
+                error: error instanceof Error ? error.message : 'unknown',
+              })
+              return null
+            }
+          })()
+
           const payload: DashboardOverview = {
             schemaVersion: DASHBOARD_SCHEMA_VERSION,
             organizationId: principal.organizationId,
@@ -495,6 +551,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
               discoveryTrend,
               alertVolume,
               ...(roleClass === 'billing-reader' ? { usage } : {}),
+              ...(profileOwner ? { profileOwner } : {}),
             },
           }
 

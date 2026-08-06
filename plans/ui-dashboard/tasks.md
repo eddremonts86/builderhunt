@@ -216,8 +216,33 @@
   - Do: Show current draft/sent/opened/booked/declined/revoked counts and organizer follow-ups; link to filtered invitation management.
   - Verify: current-state counts reconcile, unauthorized candidate email is absent, and copy says snapshot/status rather than funnel/conversion.
 
-- [ ] **Add an optional verified-profile-owner summary**
-  - **Not blocked — the dependency shipped, verified 2026-08-06.** `GET /api/builders/$builderId/views`
+- [x] **Add an optional verified-profile-owner summary**
+  - **Shipped 2026-08-06.** Optional `profileOwner` section on the overview contract, present only for
+    a holder of a **verified** claim and absent entirely otherwise — the whole key missing, like
+    `usage` for a non-billing role. Not built with the `section()` helper: its three outcomes are
+    ready / empty / unavailable, and this needed a fourth it cannot express. `empty` would tell
+    someone who owns no profile that they own one with nothing to show, and `unavailable` would tell
+    them their summary failed; both answer a question never asked of that account.
+  - **The cohort floor is enforced where the number is produced, not where it is rendered.** Below
+    five viewers the count does not reach the response — verified over the wire, `viewsInWindow: null`
+    with the suppressed figure nowhere in the serialized section. The widget says "Fewer than 5" rather
+    than blanking, because an owner who sees nothing concludes the feature is broken while one who
+    sees the floor knows to open `/me`.
+  - **Verified against the real least-privilege role, not a superuser.** With `0154` in force: the
+    owner reads the views of their claimed profile, a different signed-in user reads none of them, and
+    a viewer still reads their own row — which is the account-export path, and the one that would have
+    broken silently.
+  - **No `dependsOn`.** That field gates on a product capability having shipped; profile ownership is
+    neither shipped nor unshipped, it is a fact about a person, and declaring it there would file
+    every non-owner under "waiting on a feature".
+  - **A type-system finding worth keeping.** The first contract used a discriminated union for the
+    count, and `SectionData<K>` — distributive over every section — tipped past TypeScript's
+    union-complexity limit at the thirteenth section, reporting `TS2590` against `use-dashboard-overview.ts`
+    rather than against the section just added. The union was also redundant: a section that cannot be
+    read is `unavailable` at the envelope, so inside a `ready` payload a null count has exactly one
+    meaning. Both the contract and the accessor are simpler now, and the accessor no longer builds a
+    cross-section union at all — so a fourteenth section will not hit this.
+  - **Previously recorded as blocked; the dependency had shipped.** `GET /api/builders/$builderId/views`
     exists, is gated on `isVerifiedBuilderClaimant` (an admin gets no back door), and returns counts
     only: viewer identities never leave the server, by construction in the SQL. `builder_profile_views`
     also de-duplicates one viewer per day, so a total is people-per-day rather than page loads. This

@@ -9,7 +9,7 @@
 
 import { and, count, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
-import { builderProfileViews } from '../db/schema'
+import { builderClaims, builderProfileViews, publishedBuilderProfiles } from '../db/schema'
 
 /**
  * Whether the (viewer, builder, day) tuple already has a row. Used by the
@@ -87,4 +87,80 @@ export async function listBuilderProfileViewCounts(
     .groupBy(sql`date_trunc('day', ${builderProfileViews.viewedAt})`)
     .orderBy(desc(sql`date_trunc('day', ${builderProfileViews.viewedAt})`))
   return rows.map((r) => ({ day: r.day, count: Number(r.count) }))
+}
+
+/**
+ * The dashboard's verified-profile-owner summary: publication state, and how many people looked.
+ *
+ * Returns `null` when the caller holds no **verified** claim, which is what makes the dashboard
+ * section absent rather than empty for everyone else. Read as one query joined through
+ * `builder_claims` rather than "is this person an owner?" followed by "now count the views": the two
+ * questions asked separately can disagree if the claim is revoked between them, and the one that
+ * would be wrong is the one that returns the numbers.
+ *
+ * Both publication flags are reported because the codebase keeps them independent — a
+ * `published_builder_profiles` row is the public directory listing, `metadata.portfolio.published` is
+ * the portfolio builder's own switch — and a profile can have either without the other.
+ *
+ * Counts are floored, not rounded: below `PROFILE_VIEW_COHORT_FLOOR` the caller is told there were
+ * too few and no number is produced at all. See the constant for why the number must not exist rather
+ * than merely not be rendered.
+ */
+export interface VerifiedProfileOwnerSummary {
+  builderId: string
+  directoryPublished: boolean
+  portfolioPublished: boolean
+  /** `null` below the floor — the number is not produced, not merely withheld from the page. */
+  viewsInWindow: number | null
+}
+
+export async function getVerifiedProfileOwnerSummary(
+  transaction: TenantTransaction,
+  subjectUserId: string,
+  from: Date,
+  to: Date,
+  cohortFloor: number,
+): Promise<VerifiedProfileOwnerSummary | null> {
+  const [claim] = await transaction
+    .select({
+      builderIdentityId: builderClaims.builderIdentityId,
+      metadata: builderClaims.metadata,
+    })
+    .from(builderClaims)
+    .where(and(
+      eq(builderClaims.subjectUserId, subjectUserId),
+      eq(builderClaims.status, 'verified'),
+    ))
+    // The oldest verified claim, deterministically. A person with two verified identities gets one
+    // tile rather than an arbitrary one that changes between requests; a picker belongs on `/me`,
+    // where the full analytics already are.
+    .orderBy(builderClaims.createdAt)
+    .limit(1)
+
+  if (!claim) return null
+
+  const [[directory], [views]] = await Promise.all([
+    transaction
+      .select({ builderIdentityId: publishedBuilderProfiles.builderIdentityId })
+      .from(publishedBuilderProfiles)
+      .where(eq(publishedBuilderProfiles.builderIdentityId, claim.builderIdentityId))
+      .limit(1),
+    transaction
+      .select({ value: count() })
+      .from(builderProfileViews)
+      .where(and(
+        eq(builderProfileViews.builderId, claim.builderIdentityId),
+        gte(builderProfileViews.viewedAt, from),
+        lte(builderProfileViews.viewedAt, to),
+      )),
+  ])
+
+  const total = Number(views?.value ?? 0)
+  const portfolio = (claim.metadata as { portfolio?: { published?: unknown } } | null)?.portfolio
+  return {
+    builderId: claim.builderIdentityId,
+    directoryPublished: Boolean(directory),
+    portfolioPublished: portfolio?.published === true,
+    viewsInWindow: total >= cohortFloor ? total : null,
+  }
 }

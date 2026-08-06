@@ -1720,3 +1720,46 @@ And the new checks passed without appearing anywhere. `verify-rls-local.mjs` end
 summary of what it covered; assertions that throw on failure and print nothing on success are
 invisible in it, which makes a deleted check and a passing check look identical to a reader. The five
 profile-view results are now in that summary.
+
+## 2026-08-06 — the verified-profile-owner tile, and a floor that has to be real
+
+plans/ui-dashboard Wave 5. The section is optional on the wire: present only for a holder of a
+verified builder claim, absent entirely — the key missing, not empty, not unavailable — for everyone
+else.
+
+**It is the first section not built with the `section()` helper**, and that is the interesting part.
+That helper offers ready / empty / unavailable, and this needed a fourth state it cannot express:
+*absent*. `empty` tells someone who owns no profile that they own one with nothing to show;
+`unavailable` tells them their summary failed. Both answer a question that was never asked of that
+account, and both would confirm the feature applies to them.
+
+**The cohort floor is enforced where the number is made, not where it is shown.** Below five viewers
+the count is never produced — verified over the wire against a live workspace: `viewsInWindow: null`,
+with the suppressed figure nowhere in the serialized section. A floor that transmits the small number
+and asks the client to hide it is not a floor. The tile then says "Fewer than 5" rather than blanking,
+because an owner who sees nothing concludes the feature is broken while one who sees the threshold
+knows to open `/me`.
+
+The privacy argument and the honesty argument point the same way, which is why the number is five and
+not one: "2 views" beside an approach received the same morning is one inference from naming the
+person who looked, and below a handful there is no trend to summarise — printing "3" as a thirty-day
+figure dresses an anecdote as a measurement.
+
+**Verified against the real least-privilege role.** With `0154` in force, on real rows: the owner
+reads views of their claimed profile, a different signed-in user reads none of them, and a viewer
+still reads their own row — that last one being the account-export path, and the one that would have
+broken silently. A unit test could not have shown any of this; it runs as superuser and would have
+reported a pass whatever the policies said.
+
+**A type-system finding worth keeping.** The count started as a discriminated union — `counted` or
+`too_few` — and `SectionData<K>`, distributive over every section, tipped past TypeScript's
+union-complexity limit at the thirteenth section. `TS2590`, reported against `use-dashboard-overview.ts`
+rather than against the section that had just been declared, which is a long way from the cause. The
+union was also redundant: a section that cannot be read is `unavailable` at the envelope, so inside a
+`ready` payload a null count already has exactly one meaning. Flattening it was the better contract
+*and* the fix. The accessor no longer builds a cross-section union at all, so the fourteenth section
+will not hit this.
+
+**`dependsOn` was wrong for this widget and the type caught it.** That field gates on a product
+capability having shipped. Profile ownership is neither shipped nor unshipped — it is a fact about a
+person — and filing it there would put every non-owner under "waiting on a feature".
