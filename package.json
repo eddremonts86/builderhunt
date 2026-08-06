@@ -57,6 +57,7 @@
     "db:reembed": "node scripts/db/reembed-builder-embeddings.mjs",
     "db:seed": "tsx scripts/db/seed.ts",
     "db:seed:admin": "tsx --env-file-if-exists=.env scripts/db/seed-admin.ts",
+    "db:seed:test-users": "tsx --env-file-if-exists=.env scripts/db/seed-test-users.ts",
     "content:sync": "tsx --env-file-if-exists=.env scripts/db/sync-platform-content.ts",
     "content:sync:dry": "tsx --env-file-if-exists=.env scripts/db/sync-platform-content.ts --dry-run",
     "content:export": "tsx --env-file-if-exists=.env scripts/db/sync-platform-content.ts --export",
