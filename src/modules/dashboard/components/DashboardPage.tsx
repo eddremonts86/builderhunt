@@ -2,7 +2,6 @@ import * as React from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { RecommendationsSection } from './RecommendationsSection'
 import { OnboardingBanner } from './OnboardingBanner'
-import { PendingInvitationsBanner } from './PendingInvitationsBanner'
 import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, ExternalLink,
@@ -1049,7 +1048,6 @@ export function DashboardPage() {
           bento: a tile wrapping a null-rendering banner would still occupy its
           grid cell and leave a hole. */}
       <div className="mb-4 space-y-4">
-        <PendingInvitationsBanner />
         <OnboardingBanner />
       </div>
 

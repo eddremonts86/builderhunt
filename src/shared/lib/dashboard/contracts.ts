@@ -61,7 +61,18 @@ export const DASHBOARD_ACTION_KINDS = [
   'open-interview',
   'open-calendar',
   'open-availability',
+  /** The interview-invitation hub, for invitations sent to *candidates*. */
   'open-invitation',
+  /**
+   * An organization membership invitation addressed to the signed-in user.
+   *
+   * Separate from `open-invitation` on purpose. The two are unrelated objects that share a word: that
+   * one is the candidate interview hub, this one is `/team/invite/$invitationId`, a page outside the
+   * dashboard layout that takes the invitation id. Reusing the similar-sounding kind would send
+   * someone with a team invitation to a page about interviews — wrong, plausible-looking, and
+   * invisible to the type system, since the enum already holds a name that fits.
+   */
+  'open-membership-invitation',
   'open-alert',
   'open-sprint',
   'open-saved-search',

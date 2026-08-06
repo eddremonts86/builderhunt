@@ -13,7 +13,7 @@ const DISMISS_KEY = 'bh_abuse_warning_dismissed_stage'
  * Dashboard-wide enforcement-stage surface (abuse-and-usage-integrity plan, Phase 5's second
  * task). Framed as fairness, not accusation, per `spec.md`'s own language for the `warned` stage.
  * Fetches its own status (same zero-props, client-side-fetch pattern as `OnboardingBanner`/
- * `PendingInvitationsBanner`) rather than threading it through route loaders, since this needs to
+ * `OnboardingBanner`) rather than threading it through route loaders, since this needs to
  * render on every dashboard page and those two banners establish that self-fetching is already
  * this codebase's convention for dashboard notices.
  *

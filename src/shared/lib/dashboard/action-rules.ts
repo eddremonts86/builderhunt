@@ -195,22 +195,73 @@ const RULES: readonly Rule[] = [
       return outputs
     },
   },
+  /**
+   * A membership invitation this user has been sent and has not answered.
+   *
+   * ## The destination is not `open-invitation`, and that is a trap worth naming
+   *
+   * `open-invitation` already exists in the action kinds and resolves to `/interviews/invitations` —
+   * the hub for *interview* invitations sent to candidates. A membership invitation is an unrelated
+   * object at `/team/invite/$invitationId`, on a route outside the dashboard layout entirely. Reading
+   * `membershipInvitations` here and reaching for the kind whose name matches would send someone with
+   * a team invitation to a page about candidate interviews: a wrong destination that looks right, that
+   * no type can catch because the enum already contains a plausible name, and that
+   * `resolveActionHref` could not even carry the id to. Hence `open-membership-invitation`, with its
+   * own route entry.
+   *
+   * ## One row for all of them
+   *
+   * Same reasoning as the unread-alert rule below. Two pending invitations are two rows saying the
+   * same sentence, and the queue's value is that its order means something.
+   *
+   * ## What replacing the banner cost, which is nothing
+   *
+   * A note here previously claimed this could not move because `PendingInvitationsBanner` "accepts or
+   * declines in place". It does not, and never did — it renders one link per invitation to
+   * `/team/invite/$invitationId`, which is exactly the shape of a queue row. The note was wrong and
+   * blocked the task for as long as it stood.
+   */
+  {
+    id: 'membership-invitation-pending',
+    priority: ACTION_PRIORITY.membershipInvitation,
+    evaluate: ({ membershipInvitations }) => {
+      const [first, ...rest] = membershipInvitations
+      if (!first) return []
+      const only = rest.length === 0
+      return [{
+        resourceKey: only ? `membership-invitation:${first.id}` : 'membership-invitation:multiple',
+        // Informational: nothing is broken and nothing expires today. An invitation is an offer, and
+        // ranking it above a failed payment because it is new would be the notification-feed failure
+        // the ordering comment above describes.
+        severity: 'info' as const,
+        title: only
+          ? 'You have been invited to join a team'
+          : `You have been invited to join ${membershipInvitations.length} teams`,
+        detail: only
+          ? 'Review the invitation to accept or decline it.'
+          : 'Review each invitation to accept or decline it.',
+        dueAt: null,
+        kind: 'open-membership-invitation' as const,
+        // Only a single invitation can carry an id. With several there is no one page to open, and
+        // picking the first would choose for the user; `resolveActionHref` renders no link rather
+        // than guessing, which is the behaviour that field's `null` case exists for.
+        resourceId: only ? first.id : null,
+      }]
+    },
+  },
   /*
-   * **Onboarding and membership invitations are deliberately NOT rules yet.**
+   * **Onboarding is deliberately NOT a rule yet.**
    *
-   * The spec wants them folded into this queue (Wave 2, "Unify onboarding and invitation notices
-   * with the queue"), and the inputs above are already carried for exactly that. What stops it today
-   * is that `OnboardingBanner` and `PendingInvitationsBanner` each do something a queue row cannot:
-   * the first offers *skip*, the second accepts or declines in place. A queue row is one link.
+   * `OnboardingBanner` does something a queue row cannot: it offers *skip*, which is a real server
+   * action (`POST /api/onboarding/skip`, counted against `MAX_SKIPS`) rather than a link. The
+   * unification task requires valid dismissals be preserved, and `onboarding.spec.ts` covers them
+   * across four cases.
    *
-   * Shipping the rules while the banners still render would put each of those notices on the page
-   * twice — the duplication the unification task exists to remove, introduced by the change meant to
-   * remove it. Shipping the rules and deleting the banners would quietly drop skip and inline
-   * accept, which the same task requires be preserved ("preserve blocking/critical behaviour and
-   * valid dismissals"), and which `onboarding.spec.ts` covers across four cases.
-   *
-   * So the order is: give the queue row a secondary affordance, then move these two, then delete the
-   * banners. Until then the banners own both notices and the queue stays silent about them.
+   * Shipping the rule while the banner still renders would put the notice on the page twice — the
+   * duplication this task exists to remove, introduced by the change meant to remove it. So the order
+   * is: give the queue row a secondary dismissal affordance, then move this, then delete the banner.
+   * A skip is a dismissal rather than a second decision, so it does not violate the one-action-per-row
+   * rule the queue widget documents.
    */
   {
     id: 'unread-high-value-alert',

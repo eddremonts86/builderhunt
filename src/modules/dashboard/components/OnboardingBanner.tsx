@@ -10,6 +10,22 @@ interface OnboardingStatus {
   reason?: string
 }
 
+/**
+ * A browser-local dismissal that overrides the server's model, deliberately left alone for now.
+ *
+ * The server allows three skips: `POST /api/onboarding/skip` increments `skippedCount`, and
+ * `isEligibleForOnboarding` keeps returning true until it reaches `MAX_SKIPS`. So the product intends
+ * this notice to come back twice more after a skip.
+ *
+ * This key silently prevents that. The effect below reads it *before* the fetch, so once dismissed in
+ * a browser the banner never returns there, whatever the server says — client state overriding a
+ * server rule, which is the same fragility Wave 6 removed from dashboard preferences.
+ *
+ * Not fixed here on purpose. Removing the key makes the product naggier for every user who has
+ * already dismissed it, and "should we remind twice more?" is a product decision rather than a bug
+ * with one right answer. The real resolution is Wave 2's: this banner folds into the action queue,
+ * whose dismissals are server-backed by construction, and the key goes away with the component.
+ */
 const DISMISS_KEY = 'bh_onboarding_banner_dismissed'
 
 export function OnboardingBanner() {
@@ -71,12 +87,19 @@ export function OnboardingBanner() {
         >
           Start tour
         </LinkButton>
+        {/*
+          The accessible name has to be the *action*, not the gesture.
+          It said "Dismiss" while the tooltip said "Skip onboarding" and the handler posted a real
+          server-side skip counted against `MAX_SKIPS`. A sighted user hovered and learned the truth;
+          a screen-reader user heard "Dismiss" and spent one of three skips. Same defect class as the
+          Customize dialog's pin buttons: the name described the affordance instead of the effect.
+        */}
         <Button
           variant="ghost"
           size="sm"
           onClick={skip}
           className="p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-          aria-label="Dismiss"
+          aria-label="Skip onboarding"
           title="Skip onboarding"
           data-testid="onboarding-banner-skip"
         >

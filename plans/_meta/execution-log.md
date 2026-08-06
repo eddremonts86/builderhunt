@@ -1763,3 +1763,79 @@ will not hit this.
 **`dependsOn` was wrong for this widget and the type caught it.** That field gates on a product
 capability having shipped. Profile ownership is neither shipped nor unshipped — it is a fact about a
 person — and filing it there would put every non-owner under "waiting on a feature".
+
+## 2026-08-06 — a comment of mine was the blocker
+
+plans/ui-dashboard Wave 2. `action-rules.ts` carried a note explaining why onboarding and membership
+invitations could not become queue rules: "the first offers *skip*, the second accepts or declines in
+place. A queue row is one link." Half of that was false. `PendingInvitationsBanner` never accepted
+anything in place — it rendered one link per invitation to `/team/invite/$invitationId`, which is the
+shape of a queue row exactly. The task sat blocked on a sentence.
+
+Worth recording as a failure mode rather than a slip: a wrong comment outlives a wrong line of code,
+because nothing executes it. The tests were green the whole time.
+
+**The destination was the real hazard.** `open-invitation` already existed in the closed action-kind
+enum and resolved to `/interviews/invitations` — the hub for interview invitations sent to
+*candidates*, an unrelated object that shares a word. No rule emitted it. Anyone implementing this
+would read `membershipInvitations` in the rule input, see the matching name in the enum, and send
+users with a team invitation to a page about candidate interviews. The type system cannot catch that:
+the enum exists to stop a kind being invented, and this is a kind being *reused*. `resolveActionHref`
+could not have carried the invitation id there either. `open-membership-invitation` is its own kind
+with its own route, returning `null` rather than a list when it has no id.
+
+**A test of mine encoded an assumption the product had already decided against.** I asserted the
+invitation row ranked below the seats/credits row, on the intuition that anything billing-shaped
+outranks an offer. `ACTION_PRIORITY` disagrees — `membershipInvitation` is 80 and `usageThreshold` is
+100 — and the table is right: a full seat allowance is a fact about a plan, not an urgency. The test
+now asserts position relative to other rules rather than to a literal, so it follows the table instead
+of duplicating it.
+
+**Two onboarding defects, one fixed and one deliberately not.** The skip button's accessible name was
+"Dismiss" while its tooltip read "Skip onboarding" and its handler posted a real server-side skip
+counted against `MAX_SKIPS` — a sighted user hovered and learned the truth, a screen-reader user heard
+"Dismiss" and spent one of three skips. Same defect class as the Customize dialog's pin labels: the
+name described the gesture instead of the effect. Fixed.
+
+The second is left alone. The banner reads a `localStorage` dismissal *before* fetching status, so one
+dismissal hides it on that browser permanently even though the server's three-skip model intends two
+more reminders — client state silently overriding a server rule, the same fragility Wave 6 removed
+from preferences. Removing the key would make the product naggier for everyone who has already
+dismissed it, and "should we remind twice more?" is a product decision, not a bug with one right
+answer. Documented in place; it disappears when this banner folds into the queue, whose dismissals are
+server-backed by construction.
+
+## 2026-08-06 — three red runs, one real defect
+
+The Wave 2 batch took three gate runs to land, and the failures are worth separating because only one
+of them was a defect.
+
+**`admin-operations` was racing a wall clock, and had been winning by luck.** The pause/resume test
+asserts `sprints.execute` reads "healthy" before it pauses it. That job's cron fires on the
+ten-minute boundaries — :00, :10, :20 — not ten minutes after the fixture syncs the registry. A sync
+at 11:39:50 sets `nextRunAt` to 11:40:00, ten seconds later, and `/api/admin/operations` marks a
+schedule overdue as soon as `nextRunAt <= now` because no worker advances it during a test. Whether
+the test passed depended on where in the ten-minute cycle the suite happened to start. It survived
+hundreds of green runs and then failed on one that changed nothing near it.
+
+Fixed by pinning every schedule's `next_run_at` a day out after the sync, not by relaxing the matcher
+to `/healthy|overdue/`: the assertion exists to prove the row is live *before* it is paused, and a
+matcher accepting both states checks nothing. (Writing that comment nearly introduced a second bug —
+the literal cron string contains `*/`, which would have closed the block comment early.)
+
+**A 30-second hydration timeout was load, and the proof is the next run.** The same test that timed
+out waiting for `data-hydrated="true"` completed in 4.2s once the machine was quieter. Resisting the
+urge to raise the timeout was the right call: that would have buried the signal instead of explaining
+it.
+
+**`ERR_NETWORK_CHANGED` was the host, and the collector now says so.** An organization-switching test
+failed on a same-origin request to `/api/alerts/triggers/unread-count` — an endpoint it has nothing to
+do with — because the machine's network interface changed mid-run and Chromium tore down its sockets.
+`ERR_ABORTED` was already exempt in the strict collector for the same reason one level up; this adds
+`ERR_NETWORK_CHANGED`, `ERR_INTERNET_DISCONNECTED` and `ERR_NETWORK_IO_SUSPENDED`, as an exact list
+rather than a pattern. "Ignore transport errors" would swallow `ERR_CONNECTION_REFUSED`, which is the
+server being down and is precisely what this collector exists to catch.
+
+The console half needed exempting too. Chromium logs "Failed to load resource: net::ERR_NETWORK_CHANGED"
+beside the failed request, and exempting one without the other leaves the test failing on the second
+half of a single event — which is how this run reported two violations for one cause.

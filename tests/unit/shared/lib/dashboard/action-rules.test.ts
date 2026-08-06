@@ -297,3 +297,71 @@ describe('the interview-readiness rule', () => {
     expect(queue.items[0].action.kind).toBe('open-interview')
   })
 })
+
+/**
+ * plans/ui-dashboard Wave 2, "Unify onboarding and invitation notices with the queue" — the
+ * invitation half. `PendingInvitationsBanner` rendered the same notice and is gone with this rule; the
+ * duplication the task exists to remove never existed at runtime because the two never shipped
+ * together.
+ */
+describe('membership invitations', () => {
+  it('says nothing when the user has none', () => {
+    const { items } = buildActionQueue(input({ membershipInvitations: [] }))
+    expect(items.filter((item) => item.id.startsWith('membership-invitation'))).toHaveLength(0)
+  })
+
+  /**
+   * The destination is the trap this rule was written around. `open-invitation` already exists and
+   * resolves to `/interviews/invitations` — the *candidate* interview hub, an unrelated object that
+   * shares a word. A membership invitation belongs at `/team/invite/$invitationId`.
+   */
+  it('carries the id on the membership kind, never the interview one', () => {
+    const { items } = buildActionQueue(input({ membershipInvitations: [{ id: 'inv-1' }] }))
+    const [item] = items.filter((entry) => entry.id.startsWith('membership-invitation'))
+
+    expect(item.action.kind).toBe('open-membership-invitation')
+    expect(item.action.kind).not.toBe('open-invitation')
+    expect(item.action.resourceId).toBe('inv-1')
+    expect(dashboardActionItemSchema.safeParse(item).success).toBe(true)
+  })
+
+  /**
+   * One row for several, and no id on it. With more than one invitation there is no single page to
+   * open, and defaulting to the first would pick for the user — `resolveActionHref` renders no link
+   * for a null id, which is the honest outcome.
+   */
+  it('collapses several invitations into one row that names no single one', () => {
+    const { items } = buildActionQueue(input({
+      membershipInvitations: [{ id: 'inv-1' }, { id: 'inv-2' }, { id: 'inv-3' }],
+    }))
+    const rows = items.filter((entry) => entry.id.startsWith('membership-invitation'))
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].title).toContain('3 teams')
+    expect(rows[0].action.resourceId).toBeNull()
+  })
+
+  /**
+   * Informational, and it sits where the product's priority table puts it: below an unread
+   * high-value alert (50) and above a usage threshold (100). Asserted against another rule rather
+   * than against a literal, so the test follows the table if the table is re-ranked — the ordering
+   * *policy* lives in `ACTION_PRIORITY`, and a second copy of it here would be a second policy.
+   *
+   * An earlier version of this test asserted the invitation ranked below the seats/credits row, on
+   * the assumption that anything billing-shaped outranks an offer. The table disagrees, and the table
+   * is right: a full seat allowance is not urgent, it is a fact about a plan.
+   */
+  it('ranks below an unread alert and above a usage threshold, per the priority table', () => {
+    const { items } = buildActionQueue(input({
+      membershipInvitations: [{ id: 'inv-1' }],
+      unreadAlerts: [{ id: 'trigger-1', highValue: true, triggeredAt: days(1) }],
+      usage: { seatsUsed: 5, seatsAllowed: 5, creditBalanceUnits: 0, paidActionsAllowed: true },
+    }))
+
+    const at = (prefix: string) => items.findIndex((item) => item.id.startsWith(prefix))
+    expect(at('unread-high-value-alert')).toBeGreaterThan(-1)
+    expect(at('unread-high-value-alert')).toBeLessThan(at('membership-invitation'))
+    expect(at('membership-invitation')).toBeLessThan(at('usage'))
+    expect(items[at('membership-invitation')].severity).toBe('info')
+  })
+})

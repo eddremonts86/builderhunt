@@ -105,10 +105,32 @@
   - Do: Render why, severity text, due/age context, and one primary action. Resolve only allowlisted route kinds; render unknown kinds safely as unavailable. Add loading/empty/stale/error states.
   - Verify: keyboard, screen-reader, touch-target, 320 px, long localization, and unknown-action fixtures pass.
 
-- [ ] **Unify onboarding and invitation notices with the queue**
+- [~] **Unify onboarding and invitation notices with the queue**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, onboarding/invitation banner components, E2E tests
   - Do: Remove duplicate banners after their equivalent queue rules ship. Preserve blocking/critical behavior and valid dismissals; do not allow required actions to be hidden through preferences.
   - Verify: each underlying issue appears exactly once, dismissal applies only to eligible informational items, and resolution removes the item after refresh.
+  - **Invitations done, 2026-08-06 — and the blocker was a note of mine that was false.**
+    `action-rules.ts` recorded that neither notice could move because "the first offers *skip*, the
+    second accepts or declines in place". `PendingInvitationsBanner` never accepted anything in place;
+    it rendered one link per invitation to `/team/invite/$invitationId`, which is exactly the shape of
+    a queue row. The rule ships, the banner is deleted, and nothing was lost.
+  - **The destination is a trap with a plausible name.** `open-invitation` already existed and resolves
+    to `/interviews/invitations` — the *candidate* interview hub, an unrelated object sharing a word —
+    and no rule emitted it. Reading `membershipInvitations` and reaching for the matching-sounding kind
+    would have sent someone with a team invitation to a page about interviews: wrong, plausible, and
+    invisible to the type system, since the closed enum guards against inventing a kind and not
+    against reusing one. Hence `open-membership-invitation`, with its own route entry that returns
+    `null` rather than a list when it has no id.
+  - **Onboarding still open, and now for one reason instead of two.** Its skip is a real server action
+    (`POST /api/onboarding/skip`, counted against `MAX_SKIPS`), not a link, so the queue row needs a
+    secondary dismissal affordance first. A skip is a dismissal rather than a second decision, so that
+    does not breach the one-action-per-row rule the widget documents.
+  - **Two onboarding defects found on the way.** The skip button's accessible name was "Dismiss" while
+    its tooltip said "Skip onboarding" and its handler posted a real skip — fixed. And the banner reads
+    a `localStorage` dismissal *before* fetching status, so one dismissal hides it on that browser
+    forever even though the server intends to remind twice more; documented in place and deliberately
+    not changed, because removing it makes the product naggier and that is a product decision, not a
+    bug with one answer. It resolves for free when this banner folds into the queue.
 
 - [ ] **Add privacy-safe queue telemetry**
   - Files: dashboard analytics events/contracts, telemetry tests

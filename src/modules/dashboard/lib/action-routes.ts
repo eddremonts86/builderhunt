@@ -27,6 +27,7 @@ const ACTION_LABELS: Record<DashboardActionKind, string> = {
   'open-calendar': 'Open calendar',
   'open-availability': 'Set availability',
   'open-invitation': 'Open invitation',
+  'open-membership-invitation': 'Review invitation',
   'open-alert': 'Open alerts',
   'open-sprint': 'Open sprint',
   'open-saved-search': 'Open search',
@@ -63,6 +64,12 @@ export function resolveActionHref(action: DashboardAction): string | null {
     case 'open-interview': return resourceId ? `/interviews/${resourceId}` : null
     // The invitation hub is one page; individual invitations are rows on it, not routes.
     case 'open-invitation': return '/interviews/invitations'
+    /*
+     * A membership invitation *is* its own route, and it needs the id. `null` without one rather than
+     * a fallback to a list: there is no "all my team invitations" page, and inventing a destination
+     * for a queue row whose job is to unblock someone is worse than showing no link.
+     */
+    case 'open-membership-invitation': return resourceId ? `/team/invite/${resourceId}` : null
     /*
      * `/search`, without the saved-search id. The saved search is loaded through a query parameter,
      * and a path built here would either encode one this router does not read or invent a route that
