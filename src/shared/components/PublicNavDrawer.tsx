@@ -45,7 +45,19 @@ export function PublicNavDrawer({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) onClose() }}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className={`fixed inset-0 z-50 bg-bh-text/25 backdrop-blur-sm animate-fade-in ${MOBILE_DRAWER_VISIBLE}`} />
+        {/*
+          `data-testid` for the same reason the Content below carries one: the overlay has no role,
+          no name and no stable class a test can hold onto, and the alternative — a raw
+          `page.mouse.click(10, 300)` — skips Playwright's actionability wait. That version failed
+          two of eight full gate runs while passing every time in isolation, because a blind
+          coordinate click can land before the freshly re-mounted overlay is hit-testable. Clicking
+          the element makes the wait the test framework's job instead of a guess about animation
+          timing.
+        */}
+        <DialogPrimitive.Overlay
+          data-testid="public-nav-overlay"
+          className={`fixed inset-0 z-50 bg-bh-text/25 backdrop-blur-sm animate-fade-in ${MOBILE_DRAWER_VISIBLE}`}
+        />
         <DialogPrimitive.Content
           // A stable hook for the responsive guard. Radix names this dialog via `aria-labelledby` pointing at
           // its Title, but that name does not resolve reliably at every viewport — `getByRole('dialog',

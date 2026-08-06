@@ -40,6 +40,7 @@ function overview(overrides: Record<string, unknown> = {}) {
       },
       actionQueue: { status: 'empty', generatedAt: GENERATED_AT },
       sourceCoverage: { status: 'unavailable', code: 'section_failed' },
+      upcoming: { status: 'empty', generatedAt: GENERATED_AT },
     },
     ...overrides,
   }
@@ -211,5 +212,67 @@ describe('recency buckets', () => {
       },
     })
     expect(parseDashboardOverview(payload).ok).toBe(false)
+  })
+})
+
+describe('the upcoming agenda', () => {
+  /**
+   * plans/ui-dashboard Wave 3. The field worth guarding is `meetingUrl`: it is the one value in this
+   * projection that a *user typed* and that the browser will follow. Validating it at the boundary
+   * means no component has to remember to sanitise it, and no future component can forget.
+   */
+  const item = {
+    eventId: 'evt-1',
+    title: 'Interview: Senior Backend Engineer',
+    startsAt: '2027-03-01T10:00:00.000Z',
+    endsAt: '2027-03-01T10:30:00.000Z',
+    timezone: 'Europe/Copenhagen',
+    allDay: false,
+    type: 'interview',
+    location: null,
+    meetingUrl: 'https://meet.test.invalid/abc',
+    hasActiveBrief: false,
+    invitationId: null,
+  }
+
+  function withUpcoming(items: unknown[]) {
+    const base = overview()
+    return parseDashboardOverview({
+      ...base,
+      sections: { ...base.sections, upcoming: { status: 'ready', generatedAt: GENERATED_AT, data: { items } } },
+    })
+  }
+
+  it('accepts a well-formed appointment', () => {
+    expect(withUpcoming([item]).ok).toBe(true)
+  })
+
+  it.each([
+    'javascript:alert(1)',
+    '//evil.test/meeting',
+    'data:text/html,<script>',
+    'meet.test.invalid/abc',
+    'file:///etc/passwd',
+  ])('refuses %s as a meeting link', (meetingUrl) => {
+    // Not sanitised in the component — refused here, so every renderer downstream is safe by
+    // construction rather than by discipline.
+    expect(withUpcoming([{ ...item, meetingUrl }]).ok).toBe(false)
+  })
+
+  it('allows a null meeting link, which is an in-person or unlinked appointment', () => {
+    expect(withUpcoming([{ ...item, meetingUrl: null, location: 'Room 4' }]).ok).toBe(true)
+  })
+
+  it('requires the event timezone, so a time cannot be rendered in a zone nobody agreed to', () => {
+    const { timezone: _dropped, ...withoutZone } = item
+    expect(withUpcoming([withoutZone]).ok).toBe(false)
+  })
+
+  it('refuses more rows than a week of agenda should carry', () => {
+    const many = Array.from({ length: DASHBOARD_ROW_LIMITS.upcoming + 1 }, (_, index) => ({
+      ...item,
+      eventId: `evt-${index}`,
+    }))
+    expect(withUpcoming(many).ok).toBe(false)
   })
 })

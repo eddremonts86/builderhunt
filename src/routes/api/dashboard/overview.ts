@@ -27,6 +27,7 @@ import { buildActionQueue } from '~/shared/lib/dashboard/action-rules'
 import { getOnboardingStatus } from '~/shared/lib/onboarding'
 import { listOrganizationTriggers } from '~/shared/lib/repositories/organization-alerts'
 import { listSprints } from '~/lib/sprints/service'
+import { listUpcomingAppointments } from '~/shared/lib/repositories/dashboard-upcoming'
 import { listInvitationsForEmail } from '~/shared/lib/organizations/contracts'
 import { auth } from '~/shared/lib/auth/better-auth'
 
@@ -112,6 +113,23 @@ export function cacheKey(organizationId: string, userId: string, roleClass: Role
     roleClass,
     range,
   ].join(':')
+}
+
+/**
+ * Whether a stored meeting link is something a browser may be sent to.
+ *
+ * `meeting_url` is user-typed. The contract already refuses anything that is not absolute http(s),
+ * so this exists to fail *one row* rather than the response: without it a single malformed link
+ * would fail outbound validation and 500 the whole dashboard for that user.
+ */
+function isSafeMeetingUrl(value: string | null): value is string {
+  if (!value) return false
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -230,6 +248,48 @@ export const Route = createFileRoute('/api/dashboard/overview')({
           }, () => false)
 
           /*
+           * The agenda. Its own section rather than part of the summary because it fails on its own
+           * terms: the calendar tables are a different subsystem, and a broken join there must not
+           * take the headline counts with it.
+           *
+           * Owner-scoped by `principal.userId`, not by organization. Calendar events are personal
+           * even inside a shared tenant, and a dashboard is not where someone discovers a
+           * colleague's schedule.
+           */
+          const upcoming = await section('upcoming', generatedAt, async () => {
+            const items = await withTenantContext(principal, (transaction) =>
+              listUpcomingAppointments(
+                transaction,
+                principal.organizationId,
+                principal.userId,
+                now,
+                DASHBOARD_ROW_LIMITS.upcoming,
+              ))
+            return {
+              items: items.map((item) => ({
+                eventId: item.eventId,
+                title: item.title,
+                startsAt: item.startsAt.toISOString(),
+                endsAt: item.endsAt.toISOString(),
+                timezone: item.timezone,
+                allDay: item.allDay,
+                type: item.type,
+                location: item.location,
+                /*
+                 * Dropped rather than passed through when it is not an absolute http(s) URL. The
+                 * contract refuses anything else, so leaving a `javascript:` value here would fail
+                 * the outbound validation and take the *whole response* down with a 500 — one user's
+                 * malformed meeting link breaking every other section of their dashboard. A null
+                 * meeting link degrades one row.
+                 */
+                meetingUrl: isSafeMeetingUrl(item.meetingUrl) ? item.meetingUrl : null,
+                hasActiveBrief: item.hasActiveBrief,
+                invitationId: item.invitationId,
+              })),
+            }
+          }, (value) => value.items.length === 0)
+
+          /*
            * The action queue reads a snapshot the route assembles, and the rules are a pure function
            * of it (`action-rules.ts`). Assembled *after* the sections above so `usage` can be fed in
            * only when the role produced one — a member's snapshot has `usage: null`, so the usage
@@ -288,6 +348,18 @@ export const Route = createFileRoute('/api/dashboard/overview')({
                   resultCount: sprint.resultCount,
                   lastRunAt: sprint.lastRunAt,
                 })),
+                // The agenda the section above already computed, reused rather than re-queried:
+                // two reads of the same window a few milliseconds apart can disagree about an
+                // interview starting right now, and the queue and the agenda must not.
+                upcoming: upcoming.status === 'ready'
+                  ? upcoming.data.items.map((item) => ({
+                      eventId: item.eventId,
+                      title: item.title,
+                      startsAt: new Date(item.startsAt),
+                      type: item.type,
+                      hasActiveBrief: item.hasActiveBrief,
+                    }))
+                  : [],
                 usage: usage.status === 'ready'
                   ? {
                       seatsUsed: usage.data.seats?.used ?? 0,
@@ -310,6 +382,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
               recency,
               actionQueue,
               sourceCoverage,
+              upcoming,
               ...(roleClass === 'billing-reader' ? { usage } : {}),
             },
           }

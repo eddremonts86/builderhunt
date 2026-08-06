@@ -22,6 +22,7 @@ function input(overrides: Partial<ActionQueueInput> = {}): ActionQueueInput {
     unreadAlerts: [],
     sprints: [],
     usage: null,
+    upcoming: [],
     ...overrides,
   }
 }
@@ -229,5 +230,70 @@ describe('buildActionQueue', () => {
     }))
     expect(queue.items[0].detail).toBe('Backend hiring')
     expect(JSON.stringify(queue.items)).not.toMatch(/@|http|token/i)
+  })
+})
+
+describe('the interview-readiness rule', () => {
+  /**
+   * plans/ui-dashboard Wave 3, "Add interview-readiness and scheduling action rules".
+   *
+   * The window is the whole design here. An interview next week with no brief is not a problem —
+   * briefs get written the day before, and a queue that says otherwise is wrong about how the work
+   * happens and gets scrolled past for it. The agenda already labels every unbriefed interview
+   * regardless of distance; that is information. This rule is the point where it becomes urgency.
+   */
+  const interview = (overrides: Partial<{ eventId: string; title: string; startsAt: Date; type: string; hasActiveBrief: boolean }> = {}) => ({
+    eventId: 'evt-1',
+    title: 'Interview: Senior Backend Engineer',
+    startsAt: new Date(NOW.getTime() + 2 * 60 * 60 * 1000),
+    type: 'interview',
+    hasActiveBrief: false,
+    ...overrides,
+  })
+
+  it('raises an unbriefed interview inside the day', () => {
+    const queue = buildActionQueue(input({ upcoming: [interview()] }))
+    expect(queue.items).toHaveLength(1)
+    expect(queue.items[0].severity).toBe('warning')
+    expect(queue.items[0].action).toEqual({ kind: 'open-interview', resourceId: 'evt-1' })
+  })
+
+  it.each([
+    ['inside the window', 23, 1],
+    ['outside the window', 25, 0],
+  ])('an interview %s hours away raises %s', (_label, hoursAway, expected) => {
+    const queue = buildActionQueue(input({
+      upcoming: [interview({ startsAt: new Date(NOW.getTime() + hoursAway * 60 * 60 * 1000) })],
+    }))
+    expect(queue.items).toHaveLength(expected)
+  })
+
+  it('still raises one that has already started', () => {
+    // `listUpcomingAppointments` excludes anything that has finished, so a negative offset here is a
+    // meeting in progress — the most unprepared anyone can be, not the least.
+    const queue = buildActionQueue(input({
+      upcoming: [interview({ startsAt: new Date(NOW.getTime() - 10 * 60 * 1000) })],
+    }))
+    expect(queue.items).toHaveLength(1)
+  })
+
+  it('says nothing about an interview that has a brief', () => {
+    expect(buildActionQueue(input({ upcoming: [interview({ hasActiveBrief: true })] })).items).toEqual([])
+  })
+
+  it('says nothing about a non-interview appointment', () => {
+    // `calendar_events_type_check` allows exactly `personal` and `interview`. A personal block with
+    // no interview brief is not a gap; it is a block.
+    expect(buildActionQueue(input({ upcoming: [interview({ type: 'personal' })] })).items).toEqual([])
+  })
+
+  it('outranks every other rule, because it expires and the others do not', () => {
+    const queue = buildActionQueue(input({
+      upcoming: [interview()],
+      unreadAlerts: [{ id: 'a1', highValue: true, triggeredAt: days(1) }],
+      sprints: [{ id: 's', name: 'Paused', status: 'paused', resultCount: 0, lastRunAt: null }],
+      usage: { seatsUsed: 5, seatsAllowed: 5, creditBalanceUnits: 0, paidActionsAllowed: true },
+    }))
+    expect(queue.items[0].action.kind).toBe('open-interview')
   })
 })

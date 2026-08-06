@@ -88,6 +88,18 @@ export interface ActionQueueInput {
     creditBalanceUnits: number
     paidActionsAllowed: boolean
   } | null
+  /**
+   * The caller's own next appointments, already merged and bounded by
+   * `listUpcomingAppointments`. The rule below reads only whether an interview is imminent and
+   * whether it has an active brief — never the candidate, the location, or the meeting link.
+   */
+  upcoming: ReadonlyArray<{
+    eventId: string
+    title: string
+    startsAt: Date
+    type: string
+    hasActiveBrief: boolean
+  }>
 }
 
 interface Rule {
@@ -115,7 +127,42 @@ interface RuleOutput {
  */
 const SPRINT_STALL_MS = 3 * 24 * 60 * 60 * 1000
 
+/**
+ * How close an interview has to be before "no brief yet" becomes something to act on *now*.
+ *
+ * 24 hours. An interview next week with no brief is normal — briefs are written the day before, and
+ * a queue that says otherwise is wrong about how the work happens and gets ignored for it. The
+ * agenda already shows "No brief yet" on every such row regardless of distance; that is information.
+ * This is the point at which it becomes urgency, and the two surfaces saying it for different
+ * reasons is the intended division.
+ */
+const INTERVIEW_BRIEF_WINDOW_MS = 24 * 60 * 60 * 1000
+
 const RULES: readonly Rule[] = [
+  {
+    id: 'interview-missing-brief',
+    priority: ACTION_PRIORITY.interviewUnprepared,
+    evaluate: ({ upcoming, now }) => upcoming
+      .filter((appointment) => {
+        if (appointment.type !== 'interview' || appointment.hasActiveBrief) return false
+        const until = appointment.startsAt.getTime() - now.getTime()
+        // Already started is still unprepared, and more so — `until` goes negative and stays inside
+        // the window, which is deliberate. `listUpcomingAppointments` has already excluded anything
+        // that finished.
+        return until < INTERVIEW_BRIEF_WINDOW_MS
+      })
+      .map((appointment) => ({
+        resourceKey: `interview:${appointment.eventId}`,
+        // Warning, not critical: the interview will happen either way, and reserving `critical` for
+        // things that are actually broken is what keeps the word meaning something.
+        severity: 'warning' as const,
+        title: 'An interview starts soon with no brief',
+        detail: appointment.title,
+        dueAt: appointment.startsAt,
+        kind: 'open-interview' as const,
+        resourceId: appointment.eventId,
+      })),
+  },
   {
     id: 'usage-threshold',
     priority: ACTION_PRIORITY.usageThreshold,

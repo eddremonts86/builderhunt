@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, ExternalLink,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
@@ -15,6 +15,7 @@ import { Button, LinkButton } from '~/components/ui'
 import { BentoRegion, BentoTileHeader, BentoTileList } from '~/modules/dashboard/ui/bento/Bento'
 import { WidgetFrame } from '~/modules/dashboard/ui/WidgetFrame'
 import { ActionQueueWidget } from './ActionQueueWidget'
+import { UpcomingWidget } from './UpcomingWidget'
 import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/dashboard/lib/use-dashboard-overview'
 import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
 import { useBentoDensity } from '~/modules/dashboard/ui/bento/useBentoDensity'
@@ -189,6 +190,29 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     sectionGroup: 'metrics',
     render: (ctx: HomeContext) => <MetricWidget {...ctx.statsData[index]} />,
   })),
+
+  /*
+   * Second, right after the queue: "what is happening next" is the dashboard's second question, and
+   * an agenda that sits below three analytics tiles is not answering it. Hidden when the week is
+   * empty rather than showing a reassurance nobody re-reads.
+   */
+  {
+    id: 'upcoming',
+    span: 'full',
+    isEmpty: (ctx) => ctx.overview.section('upcoming').kind === 'empty',
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Today and upcoming"
+        icon={CalendarClock}
+        state={ctx.overview.section('upcoming')}
+        onRetry={ctx.overview.refetch}
+        emptyMessage="Nothing scheduled in the next 7 days."
+      >
+        {(agenda) => <UpcomingWidget items={agenda.items} />}
+      </WidgetFrame>
+    ),
+  },
 
   // Band 2 — two halves. 6 + 6 = 12.
   {

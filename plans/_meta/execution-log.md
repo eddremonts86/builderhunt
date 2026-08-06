@@ -1127,14 +1127,62 @@ the first to rot is the one nobody opens — this repository already has the rec
 a compile-time registry nobody updated. The remaining `GET /api/admin/overview` work is folded into
 the Metrics rebuild; the task is marked `[~]` with that reasoning.
 
-### One flake, recorded rather than fixed
+### One flake, recorded and then fixed
 
 `public-content.spec.ts` "at 320px, the mobile drawer reaches every destination without the page
-footer" failed once in six full gate runs, at its *second* close — the overlay click, not the Escape
-that precedes it. It passes 4/4 in isolation and passed on the immediate re-run of the whole gate.
+footer" failed **two of eight** full gate runs, always at its *second* close — the overlay click, not
+the Escape that precedes it — while passing every time in isolation.
 
-The shape is a race with Radix's overlay fade-in: the test reopens the drawer and immediately clicks
-a raw coordinate, so under the contention of two vite dev servers the click can land before the
-dismiss handler is live. Not caused by any change in this session, and not fixed here because the
-repair is a guess at someone else's spec — but a test that fails one run in six costs the same as a
-real failure under a "green before deploy" rule, so it is written down rather than forgotten.
+Recorded first and fixed on the second occurrence, because one failure in eight looked like weather
+and two looked like a defect. Not caused by anything in this session; it costs the same as a real
+failure under a "green before deploy" rule either way.
+
+The cause was not the coordinate. `page.mouse.click(10, 300)` is genuinely outside the drawer, which
+is `right-0 w-[85vw]` and therefore starts at x=48 on a 320px viewport. It is that a raw mouse event
+**skips Playwright's actionability wait**, and the freshly re-mounted Radix overlay is not
+hit-testable while it fades in — which only matters when two vite dev servers are compiling routes on
+demand and everything is a few hundred milliseconds slower.
+
+The overlay now carries a `data-testid` (the Content beside it already did, for a comparable
+testability reason) and the spec clicks it as an element with `position`, landing on the same point.
+The wait becomes the framework's job instead of an assumption about animation timing.
+
+### Wave 3 — today and upcoming
+
+Three tasks closed, one partial. The agenda projection, the widget, and the interview-readiness rule.
+
+**The merge the plan worried about does not exist.** It asks for Calendar, Interview and booked
+Scheduling records "merged by canonical event/interview identifiers", which reads as three sources to
+reconcile. They are not three sources: an interview brief is keyed by `event_id` and a booked
+invitation stores `booked_event_id`. Both hang off the event. Selecting from `calendar_events` and
+joining outward gives one row per appointment by construction — no dedup step to get wrong, and no
+way for a rescheduled invitation pointing at a replacement event to appear twice.
+
+**Three defects, all found by running it rather than reading it:**
+
+1. **`max(uuid)` does not exist in Postgres.** The invitation id is a uuid, and aggregating it under
+   the `group by` failed the whole section — which the per-section `try` then reported as a quiet
+   `unavailable` for every user with a calendar entry. That is the envelope doing the opposite of its
+   job: hiding a bug it was built to make visible. `::text` before `max`. Nothing in the type system
+   could have caught it; drizzle types a `sql` fragment from the annotation it is handed.
+2. **The action-item id was capped at 64 and `interview-missing-brief:interview:<uuid>` is 70.**
+   Outbound validation refused the entire response. The cap working as designed, at the cost of a 500
+   the first time a real rule met a real uuid. Raised to 128, with the reasoning: it is two
+   identifiers and a separator, not one.
+3. **Two destinations in the route map did not exist.** `/calendar/availability` (the editor lives on
+   `/calendar`) and a per-invitation route (invitations are rows on one hub). Both would have sent an
+   administrator from a queue item to a 404 — from the one surface whose purpose is unblocking them.
+
+**A meeting link is the only user-typed value here that a browser will follow**, so it is validated
+as absolute http(s) at the contract boundary rather than sanitised per component. A row whose link
+fails that check loses the link and keeps the row: passing it through would fail outbound validation
+and take every other section of that user's dashboard down with it.
+
+**The window in the readiness rule is the design.** 24 hours. An interview next week with no brief is
+normal — briefs get written the day before, and a queue that says otherwise is wrong about how the
+work happens and gets scrolled past for it. The agenda labels every unbriefed interview regardless of
+distance; that is information. The rule is where it becomes urgency.
+
+**Evidence:** 55 unit tests on the rules and contract, 27 e2e in `dashboard-and-navigation.spec.ts`.
+The agenda's e2e is deliberately one test making one request: split across two, the second read a
+cached answer from before its own fixture existed — green alone, red in the file.

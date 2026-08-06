@@ -131,6 +131,8 @@ export const DASHBOARD_ROW_LIMITS = {
   alerts: 10,
   sourceCoverage: 16,
   recencyBuckets: 31,
+  /** A week's agenda, bounded. Past six rows the widget is a calendar and should link to one. */
+  upcoming: 6,
 } as const
 
 // ── Sections ──────────────────────────────────────────────────────────────────────────────────
@@ -161,7 +163,16 @@ export const dashboardRecencySchema = z.object({
 export type DashboardRecency = z.infer<typeof dashboardRecencySchema>
 
 export const dashboardActionItemSchema = z.object({
-  id: z.string().min(1).max(64),
+  /**
+   * A composite: `<ruleId>:<resourceKey>`, stable across requests for the same underlying problem so
+   * a client can key a list on it and telemetry can correlate a resolution without the resource id.
+   *
+   * Bounded at 128 rather than the 64 used for `resourceId`, because it is two identifiers and a
+   * separator, not one. It was 64, and `interview-missing-brief:interview:<uuid>` is 70 — the
+   * outbound validation caught it and refused the whole response, which is the cap doing its job at
+   * the cost of a 500 the first time a real rule met a real uuid.
+   */
+  id: z.string().min(1).max(128),
   severity: z.enum(DASHBOARD_SEVERITIES),
   /** Short, already-resolved text. Never a template the client has to fill from other fields. */
   title: z.string().min(1).max(120),
@@ -182,6 +193,40 @@ export const dashboardSourceCoverageSchema = z.object({
   totalTracked: z.number().int().nonnegative(),
 })
 export type DashboardSourceCoverage = z.infer<typeof dashboardSourceCoverageSchema>
+
+/**
+ * One row of the today-and-upcoming agenda.
+ *
+ * Instants, not display strings. The server knows the event's own IANA zone and sends it alongside,
+ * so the widget can say "14:00 Europe/Copenhagen" to a viewer in another zone without the server
+ * having to guess which zone that is. Formatting on the server would bake in a locale the request
+ * never carried.
+ */
+export const dashboardUpcomingItemSchema = z.object({
+  eventId: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
+  title: z.string().min(1).max(200),
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+  timezone: z.string().min(1).max(64),
+  allDay: z.boolean(),
+  /** The event's own type, never inferred from its title. */
+  type: z.string().min(1).max(32),
+  location: z.string().max(200).nullable(),
+  /**
+   * Validated as an absolute http(s) URL here rather than trusted at render time. It is the one
+   * field in this projection that a user typed and that the browser will follow, so `javascript:`,
+   * a protocol-relative `//evil.test`, and anything else that is not a fetchable meeting link is
+   * refused at the boundary instead of being sanitised in each component that shows it.
+   */
+  meetingUrl: z.url({ protocol: /^https?$/ }).max(500).nullable(),
+  /**
+   * Whether an *active* interview brief exists. A draft or superseded brief counts as absent,
+   * because the question the dashboard asks is "am I walking into this unprepared".
+   */
+  hasActiveBrief: z.boolean(),
+  invitationId: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/).nullable(),
+})
+export type DashboardUpcomingItem = z.infer<typeof dashboardUpcomingItemSchema>
 
 /**
  * The role-minimized usage view.
@@ -226,6 +271,9 @@ export const dashboardOverviewSchema = z.object({
       z.object({ items: z.array(dashboardActionItemSchema).max(DASHBOARD_ROW_LIMITS.actionQueue) }),
     ),
     sourceCoverage: sectionEnvelope(dashboardSourceCoverageSchema),
+    upcoming: sectionEnvelope(
+      z.object({ items: z.array(dashboardUpcomingItemSchema).max(DASHBOARD_ROW_LIMITS.upcoming) }),
+    ),
     // Absent entirely for a role that may not see it — see the note on `forbidden` above.
     usage: sectionEnvelope(dashboardUsageSchema).optional(),
   }),

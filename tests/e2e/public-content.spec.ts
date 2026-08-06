@@ -257,7 +257,18 @@ test.describe('public navigation', () => {
         // Overlay click closes it too.
         await trigger.click()
         await expect(dialog).toBeVisible()
-        await page.mouse.click(10, 300)
+        /*
+         * Clicked as an element, not as a coordinate. `page.mouse.click(10, 300)` was the same point
+         * — the drawer is `right-0 w-[85vw]`, so x=10 is outside it at 320px — but a raw mouse event
+         * skips Playwright's actionability wait, and the freshly re-mounted overlay is not
+         * immediately hit-testable while it fades in. That version failed two of eight full gate runs
+         * while passing every time in isolation, which is the signature of a race that only appears
+         * under compile contention.
+         *
+         * `position` keeps the click in the same place: relative to the overlay's box, which is the
+         * viewport.
+         */
+        await page.getByTestId('public-nav-overlay').click({ position: { x: 10, y: 300 } })
         await expect(dialog).not.toBeVisible()
       },
       { viewport: { width: 320, height: 720 } },

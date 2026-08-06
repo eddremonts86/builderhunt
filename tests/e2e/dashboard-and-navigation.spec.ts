@@ -26,6 +26,7 @@ import { test, expect as baseExpect, request as playwrightRequest, type Browser,
 // default under that contention. Still bounded, never a fixed delay.
 const expect = baseExpect.configure({ timeout: 15_000 })
 import postgres, { type Sql } from 'postgres'
+import { randomUUID } from 'node:crypto'
 import { loadHarnessEnv } from './harness/load-env'
 
 // Plain Node process — nothing auto-loads `.env` the way vite/vitest do.
@@ -1245,4 +1246,90 @@ test('the Admin area has an index, and it is Metrics', async ({ browser }) => {
   } finally {
     await closeStrictPage(tenantPage)
   }
+})
+
+test.describe('today and upcoming', () => {
+  /**
+   * plans/ui-dashboard Wave 3. Seeded through the calendar tables directly rather than through the
+   * booking flow, because what is under test is the projection's merge and its exclusions, not the
+   * flow that creates an event.
+   *
+   * **One request, several properties.** The projection caches for 30 seconds per
+   * (organization, user, role, range) and this tenant has already used every range in the specs
+   * above, so a second test asking a second question would read a cached answer from before its own
+   * fixture existed — which is exactly how the split version of this failed: green alone, red in the
+   * file. Everything is seeded first and asserted from a single uncached response.
+   */
+  test('the agenda merges, excludes and sanitises in one projection', async () => {
+    const { principal, organization } = await ensureSecondTenant()
+    // Calendar and event ids are uuid columns, so the run-unique string ids used elsewhere in this
+    // file will not do.
+    const calendarId = randomUUID()
+    const soonId = randomUUID()
+    const cancelledId = randomUUID()
+    const pastId = randomUUID()
+    const hostileId = randomUUID()
+    const now = new Date()
+    const iso = (offsetMinutes: number) => new Date(now.getTime() + offsetMinutes * 60_000).toISOString()
+
+    await harness.sql`
+      insert into user_calendars (id, organization_id, owner_user_id, name, timezone)
+      values (${calendarId}, ${organization.organizationId}, ${principal.userId}, 'E2E', 'Europe/Copenhagen')
+    `
+    for (const [id, type, title, startsAt, endsAt, cancelledAt, meetingUrl] of [
+      [soonId, 'interview', 'Interview: agenda case', iso(120), iso(150), null, null],
+      // Both of these must be absent, and for different reasons: a cancelled interview is not
+      // upcoming work, and one that finished is a log entry.
+      [cancelledId, 'interview', 'Interview: cancelled', iso(180), iso(210), iso(-5), null],
+      [pastId, 'interview', 'Interview: finished', iso(-180), iso(-150), null, null],
+      // `meeting_url` is user-typed and the browser follows it.
+      [hostileId, 'personal', 'Hostile link', iso(30), iso(60), null, 'javascript:alert(1)'],
+    ] as Array<[string, string, string, string, string, string | null, string | null]>) {
+      await harness.sql`
+        insert into calendar_events (id, organization_id, calendar_id, owner_user_id, type, status, title,
+                                     starts_at, ends_at, timezone, all_day, busy, visibility, version,
+                                     cancelled_at, meeting_url)
+        values (${id}, ${organization.organizationId}, ${calendarId}, ${principal.userId}, ${type}, 'confirmed',
+                ${title}, ${startsAt}, ${endsAt}, 'Europe/Copenhagen', false, true, 'private', 1,
+                ${cancelledAt}, ${meetingUrl})
+      `
+    }
+
+    const response = await principal.api!.get('/api/dashboard/overview?range=24h')
+    expect(response.status(), await response.text()).toBe(200)
+    const body = await response.json() as {
+      sections: {
+        upcoming: { status: string; data?: { items: Array<{ eventId: string; timezone: string; hasActiveBrief: boolean; meetingUrl: string | null }> } }
+        actionQueue: { status: string; data?: { items: Array<{ action: { kind: string; resourceId: string | null } }> } }
+      }
+    }
+
+    const agenda = body.sections.upcoming.data?.items ?? []
+    const ids = agenda.map((item) => item.eventId)
+    expect(ids, JSON.stringify(body.sections.upcoming)).toContain(soonId)
+    expect(ids).not.toContain(cancelledId)
+    expect(ids).not.toContain(pastId)
+
+    const interview = agenda.find((item) => item.eventId === soonId)!
+    expect(interview.hasActiveBrief).toBe(false)
+    // The event's own zone travels with it, so a viewer elsewhere is not shown a time nobody agreed to.
+    expect(interview.timezone).toBe('Europe/Copenhagen')
+
+    /*
+     * The hostile link loses its URL and keeps its row. Dropping the field costs one link; letting
+     * it reach outbound validation would 500 the entire dashboard — every other section included —
+     * for the one user who typed it.
+     */
+    const hostile = agenda.find((item) => item.eventId === hostileId)
+    expect(hostile, 'the row was dropped instead of its link').toBeTruthy()
+    expect(hostile!.meetingUrl).toBeNull()
+    expect(JSON.stringify(body)).not.toContain('javascript:')
+
+    // The unbriefed interview reaches the queue exactly once — the agenda says when, the queue says
+    // act. The personal block does not: an event with no interview brief is not a gap.
+    const interviewItems = (body.sections.actionQueue.data?.items ?? [])
+      .filter((item) => item.action.kind === 'open-interview')
+    expect(interviewItems).toHaveLength(1)
+    expect(interviewItems[0].action.resourceId).toBe(soonId)
+  })
 })

@@ -98,25 +98,31 @@
 
 ## Wave 3 — Upcoming work
 
-- [ ] **Build the upcoming schedule projection**
+- [x] **Build the upcoming schedule projection**
   - Files: `src/shared/lib/repositories/dashboard-upcoming.ts`, dashboard overview adapter, repository tests
   - Do: Merge Calendar, Interview, and booked Scheduling records by canonical event/interview identifiers; return the next bounded items with local display context and authorized action state.
   - Verify: duplicate, cancelled, rescheduled, all-day, DST, shared-access, foreign-tenant, and missing-meeting-link fixtures pass.
 
-- [ ] **Build the Today and Upcoming widget**
+- [x] **Build the Today and Upcoming widget**
   - Files: `src/modules/dashboard/components/UpcomingWidget.tsx`, component/E2E tests
   - Do: Render a semantic agenda with timezone, start/end, status, and context-aware Join/Prepare/View action. Prefer the agenda over a chart; allow a compact week strip only as a redundant summary.
   - Verify: focus order follows chronological order; 320 px/400% zoom reflow, screen-reader labels, external-link safety, and empty/offline states pass.
 
-- [ ] **Add interview-readiness and scheduling action rules**
+- [x] **Add interview-readiness and scheduling action rules**
   - Files: dashboard action rules, interview/scheduling adapters, tests
   - Do: Add imminent interview missing brief, invitation needing organizer action, calendar conflict, and missing availability rules. Use the canonical readiness/state machines rather than client guesses.
   - Verify: valid state/time windows, reschedule, cancellation, shared access, owner/member permissions, and expiry pass.
 
-- [ ] **Connect dashboard schedule actions to canonical destinations**
+- [~] **Connect dashboard schedule actions to canonical destinations**
   - Files: typed route mapper, Calendar/Interview/Invitation routes, navigation E2E tests
   - Do: Continue to event detail, brief, live interview, invitation hub, or validated meeting URL; preserve allowlisted same-origin `from` context for the return path.
   - Verify: each state exposes only legal actions; external/protocol-relative/script URLs are rejected and cross-tenant IDs remain undiscoverable.
+  - **Partial.** `action-routes.ts` maps every allowlisted kind to a real destination and refuses an
+    unknown one (no button, rather than a guess). Meeting links are validated as absolute http(s) at
+    the contract boundary and opened with `noopener noreferrer`. Two destinations were corrected
+    against the router while writing it: `/calendar/availability` does not exist (the editor is on
+    `/calendar`), and invitations are rows on one hub rather than routes. **Not done:** the
+    allowlisted same-origin `from` context for the return path.
 
 ## Wave 4 — Current-data widgets and charts
 
