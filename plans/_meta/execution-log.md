@@ -1207,3 +1207,22 @@ allowance for it is out of the degraded-tenant e2e — one of the seven original
 **Source coverage was already canonical** as of Wave 1: it aggregates every tracked builder rather
 than the recent sample, states its denominator in words, and shows raw counts beside the
 percentages. Marked closed against its verify line rather than rebuilt.
+
+### One migration attempted and reverted
+
+Moving the three headline counts off `/api/dashboard/stats` and onto the projection's `summary`
+section was written, type-checked and then **reverted**.
+
+Two specs intercept that endpoint with `page.route`: one holds the response to make the loading
+skeleton observable, the other fulfils a 500 to make the page-level "Some data may be missing"
+degradation observable. Repointing either at `/api/dashboard/overview` makes it hang for the full
+120-second test timeout — `main` renders empty and the navigation never settles. Glob and regex
+patterns behave identically, and the identical interception against `/api/dashboard/stats` still
+works, so the cause is something about intercepting the request TanStack Query issues rather than the
+pattern. There is a second, smaller gap: the page-level `error` banner is set by the fetch's catch
+block, so removing that fetch leaves it with no source (`overview.fatal` is the obvious one).
+
+Reverted rather than shipped because two specs hanging two minutes each is a worse state than one
+legacy endpoint still being read, and because the endpoints agree — they read the same columns with
+the same predicates, and the e2e asserts the projection's `summary` against them. The task stays
+`[~]` with the diagnosis recorded so the next attempt starts from it instead of rediscovering it.

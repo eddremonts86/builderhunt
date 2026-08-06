@@ -68,6 +68,19 @@
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, dashboard query hooks, page tests
   - Do: Fetch the core overview once; keep genuinely heavy optional widgets lazy with query keys scoped by session organization and range. Render shell/critical actions independently from lower-section failures.
   - Verify: one failed lazy request leaves the queue/navigation usable; organization switch cancels/invalidates old queries and never flashes prior-tenant content.
+  - **Partial, and the remainder is blocked on test design rather than on product code.** The
+    recency, source-coverage, action-queue, agenda and usage sections all read the projection. The
+    three headline counts still come from `/api/dashboard/stats`.
+    Migrating them was attempted and reverted on 2026-08-06: two specs intercept
+    `**/api/dashboard/stats` with `page.route` — one holds it to observe the loading skeleton, one
+    fulfils a 500 to observe the page-level degradation — and repointing either at
+    `/api/dashboard/overview` makes it hang for the full 120 s test timeout, with `main` empty and
+    the navigation never settling. Glob and regex patterns behave identically, and the same
+    interception against `/api/dashboard/stats` works, so it is something about intercepting the
+    request TanStack Query issues rather than about the pattern. The page-level `error` banner also
+    needs a source once the fetch that sets it is gone — `overview.fatal` is the obvious one.
+    Neither is a five-minute change, and leaving two specs hanging two minutes each is worse than
+    leaving one endpoint in place.
 
 ## Wave 2 — Action queue
 
