@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, ExternalLink,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert, CalendarClock, Gauge,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
@@ -16,6 +16,7 @@ import { BentoRegion, BentoTileHeader, BentoTileList } from '~/modules/dashboard
 import { WidgetFrame } from '~/modules/dashboard/ui/WidgetFrame'
 import { ActionQueueWidget } from './ActionQueueWidget'
 import { UpcomingWidget } from './UpcomingWidget'
+import { WorkspaceUsageWidget } from './WorkspaceUsageWidget'
 import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/dashboard/lib/use-dashboard-overview'
 import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
 import { useBentoDensity } from '~/modules/dashboard/ui/bento/useBentoDensity'
@@ -25,9 +26,7 @@ import { MetricWidget, type MetricWidgetProps } from '~/modules/dashboard/ui/hom
 import { RecentBuildersWidget } from '~/modules/dashboard/ui/home/RecentBuildersWidget'
 import { SprintsWidget, type SprintListItem } from '~/modules/dashboard/ui/home/SprintsWidget'
 import { AlertsWidget, type AlertTrigger } from '~/modules/dashboard/ui/home/AlertsWidget'
-import { PlanUsageWidget, type PlanUsage } from '~/modules/dashboard/ui/home/PlanUsageWidget'
 import { SavedQueryVisibilityBadge, type SavedQueryVisibility } from '~/modules/dashboard/components/SavedQueryVisibilityBadge'
-import type { OrganizationTier } from '~/shared/lib/billing-shared'
 import { SourceMixWidget } from '~/modules/dashboard/ui/home/SourceMixWidget'
 
 interface Stats {
@@ -88,7 +87,6 @@ interface HomeContext {
   recent: RecentBuilder[]
   sprints: SprintListItem[]
   triggers: AlertTrigger[]
-  planUsage: PlanUsage | null
   error: string | null
   statsData: MetricWidgetProps[]
   onQueriesChanged: () => void
@@ -348,11 +346,33 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     id: 'plan-usage',
     span: 'half',
     minSpan: 'quarter',
-    // Hidden rather than shrunk: without a tier from /api/plans/me there is no
-    // limit to measure against, and a usage meter with no limit says nothing.
-    isEmpty: (ctx) => ctx.planUsage === null,
+    /*
+     * Reads the projection's `usage` section, which the server computes from the canonical billing
+     * summary. It read `/api/plans/me` — the legacy endpoint `/api/billing/summary` replaced — and
+     * then looked the limits up client-side from `PLAN_LIMITS`, inlining its own copy of
+     * `resolveLegacyPlanTier` because the real helper is server-only. Two implementations of "what
+     * is this plan allowed", one of them in the browser.
+     *
+     * The section is **absent** for a role that may not read billing, so `WidgetFrame` renders
+     * `forbidden` — nothing at all. The `isEmpty` check below is only for the tenant whose billing
+     * is genuinely unconfigured.
+     */
+    isEmpty: (ctx) => {
+      const state = ctx.overview.section('usage')
+      return state.kind === 'empty' || state.kind === 'forbidden'
+    },
     whenEmpty: 'hide',
-    render: (ctx) => (ctx.planUsage ? <PlanUsageWidget usage={ctx.planUsage} /> : null),
+    render: (ctx) => (
+      <WidgetFrame
+        title="Workspace usage"
+        icon={Gauge}
+        tone="warning"
+        state={ctx.overview.section('usage')}
+        onRetry={ctx.overview.refetch}
+      >
+        {(usage) => <WorkspaceUsageWidget usage={usage} />}
+      </WidgetFrame>
+    ),
   },
   {
     id: 'source-mix',
@@ -384,7 +404,6 @@ export function DashboardPage() {
   const [recent, setRecent] = React.useState<RecentBuilder[]>([])
   const [sprints, setSprints] = React.useState<SprintListItem[]>([])
   const [triggers, setTriggers] = React.useState<AlertTrigger[]>([])
-  const [planTier, setPlanTier] = React.useState<OrganizationTier | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   // The principal's id is what gates the visibility-flip action on a
@@ -528,14 +547,11 @@ export function DashboardPage() {
       triggers,
       error,
       statsData,
-      planUsage: planTier
-        ? { tier: planTier, savedSearches: queries.length, savedBuilders: stats?.totalBuilders ?? 0 }
-        : null,
       onQueriesChanged: refetchQueries,
       currentUserId: currentUserId ?? '',
       overview,
     }),
-    [stats, queries, recent, sprints, triggers, planTier, error, statsData, refetchQueries, currentUserId, overview],
+    [stats, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
   )
 
   React.useEffect(() => {
@@ -551,10 +567,6 @@ export function DashboardPage() {
       .then((r) => (r.ok ? r.json() : []))
       .then((rows) => setTriggers(asArray<AlertTrigger>(rows)))
       .catch(() => setTriggers([]))
-    fetch('/api/plans/me', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: { plan?: { plan?: OrganizationTier } } | null) => setPlanTier(body?.plan?.plan ?? null))
-      .catch(() => setPlanTier(null))
   }, [])
 
   if (loading) {

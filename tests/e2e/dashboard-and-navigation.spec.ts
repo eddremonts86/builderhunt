@@ -820,7 +820,6 @@ test('a member removed from their active organization degrades gracefully and re
       /\/api\/organizations\/invitations\/mine/,
       /\/api\/sprints/,
       /\/api\/alerts\/triggers/,
-      /\/api\/plans\/me/,
       /\/api\/dashboard\/overview/,
     ])
   } finally {

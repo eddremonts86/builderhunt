@@ -1186,3 +1186,24 @@ distance; that is information. The rule is where it becomes urgency.
 **Evidence:** 55 unit tests on the rules and contract, 27 e2e in `dashboard-and-navigation.spec.ts`.
 The agenda's e2e is deliberately one test making one request: split across two, the second read a
 cached answer from before its own fixture existed — green alone, red in the file.
+
+### Wave 4 — two widgets onto the canonical sources
+
+**Workspace usage replaces Plan usage, and deletes a second implementation of the plan rules.** The
+old widget read `GET /api/plans/me` — the legacy endpoint `/api/billing/summary` exists to replace —
+and then looked the limits up **client-side** from `PLAN_LIMITS`, inlining its own copy of
+`resolveLegacyPlanTier` because the real helper is server-only. Two implementations of "what is this
+plan allowed", one of them in the browser, is how a dashboard ends up promising a quota the API then
+refuses. Everything is now computed server-side from the canonical summary, warning included; the
+client re-derives nothing.
+
+The meters changed with it. Saved searches and tracked builders are counts that grow slowly and that
+nobody is actually blocked by; a full seat allowance stops a person joining and an empty credit
+balance stops paid actions, so those are what it shows.
+
+`PlanUsageWidget` is deleted, the `/api/plans/me` fetch is gone from the page, and the stale
+allowance for it is out of the degraded-tenant e2e — one of the seven original fetches retired.
+
+**Source coverage was already canonical** as of Wave 1: it aggregates every tracked builder rather
+than the recent sample, states its denominator in words, and shows raw counts beside the
+percentages. Marked closed against its verify line rather than rebuilt.

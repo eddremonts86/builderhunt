@@ -141,7 +141,7 @@
   - Do: Aggregate trigger timestamps by day and allowlisted type; stack only when types are understandable/actionable. Link to Alerts with validated filters.
   - Verify: acknowledgement state does not change historical volume, type totals reconcile, high-volume data remains bounded, and exact values are keyboard accessible.
 
-- [ ] **Build canonical Source Coverage**
+- [x] **Build canonical Source Coverage**
   - Files: dashboard aggregate repository, `SourceCoverageWidget.tsx`, source registry, tests
   - Do: Choose and label one denominator: all tracked builders or configured saved-search sources. Render ranked bars/100% stack plus exact values and source-filtered Search continuation.
   - Verify: percentage rounding reconciles, unknown sources have safe metadata, empty denominator is explicit, and recent-sample data is no longer presented as workspace coverage.
@@ -156,7 +156,7 @@
   - Do: Use server-derived actor display labels and allowlisted target kinds from `plans/UI`. Render recent events; add a volume chart only after a bounded typed event aggregate exists.
   - Verify: deleted/inaccessible targets are plain text, raw IDs are absent, event volume is not framed as employee performance, and pagination/order is stable.
 
-- [ ] **Replace legacy Plan Usage with canonical Workspace Usage**
+- [x] **Replace legacy Plan Usage with canonical Workspace Usage**
   - Files: dashboard billing adapter, `WorkspaceUsageWidget.tsx`, billing tests
   - Do: Consume `/api/billing/summary` or its shared service; show plan/credit/seat progress appropriate to role. Financial amounts and management actions remain owner/admin-only.
   - Verify: member, owner/admin, free, paid, past-due, manual exception, unlimited, and stale-billing fixtures pass without field leakage.
