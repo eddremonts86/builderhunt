@@ -5,7 +5,7 @@ import { accountDb } from '../db/client'
 // drizzle/0007_auth_broker.sql) — builderhunt_app has no grant on them, so
 // this account-subject export must read them through authDb, not accountDb.
 import { authDb } from '../db/auth-db'
-import { withTenantContext } from '../db/tenant-context'
+import { withAccountSubjectContext, withTenantContext } from '../db/tenant-context'
 import type { OrganizationRole } from '../authorization/permissions'
 import {
   alerts,
@@ -84,7 +84,22 @@ export async function loadAccountExportSource(userId: string) {
       usedAt: builderClaimRequests.usedAt,
       createdAt: builderClaimRequests.createdAt,
     }).from(builderClaimRequests).where(eq(builderClaimRequests.email, user.email)),
-    accountDb.select({
+    /*
+     * These two read through `withAccountSubjectContext`, not the bare `accountDb`, because their
+     * tables' RLS keys on `app.user_id` and the bare connection never sets it.
+     *
+     * For `builder_claims` that was a live gap rather than a precaution. With no `app.user_id`,
+     * `builder_claims_app_select` matches nothing; a second additive policy
+     * (`builder_claims_public_portfolio_select`, `USING (status = 'verified')`) let the *verified*
+     * ones through, so the export looked populated and the omission was invisible. Pending, rejected,
+     * revoked and expired claims were dropped — a person whose claim was refused got an export saying
+     * they had never filed one, from the endpoint whose entire purpose is telling them what is held
+     * about them.
+     *
+     * For `builder_profile_views` it is a prerequisite: that table had no RLS at all until
+     * `0154_builder_profile_views_rls.sql`, and once it has some, this read needs an identity.
+     */
+    withAccountSubjectContext(userId, (transaction) => transaction.select({
       id: builderClaims.id,
       builderIdentityId: builderClaims.builderIdentityId,
       evidenceSource: builderClaims.evidenceSource,
@@ -93,11 +108,11 @@ export async function loadAccountExportSource(userId: string) {
       verifiedAt: builderClaims.verifiedAt,
       revokedAt: builderClaims.revokedAt,
       createdAt: builderClaims.createdAt,
-    }).from(builderClaims).where(eq(builderClaims.subjectUserId, userId)),
-    accountDb.select({
+    }).from(builderClaims).where(eq(builderClaims.subjectUserId, userId))),
+    withAccountSubjectContext(userId, (transaction) => transaction.select({
       builderId: builderProfileViews.builderId,
       viewedAt: builderProfileViews.viewedAt,
-    }).from(builderProfileViews).where(eq(builderProfileViews.viewerId, userId)),
+    }).from(builderProfileViews).where(eq(builderProfileViews.viewerId, userId))),
     accountDb.select({
       id: deletionRequests.id,
       status: deletionRequests.status,

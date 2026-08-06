@@ -616,6 +616,10 @@
     "0153_dashboard_preferences_order": {
       "sql": "bab271b8f138f82af48457d7b1a7ca7ac5a81017fd5614d94dce059ee00d44f0",
       "snapshot": "16611bc1e19fb2723e5eb2921d475d30be798914477e68dabd4f85a921a0c220"
+    },
+    "0154_builder_profile_views_rls": {
+      "sql": "fa69f52ee032225386d5dda27e72013f31e8f0318f09521b9f2602732ff1b61c",
+      "snapshot": "bea18cf9d81d75b105f29b9d63b15860bc2ad3630311a6d81a1ef7b777dd5b2e"
     }
   }
 }

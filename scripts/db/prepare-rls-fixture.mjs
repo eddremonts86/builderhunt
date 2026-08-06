@@ -201,6 +201,31 @@ try {
     values ('member-c', 'org-a', 'user-c', 'member', now()), ('member-d', 'org-a', 'user-d', 'admin', now())
     on conflict (organization_id, user_id) do nothing
   `
+
+  /*
+   * Profile views, for `0154_builder_profile_views_rls.sql`.
+   *
+   * Seeded here rather than beside the claims above, which is where they belong topically: `user-c`
+   * is created a few lines up, and `viewer_id` has a foreign key to `auth_users`. Putting them with
+   * the claims aborted the whole fixture on a 23503, which took the two RLS steps down as skips and
+   * the accessibility gate down with a missing roles file — one ordering mistake, three red steps.
+   *
+   * All three views are made by `user-c`, who claims nothing, so the two SELECT policies can be told
+   * apart: any row `user-a` sees, they see as the *subject* of a verified claim; any row `user-c`
+   * sees, they see as the *viewer*. A fixture where one person was both would pass with either policy
+   * missing.
+   *
+   * The `identity-pending` row matters most: its claimant's claim exists but is unverified, and an
+   * unverified claim must reveal nothing about who has been looking.
+   */
+  await owner`
+    insert into builder_profile_views (id, builder_id, viewer_id, viewed_at)
+    values
+      ('00000000-0000-7000-8000-0000000000a1', 'identity-a', 'user-c', now()),
+      ('00000000-0000-7000-8000-0000000000b1', 'identity-b', 'user-c', now()),
+      ('00000000-0000-7000-8000-0000000000c1', 'identity-pending', 'user-c', now())
+    on conflict (id) do nothing
+  `
   await owner`
     insert into user_calendars (id, organization_id, owner_user_id, name, timezone, is_default)
     values

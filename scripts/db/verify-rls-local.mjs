@@ -131,6 +131,65 @@ try {
   })
   if (pendingOwnerSeesOwnClaim.length !== 1) throw new Error("The pending claim's own subject could not read their own claim")
 
+  /*
+   * `builder_profile_views` — who looked at whose profile (0154).
+   *
+   * Until 0154 this table had RLS *disabled* while `builderhunt_app` held a blanket grant, so the
+   * application role could read every row including `viewer_id`. Nothing exploited it — the one read
+   * path gates on `isVerifiedBuilderClaimant` first — but the guarantee lived in a handler rather
+   * than in the database, on the most identifying table in this area.
+   *
+   * Every fixture row is viewed by `user-c`, who claims nothing, so the subject policy and the viewer
+   * policy can be told apart. A fixture where one person is both would pass with either one missing.
+   */
+  const viewsNoContext = await app`select id from builder_profile_views order by id`
+  if (viewsNoContext.length !== 0) throw new Error('Missing context exposed builder profile views')
+
+  const viewsAsSubject = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    return transaction`select id from builder_profile_views order by id`
+  })
+  assertIds(viewsAsSubject, ['00000000-0000-7000-8000-0000000000a1'], 'verified claim subject reads views of their own profile')
+
+  const viewsAsViewer = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-c', true)`
+    return transaction`select id from builder_profile_views order by id`
+  })
+  assertIds(
+    viewsAsViewer,
+    [
+      '00000000-0000-7000-8000-0000000000a1',
+      '00000000-0000-7000-8000-0000000000b1',
+      '00000000-0000-7000-8000-0000000000c1',
+    ],
+    'viewer reads their own view history (the account data export path)',
+  )
+
+  // The sharpest case: a claim that exists but is not verified grants nothing. `user-pending-claimant`
+  // has claimed `identity-pending` and is still waiting, so they must not learn that anyone looked.
+  const viewsAsPendingClaimant = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-pending-claimant', true)`
+    return transaction`select id from builder_profile_views order by id`
+  })
+  if (viewsAsPendingClaimant.length !== 0) {
+    throw new Error('An unverified claimant read the view history of the profile they are still claiming')
+  }
+
+  // Writing a view attributed to somebody else would let one account forge another's browsing.
+  let forgedViewDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.user_id', 'user-a', true)`
+      await transaction`
+        insert into builder_profile_views (id, builder_id, viewer_id, viewed_at)
+        values ('00000000-0000-7000-8000-0000000000d1', 'identity-b', 'user-b', now())
+      `
+    })
+  } catch (error) {
+    forgedViewDenied = error?.code === '42501'
+  }
+  if (!forgedViewDenied) throw new Error('One user inserted a profile view attributed to another')
+
   let crossSubjectClaimDenied = false
   try {
     await app.begin(async (transaction) => {
@@ -1782,6 +1841,14 @@ try {
     pendingClaimAnonymousRead: 'denied',
     claimSubjectIsolation: subjectClaims.map((row) => row.id),
     crossSubjectClaimInsert: 'denied',
+    // 0154. Reported rather than merely asserted: this JSON is what a reader scans to see what the
+    // run actually covered, and a check that throws on failure but prints nothing on success is
+    // indistinguishable from a check somebody deleted.
+    profileViewsMissingContext: 'denied',
+    profileViewsAsSubject: viewsAsSubject.map((row) => row.id),
+    profileViewsAsViewer: viewsAsViewer.map((row) => row.id),
+    profileViewsUnverifiedClaimant: 'denied',
+    profileViewForgedViewer: 'denied',
     authProductAccess: 'denied',
     creditWriteUnelevated: 'denied',
     creditWriteElevated: 'inserted',

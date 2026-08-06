@@ -1654,3 +1654,69 @@ visible if somebody reads the output of the steps that succeeded.
 The test moved with the component, to `tests/unit/modules/admin/metrics/`, so the mirror between
 source and test paths still holds — and so the next person who needs to import a page component finds
 it somewhere it is safe to import from.
+
+## 2026-08-06 — a table with no row security, and an export that had been quietly short
+
+Preparing the verified-profile-owner widget (plans/ui-dashboard Wave 5) turned up two things in the
+data it was going to read.
+
+**`builder_profile_views` had row-level security disabled.** The table records who looked at whose
+builder profile. `0020_account_subject_grants.sql` gave `builderhunt_app` a blanket
+`SELECT, INSERT, UPDATE, DELETE` on it and no migration ever enabled RLS. Read from the catalog rather
+than inferred from the SQL:
+
+    published_builder_profiles | t | t
+    builder_profile_views      | f | f
+    builder_claims             | t | t
+
+Both siblings enabled *and* forced; this one neither. Nothing exploited it — the single read path,
+`GET /api/builders/$builderId/views`, gates on `isVerifiedBuilderClaimant` before it queries — but the
+guarantee lived entirely in one handler. The repository comment says viewer identities never leave the
+server; that was true of that query, not of the table. And the widget would have added a second read
+path over the same rows, so the number of places where one forgotten condition becomes a disclosure of
+who is looking at whom was about to double.
+
+0154 enables and forces RLS with two SELECT policies rather than one `OR`, because they authorise two
+different people whose rules will change independently: the **viewer** may read their own rows, the
+**subject** may read views of a profile they have verifiably claimed. No UPDATE policy at all — a view
+is an immutable fact about a moment, nothing updates one, and the absence means a future accident
+fails closed. The grant is the ceiling; the policies are the door.
+
+**Then the fix broke something, which is how the second bug surfaced.** Enabling RLS meant the account
+data export's "profiles I viewed" read would return nothing, because it goes through the bare app-role
+connection and `app.user_id` is set only inside `withTenantContext`. Checking whether anything else on
+that path had the same shape found that `builder_claims` — already RLS-protected on `app.user_id` —
+was being read the same way. Its export section was therefore filtered to zero, except that a second
+additive policy (`builder_claims_public_portfolio_select`, `USING (status = 'verified')`) let the
+verified ones through. So the export looked populated. What it dropped were pending, rejected, revoked
+and expired claims: a person whose claim was refused received an export saying they had never filed
+one, from the endpoint whose entire purpose is telling them what is held about them.
+
+`withAccountSubjectContext` sets `app.user_id` and deliberately nothing else. Not an omission to tidy
+up later — every tenant-scoped policy keys on `app.organization_id`, so a context that also set an
+organization would turn "read my own claims" into a way to read a workspace's rows with no membership
+check. The narrowness is the safety property.
+
+**The fixture is built so the two policies cannot cover for each other.** Every seeded view is made by
+`user-c`, who claims nothing: any row `user-a` sees, they see as a subject; any row `user-c` sees, they
+see as a viewer. A fixture where one person was both would pass with either policy missing. The
+sharpest case is `user-pending-claimant`, whose claim exists but is unverified and must therefore learn
+nothing about who has been looking.
+
+**Two things the red run taught, both about the harness rather than the change.**
+
+The ordering mistake — seeding profile views with `user-c` as viewer before the fixture creates
+`user-c` — aborted `prepare-rls-fixture.mjs` on a `23503`. That took down three steps, and only one of
+them said anything true about the cause. `accessibility` named it outright (`No such file or
+directory` on the roles file the fixture writes). `e2e` did not: three sign-up tests failed with
+"BuilderHunt is currently invite-only", which reads as a product regression. It was not.
+`local-quality.sh` exports `DATABASE_AUTH_URL` and its siblings **only if that roles file exists**, so
+better-auth ran without the auth-broker connection and could not see the approved access request the
+observer had just written. `rls-policies` and `api-isolation` are explicitly skipped with the real
+reason when the fixture fails; `e2e` and `accessibility` are not, so the loudest failures point at the
+wrong place.
+
+And the new checks passed without appearing anywhere. `verify-rls-local.mjs` ends by printing a JSON
+summary of what it covered; assertions that throw on failure and print nothing on success are
+invisible in it, which makes a deleted check and a passing check look identical to a reader. The five
+profile-view results are now in that summary.
