@@ -57,6 +57,21 @@ jobs:
       DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
       DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
       DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+      # Not optional here, despite being optional in the app.
+      #
+      # `capability-db.ts` falls back to the worker URL when this is unset, and
+      # `workerDatabaseUrls` only applies its `forceRole` when the source URL names a user
+      # that is *not* already a base role. The worker URL names one, so the fallback kept
+      # `builderhunt_worker` and the public candidate flow connected as the worker.
+      # drizzle/0078 revokes EXECUTE on `scheduling_resolve_capability` from that role and
+      # grants it to `builderhunt_capability`, so every capability exchange raised
+      # `permission denied for function`, which the route catches and reports as a coded
+      # `invalid_input` — about 45 failures across scheduling, interviews, documents and
+      # billing-credits, all reading as one unexplained 400.
+      #
+      # Reproduced locally by removing this variable alone: scheduling.spec.ts goes from 5
+      # failures to 10, with the `permission denied` visible in the server log.
+      DATABASE_CAPABILITY_URL: postgresql://builderhunt_capability:test-capability-password@127.0.0.1:5432/builderhunt_security_test_ci
       APP_URL: http://localhost:3000
       VITE_APP_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
@@ -71,15 +86,6 @@ jobs:
       # restore puts back, and at --workers=1 every spec shares the process it puts it back
       # into. Redundant, with a leak vector attached.
       CALENDAR_ENABLED: 'true'
-      # TEMPORARY DIAGNOSTIC — remove once the capability-exchange failure is understood.
-      #
-      # `POST /api/public/scheduling/:id/session` catches everything and answers a coded
-      # `invalid_input`, which is right for a public endpoint and useless to a reporter: the
-      # E2E log shows `capability exchange failed (400): {"error":"invalid_input"}` for ~45
-      # tests across scheduling, interviews, documents and billing-credits, with the actual
-      # exception sitting in a `console.error` no one reads. `harness/server.ts` forwards the
-      # worker server's output only when this is set, precisely for this situation.
-      E2E_SERVER_LOG: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
