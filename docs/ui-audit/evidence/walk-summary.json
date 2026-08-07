@@ -43,12 +43,8 @@
       "file": "src/routes/_landing/status.tsx",
       "status": 200,
       "finalUrl": "http://localhost:3010/status",
-      "consoleErrors": [
-        "%o\n\n%s\n\n%s\n Error: Invariant failed: Could not find an active match from \"/_dashboard\"\n    at useMatch (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useMatch.js?v=ca08bbe4:46:45)\n    at useRouteContext (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useRouteContext.js?v=ca08bbe4:4:9)\n    at DashboardLayoutInner (http://localhost:3010/src/modules/dashboard/ui/shell/DashboardLayout.tsx:34:19)\n    at Object.react_stack_bottom_frame (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:12866:12)\n    at renderWithHooks (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:4213:19)\n    at updateFunctionComponent (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:5569:16)\n    at beginWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:6140:20)\n    at runWithFiberInDEV (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:851:66)\n    at performUnitOfWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8429:92)\n    at workLoopSync (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8325:37) The above error occurred in the <DashboardLayoutInner> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl."
-      ],
-      "consoleWarnings": [
-        "Warning: Error in route match: __root__/"
-      ],
+      "consoleErrors": [],
+      "consoleWarnings": [],
       "failedRequests": [],
       "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/status.light.png",
       "redirected": false,
@@ -491,8 +487,8 @@
       ],
       "consoleWarnings": [],
       "failedRequests": [
-        "404 http://localhost:3010/api/sprints/:sprintId",
-        "404 http://localhost:3010/api/sprints/:sprintId/results?sort=score"
+        "404 http://localhost:3010/api/sprints/:sprintId/results?sort=score",
+        "404 http://localhost:3010/api/sprints/:sprintId"
       ],
       "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/sprints_sprintId.light.png",
       "redirected": false,
@@ -894,7 +890,9 @@
       "status": 200,
       "finalUrl": "http://localhost:3010/",
       "consoleErrors": [],
-      "consoleWarnings": [],
+      "consoleWarnings": [
+        "Warning: Error in route match: __root__/"
+      ],
       "failedRequests": [],
       "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/root.light.png",
       "redirected": false,
@@ -929,12 +927,8 @@
       "file": "src/routes/_landing/status.tsx",
       "status": 200,
       "finalUrl": "http://localhost:3010/status",
-      "consoleErrors": [
-        "%o\n\n%s\n\n%s\n Error: Invariant failed: Could not find an active match from \"/_dashboard\"\n    at useMatch (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useMatch.js?v=ca08bbe4:46:45)\n    at useRouteContext (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useRouteContext.js?v=ca08bbe4:4:9)\n    at DashboardLayoutInner (http://localhost:3010/src/modules/dashboard/ui/shell/DashboardLayout.tsx:34:19)\n    at Object.react_stack_bottom_frame (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:12866:12)\n    at renderWithHooks (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:4213:19)\n    at updateFunctionComponent (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:5569:16)\n    at beginWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:6140:20)\n    at runWithFiberInDEV (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:851:66)\n    at performUnitOfWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8429:92)\n    at workLoopSync (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8325:37) The above error occurred in the <DashboardLayoutInner> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl."
-      ],
-      "consoleWarnings": [
-        "Warning: Error in route match: __root__/"
-      ],
+      "consoleErrors": [],
+      "consoleWarnings": [],
       "failedRequests": [],
       "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/status.light.png",
       "redirected": false,
@@ -1335,8 +1329,8 @@
       ],
       "consoleWarnings": [],
       "failedRequests": [
-        "404 http://localhost:3010/api/lists/:listId/items",
-        "404 http://localhost:3010/api/lists/:listId"
+        "404 http://localhost:3010/api/lists/:listId",
+        "404 http://localhost:3010/api/lists/:listId/items"
       ],
       "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/lists_listId.light.png",
       "redirected": false,
