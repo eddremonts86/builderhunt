@@ -92,6 +92,43 @@ test.describe('a platform admin', () => {
   }
 })
 
+/**
+ * The way *in*.
+ *
+ * Every assertion above reaches an admin page by typing its URL, which is how the console stayed
+ * navigable in tests while being unreachable in the product: `DashboardLayout` read the admin flag
+ * one level too high on the route match (`match.user` rather than `match.context.user`), a cast
+ * asserted the shape instead of checking it, and `?.` turned the miss into `false`. The rail lost
+ * its Admin entry for every admin and nothing failed — each page guards itself separately.
+ *
+ * So this asserts the link, not only the page.
+ */
+test.describe('the admin area in the navigation rail', () => {
+  test('a platform admin has it', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/dashboard`)
+      await dismissOverlays(tab)
+      await expect(tab.getByLabel('Admin', { exact: true })).toBeVisible()
+    } finally {
+      await context.close()
+    }
+  })
+
+  test('a tenant owner does not', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const tab = await context.newPage()
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/dashboard`)
+      await dismissOverlays(tab)
+      await expect(tab.getByLabel('Admin', { exact: true })).toHaveCount(0)
+    } finally {
+      await context.close()
+    }
+  })
+})
+
 test.describe('a tenant owner who is not a platform admin', () => {
   for (const page of PAGES) {
     test(`${page.path} does not render for them`, async ({ browser }) => {

@@ -34,10 +34,20 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   // stays available). `useMatch` does not throw on a missing match; it
   // returns `undefined`. We always call the hook (Rules of Hooks require a
   // stable order), then narrow.
-  const match = useMatch({ from: '/_dashboard', shouldThrow: false }) as
-    | { user?: { isPlatformAdmin?: boolean } }
-    | undefined
-  const isAdmin = match?.user?.isPlatformAdmin ?? false
+  //
+  // `select` rather than a cast on the match. `useRouteContext` returned the
+  // context itself, so the switch to `useMatch` — which returns the *match*,
+  // with the context under `.context` — left this reading `match.user`, one
+  // level too high. `as` asserted the shape instead of checking it and `?.`
+  // turned the miss into `undefined`, so `isAdmin` was false for every admin
+  // and the admin area vanished from the rail. The pages themselves kept
+  // working, because each one guards itself with its own `beforeLoad` call —
+  // which is exactly why nothing failed loudly.
+  const isAdmin = useMatch({
+    from: '/_dashboard',
+    shouldThrow: false,
+    select: (m) => (m.context as { user?: { isPlatformAdmin?: boolean } } | undefined)?.user?.isPlatformAdmin ?? false,
+  }) ?? false
   // `isPlatformAdmin` is computed server-side in `beforeLoad` (see
   // `getAppAuthSession` in auth-session.ts) and surfaced via route context.
   // The previous version polled `/api/admin/incidents` from a `useEffect` to
