@@ -42,13 +42,24 @@
     impossible. Non-pending rows now render a read-only note instead.
     Indexes `billing_refunds_org_{created,amount}_id_idx` in `drizzle/0158`.
 
-- [ ] **Migrate the dispute queue**
+- [x] **Migrate the dispute queue**
   - Files: `src/modules/admin/billing/DisputeQueue.tsx`,
     `src/shared/lib/repositories/billing-disputes.ts`,
     `src/shared/lib/table/capabilities/billing-disputes.ts`
   - Do: same shape as refunds over `listDisputes`.
   - Verify: billing regression specs green; the queue lists the same rows as before for a known
     organization.
+  - **Done — and "the same rows as before" turned out to be an assumption the old code could not
+    make.** `listDisputes` had no `ORDER BY`, so the queue's order was whatever Postgres returned;
+    a keyset needs a total order to exist, which is how that surfaced. The rows are the same set,
+    now in a defined one. `stripePaymentIntentId` stopped being sent: the old route projected
+    `select()` and the page displayed six columns of it.
+    `evidenceDueBy` is sortable — "which deadline is closest" is what this read-only view is for —
+    and it is nullable, which exposed a real gap in plan 04's guard. Recorded there; the short
+    version is that declaring `nullsLast` would have made the descending sort unservable by the
+    index the guard reported as covering it, so the declaration is deliberately absent and the
+    null placement follows the scan direction.
+    Indexes `billing_disputes_org_{created,evidence_due}_id_idx` in `drizzle/0159`.
 
 - [ ] **Migrate team settings as two grids**
   - Files: `src/modules/dashboard/components/TeamSettingsPage.tsx`,

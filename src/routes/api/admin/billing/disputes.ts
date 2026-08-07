@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
-import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
-import { listOrganizationDisputes } from '~/shared/lib/billing/disputes'
+import { pageOrganizationDisputes } from '~/shared/lib/billing/disputes'
 import { withPlatformOrganization } from '~/shared/lib/repositories/billing-risk'
+import { billingDisputesCapability } from '~/shared/lib/table/capabilities/billing-disputes'
+import { platformTablePageHandler, TablePageError } from '~/shared/lib/table/handler'
 
 /**
  * Platform-operator read-only view for §8 task 5's chargeback tracking — reuses
@@ -19,21 +20,29 @@ export const Route = createFileRoute('/api/admin/billing/disputes')({
       // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
       ANY: methodNotAllowed(['GET']),
 
-      GET: async ({ request }) => {
-        try {
-          await requirePlatformAdminPrincipal(request)
-          const organizationId = new URL(request.url).searchParams.get('organizationId')
-          if (!organizationId) return Response.json({ error: 'organizationId query parameter is required' }, { status: 400 })
-
-          const disputes = await withPlatformOrganization(organizationId, (tx) => listOrganizationDisputes(tx, organizationId))
-          return Response.json({ disputes })
-        } catch (err) {
-          const response = platformAdminErrorResponse(err)
-          if (response) return response
-          console.error('admin disputes read error:', err)
-          return Response.json({ error: 'Failed' }, { status: 500 })
-        }
-      },
+      /**
+       * One keyset page of the chargeback view, for one organization.
+       *
+       * Same shape as the refund queue next door, and for the same reasons: the organization is
+       * `filter.organizationId` so it lives in the URL and in the cursor's binding, and it is still
+       * required and singular because `builderhunt_platform`'s SELECT policy on `billing_disputes`
+       * is org-scoped (drizzle/0036).
+       *
+       * The read gained an `ORDER BY` on the way. `listDisputes` had none, so the queue's order was
+       * whatever Postgres happened to return — the surface looked sorted and was not.
+       */
+      GET: async ({ request }) => platformTablePageHandler({
+        capability: billingDisputesCapability,
+        request,
+        load: ({ search }) => {
+          const selected = search.query.filters.organizationId ?? []
+          if (selected.length !== 1) {
+            throw new TablePageError(400, 'Exactly one filter.organizationId is required')
+          }
+          return withPlatformOrganization(selected[0], (tx) =>
+            pageOrganizationDisputes(tx, search.query, search.page))
+        },
+      }),
     },
   },
 })

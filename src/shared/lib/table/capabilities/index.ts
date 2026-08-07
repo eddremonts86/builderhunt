@@ -11,6 +11,7 @@
  */
 
 export { abuseSignalsCapability, ABUSE_SIGNAL_FILTER_LABELS } from './abuse-signals'
+export { billingDisputesCapability, BILLING_DISPUTE_FILTER_LABELS, DISPUTE_OUTCOMES } from './billing-disputes'
 export { billingRefundsCapability, BILLING_REFUND_FILTER_LABELS } from './billing-refunds'
 export { platformUsersCapability } from './platform-users'
 export { sprintResultsCapability, SPRINT_RESULT_FILTER_LABELS } from './sprint-results'

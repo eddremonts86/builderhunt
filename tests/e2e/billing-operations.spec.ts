@@ -466,3 +466,191 @@ test.describe('refund queue — a bounded, filterable page', () => {
     }
   })
 })
+
+/**
+ * The chargeback view, after plans/phase-3/10 moved it onto the table shell.
+ *
+ * Read-only — evidence and the won/lost outcome live in the Stripe Dashboard — so what these
+ * assert is the read: a bounded page, a total order where there was none, and the organization as
+ * a filter rather than a Load-button precondition.
+ */
+test.describe('dispute queue — a bounded, ordered page', () => {
+  const SEEDED_DISPUTES = 60
+  const OUTCOMES = ['open', 'won', 'lost'] as const
+
+  async function seedDisputes(): Promise<string[]> {
+    const ids: string[] = []
+    for (let index = 0; index < SEEDED_DISPUTES; index += 1) {
+      const id = `e2e-dispute-${harness.workerIndex}-${String(index).padStart(3, '0')}`
+      await harness.sql`
+        insert into billing_disputes (
+          id, organization_id, grant_id, stripe_dispute_id, stripe_payment_intent_id,
+          amount_cents, reason, stripe_status, outcome, evidence_due_by, created_at
+        )
+        values (
+          ${id}, ${harness.organization.organizationId}, null, ${`dp_${id}`}, ${`pi_${id}`},
+          ${(index + 1) * 100}, ${index % 2 === 0 ? 'fraudulent' : 'product_not_received'},
+          ${index % 2 === 0 ? 'needs_response' : 'under_review'},
+          ${OUTCOMES[index % OUTCOMES.length]},
+          -- Every third dispute has no deadline, so the nullable sort has nulls to place.
+          ${index % 3 === 0 ? null : new Date(Date.UTC(2026, 8, 1 + (index % 27)))},
+          now() - (${index} * interval '1 hour')
+        )
+      `
+      ids.push(id)
+    }
+    return ids
+  }
+
+  async function clearDisputes(): Promise<void> {
+    await harness.sql`delete from billing_disputes where id like ${`e2e-dispute-${harness.workerIndex}-%`}`
+  }
+
+  const queueUrl = (extra = '') =>
+    `/api/admin/billing/disputes?filter.organizationId=${encodeURIComponent(harness.organization.organizationId)}${extra}`
+
+  test('answers a bounded page, newest first, with a total over the whole set', async () => {
+    await seedDisputes()
+    try {
+      const page = await (await harness.admin.api!.get(queueUrl())).json()
+
+      expect(page.rows.length).toBe(50)
+      expect(page.total).toBe(SEEDED_DISPUTES)
+      expect(page.nextCursor).toBeTruthy()
+      expect(new Date(page.rows[0].createdAt).getTime())
+        .toBeGreaterThan(new Date(page.rows[1].createdAt).getTime())
+    } finally {
+      await clearDisputes()
+    }
+  })
+
+  /**
+   * `listDisputes` had no `ORDER BY`, so this is the property that did not exist before: two
+   * requests for the same page return the same rows, and the pages tile the set exactly.
+   */
+  test('walks every dispute exactly once across pages', async () => {
+    await seedDisputes()
+    try {
+      const seen = new Set<string>()
+      let cursor: string | null = null
+      let guard = 0
+      do {
+        const url: string = queueUrl(cursor ? `&cursor=${encodeURIComponent(cursor)}` : '')
+        const page = await (await harness.admin.api!.get(url)).json()
+        for (const row of page.rows as Array<{ id: string }>) {
+          expect(seen.has(row.id), `dispute ${row.id} served twice`).toBe(false)
+          seen.add(row.id)
+        }
+        cursor = page.nextCursor
+        guard += 1
+      } while (cursor && guard < 10)
+
+      expect(seen.size).toBe(SEEDED_DISPUTES)
+    } finally {
+      await clearDisputes()
+    }
+  })
+
+  /**
+   * The nullable sort, which is the one that quietly drops rows when the keyset predicate and the
+   * `ORDER BY` disagree about where nulls go. A third of these have no deadline.
+   */
+  test('sorting by an evidence deadline pages over the nulls without losing a row', async () => {
+    await seedDisputes()
+    try {
+      const seen = new Set<string>()
+      let cursor: string | null = null
+      let guard = 0
+      do {
+        const url: string = queueUrl(`&sort=evidenceDueBy:asc${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`)
+        const page = await (await harness.admin.api!.get(url)).json()
+        for (const row of page.rows as Array<{ id: string }>) {
+          expect(seen.has(row.id), `dispute ${row.id} served twice`).toBe(false)
+          seen.add(row.id)
+        }
+        cursor = page.nextCursor
+        guard += 1
+      } while (cursor && guard < 10)
+
+      expect(seen.size).toBe(SEEDED_DISPUTES)
+    } finally {
+      await clearDisputes()
+    }
+  })
+
+  test('never sends the payment intent id to the browser', async () => {
+    await seedDisputes()
+    try {
+      const page = await (await harness.admin.api!.get(queueUrl())).json()
+      // The old route returned `select()` — every column. The page showed six of them.
+      expect(Object.keys(page.rows[0])).not.toContain('stripePaymentIntentId')
+    } finally {
+      await clearDisputes()
+    }
+  })
+
+  test('refuses a missing or ambiguous organization filter', async () => {
+    expect((await harness.admin.api!.get('/api/admin/billing/disputes')).status()).toBe(400)
+    expect((await harness.admin.api!.get(
+      '/api/admin/billing/disputes?filter.organizationId=org-a&filter.organizationId=org-b',
+    )).status()).toBe(400)
+  })
+
+  test('an outcome filter narrows the total and keeps its own facet counts', async () => {
+    await seedDisputes()
+    try {
+      const page = await (await harness.admin.api!.get(queueUrl('&filter.outcome=open'))).json()
+
+      expect(page.total).toBeLessThan(SEEDED_DISPUTES)
+      expect([...new Set(page.rows.map((row: { outcome: string }) => row.outcome))]).toEqual(['open'])
+      const outcomes = page.facets.outcome as Array<{ value: string; count: number }>
+      expect(outcomes.find((facet) => facet.value === 'won')?.count).toBeGreaterThan(0)
+    } finally {
+      await clearDisputes()
+    }
+  })
+
+  test('an unknown outcome value is refused — this filter is an enum, not free text', async () => {
+    const response = await harness.admin.api!.get(queueUrl('&filter.outcome=settled'))
+    expect(response.status()).toBe(400)
+    expect((await response.json()).error).toContain('Unknown value for filter outcome')
+  })
+
+  test('the queue is unavailable to a non-platform-admin', async () => {
+    expect((await harness.owner.api!.get(queueUrl())).status()).toBe(403)
+  })
+
+  test('an operator loads a queue from its URL, bounded and announced in full', async ({ browser }) => {
+    await seedDisputes()
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(
+        page,
+        `${harness.baseURL}/admin/disputes?filter.organizationId=${encodeURIComponent(harness.organization.organizationId)}`,
+      )
+      await dismissOverlays(page)
+
+      // `total + 1` for the header row. The announced count is the whole set; the DOM is not.
+      await expect(page.locator('[role="grid"]')).toHaveAttribute('aria-rowcount', String(SEEDED_DISPUTES + 1))
+      expect(await page.locator('[role="row"][data-testid^="dispute-row-"]').count()).toBe(50)
+    } finally {
+      await context.close()
+      await clearDisputes()
+    }
+  })
+
+  test('an organization with no disputes shows the filtered-empty state, naming the filter', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/admin/disputes?filter.organizationId=no-such-organization`)
+      await dismissOverlays(page)
+
+      await expect(page.getByTestId('table-filtered-empty')).toContainText('no-such-organization')
+      await expect(page.getByTestId('dispute-queue-prompt')).toHaveCount(0)
+    } finally {
+      await context.close()
+    }
+  })
+})

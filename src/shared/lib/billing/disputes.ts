@@ -42,9 +42,12 @@ import {
   findDisputeByStripeId,
   listDisputes,
   markDisputeFundsReinstated,
+  pageDisputes,
   updateDisputeStatus,
+  type BillingDisputePageRow,
   type BillingDisputeRecord,
 } from '../repositories/billing-disputes'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 
 export interface RecordDisputeOpenedInput {
   organizationId: string
@@ -156,4 +159,19 @@ export function listOrganizationDisputes(
   organizationId: string,
 ): Promise<BillingDisputeRecord[]> {
   return listDisputes(transaction, organizationId)
+}
+
+/**
+ * One keyset page of an organization's disputes, for the operator queue.
+ *
+ * The organization is not an argument: it comes from the transaction's tenant context, which
+ * `buildKeysetPage` reads back and refuses to proceed without — see `keyset.ts`. The queue's
+ * caller supplies it as `filter.organizationId`, and that is also what scopes the RLS.
+ */
+export function pageOrganizationDisputes(
+  transaction: TenantTransaction,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<BillingDisputePageRow>> {
+  return pageDisputes(transaction, query, page)
 }

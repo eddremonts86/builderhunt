@@ -636,6 +636,10 @@
     "0158_billing_refunds_keyset_indexes": {
       "sql": "82f4f5ade7a271a3f513e7bfc4f908b8a2df967f477b0e9c37e6e6c5130f7043",
       "snapshot": "3c5fd0a069d76c03164b0fffe10697d86f5071702667280a3928fe850ee88c41"
+    },
+    "0159_billing_disputes_keyset_indexes": {
+      "sql": "3ca2da68de8a191207d6ca59051f0cce3b54f657c6cbb5cbe5db439845416377",
+      "snapshot": "ba58d48f588668888eac0443eed849044e72fac96c23bee54cf58cbdefccd093"
     }
   }
 }

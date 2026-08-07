@@ -91,6 +91,17 @@
     Direction is deliberately not checked: Postgres walks a b-tree backwards, so one ascending index
     serves both directions, and plan 03 already rejects the mixed-direction sort that would break it.
 
+    **Known hole, found in plan 10 and left for plan 13's gates.** That last sentence stops being
+    true the moment `nullsLast` is declared. `resolveSort` applies the declaration to *both*
+    directions, and `ORDER BY x DESC NULLS LAST` is the one combination a `(org, x, id)` b-tree
+    produces from neither scan direction — forward gives `ASC NULLS LAST`, backward gives
+    `DESC NULLS FIRST`. The guard checks that the index *declares* `NULLS LAST`, not that the
+    declaration is servable in the direction a client can ask for, so it would report such a sort as
+    covered while Postgres sorted the whole set. `billing-disputes` hit this and dropped the
+    declaration (see its capability comment); nothing in the codebase currently sets `nullsLast`.
+    The fix is either to demand a second index for the descending shape or to make `nullsLast`
+    direction-aware, and it belongs with the other pagination gates.
+
     Unique constraints and primary keys are read as indexes, because they are — otherwise every
     "sort by the tiebreaker" would demand a duplicate index over the primary key.
 

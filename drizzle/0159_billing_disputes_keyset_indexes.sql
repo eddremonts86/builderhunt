@@ -1,0 +1,2 @@
+CREATE INDEX "billing_disputes_org_created_id_idx" ON "billing_disputes" USING btree ("organization_id","created_at","id");--> statement-breakpoint
+CREATE INDEX "billing_disputes_org_evidence_due_id_idx" ON "billing_disputes" USING btree ("organization_id","evidence_due_by","id");

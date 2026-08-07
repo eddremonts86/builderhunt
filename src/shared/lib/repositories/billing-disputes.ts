@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { billingDisputes } from '../db/schema'
+import { billingDisputesCapability } from '../table/capabilities/billing-disputes'
+import { buildKeysetPage } from '../table/keyset'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 
 /**
  * Data access for chargeback tracking (plans/phase-1/30-stripe-billing-platform/tasks.md §8 "Implement dispute
@@ -62,6 +65,13 @@ export async function findDisputeByStripeId(
   return row ?? null
 }
 
+/**
+ * Every dispute an organization has, in no particular order.
+ *
+ * The missing `ORDER BY` is not an oversight to fix in passing — the alert path and the freeze
+ * check consume this as a set, and adding a sort would only make the absence of one harder to
+ * notice later. The **operator queue** needs an order and a bound, and reads `pageDisputes` below.
+ */
 export async function listDisputes(
   transaction: TenantTransaction,
   organizationId: string,
@@ -70,6 +80,64 @@ export async function listDisputes(
     .select()
     .from(billingDisputes)
     .where(eq(billingDisputes.organizationId, organizationId))
+}
+
+/** The chargeback view's wire shape — the reviewed subset of the row, timestamps serialized. */
+export interface BillingDisputePageRow extends Record<string, unknown> {
+  id: string
+  organizationId: string
+  grantId: string | null
+  stripeDisputeId: string
+  amountCents: number
+  reason: string | null
+  stripeStatus: string
+  outcome: string
+  evidenceDueBy: string | null
+  fundsReinstatedAt: string | null
+  createdAt: string
+}
+
+/**
+ * One keyset page of the chargeback view.
+ *
+ * `stripePaymentIntentId` is deliberately not projected. The old route returned `select()` — every
+ * column — and the page displayed six of them; the payment intent id rode along to the browser for
+ * nobody. Must run inside `withPlatformOrganization`, which `buildKeysetPage` verifies rather than
+ * assumes.
+ */
+export async function pageDisputes(
+  transaction: TenantTransaction,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<BillingDisputePageRow>> {
+  return buildKeysetPage<BillingDisputePageRow>(transaction, billingDisputesCapability, query, page, {
+    select: {
+      id: billingDisputes.id,
+      organizationId: billingDisputes.organizationId,
+      grantId: billingDisputes.grantId,
+      stripeDisputeId: billingDisputes.stripeDisputeId,
+      amountCents: billingDisputes.amountCents,
+      reason: billingDisputes.reason,
+      stripeStatus: billingDisputes.stripeStatus,
+      outcome: billingDisputes.outcome,
+      evidenceDueBy: billingDisputes.evidenceDueBy,
+      fundsReinstatedAt: billingDisputes.fundsReinstatedAt,
+      createdAt: billingDisputes.createdAt,
+    },
+    mapRow: (row) => ({
+      id: row.id as string,
+      organizationId: row.organizationId as string,
+      grantId: (row.grantId as string | null) ?? null,
+      stripeDisputeId: row.stripeDisputeId as string,
+      amountCents: row.amountCents as number,
+      reason: (row.reason as string | null) ?? null,
+      stripeStatus: row.stripeStatus as string,
+      outcome: row.outcome as string,
+      evidenceDueBy: (row.evidenceDueBy as Date | null)?.toISOString() ?? null,
+      fundsReinstatedAt: (row.fundsReinstatedAt as Date | null)?.toISOString() ?? null,
+      createdAt: (row.createdAt as Date).toISOString(),
+    }),
+  })
 }
 
 export interface UpdateDisputeStatusInput {

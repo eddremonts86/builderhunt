@@ -1876,6 +1876,12 @@ export const billingDisputes = pgTable(
   (table) => [
     uniqueIndex('billing_disputes_organization_id_id_unique').on(table.organizationId, table.id),
     uniqueIndex('billing_disputes_org_stripe_dispute_unique').on(table.organizationId, table.stripeDisputeId),
+    // Keyset sorts for the operator chargeback view (plans/phase-3/10). No explicit nulls
+    // placement on `evidence_due_by`: Postgres' default follows the scan direction, which is what
+    // lets one index serve both `ASC NULLS LAST` and `DESC NULLS FIRST`. See the capability for
+    // why declaring `nullsLast` there would make the descending sort unservable by this index.
+    index('billing_disputes_org_created_id_idx').on(table.organizationId, table.createdAt, table.id),
+    index('billing_disputes_org_evidence_due_id_idx').on(table.organizationId, table.evidenceDueBy, table.id),
     foreignKey({
       columns: [table.organizationId, table.grantId],
       foreignColumns: [billingCreditGrants.organizationId, billingCreditGrants.id],
