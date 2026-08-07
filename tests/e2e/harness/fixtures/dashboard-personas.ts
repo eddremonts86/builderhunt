@@ -37,7 +37,6 @@ import {
   type Principal,
 } from './principals'
 import {
-  addMemberDirect,
   createOrganizationFixture,
   type OrganizationFixture,
 } from './organizations'
@@ -112,20 +111,17 @@ export async function seedDashboardFixtures(
   })
 
   // 3. Org owner/admin and member — same workspace, different roles.
-  //    The recruiter owner is the org owner; the member joins via
-    // `addMemberDirect` (no product flow exists for direct invite).
+  //    The recruiter owner is the org owner. `createMemberPrincipal` already inserts the
+  //    membership row itself (no product flow exists for a direct invite), so calling
+  //    `addMemberDirect` here as well inserted the same (organization_id, user_id) twice and
+  //    violated `organization_members_org_user_unique` — which failed the whole `beforeAll` and
+  //    took every test in both dashboard specs with it.
   const orgOwnerAdmin = activeRecruiter
   const orgMember = await createMemberPrincipal(
     ctx,
     recruiterOrg.organizationId,
     'member',
   )
-  await addMemberDirect(ctx.sql, {
-    organizationId: recruiterOrg.organizationId,
-    userId: orgMember.userId!,
-    role: 'member',
-    scope: ctx.scope,
-  })
 
   // 4. Profile owner — verified profile owner in their personal workspace,
   //    not part of the recruiter org.
