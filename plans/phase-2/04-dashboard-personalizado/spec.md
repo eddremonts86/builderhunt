@@ -1,11 +1,14 @@
 # Especificación — dashboard personalizado por segmento
 
-> **Status**: `pending`
+> **Status**: `partially-implemented`
 > **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md)
 > **Blocks**: nothing
-> **Reality check**: `/dashboard` renderiza `DashboardPage` y obtiene stats tenant-scoped desde
-> `/api/dashboard/stats`. Ya existe un sistema bento en `src/modules/dashboard/ui/bento/` y widgets
-> en `src/modules/dashboard/ui/home/`; debe convertirse en compositor, no duplicarse tres veces.
+> **Reality check**: `/dashboard` already has a typed widget registry
+> (`src/modules/dashboard/lib/widget-registry.ts`), accessible customization controls, and
+> organization-scoped, versioned preferences through `/api/dashboard/preferences` backed by
+> `drizzle/0151_dashboard_preferences.sql`, `drizzle/0152_dashboard_preferences_grants.sql` and
+> `drizzle/0153_dashboard_preferences_order.sql`. This plan adds segment presets and context; it
+> must reuse those contracts.
 
 ## Objetivo
 
@@ -128,4 +131,3 @@ Mantiene la composición actual y sirve a null, other, errores o segmentos nuevo
 - permisos y entitlements se respetan en servidor;
 - cambio de segmento actualiza sin perder recursos;
 - dashboard cumple rendimiento, accesibilidad y E2E.
-

@@ -3,7 +3,9 @@
 > **Status**: `pending`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`11-migrate-search`](../11-migrate-search/spec.md), [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: Six UI files plus their repository reads. Some sortable columns here are not indexed yet — plan 04's guard will say which.
+> **Reality check**: Six surfaces plus their repository reads. Admin users, refunds and disputes
+> are platform-scoped; team, sprints and alerts are tenant-scoped. The scope adapters from plan 03
+> are mandatory, and plan 04's guard identifies any missing sort index.
 
 ## Sequence
 
@@ -11,8 +13,8 @@
    client-side filter, and the inline edit row. If the `expansion` slot cannot carry that form, the
    shell needs work before five more surfaces depend on it.
 2. **The two billing queues**, which share a shape.
-3. **Team settings, sprints index, alerts** — alerts last, since it is 765 lines and brings
-   grouping.
+3. **Team settings, sprints index, alerts** — alerts last because it brings grouping and is the
+   broadest tenant surface in this set.
 
 Worst first again. The inline edit row is the single most likely thing to expose a shell
 assumption, and it is cheaper to find that with one surface migrated than six.

@@ -6,12 +6,13 @@
 > **Reality check**: `listPlatformUsersWithPlans()` is unbounded; `admin/users.tsx:110` filters client-side.
 
 - [ ] **Bound the platform users read and migrate the admin users page**
-  - Files: `src/routes/_dashboard/admin/users.tsx`,
+  - Files: `src/routes/_dashboard/admin/users.tsx`, `src/modules/admin/users/AdminUsersPage.tsx`,
     `src/shared/lib/repositories/platform-billing.ts`,
     `src/shared/lib/table/capabilities/platform-users.ts`
   - Do: replace `listPlatformUsersWithPlans()` with a cursor-and-limit form. Capability: sortable
     created-at (default), name, plan; `searchable` name and email so search covers **all** users,
-    not the loaded 50; `tiebreaker` the user id. Delete the client-side filter at `users.tsx:110`.
+    not the loaded 50; `tiebreaker` the user id. Delete the client-side filter from
+    `AdminUsersPage.tsx`.
     Move the inline edit row into the shell's `expansion` slot keyed by row id — the plan select,
     end date, reason field and PATCH all stay in this file.
   - Verify: `grep -rn 'listPlatformUsersWithPlans' src` shows no unbounded form; search for an email

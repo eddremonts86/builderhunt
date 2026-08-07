@@ -1,14 +1,15 @@
-# Tasks — tenant-safe keyset pagination
+# Tasks — scope-safe keyset pagination
 
 > **Status**: `implemented`
 > **Depends on**: [`02-table-query-contract`](../02-table-query-contract/spec.md)
 > **Blocks**: [`04-sort-indexes`](../04-sort-indexes/spec.md), [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
-> **Reality check**: `capability.ts`, `keyset.ts` and `handler.ts` live in `src/shared/lib/table/`. 48 tests across `capability.test.ts`, `keyset.test.ts`, `facets.test.ts` and `tests/unit/security/table-keyset-isolation.test.ts`. No existing read path changed; plan 07 is the first caller.
+> **Reality check**: `capability.ts`, `keyset.ts` and `handler.ts` live in `src/shared/lib/table/`, with 48 tests. **Tenant and platform adapters exist** (`tablePageHandler`, `platformTablePageHandler`); the account-subject and public adapters this plan's revision asks for do not yet.
 
 - [x] **Declare the capability type and registry**
   - Files: `src/shared/lib/table/capability.ts`, `tests/unit/shared/lib/table/capability.test.ts`
-  - Do: `TableCapability` exactly as in `spec.md`, plus a `TABLE_CAPABILITIES` registry keyed by
-    table id. Construction throws when `tiebreaker` is missing or a `defaultSort` id is absent
+  - Do: `TableCapability` exactly as in `spec.md`, including mandatory `scope`, plus a
+    `TABLE_CAPABILITIES` registry keyed by table id. Construction throws when `tiebreaker` is
+    missing or a `defaultSort` id is absent
     from `sortable` — a broken capability must fail at import, not at request time.
   - Verify: `pnpm test tests/unit/shared/lib/table/capability.test.ts`, including both throw cases.
   - Done: 9 tests. Both required throw cases, plus four the spec implies and does not list — an
@@ -31,7 +32,8 @@
   - Do: `buildKeysetPage(tx, capability, query, page): Promise<PageResult>`. Resolve ids through
     the capability only; append `capability.tiebreaker` to every `ORDER BY`; emit row-value tuple
     comparison; clamp `limit` to `TABLE_PAGE_SIZE`; run rows + `COUNT(*)` + one aggregate per
-    declared facet in a single transaction. Honour `nullsLast`.
+    declared facet in a single transaction. Honour `nullsLast`; bind the cursor to the normalized
+    query fingerprint and the server-resolved access scope.
   - Verify: `pnpm test tests/unit/shared/lib/table/keyset.test.ts` — asserts the SQL contains the
     tiebreaker, contains no `offset`, and that an unknown sort id throws instead of falling back
     to `defaultSort`.
@@ -67,14 +69,21 @@
     Facet rows are capped at `FACET_VALUE_LIMIT` (50). A facet is a list read, and "nothing loads
     a whole result set" does not stop being true because the rows are counts.
 
-- [x] **Prove the tenant boundary cannot be crossed**
+- [~] **Prove no access scope can be crossed**
   - Files: `tests/unit/security/table-keyset-isolation.test.ts`
-  - Do: negative tenant A/B — organization A mints a cursor, organization B presents it, assert
-    rejection. Assert a throw when `app.organization_id` is unset. Assert a filter value
+  - Do: negative tenant A/B and account A/B; assert rejection across tenant/account/platform/public
+    scope kinds. Assert a throw when the capability's required context is unset. Assert a filter value
     containing quotes and SQL keywords is bound as a parameter and changes nothing structural.
   - Verify: `pnpm test tests/unit/security/table-keyset-isolation.test.ts` and
     `pnpm security:boundaries` both green.
   - Done: 8 tests, `security:boundaries` green ("Tenant boundary ratchet passed").
+
+    **The tenant boundary is proven; the wider scope claim is not.** This revision asks for every
+    access scope — tenant, account-subject, platform, public — and the tests cover the tenant one.
+    A cursor cannot carry a scope it has no field for (see plan 02's note), so "a platform cursor
+    presented on an account-subject surface is refused" is currently true only because those
+    surfaces share no capability, which is a coincidence of what has been built rather than a
+    property that is enforced.
 
     The disposable harness does not enable RLS, and that is what makes the file worth having: the
     layer under test is the emitted `organization_id` predicate and the organization-bound cursor,
@@ -108,3 +117,21 @@
 
     `tsc --noEmit` exit 0. Not re-exported from `index.ts` — it reaches the auth and database
     layers, and `index.ts` is what the shell imports (see 02's task 4).
+
+    **This task was later revised to ask for four scope-specific adapters, and two exist.** The
+    revised text:
+
+    > Expose tenant, account, platform and public adapters. Each checks that `capability.scope`
+    > matches, establishes only its own principal/connection context, parses `tableSearchSchema`,
+    > and returns an explicit allowlisted DTO rather than an ORM row. Unknown ids and
+    > invalid/mismatched cursors are 400; missing auth is 401/403 as appropriate.
+    > **Verify:** handler unit tests prove the happy path and wrong-scope refusal for all four
+    > adapters.
+
+    `tablePageHandler` (tenant) and `platformTablePageHandler` (platform, added by plan 08) exist
+    and do everything above except the scope check: **`TableCapability` has no `scope` field**, so
+    nothing stops a platform capability being passed to the tenant adapter. Today that is
+    unreachable because each capability has exactly one call site, which is a property of what has
+    been built rather than one the code enforces. Account-subject and public adapters do not
+    exist — no surface has needed them yet, and `withAccountSubjectContext` is the context an
+    account adapter would wrap.

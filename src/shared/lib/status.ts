@@ -30,11 +30,18 @@ async function checkDb(): Promise<CheckResult> {
 async function checkMemory(): Promise<CheckResult> {
   const mem = process.memoryUsage()
   const rssMB = mem.rss / 1024 / 1024
-  // Flag if RSS > 1GB
+  // Flag if RSS > STATUS_MEMORY_LIMIT_MB (default 1024MB prod / 2048MB dev).
+  // The previous fixed 1GB threshold turned /status into a noisy "degraded"
+  // page on every dev visit (saas-review F8): Vite + TanStack-Start SSR
+  // routinely sits at 1100–1600MB in dev, and the same Node process in prod
+  // stays under 800MB. One knob, env-driven, default tuned for production.
+  const isDev = process.env.NODE_ENV !== 'production'
+  const limitMB = Number(process.env.STATUS_MEMORY_LIMIT_MB) || (isDev ? 2048 : 1024)
+  const ok = rssMB < limitMB
   return {
     name: 'memory',
-    ok: rssMB < 1024,
-    message: rssMB < 1024 ? `${rssMB.toFixed(0)}MB rss` : `${rssMB.toFixed(0)}MB rss — high`,
+    ok,
+    message: ok ? `${rssMB.toFixed(0)}MB rss` : `${rssMB.toFixed(0)}MB rss — high (limit ${limitMB}MB)`,
   }
 }
 

@@ -3,7 +3,16 @@
 > **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`12-bounded-reads-sweep`](../12-bounded-reads-sweep/spec.md), [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: `scripts/check-unbounded-reads.mjs` reports `{"unbounded":97,"aggregates":16,"exempted":0}` (2026-08-07), classified in full in [`tasks.md`](./tasks.md) as 38 page + 26 model-bounded + 33 batch. The pre-script survey said ≈50 + 13 worker scans + 11 aggregates; the reconciliation is in `tasks.md`, and the survey was the side that was wrong.
+> **Reality check**: Earlier counts (~50 request reads, 13 worker scans, 11 aggregates) are a
+> dated survey, not acceptance criteria. `src/` has changed since it was taken. This plan produces a
+> fresh inventory from the TypeScript AST and records its commit SHA.
+>
+> **A text-matching detector shipped first and is still what runs.** It reports
+> `{"unbounded":96,"aggregates":16,"exempted":0}` and its classification is in [`tasks.md`](./tasks.md).
+> It reached the same two conclusions this revision is built on — that route handlers are invisible
+> to it and that a `.limit()` on one query is mistaken for a bound on another — and *documented*
+> them as blind spots rather than closing them. The revision is right that documenting is not
+> closing. See "Not yet met by the shipped detector" below.
 
 ## Problem
 
@@ -25,9 +34,11 @@ demand so every later plan can prove it made progress.
 
 ## The detector
 
-`scripts/check-unbounded-reads.mjs` walks `src/**/*.{ts,tsx}`, and for each exported function
-whose body contains a Drizzle list read (`.select({`, `.select()`, `db.select`, `tx.select`,
-`findMany(`) reports it when the body has no `.limit(`.
+`scripts/check-unbounded-reads.mjs` walks `src/**/*.{ts,tsx}` with the installed TypeScript compiler
+API. It reports Drizzle list-query call chains and `findMany` calls that have no explicit bound,
+including queries inside non-exported helpers and route handlers. Regex over exported function bodies
+is explicitly rejected: it misses nested handlers and mistakes a `.limit()` on another query for a
+bound on the target query.
 
 It must handle three classes of false positive found during the survey:
 
@@ -36,10 +47,10 @@ It must handle three classes of false positive found during the survey:
 2. Scalar aggregates (`count(`, `sum(`, `sql\`count`) which return a number, not rows.
 3. Reviewed exceptions, via a `// unbounded-read-ok: <reason>` comment above the function.
 
-Output is machine-readable so later plans can assert on it:
+Output is machine-readable and includes file/line/kind entries so later plans can reconcile it:
 
 ```json
-{"unbounded":97,"aggregates":16,"exempted":0}
+{"commit":"<sha>","unbounded":0,"aggregates":0,"exempted":0,"entries":[]}
 ```
 
 ## The classification
@@ -56,11 +67,27 @@ needed completeness and no data-model ceiling could be named.
 
 ## Success metrics
 
-- `node scripts/check-unbounded-reads.mjs` runs in under 5 seconds and prints the JSON above.
+- `node scripts/check-unbounded-reads.mjs` runs in under 5 seconds and prints schema-valid JSON.
 - Its `unbounded` count equals the number of page + model-bounded + batch rows in the committed
   classification, with no unclassified remainder.
-- Re-running after adding a deliberate unbounded read increments the count by exactly 1.
+- Re-running after adding a deliberate unbounded read in a route handler and in a non-exported helper
+  increments the count by exactly 2.
 - No false positive from `Buffer.from`/`Array.from` and no aggregate counted as a list read.
+
+## Not yet met by the shipped detector
+
+This plan was revised (upstream `e5bc8a2d5`) after a text-matching detector had already shipped, and
+the revision raises the bar in three ways the current script does not clear:
+
+| Required now | Shipped | Gap |
+|---|---|---|
+| TypeScript compiler API | Text matching with a brace scanner | Blind spots 1 and 4 below are structural, not fixable by better regex |
+| `commit` and `entries[]` in the JSON | `{unbounded, aggregates, exempted}` only | Plan 13 wants entries to reconcile against |
+| A route handler *and* a non-exported helper each increment by 1 | Neither is seen at all | Blind spots 1 and 4 |
+| `.limit()` associated with its own query chain | Any `.limit(` in the body counts | Blind spot 2 — nine live cases, one in the GDPR export path |
+
+The blind-spot list below is what the shipped detector honestly cannot see, and it is precisely the
+list the revision asks to eliminate. Rewriting it on the AST closes 1, 2 and 4 outright; 3 and 5 stay.
 
 ## Known blind spots
 

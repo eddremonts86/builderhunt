@@ -7,9 +7,8 @@
 
 ## Sequence
 
-1. **Write the detector against the known survey result.** The survey's 50/13/11 split is the
-   fixture: a detector that reports wildly different numbers is wrong, and one that reports the
-   same numbers has been validated against a hand-checked baseline.
+1. **Write the AST detector and test it with synthetic fixtures.** The old 50/13/11 survey is a
+   comparison clue, not a fixture; matching a stale count can still mean the detector is wrong.
 2. **Walk the output and classify each entry.** This is reading code, not writing it. The output
    is the table in `tasks.md`.
 3. **Wire it as a reportable script**, not a gate.
@@ -21,7 +20,7 @@ two cannot disagree — which is the property plan 13 relies on when it turns th
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| The heuristic misses a read shape (raw `sql` template, a helper that wraps `select`) | Medium | Medium — a real unbounded read survives the phase | Cross-check the count against `grep -c '\.select(' src -r`; record known blind spots in the spec rather than pretending coverage is total |
+| The AST visitor misses a wrapper or raw SQL read | Medium | Medium — a real unbounded read survives the phase | Cross-check route/repository inventories, add explicit wrapper recognition, and record raw-SQL blind spots rather than trusting a matching old count |
 | A read is classified `page` when it must cover every row | Medium | High — plan 12 would introduce a data bug (partial deletion, incomplete export) | Every `batch` and `page` decision names the caller that consumes it; deletion and export paths are reviewed explicitly, not by name pattern |
 | The classification goes stale before plan 12 runs | Low | Low | The detector is the source of truth; the table is a snapshot with a date, and plan 12 re-runs the script first |
 

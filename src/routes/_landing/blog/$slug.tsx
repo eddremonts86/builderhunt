@@ -8,8 +8,17 @@ import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
 import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
+// Mirrors `blogSlugSchema` inside `getBlogPostPage` (src/shared/lib/blog-data.ts).
+// That schema is a hard guard against injection, but it also turns a malformed
+// URL — anything that isn't a real blog slug — into a Zod `invalid_format` 500.
+// For the route, a bad slug is just "post not found": the inner server function
+// still validates, so nothing unsafe slips through, and the user gets a proper
+// 404 instead of a 500 (saas-review F2).
+const ROUTE_SLUG_RE = /^[a-z0-9-]{1,160}$/
+
 export const Route = createFileRoute('/_landing/blog/$slug')({
   loader: async ({ params }) => {
+    if (!ROUTE_SLUG_RE.test(params.slug)) throw notFound()
     const [page, robots] = await Promise.all([
       getBlogPostPage({ data: params.slug }),
       getSurfaceRobotsFn({ data: 'blog' }),

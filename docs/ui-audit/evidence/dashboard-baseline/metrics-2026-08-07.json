@@ -1,0 +1,79 @@
+[
+  {
+    "viewport": "desktop-1440",
+    "route": "/dashboard",
+    "status": 200,
+    "cls": 0,
+    "requestCount": 708,
+    "transferredBytes": 27876638,
+    "consoleErrors": [],
+    "axeViolations": 2,
+    "screenshotPath": "docs/ui-audit/evidence/dashboard-baseline/desktop-1440/desktop-1440-dashboard.png",
+    "notes": [],
+    "ttfbMs": 444,
+    "domContentLoadedMs": 533,
+    "loadMs": 538
+  },
+  {
+    "viewport": "mobile-320",
+    "route": "/dashboard",
+    "status": 200,
+    "cls": 0,
+    "requestCount": 639,
+    "transferredBytes": 16660310,
+    "consoleErrors": [
+      "%o\n\n%s\n\n%s\n TypeError: Failed to fetch The above error occurred in the <MatchInnerImpl> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl."
+    ],
+    "axeViolations": 0,
+    "screenshotPath": "docs/ui-audit/evidence/dashboard-baseline/mobile-320/mobile-320-dashboard.png",
+    "notes": [],
+    "ttfbMs": 11,
+    "domContentLoadedMs": 57,
+    "loadMs": 60
+  },
+  {
+    "viewport": "desktop-1440-zoom400",
+    "route": "/dashboard",
+    "status": 200,
+    "cls": 0,
+    "requestCount": 640,
+    "transferredBytes": 16660310,
+    "consoleErrors": [],
+    "axeViolations": 0,
+    "screenshotPath": "docs/ui-audit/evidence/dashboard-baseline/desktop-1440-zoom400/desktop-1440-zoom400-dashboard.png",
+    "notes": [],
+    "ttfbMs": 11,
+    "domContentLoadedMs": 56,
+    "loadMs": 58
+  },
+  {
+    "viewport": "desktop-1440-reduce-motion",
+    "route": "/dashboard",
+    "status": 200,
+    "cls": 0,
+    "requestCount": 640,
+    "transferredBytes": 16660310,
+    "consoleErrors": [],
+    "axeViolations": 0,
+    "screenshotPath": "docs/ui-audit/evidence/dashboard-baseline/desktop-1440-reduce-motion/desktop-1440-reduce-motion-dashboard.png",
+    "notes": [],
+    "ttfbMs": 11,
+    "domContentLoadedMs": 57,
+    "loadMs": 59
+  },
+  {
+    "viewport": "desktop-1440-forced-colors",
+    "route": "/dashboard",
+    "status": 200,
+    "cls": 0,
+    "requestCount": 640,
+    "transferredBytes": 16660310,
+    "consoleErrors": [],
+    "axeViolations": 0,
+    "screenshotPath": "docs/ui-audit/evidence/dashboard-baseline/desktop-1440-forced-colors/desktop-1440-forced-colors-dashboard.png",
+    "notes": [],
+    "ttfbMs": 11,
+    "domContentLoadedMs": 58,
+    "loadMs": 60
+  }
+]

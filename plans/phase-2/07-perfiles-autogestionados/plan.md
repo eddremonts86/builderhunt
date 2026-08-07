@@ -1,5 +1,19 @@
 # Plan de implementación — perfiles auto-gestionados
 
+> **Status**: `pending`
+> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md),
+> [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md),
+> [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md),
+> [`06-landing-segmentada`](../06-landing-segmentada/spec.md),
+> [`phase-1/36-claimable-profiles`](../../phase-1/36-claimable-profiles/spec.md),
+> [`phase-1/37-portfolio-builder`](../../phase-1/37-portfolio-builder/spec.md), and
+> [`phase-1/38-work-sample`](../../phase-1/38-work-sample/spec.md)
+> **Blocks**: nothing
+> **Reality check**: The current migration tip is `0154`. The complete quarantine, magic-byte,
+> S3-signing and ClamAV pipeline already exists under `src/lib/storage/` and
+> `src/lib/scheduling/document-worker.ts`; implementation extends it rather than creating a second
+> storage tree as described by the original draft.
+
 > Este plan describe el orden de ejecución recomendado, los criterios de salida por
 > fase y la estrategia de despliegue. Las tareas individuales viven en `tasks.md`;
 > el contrato y los criterios de éxito, en `spec.md`.
@@ -35,8 +49,8 @@ El plan entrega:
    renderiza con el verde del badge verificado. Chip separado, color secundario.
 3. **Adjuntos separados de `work-sample`**. `38-work-sample` modela evidencias
    scrapeadas/verificadas de builders con claim; los adjuntos del dueño viven en
-   `selfManagedAttachments`. Mismo antivirus, mismo `safeDeliverBlob`, pero
-   storage separado para no mezclar.
+   `selfManagedAttachments`. Reutiliza el provider, object-key policy, antivirus y signed-download
+   existentes con un nuevo owner kind; no duplica la implementación de storage.
 4. **Migración a claim sin perder datos**. `promotedToBuilderClaimId` en
    `selfManagedProfiles` permite que el upgrade sea aditivo.
 5. **Taxonomía cerrada para `services`, abierta para `topics` e `languages`**. La
@@ -63,7 +77,7 @@ flowchart LR
 
 ### Fase 0 — modelo y migraciones (1 sprint)
 
-Salida: la migración 0042 aplica en local y en CI; los repositories CRUD existen
+Salida: la migración generada en el siguiente número libre aplica en local y en CI; los repositories CRUD existen
 con tests unitarios; la taxonomía de servicios se puede importar desde
 `service-taxonomy.ts`.
 
@@ -74,12 +88,13 @@ intencionales; los repositories tienen al menos un test por método público.
 
 ### Fase 1 — capa de seguridad para adjuntos (1 sprint)
 
-Salida: `safeDeliverBlob` y `upload-validator` con cobertura de tests; el servicio
-de antivirus está integrado y se ve `pending_scan` → `clean` en una prueba local.
+Salida: la política de adjuntos reutiliza `document-validation.ts`, el provider S3,
+las claves `quarantine/` → `clean/`, ClamAV y el worker existentes; se ve
+`pending` → `clean` en una prueba local real.
 
 Esta fase puede correr en paralelo a la Fase 0 en otro stream, pero se bloquea la
 Fase 2 hasta que esté completa. Razón: cualquier endpoint que acepte multipart
-antes de que `upload-validator` esté testeado es un vector de ataque abierto.
+antes de que la nueva policy sobre `document-validation.ts` esté testeada es un vector de ataque abierto.
 
 Criterio de salida: ningún test de seguridad de la suite
 `tests/unit/security/` queda en rojo; el script de retention pass se ejecuta
@@ -241,8 +256,8 @@ alertas.
 ## Dependencias externas
 
 - `docker/clamav/` debe estar operativo antes de la Fase 1.
-- `src/shared/lib/storage/` (object storage) debe existir; si no, levantar como
-  sub-tarea de la Fase 1.
+- `src/lib/storage/`, `src/lib/scheduling/document-worker.ts`, MinIO and ClamAV are the mandatory
+  existing primitives; do not create a parallel storage tree.
 - `04-dashboard-personalizado` debe estar implementado para la Fase 7 (el banner
   de sugerencia de promoción requiere el dashboard del segmento `building`).
 - `02-segmentacion-usuarios` debe estar implementado para la Fase 4 (la
@@ -261,7 +276,7 @@ alertas.
 | Riesgo | Probabilidad | Impacto | Mitigación |
 |---|---|---|---|
 | Spam de perfiles auto-gestionados para inflar la SERP | Media | Alto | Rate limit en creación + retención de handle a 7 días + antivirus obligatorio en adjuntos + revisión manual semanal de perfiles nuevos con > 3 adjuntos |
-| Malware en adjuntos | Baja | Crítico | `upload-validator` con magic bytes + ClamAV async + estado `quarantined` no se sirve; report button en página pública |
+| Malware en adjuntos | Baja | Crítico | Reutilizar `document-validation.ts`, ClamAV y `quarantine/` → `clean/`; nunca servir un estado no limpio; report button en página pública |
 | Squatting de handles | Media | Medio | TTL 7 días + rate limit 5/día por usuario + auto-liberación tras 30 días sin perfil |
 | Perfiles auto-gestionados diluyen "proof of work" | Media | Alto | Chip "Self-managed" siempre visible; nunca comparten badge verde con verificados; ranking documentado en `04-dashboard-personalizado` |
 | Usuarios con claim se sienten rebajados | Baja | Medio | Anuncio en `/changelog` antes del rollout; la marca "verified" no cambia; ningún builder con claim pierde posición |

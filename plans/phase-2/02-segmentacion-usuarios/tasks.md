@@ -16,9 +16,11 @@
   - Verify: `pnpm test tests/unit/shared/lib/user-segments.test.ts`.
 
 - [ ] **Crear persistencia account-subject**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0115_user_preferences.sql`, `drizzle/migration-hashes.json`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/*.sql` (new migration allocated by
+    `pnpm db:generate`), `drizzle/migration-hashes.json`
   - Do: crear `user_preferences` con FK, timestamps, source y version; añadir grants/RLS coherentes
-    con datos account-subject.
+    con datos account-subject. Nunca reservar un número de migración en el plan: el tip actual es
+    `0154` y puede avanzar antes de ejecutar esta tarea.
   - Verify: aplicar migraciones en DB desechable y probar que usuario A no lee/escribe usuario B.
 
 - [ ] **Crear repositorio de preferencias**

@@ -15,6 +15,7 @@ import {
   listSessionSegments,
 } from '~/shared/lib/repositories/interviews'
 import { assertJsonRequest, assertSameOrigin, CrossOriginError } from '~/shared/lib/security/same-origin'
+import { interviewIdGuard } from '~/shared/lib/api/interview-id'
 
 /**
  * Final transcript segments: read them, append a batch, correct a speaker (plan:
@@ -100,6 +101,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/segments')({
       ANY: methodNotAllowed(['GET', 'POST', 'PATCH']),
 
       GET: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           const principal = await requireTenantPrincipal(request)
           const segments = await withTenantContext(principal, async (transaction) => {
@@ -131,6 +134,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/segments')({
       },
 
       POST: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           assertSameOrigin(request)
           assertJsonRequest(request)
@@ -173,6 +178,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/segments')({
       },
 
       PATCH: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           assertSameOrigin(request)
           assertJsonRequest(request)

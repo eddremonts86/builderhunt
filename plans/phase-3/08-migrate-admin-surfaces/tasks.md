@@ -3,7 +3,7 @@
 > **Status**: `implemented`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: All seven accounted for — four on the shell (abuse console, incidents, active sessions, privacy exports), three audited and deliberately left as they are (`HygieneCard`, `InvitationStatus`, `me/index`), and `plan-requests` no longer exists. The one thing not done is the shared e2e parameter list; see the closing note.
+> **Reality check**: Add each applicable surface to `tests/e2e/data-tables.spec.ts` as it lands. `/admin/plan-requests` is intentionally gone; never recreate it. **Status of the original seven:** four on the shell (abuse console, incidents, active sessions, privacy exports), three audited and deliberately left as they are (`HygieneCard`, `InvitationStatus`, `me/index`). Integrations, metrics and operations were added by a later revision of this plan and are **not** done.
 
 - [x] **Migrate the abuse console**
   - Files: `src/modules/dashboard/components/AbuseConsole.tsx`,
@@ -44,6 +44,20 @@
     Rows here **are** tabular — every incident shows the same fields — which is what separates this
     one from the three audited below.
 
+- [ ] **Migrate integrations, metrics, and operations tables**
+  - Files: `src/modules/admin/integrations/IntegrationsPage.tsx`,
+    `src/modules/admin/metrics/AdminMetricsPage.tsx`,
+    `src/modules/admin/operations/OperationsPage.tsx`,
+    `src/shared/lib/table/capabilities/platform-integrations.ts`,
+    `src/shared/lib/table/capabilities/platform-metrics.ts`,
+    `src/shared/lib/table/capabilities/platform-operations.ts`
+  - Do: migrate only real row collections to platform-scoped capabilities and `DataTable`;
+    charts/cards remain semantic charts/cards. Preserve health, run-action, audit and error behavior.
+    Classify and bound each backing read before migration. Never recreate the retired plan-request queue.
+  - Verify: platform-admin e2e covers sorting/filtering and existing actions for all three; read-path
+    detector does not increase; `rg "plan-requests" src/routes` returns nothing.
+  - **Not started.** Added to this plan by a later revision, after the other six were migrated.
+
     The edit form in the expansion slot needed a new shell capability: **expansion state a surface
     can own**. Opening a row here *is* editing that incident, so the page has to load it into its
     form; with the shell keeping the flag the page would have had to mirror it, which is how the
@@ -57,14 +71,6 @@
 
     One `renderForm()` serves create and edit. Every test id
     `tests/regression/test-status-and-trust.mjs` drives is unchanged.
-
-- [ ] ~~**Migrate plan requests, with the first bulk action**~~ — **the surface does not exist.**
-  `plan_requests` was dropped on 2026-08-03 with `plans` and `plan_changes` (`schema.ts:1058-1067`:
-  the pre-organization billing model, 0 rows, every new request already refused by
-  `LegacyPlanMutationDisabledError`), and there is no route file. This was also where the plan put
-  "the first genuine use of select-loaded plus a bulk action", so that demonstration has no host in
-  this group; `admin/access-requests` is the nearest live equivalent if it is wanted. Recorded in
-  `spec.md`.
 
 - [x] **Migrate the four small surfaces**
   - Files: `src/modules/dashboard/components/ActiveSessionsPanel.tsx`,
@@ -111,6 +117,20 @@
     The audit turned up a second one on the same reasoning (`InvitationStatus`, above), which is
     why the verdict is written as a rule rather than a one-off: **table markup is not a data grid
     unless the rows share columns and the list grows.**
+
+## Removed from this checklist: "migrate plan requests"
+
+Not an open task, because it is not work — it is a decision, and `check-plan-tasks.mjs` is right to
+refuse a checkbox with no Files/Do/Verify behind it.
+
+`plan_requests` was dropped on 2026-08-03 with `plans` and `plan_changes` (`schema.ts:1058-1067`:
+the pre-organization billing model, 0 rows, every new request already refused by
+`LegacyPlanMutationDisabledError`), and there is no route file. This plan's own reality check now
+says never to recreate it.
+
+It was also where the plan put "the first genuine use of select-loaded plus a bulk action", so that
+demonstration has no host in this group. `admin/access-requests` is the nearest live equivalent if
+it is wanted.
 
 ## The one thing not done
 

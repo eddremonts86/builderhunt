@@ -1,4 +1,4 @@
-# Specification — tenant-safe keyset pagination
+# Specification — scope-safe keyset pagination
 
 > **Status**: `implemented`
 > **Depends on**: [`02-table-query-contract`](../02-table-query-contract/spec.md)
@@ -16,8 +16,8 @@ page boundary landing inside a tie means a row appears on two pages or on none.
 
 ## Goal
 
-One function — `buildKeysetPage` — that is the only place table filtering, sorting and grouping
-reach SQL, safe by construction rather than by review.
+One SQL function — `buildKeysetPage` — and scope-specific request adapters that are the only places
+table filtering, sorting and grouping reach SQL, safe by construction rather than by review.
 
 ## Non-goals
 
@@ -32,6 +32,8 @@ A client never names a column. It names an **id**, resolved through a per-table 
 ```ts
 export interface TableCapability {
   table: string
+  /** Which server-resolved principal/context may execute this capability. */
+  scope: 'tenant' | 'account' | 'platform' | 'public'
   /** An id absent here cannot reach SQL. */
   sortable: Record<string, { column: PgColumn; nullsLast?: boolean }>
   filterable: Record<string, { column: PgColumn; values?: readonly string[] }>
@@ -74,10 +76,11 @@ this one's, so multi-select chips show what each option would add rather than ze
 
 - Generated SQL contains the tiebreaker on every `ORDER BY` and the string `offset` nowhere.
 - An unknown sort id, an unknown filter id, and an out-of-allowlist filter value each throw.
-- A cursor minted by organization A and presented by organization B is rejected — a negative
-  tenant A/B test, per `plans/_meta/security-policy.md`'s required threat cases.
-- `buildKeysetPage` throws when called outside `withTenantContext` rather than falling back to a
-  global connection.
+- A tenant cursor crossing organizations, an account cursor crossing users, and any cursor crossing
+  scope kinds are rejected.
+- Each adapter proves its required context: tenant uses `withTenantContext`, account uses the
+  authenticated subject context, platform uses `requirePlatformAdminPrincipal` plus the platform
+  connection, and public uses an explicit public projection. No adapter falls back to a broader DB.
 - `pnpm security:boundaries` green.
 
 ## Resolved edge cases
@@ -90,3 +93,5 @@ this one's, so multi-select chips show what each option would add rather than ze
   presentation and aggregates and never changes which rows a page contains.
 - **A table with no natural unique column.** It cannot be paginated safely, so the capability
   fails to construct at import time rather than at request time.
+- **A filter/search/group change with an old cursor.** The normalized query fingerprint is part of
+  the signed cursor, so it is rejected rather than mixing two result sets.

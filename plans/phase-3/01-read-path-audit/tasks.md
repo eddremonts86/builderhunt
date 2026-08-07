@@ -7,11 +7,11 @@
 
 - [x] **Write the detector in report-only mode**
   - Files: `scripts/check-unbounded-reads.mjs`, `package.json`
-  - Do: walk `src/**/*.{ts,tsx}`; flag exported functions whose body has a Drizzle list read
-    (`.select({`, `.select()`, `db.select`, `tx.select`, `findMany(`) and no `.limit(`. Strip
-    `(Buffer|Array|Object|Set|Map).from(` before matching. Exclude scalar aggregates (`count(`,
-    `sum(`, `` sql`count ``). Honour `// unbounded-read-ok: <reason>`. Print
-    `{"unbounded":N,"aggregates":M,"exempted":K}` and **exit 0**.
+  - Do: use the installed TypeScript compiler API to visit Drizzle list-query chains and `findMany`
+    calls in exported functions, non-exported helpers and route-handler objects. Associate `.limit()`
+    with the same query chain; exclude scalar aggregates structurally, not by file-wide regex. Honour
+    `// unbounded-read-ok: <reason>` on the exact statement. Print commit SHA, counts and file/line/kind
+    entries as JSON and **exit 0**.
   - Verify: `node scripts/check-unbounded-reads.mjs` prints the JSON and exits 0; add
     `"check:unbounded": "node scripts/check-unbounded-reads.mjs"` to `package.json`.
   - Done: runs in 0.14 s, exits 0, and `pnpm check:unbounded` is wired. Two accuracy fixes were
@@ -26,17 +26,29 @@
       ran over comments, so the explanation was counted as the read. Comments are now stripped
       before matching (strings are not — a `.limit(` there is still a bound worth seeing).
 
-- [x] **Validate the detector against the survey baseline**
+- [~] **Validate the detector against synthetic and historical cases**
   - Files: `scripts/check-unbounded-reads.mjs`
-  - Do: the survey found ≈50 request-serving reads, 13 worker scans and 11 aggregates. If the
-    detector reports a materially different number, find out which side is wrong before
-    continuing. Add a deliberate unbounded read to a scratch file and confirm the count rises
-    by 1, then remove it.
-  - Verify: count is within a couple of entries of 50 and every difference is explained in the
-    commit message, not averaged away.
-  - Done, and **the survey was the side that was wrong**. The detector reports 97 unbounded reads
-    against the survey's ≈63 (50 request-serving + 13 worker scans). The difference is not noise
-    and was not averaged away — it is four specific things:
+  - Do: add scratch fixtures for an exported repository function, nested route handler,
+    non-exported helper, scalar aggregate, two queries in one function where only one is limited,
+    and an approved comment. Compare the fresh output with the old survey and investigate every
+    difference, but never force the count to match history.
+  - Verify: each positive fixture increments exactly once, each negative fixture increments zero,
+    scratch files are removed, and the committed classification records the current git SHA.
+  - **Partly done, against the older wording of this task.** Three fixtures were run and behaved:
+    an exported repository read incremented by exactly 1, an aggregate-only projection moved
+    `aggregates` and not `unbounded`, and an `unbounded-read-ok` comment moved `exempted` and not
+    `unbounded`. `Buffer.from(...)` produced nothing.
+
+    **Three fixtures this revision adds would fail**, and that is the point of the revision: a
+    nested route handler and a non-exported helper both increment by **0** because the text
+    detector only sees exported function declarations, and the two-queries-one-limit case
+    increments by 0 because any `.limit(` in the body counts as a bound. All three are recorded as
+    blind spots in `spec.md`; the AST rewrite is what closes them.
+
+    The output carries no `commit` SHA yet either.
+
+    The historical comparison was done and is worth keeping: the detector reports far more than the
+    old survey, and **the survey was the side that was wrong** — not noise, four specific things:
 
     | Why the survey was short | Count | Evidence |
     |---|---|---|

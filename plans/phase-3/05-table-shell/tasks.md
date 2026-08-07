@@ -26,8 +26,8 @@
   - Files: `src/shared/components/table/DataTable.tsx`,
     `src/shared/components/table/grid-roles.ts`
   - Do: div tree with `role="grid"|row|columnheader|gridcell`, CSS grid template columns from
-    `ColumnDef`, sticky header. `aria-rowcount` from `PageResult.total`, `aria-rowindex` from the
-    **absolute** row index. `@tanstack/react-table` in manual mode. Required
+    `ColumnDef`, sticky header. `aria-rowcount` from a known `PageResult.total` and omitted when
+    `total` is null; `aria-rowindex` from the **absolute** row index. `@tanstack/react-table` in manual mode. Required
     `rowTestId: (row) => string` prop forwarded as `data-testid`.
   - Verify: `pnpm type-check`, `pnpm lint`; render a 20-row fixture and confirm
     `aria-rowcount` reflects a `total` larger than the rendered rows.

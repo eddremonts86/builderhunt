@@ -42,17 +42,33 @@
 
 - [x] **Mint and verify signed keyset cursors**
   - Files: `src/shared/lib/table/cursor.ts`, `tests/unit/shared/lib/table/cursor.test.ts`
-  - Do: payload `{ t, s, o, k }` → base64url → `createHmac('sha256', secret)` over
+  - Do: payload `{ t, s, q, a, k }` (table, sort, normalized-query fingerprint, server-resolved
+    access scope, key tuple) → base64url → `createHmac('sha256', secret)` over
     `'builderhunt:table-cursor:v1:' + payload`, compared with `timingSafeEqual`. Read the secret
     through `src/shared/lib/env.ts`; reuse an existing signing secret if one is already loaded
     there rather than adding an environment variable.
   - Verify: `pnpm test tests/unit/shared/lib/table/cursor.test.ts` — separate assertions that a
-    tampered tuple, a cursor minted for a different sort, and a cursor minted for a different
-    organization each throw.
-  - Done: 9 tests. The three required rejections are asserted separately, plus a different table,
-    a different secret, a malformed token, and a signature computed with `feed-capability.ts`'s
-    prefix over the identical payload — the last one is what proves the versioned prefix, not just
-    the shared secret, is doing the separating.
+    tampered tuple, a cursor minted for a different filter/search/sort, and cursors crossing
+    tenant/account/platform/public scopes each throw.
+  - **Partly done.** 9 tests: a tampered tuple, a different *sort*, a different organization, a
+    different table, a different secret, a malformed token, and a signature computed with
+    `feed-capability.ts`'s prefix over the identical payload — the last one is what proves the
+    versioned prefix, not just the shared secret, is doing the separating.
+
+    **Two requirements this revision adds are not met**, and both are real:
+    - **The cursor does not bind the filter or the search term.** Its payload is
+      `{ table, sortDescriptor, organizationId, tuple }`. Presenting a cursor minted under
+      `filter.source=github` while asking for `filter.source=gitlab` is accepted today: the keyset
+      predicate is applied against a different `WHERE`, so the page starts from a row's position in
+      an ordering the new filter does not produce. That skips or repeats rows. It is a correctness
+      bug rather than a boundary one — the tenant predicate still holds — but it is exactly the
+      class of silent wrongness this phase exists to remove.
+    - **Only tenant and platform scopes exist.** `organizationId: string | null` distinguishes
+      tenant-scoped from global; there is no account-subject or public scope in the payload, so a
+      cursor cannot be refused for crossing between them.
+
+    Both are payload changes plus verification, which invalidates every cursor minted before the
+    change — acceptable, since a rejected cursor drops the client to page one by design.
 
     The secret is `BETTER_AUTH_SECRET`, no new environment variable. That is the same reuse
     `access-requests.ts:61` already makes for its 7-day invite token, and for the same reason: a

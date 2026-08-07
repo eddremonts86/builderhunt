@@ -371,9 +371,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   --page-narrow: 800px;
   --page-gutter: 1.25rem;
   /* Readable ceiling for dashboard content inside the sidebar shell. Wide
-     enough for a 12-column bento to keep 2-column tiles legible, narrow enough
-     that list rows don't stretch to an unreadable measure on a 27" display. */
-  --dashboard-max: 1320px;
+     enough for a 12-column bento to keep 2-column tiles legible on
+     27"-32" displays, with comfortable headroom. Tuned for the
+     dashboard where wider content is denser (lists, charts, tables)
+     than the landing pages; the landing keeps the tighter 1200px cap. */
+  --dashboard-max: 1680px;
 }
 
 .container { max-width: var(--page-max); margin-inline: auto; padding-inline: var(--page-gutter); }

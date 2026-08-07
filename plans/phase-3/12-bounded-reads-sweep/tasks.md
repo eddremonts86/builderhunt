@@ -23,8 +23,8 @@
     `src/shared/lib/repositories/seat-usage.ts`
   - Do: add `.limit(n)` where n is derived from the source of truth rather than a literal — e.g.
     `.limit(SEO_SURFACES.length)` with the comment
-    `// one row per governed surface, seeded by drizzle/0083`. A bare `.limit(3)` is a guess dressed
-    as a bound.
+    `// one row per governed surface, seeded by drizzle/0083_public_surface_indexing_grants.sql`.
+    A bare `.limit(3)` is a guess dressed as a bound.
   - Verify: every added limit has a comment; `pnpm test` green; the detector's count drops by the
     number of reads touched.
 

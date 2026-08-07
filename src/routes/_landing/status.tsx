@@ -64,7 +64,7 @@ function StatusPage() {
         fetch('/api/incidents'),
       ])
       // `/api/status` answers 503 when any component check fails, carrying the
-      // same body as a 200. Reading it only on `ok` meant the Components list
+      // same body as a 200. Reading it only on `ok` meant the What's running list
       // collapsed to "Checking…" exactly when something was down — a status
       // page that goes blank in an outage is backwards. Render the degraded
       // state; the overall banner already distinguishes the two.
@@ -100,7 +100,7 @@ function StatusPage() {
           <Activity className="w-8 h-8 text-bh-accent" aria-hidden="true" />
           System Status
         </h1>
-        <p className="text-bh-text-muted text-base">Live status of BuilderHunt services and API latency.</p>
+        <p className="text-bh-text-muted text-base">Live status of BuilderHunt services, sampled every 30 seconds.</p>
       </header>
 
       {search.unsubscribed && (
@@ -114,8 +114,8 @@ function StatusPage() {
           role="status"
         >
           {search.unsubscribed === 'ok'
-            ? 'You have been unsubscribed from status updates.'
-            : 'That unsubscribe link is invalid or has already been used.'}
+            ? "You won't get any more status emails from us."
+            : "That unsubscribe link is no longer valid. You can subscribe again from this page if you want status emails."}
         </div>
       )}
 
@@ -135,7 +135,7 @@ function StatusPage() {
           )}
           <div className="flex-1">
             <p className="font-semibold text-bh-text">
-              {allOk ? 'All systems operational' : 'Some systems are degraded'}
+              {allOk ? 'All systems operational.' : 'Some systems are degraded.'}
             </p>
             <p className="text-xs text-bh-text-muted">
               {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString()}` : 'Loading…'}
@@ -147,7 +147,7 @@ function StatusPage() {
       </div>
 
       <section className="mb-8">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-3">Components</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-3">What's running</h2>
         <div className="space-y-2">
           {status ? (
             <>
@@ -165,7 +165,7 @@ function StatusPage() {
         <section className="mb-8">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-3 flex items-center gap-2">
             <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-            Active incidents
+            Open incidents
           </h2>
           <div className="space-y-3">
             {openIncidents.map((i) => (
@@ -195,14 +195,14 @@ function StatusPage() {
 
       <section className="mb-8">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-3">
-          Get notified
+          Email me when something breaks
         </h2>
         <SubscribeForm />
       </section>
 
       <footer className="text-center text-xs text-bh-text-dim">
         <p>
-          Status data refreshes every 30s. See the{' '}
+          Status refreshes every 30 seconds. See the{' '}
           <Link to="/changelog" className="text-bh-accent hover:underline">changelog</Link>
           {' '}or the <Link to="/roadmap" className="text-bh-accent hover:underline">roadmap</Link>.
         </p>
@@ -250,7 +250,7 @@ export function SubscribeForm() {
         return
       }
       if (!res.ok) {
-        setState({ kind: 'error', message: 'Enter a valid email address.' })
+        setState({ kind: 'error', message: "That doesn't look like a valid email." })
         return
       }
       // Deliberately ignore `alreadySubscribed` in the response — a new and an existing address
@@ -258,14 +258,14 @@ export function SubscribeForm() {
       // already subscribed.
       setState({ kind: 'success' })
     } catch {
-      setState({ kind: 'error', message: 'Network error. Please try again.' })
+      setState({ kind: 'error', message: 'Network error. Try again in a moment.' })
     }
   }
 
   if (state.kind === 'success') {
     return (
       <p className="text-sm text-bh-success" role="status" data-testid="subscribe-success">
-        Check your email to confirm — we'll let you know about incidents and resolutions.
+        Check your email to confirm. We'll only write when something breaks and when it's fixed.
       </p>
     )
   }
@@ -295,7 +295,7 @@ export function SubscribeForm() {
       </button>
       {state.kind === 'rate_limited' && (
         <p className="text-xs text-bh-danger sm:basis-full" role="alert" data-testid="subscribe-rate-limited">
-          Too many attempts. Please try again later.
+          Too many attempts. Try again in a minute or two.
         </p>
       )}
       {state.kind === 'error' && (

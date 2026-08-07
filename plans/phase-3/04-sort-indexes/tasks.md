@@ -3,7 +3,7 @@
 > **Status**: `implemented`
 > **Depends on**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
-> **Reality check**: The migration this plan generated is `drizzle/0155_table_sort_indexes.sql`, not `0115` — the tip was `0154`, not `0114`, when it ran. `migration-hashes.json` covers 156 migrations. The guard is `src/shared/lib/table/capability-index.ts` with 13 tests.
+> **Reality check**: The migration is always the next free number allocated by `pnpm db:generate`; recount the existing indexes at execution time rather than trusting a figure in this file. As executed: `drizzle/0155_table_sort_indexes.sql`, and the guard is `src/shared/lib/table/capability-index.ts` with 13 tests.
 
 - [x] **Audit which sortable columns are already covered**
   - Files: `04-sort-indexes/plan.md` (record the result there)
@@ -34,7 +34,8 @@
     surface is built.
 
 - [x] **Declare the missing indexes and generate the migration**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0155_table_sort_indexes.sql`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/*.sql` (next-free migration allocated by
+    `pnpm db:generate` — `0155_table_sort_indexes.sql` as executed)
   - Do: add a composite `(tenant?, sortColumn, tiebreaker)` per missing entry, in the declared
     direction, with matching `NULLS LAST` where the capability sets `nullsLast`. Lead with
     `organization_id` on tenant-private tables — RLS adds that predicate, so an index without it
@@ -58,9 +59,11 @@
 - [x] **Regenerate the migration hash manifest**
   - Files: `drizzle/migration-hashes.json`
   - Do: `node scripts/db/verify-migration-integrity.mjs --write`.
-  - Verify: `pnpm test:migration-integrity` prints `{"valid":true,"migrations":116}` (115 today + this one).
-  - Done: `{"valid":true,"migrations":156}`. The plan's 116 was arithmetic on a stale tip; the count
-    is 155 pre-existing migrations plus this one.
+  - Verify: `pnpm test:migration-integrity` prints `{"valid":true,...}` and the reported migration
+    count is exactly one above the pre-task count.
+  - Done: `{"valid":true,"migrations":156}` — 155 before, one added. An earlier version of this task
+    predicted 116, which was arithmetic on a stale tip; recounting at execution time, as this
+    revision now says, is why the number is right.
 
 - [x] **Make an unbacked sortable column fail the build**
   - Files: `tests/unit/shared/lib/table/capability-index.test.ts`

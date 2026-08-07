@@ -13,6 +13,12 @@
         "tests/e2e/api/admin.spec.ts"
       ]
     },
+    "/api/admin/access-requests": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
     "/api/admin/activity/run-retention": {
       "status": "covered",
       "specs": [
@@ -111,14 +117,16 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
-        "tests/e2e/api/admin.spec.ts"
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts"
       ]
     },
     "/api/admin/builder-claims": {
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
-        "tests/e2e/api/admin.spec.ts"
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts"
       ]
     },
     "/api/admin/calendar/run-reminders": {
@@ -201,7 +209,6 @@
       "specs": [
         "tests/e2e/api/admin.spec.ts",
         "tests/e2e/auth-and-sessions.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/portfolio-builder.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -274,12 +281,6 @@
         "tests/e2e/api/admin.spec.ts"
       ]
     },
-    "/api/admin/plan-requests": {
-      "status": "covered",
-      "specs": [
-        "tests/e2e/api/admin.spec.ts"
-      ]
-    },
     "/api/admin/roadmap/$id": {
       "status": "covered",
       "specs": [
@@ -347,13 +348,15 @@
     "/api/ai/complete": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/ai-complete-and-embed.spec.ts"
+        "tests/e2e/api/ai-complete-and-embed.spec.ts",
+        "tests/e2e/api/ai-kill-switch.spec.ts"
       ]
     },
     "/api/ai/config": {
       "status": "covered",
       "specs": [
         "tests/e2e/api/ai-complete-and-embed.spec.ts",
+        "tests/e2e/api/ai-kill-switch.spec.ts",
         "tests/e2e/api/solutions-briefs-and-configs.spec.ts"
       ]
     },
@@ -420,13 +423,15 @@
       "specs": [
         "tests/e2e/auth-and-sessions.spec.ts",
         "tests/e2e/harness/fixtures.spec.ts",
-        "tests/e2e/signup-active-organization.spec.ts"
+        "tests/e2e/signup-active-organization.spec.ts",
+        "tests/e2e/team-accounts.spec.ts"
       ]
     },
     "/api/billing/auto-recharge": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/billing-authorization.spec.ts"
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-portal-and-auto-recharge.spec.ts"
       ]
     },
     "/api/billing/checkout/credits": {
@@ -441,14 +446,14 @@
     "/api/billing/checkout/status": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/billing-authorization.spec.ts"
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-portal-and-auto-recharge.spec.ts"
       ]
     },
     "/api/billing/checkout/subscription": {
       "status": "covered",
       "specs": [
         "tests/e2e/api/billing-authorization.spec.ts",
-        "tests/e2e/api/billing-subscription-change-scenarios.spec.ts",
         "tests/e2e/api/billing-subscription-scenarios.spec.ts"
       ]
     },
@@ -473,7 +478,8 @@
     "/api/billing/portal": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/billing-authorization.spec.ts"
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-portal-and-auto-recharge.spec.ts"
       ]
     },
     "/api/billing/refunds": {
@@ -485,7 +491,8 @@
     "/api/billing/subscription/cancel": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/billing-authorization.spec.ts"
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-subscription-change-scenarios.spec.ts"
       ]
     },
     "/api/billing/subscription/change": {
@@ -499,6 +506,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-portal-and-auto-recharge.spec.ts",
         "tests/e2e/api/billing-subscription-change-scenarios.spec.ts"
       ]
     },
@@ -518,7 +526,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -534,7 +542,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -550,7 +558,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -566,7 +574,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -582,7 +590,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -598,7 +606,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -614,7 +622,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -630,7 +638,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -646,7 +654,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -662,7 +670,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -678,7 +686,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -694,7 +702,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -710,7 +718,7 @@
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
@@ -732,8 +740,8 @@
     "/api/builders/track": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
         "tests/e2e/onboarding.spec.ts"
       ]
     },
@@ -807,10 +815,28 @@
         "tests/e2e/public-and-consent.spec.ts"
       ]
     },
+    "/api/dashboard/overview": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/dashboard-api.spec.ts"
+      ]
+    },
+    "/api/dashboard/preferences": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/dashboard-api.spec.ts"
+      ]
+    },
     "/api/dashboard/stats": {
       "status": "covered",
       "specs": [
-        "tests/e2e/dashboard-and-navigation.spec.ts"
+        "tests/e2e/dashboard-api.spec.ts"
+      ]
+    },
+    "/api/e2e/billing-provider": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-subscription-change-scenarios.spec.ts"
       ]
     },
     "/api/e2e/outbox": {
@@ -1058,12 +1084,6 @@
         "tests/e2e/api/account.spec.ts"
       ]
     },
-    "/api/me/plan-changes": {
-      "status": "covered",
-      "specs": [
-        "tests/e2e/api/account.spec.ts"
-      ]
-    },
     "/api/me/sessions": {
       "status": "covered",
       "specs": [
@@ -1122,7 +1142,6 @@
         "tests/e2e/api/organizations-invitations.spec.ts",
         "tests/e2e/api/organizations.spec.ts",
         "tests/e2e/auth-and-sessions.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts",
         "tests/e2e/harness/fixtures.spec.ts",
         "tests/e2e/settings-journeys.spec.ts",
         "tests/e2e/team-accounts.spec.ts"
@@ -1161,8 +1180,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/api/cross-tenant.spec.ts",
-        "tests/e2e/api/organizations.spec.ts",
-        "tests/e2e/dashboard-and-navigation.spec.ts"
+        "tests/e2e/api/organizations.spec.ts"
       ]
     },
     "/api/organizations/switch": {
@@ -1197,16 +1215,11 @@
         "tests/e2e/api/account.spec.ts"
       ]
     },
-    "/api/plans/request-upgrade": {
-      "status": "covered",
-      "specs": [
-        "tests/e2e/api/account.spec.ts"
-      ]
-    },
     "/api/portfolio/$claimId": {
       "status": "covered",
       "specs": [
-        "tests/e2e/admin-claims.spec.ts"
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/claimable-profiles.spec.ts"
       ]
     },
     "/api/privacy/profile-removal": {
@@ -1374,7 +1387,6 @@
     "/api/queries": {
       "status": "covered",
       "specs": [
-        "tests/e2e/dashboard-and-navigation.spec.ts",
         "tests/e2e/exports.spec.ts",
         "tests/e2e/onboarding.spec.ts"
       ]
@@ -1382,7 +1394,7 @@
     "/api/recommendations": {
       "status": "covered",
       "specs": [
-        "tests/e2e/dashboard-and-navigation.spec.ts"
+        "tests/e2e/dashboard-api.spec.ts"
       ]
     },
     "/api/roadmap": {
@@ -1559,10 +1571,6 @@
       "specs": [
         "tests/e2e/api/work-samples.spec.ts"
       ]
-    },
-    "/api/admin/access-requests": {
-      "status": "n/a",
-      "reason": "Platform-admin only, and the approve/reject/revoke journey it serves has no e2e spec yet because the public request form that feeds the queue is still unbuilt. Recorded as an exemption rather than a spec that only asserts 401s: the real proof is the request -> approve -> invite -> sign-up -> revoke journey, and that spec lands with the form. Unauthenticated 401/405 behaviour is covered by hand today (verified 2026-08-05) and the decision logic by unit tests in tests/unit/shared/lib/access-requests.test.ts."
     }
   }
 }

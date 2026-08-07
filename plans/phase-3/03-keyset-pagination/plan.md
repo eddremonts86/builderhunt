@@ -1,4 +1,4 @@
-# Plan — tenant-safe keyset pagination
+# Plan — scope-safe keyset pagination
 
 > **Status**: `implemented`
 > **Depends on**: [`02-table-query-contract`](../02-table-query-contract/spec.md)
@@ -12,7 +12,8 @@
 2. **`buildKeysetPage`** — id resolution, tuple predicate, tiebreaker, counts, facets.
 3. **Adversarial tests, before any endpoint exists.** Forged cursors, cross-tenant cursors,
    unknown ids, missing tenant context.
-4. **The request handler wrapper**, so no route hand-rolls auth + parse + transaction.
+4. **The four request adapters**, so tenant, account, platform and public routes cannot hand-roll
+   auth + parse + connection context or accidentally use the tenant guard for platform data.
 
 Step 3 comes before step 4 deliberately. The moment a handler exists the surface is reachable;
 the attacks should already be proven closed.
@@ -24,7 +25,7 @@ the attacks should already be proven closed.
 | A client-supplied id or value reaches SQL unparameterised | Low by design | **Critical** | Ids resolve only through `TableCapability`; values are bound parameters; a test asserts a quote-heavy filter value changes nothing structural about the generated SQL |
 | A forged cursor reads another organization's rows | Low | **Critical** | The signature covers the organization, and RLS is the second layer and forced — neither is trusted alone, per the security policy's two-layer rule |
 | Non-total sort order duplicates or drops rows at a page boundary | **High** without a tiebreaker | High — silently wrong lists | `tiebreaker` is required, not optional; capability construction fails without it |
-| `buildKeysetPage` used outside a tenant transaction | Medium | High | Throws when `app.organization_id` is unset rather than returning rows |
+| A capability runs in the wrong security scope | Medium | **Critical** | Capability declares scope; scope-specific adapters establish the exact context and reject every mismatch |
 | Counts triple the cost of every request | Medium | Medium | Facets opt-in; counts share the rows' transaction; approximate counts revisited only when a real table proves slow |
 
 ## Rollback
