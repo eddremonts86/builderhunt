@@ -1,6 +1,6 @@
 # Plan — migrate the platform content managers
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: Three UI files plus `src/shared/lib/blog.ts`. No migration, no index — the blog is file-backed and changelog/roadmap are small.

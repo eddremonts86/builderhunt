@@ -1,11 +1,16 @@
 // e2e test for status-and-trust plan
 // Run: node test-status-and-trust.mjs
-// Requires: dev server running on http://localhost:3000, admin user seeded
+// Requires: a dev server and a seeded admin user.
+//
+// The base URL is `REGRESSION_BASE_URL`, defaulting to the usual port. It was hardcoded, which is
+// fine with one checkout and wrong with two: a worktree runs its dev server on another port
+// precisely so the two do not fight, and this script would then have driven the *other* session's
+// app and reported on its data.
 
 import { chromium } from 'playwright'
 import { writeFileSync } from 'fs'
 
-const BASE = 'http://localhost:3000'
+const BASE = process.env.REGRESSION_BASE_URL ?? 'http://localhost:3000'
 const ADMIN_EMAIL = 'edd_admin@local.com'
 const ADMIN_PASSWORD = 'Passw0rd!234'
 
@@ -23,6 +28,23 @@ function check(name, cond, detail) {
     results.push(`  ❌ ${name}${detail ? ' — ' + detail : ''}`)
     console.log(`  ❌ ${name}${detail ? ' — ' + detail : ''}`)
   }
+}
+
+/**
+ * Pick an option from a Radix `Select`.
+ *
+ * `page.selectOption` only drives a native `<select>`. Both of these controls are Radix comboboxes
+ * — a `<button role="combobox">` that renders its options in a portal — so `selectOption` threw
+ * "Element is not a <select> element" and this script has been failing at the first one of them
+ * since before phase 3. It is wired into no package script and no workflow, which is how that went
+ * unnoticed.
+ */
+async function chooseOption(page, triggerTestId, optionLabel) {
+  await page.click(`[data-testid="${triggerTestId}"]`)
+  await page.waitForSelector('[role="option"]', { timeout: 3000 })
+  await page.click(`[role="option"]:has-text("${optionLabel}")`)
+  // The portal unmounts on select; waiting for that avoids the next click landing on the overlay.
+  await page.waitForSelector('[role="option"]', { state: 'detached', timeout: 3000 })
 }
 
 async function signIn(page, email, password) {
@@ -124,7 +146,7 @@ async function run() {
   await page.waitForSelector('[data-testid="admin-incident-form"]', { timeout: 3000 })
   await page.fill('[data-testid="admin-incident-title"]', 'E2E Test Incident — DB slow')
   await page.fill('[data-testid="admin-incident-description"]', 'Investigation triggered by automated e2e test')
-  await page.selectOption('[data-testid="admin-incident-severity"]', 'minor')
+  await chooseOption(page, 'admin-incident-severity', 'Minor')
   await page.click('[data-testid="admin-incident-component-database"]')
   await page.click('[data-testid="admin-incident-save"]')
   await page.waitForTimeout(1500)
@@ -192,7 +214,7 @@ async function run() {
   await page.waitForSelector('[data-testid="admin-roadmap-form"]', { timeout: 3000 })
   await page.fill('[data-testid="admin-roadmap-title"]', 'E2E Test Roadmap Item')
   await page.fill('[data-testid="admin-roadmap-description"]', 'A roadmap item added by automated e2e test')
-  await page.selectOption('[data-testid="admin-roadmap-status"]', 'planned')
+  await chooseOption(page, 'admin-roadmap-status', 'Planned')
   await page.fill('[data-testid="admin-roadmap-estimate"]', 'Q4 2026')
   await page.click('[data-testid="admin-roadmap-save"]')
   await page.waitForTimeout(1500)

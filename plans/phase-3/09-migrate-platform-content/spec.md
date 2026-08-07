@@ -1,6 +1,6 @@
 # Specification — migrate the platform content managers
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: `src/modules/admin/content/ChangelogManager.tsx` (348 lines), `RoadmapManager.tsx` (449 lines) and `BlogLibrary.tsx` render row lists with their own filters and status controls. `tests/regression/test-status-and-trust.mjs` **drives the changelog and roadmap managers by `data-testid`**. `BlogLibrary` reads the filesystem through `src/shared/lib/blog.ts`, not the database. Content is file-managed with deterministic ids (`content-changelog-*`, `content-roadmap-*`) synced by `scripts/db/sync-platform-content.ts`.
