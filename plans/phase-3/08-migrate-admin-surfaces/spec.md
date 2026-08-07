@@ -20,8 +20,19 @@ All seven on the shell, so the visible payoff of plans 02–07 arrives before th
 - **Redesigning what any of them shows.** Same columns, same actions, same data.
 - **New filters or sorts** beyond what each already offers, except where a column is trivially
   sortable and the index already exists.
-- **`HygieneCard`.** `src/shared/components/HygieneCard.tsx` contains table markup but is a
-  summary card, not a data grid. Audit it and, if it is not a grid, record that and leave it.
+- **`HygieneCard` — audited, and it is not a grid.** `src/shared/components/HygieneCard.tsx:199`
+  renders a four-column `<table>` of a builder's repositories (close rate, docs, CI) inside a
+  summary card. It is a static comparison table over a handful of already-analysed repos: it does
+  not grow with usage, has no sort, filter, selection or per-row action, and is read-only. `<table>`
+  is the correct element for exactly that, and an ARIA grid is not — a grid promises keyboard
+  traversal that would have nowhere to go. **Left alone.**
+
+- **`admin/plan-requests` — the surface no longer exists.** `plan_requests` was dropped on
+  2026-08-03 along with `plans` and `plan_changes` (`schema.ts:1058-1067`: the pre-organization
+  billing model, 0 rows, every new request already refused by
+  `LegacyPlanMutationDisabledError`). There is no route file. Its task was also where the plan
+  placed "the first genuine use of select-loaded plus a bulk action"; that demonstration now has no
+  host in this group, and `admin/access-requests` is the nearest live equivalent if it is wanted.
 
 ## Why this group first
 

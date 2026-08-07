@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { sprintResults } from '~/shared/lib/db/schema'
+// Imported for the side effect: a capability registers itself when its module is evaluated, so
+// without this the sweep below would pass by finding nothing at all.
+import '~/shared/lib/table/capabilities'
 import { defineTableCapability, TABLE_CAPABILITIES } from '~/shared/lib/table/capability'
 import {
   auditCapabilityIndexes,
@@ -36,10 +39,16 @@ const capability = defineTableCapability({
 
 describe('every registered capability', () => {
   /**
-   * Empty today — the first capability lands in plan 07. It is written as a sweep rather than as a
-   * list so that every later plan's capability is checked the day it is registered, without anyone
-   * remembering to add it here.
+   * A sweep rather than a list, so a capability is checked the day it is registered.
+   *
+   * It only sweeps what has been imported, which is why the barrel above is imported for its side
+   * effect — and why this asserts the registry is *not* empty. A guard that passes over zero tables
+   * is the most convincing kind of wrong.
    */
+  it('covers every registered capability', () => {
+    expect(Object.keys(TABLE_CAPABILITIES).length).toBeGreaterThan(0)
+  })
+
   it('has an index behind every sortable column', () => {
     const uncovered = Object.values(TABLE_CAPABILITIES).flatMap((registered) =>
       auditCapabilityIndexes(registered)

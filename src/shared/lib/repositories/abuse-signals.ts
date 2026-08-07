@@ -2,6 +2,9 @@ import { desc, eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb } from '../db/worker-db'
 import { abuseSignals } from '../db/schema'
+import { abuseSignalsCapability } from '../table/capabilities/abuse-signals'
+import { buildKeysetPage } from '../table/keyset'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 
 /**
  * System-operational, no RLS — `abuse_signals` has no owning subject (see
@@ -86,4 +89,41 @@ export async function listRecentAbuseSignals(
   return db.select().from(abuseSignals)
     .orderBy(desc(abuseSignals.createdAt))
     .limit(limit)
+}
+
+/**
+ * One keyset page of the same feed, for the console.
+ *
+ * `listRecentAbuseSignals` above stays for callers that want "the last N and nothing more" — it is
+ * bounded and correct for that. What it cannot do is page: `LIMIT 100` with no cursor means the
+ * console can only ever show the newest hundred signals, and an operator investigating an incident
+ * from last week has no way to reach it.
+ */
+export async function pageAbuseSignals(
+  query: TableQuery,
+  page: PageRequest,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<PageResult<AbuseSignalRecord>> {
+  return buildKeysetPage<AbuseSignalRecord>(db, abuseSignalsCapability, query, page, {
+    select: {
+      id: abuseSignals.id,
+      type: abuseSignals.type,
+      severity: abuseSignals.severity,
+      details: abuseSignals.details,
+      userId: abuseSignals.userId,
+      organizationId: abuseSignals.organizationId,
+      requestId: abuseSignals.requestId,
+      createdAt: abuseSignals.createdAt,
+    },
+    mapRow: (row) => ({
+      id: row.id as string,
+      type: row.type as string,
+      severity: row.severity as string,
+      details: (row.details ?? null) as Record<string, unknown> | null,
+      userId: (row.userId ?? null) as string | null,
+      organizationId: (row.organizationId ?? null) as string | null,
+      requestId: (row.requestId ?? null) as string | null,
+      createdAt: row.createdAt as Date,
+    }),
+  })
 }

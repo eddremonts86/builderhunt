@@ -624,6 +624,10 @@
     "0155_table_sort_indexes": {
       "sql": "a62a72534a3e44b4bf381b5818f0cd34db3279e1d0045f39a48d08a5f51ff13c",
       "snapshot": "2e9d7b41079513a0fc1a9f1b48f858f5ee379cdf2435c857506fb7f9c7c40ff8"
+    },
+    "0156_abuse_signals_keyset_indexes": {
+      "sql": "206e3d638771c065d2bb109ec52a77dec8073e3538f9069bb8a1590de548c8b7",
+      "snapshot": "de4cf867666052035bfb98ecc2c53382803cbdde6b2daf9768a5fcd51fad178c"
     }
   }
 }

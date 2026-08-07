@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 const mocks = vi.hoisted(() => ({
   requirePlatformAdminPrincipal: vi.fn(),
   auditPlatformAdminAction: vi.fn(),
-  listRecentAbuseSignals: vi.fn(),
+  pageAbuseSignals: vi.fn(),
   getAccountRisk: vi.fn(),
   withPlatformUser: vi.fn(),
   setAccountRiskStageByAdmin: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('~/shared/lib/auth/platform-admin', async (importOriginal) => {
 
 vi.mock('~/shared/lib/repositories/abuse-signals', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/lib/repositories/abuse-signals')>()
-  return { ...actual, listRecentAbuseSignals: mocks.listRecentAbuseSignals }
+  return { ...actual, pageAbuseSignals: mocks.pageAbuseSignals }
 })
 
 vi.mock('~/shared/lib/repositories/account-risk', async (importOriginal) => {
@@ -64,33 +64,54 @@ describe('GET /api/admin/abuse', () => {
     const response = await callHandler('GET', getRequest('https://app.test/api/admin/abuse'))
 
     expect(response.status).toBe(500) // generic Error, not PlatformAdminAuthorizationError, falls through to catch-all
-    expect(mocks.listRecentAbuseSignals).not.toHaveBeenCalled()
+    // The point of the assertion: authorization runs before anything reads. `platformTablePageHandler`
+    // authenticates before it even parses the search params, per `security:auth-before-validate`.
+    expect(mocks.pageAbuseSignals).not.toHaveBeenCalled()
   })
 
-  it('returns the recent signals with each user\'s current stage', async () => {
+  /**
+   * The feed is a `PageResult` now, and the stage rides on the row it belongs to rather than in a
+   * side map the client has to join. Phase 3 plan 08 moved this route onto the shared table shell.
+   */
+  it('returns a page of signals with each user\'s current stage on the row', async () => {
     mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
-    mocks.listRecentAbuseSignals.mockResolvedValue([
-      { id: 'sig-1', type: 'seat_overuse', severity: 'medium', userId: 'user-1', organizationId: null, requestId: 'req-a', details: {}, createdAt: new Date('2026-01-01') },
-      { id: 'sig-2', type: 'export_burst', severity: 'high', userId: null, organizationId: 'org-1', requestId: 'req-b', details: {}, createdAt: new Date('2026-01-02') },
-    ])
+    mocks.pageAbuseSignals.mockResolvedValue({
+      rows: [
+        { id: 'sig-1', type: 'seat_overuse', severity: 'medium', userId: 'user-1', organizationId: null, requestId: 'req-a', details: {}, createdAt: new Date('2026-01-01') },
+        { id: 'sig-2', type: 'export_burst', severity: 'high', userId: null, organizationId: 'org-1', requestId: 'req-b', details: {}, createdAt: new Date('2026-01-02') },
+      ],
+      nextCursor: null,
+      total: 2,
+      facets: {},
+    })
     mocks.getAccountRisk.mockResolvedValue({ userId: 'user-1', riskScore: 40, stage: 'warned', reason: 'concurrent_sessions', updatedAt: new Date('2026-01-01') })
 
     const response = await callHandler('GET', getRequest('https://app.test/api/admin/abuse'))
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data.signals).toHaveLength(2)
-    expect(data.stageByUserId['user-1']).toMatchObject({ stage: 'warned', riskScore: 40 })
+    expect(data.rows).toHaveLength(2)
+    expect(data.total).toBe(2)
+    expect(data.rows[0].stage).toMatchObject({ stage: 'warned', riskScore: 40 })
+    // The signal with no user gets a null stage rather than a lookup.
+    expect(data.rows[1].stage).toBeNull()
     expect(mocks.getAccountRisk).toHaveBeenCalledTimes(1) // only the one unique, non-null userId
   })
 
-  it('caps the limit query parameter at the maximum', async () => {
+  /**
+   * `?limit=` is gone. Page size is `TABLE_PAGE_SIZE`, clamped by the keyset builder — a client
+   * cannot widen its own page, which is why there is nothing left here to cap.
+   */
+  it('refuses an unknown sort id rather than absorbing it', async () => {
     mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
-    mocks.listRecentAbuseSignals.mockResolvedValue([])
+    mocks.pageAbuseSignals.mockRejectedValue(
+      new (await import('~/shared/lib/table/keyset')).TableQueryError('Unknown sort column: nope'),
+    )
 
-    await callHandler('GET', getRequest('https://app.test/api/admin/abuse?limit=99999'))
+    const response = await callHandler('GET', getRequest('https://app.test/api/admin/abuse?sort=nope:desc'))
 
-    expect(mocks.listRecentAbuseSignals).toHaveBeenCalledWith(200)
+    expect(response.status).toBe(400)
+    expect((await response.json()).error).toContain('Unknown sort column')
   })
 })
 

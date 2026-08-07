@@ -1,8 +1,24 @@
 import * as React from 'react'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui'
 import { ErrorState } from '~/shared/components/ErrorState'
+import { DataTable } from '~/shared/components/table'
+import { ABUSE_SIGNAL_FILTER_LABELS } from '~/shared/lib/table/capabilities/abuse-signals'
+import {
+  emptyTableSearch,
+  serializeTableSearch,
+  tableSearchToParams,
+} from '~/shared/lib/table/query-url'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import type { PageResult, TableQuery, TableSearch } from '~/shared/lib/table/types'
 
-interface AbuseSignalRow {
+interface StageInfo {
+  stage: string
+  riskScore: number
+  reason: string | null
+  updatedAt: string
+}
+
+interface AbuseSignalRow extends Record<string, unknown> {
   id: string
   type: string
   severity: string
@@ -11,14 +27,11 @@ interface AbuseSignalRow {
   organizationId: string | null
   requestId: string | null
   createdAt: string
+  /** The account's current enforcement stage, annotated onto the page by the route. */
+  stage: StageInfo | null
 }
 
-interface StageInfo {
-  stage: string
-  riskScore: number
-  reason: string | null
-  updatedAt: string
-}
+const EMPTY_PAGE: PageResult<AbuseSignalRow> = { rows: [], nextCursor: null, total: 0, facets: {} }
 
 interface AccountCluster {
   userIds: string[]
@@ -38,23 +51,28 @@ const ACTION_OPTIONS = [
  * cluster read model (its own pre-existing route from Phase 3) into one review surface, with
  * inline manual actions per account — same expand-a-row-no-modal pattern as `RefundQueue`. */
 export function AbuseConsole() {
-  const [signals, setSignals] = React.useState<AbuseSignalRow[] | null>(null)
-  const [stageByUserId, setStageByUserId] = React.useState<Record<string, StageInfo | null>>({})
+  const [page, setPage] = React.useState<PageResult<AbuseSignalRow>>(EMPTY_PAGE)
+  const [loaded, setLoaded] = React.useState(false)
+  // Table state is local rather than in the URL: the console is a component inside `/admin/abuse`,
+  // which owns its own search params. A surface that wants linkable table state passes
+  // `tableSearchSchema` to its route, as `sprints/$sprintId` does.
+  const [search, setSearch] = React.useState<TableSearch>(() => emptyTableSearch())
   const [clusters, setClusters] = React.useState<AccountCluster[] | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  const [actingSignalId, setActingSignalId] = React.useState<string | null>(null)
+  // No `actingSignalId`: which row is expanded is the shell's business now, and two components
+  // tracking it was how the old markup ended up with a second `<tr>` it had to keep in sync.
   const [action, setAction] = React.useState(ACTION_OPTIONS[0].value)
   const [reason, setReason] = React.useState('')
   const [saving, setSaving] = React.useState(false)
 
-  const load = React.useCallback(async () => {
+  const load = React.useCallback(async (next: TableSearch, append = false) => {
     setLoading(true)
     setError(null)
     try {
       const [feedRes, clustersRes] = await Promise.all([
-        fetch('/api/admin/abuse?limit=100', { credentials: 'include' }),
+        fetch(`/api/admin/abuse?${tableSearchToParams(next).toString()}`, { credentials: 'include' }),
         fetch('/api/admin/abuse/clusters', { credentials: 'include' }),
       ])
       const feedData = await feedRes.json()
@@ -63,17 +81,19 @@ export function AbuseConsole() {
         setError(feedData.error ?? 'Failed to load abuse signals')
         return
       }
-      setSignals(feedData.signals)
-      setStageByUserId(feedData.stageByUserId ?? {})
+      setPage((current) => append ? { ...feedData, rows: [...current.rows, ...feedData.rows] } : feedData)
+      setLoaded(true)
       if (clustersRes.ok) setClusters(clustersData.clusters)
     } finally {
       setLoading(false)
     }
   }, [])
 
+  const searchKey = JSON.stringify(serializeTableSearch(search))
   React.useEffect(() => {
-    void load()
-  }, [load])
+    void load(search)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKey])
 
   const submitAction = async (userId: string) => {
     setSaving(true)
@@ -90,13 +110,90 @@ export function AbuseConsole() {
         setError(data.error ?? 'Failed to record action')
         return
       }
-      setActingSignalId(null)
       setReason('')
-      await load()
+      await load(search)
     } finally {
       setSaving(false)
     }
   }
+
+  /**
+   * The per-account action form, in the row's expansion slot.
+   *
+   * It was a second `<tr colSpan={6}>` under the row before — the "expand a row, no modal" pattern
+   * `RefundQueue` established. The shell's `expansion` slot is the same idea with the ARIA row
+   * bookkeeping done for it.
+   */
+  const renderAccountAction = (row: AbuseSignalRow) => (
+    <div className="space-y-3">
+      <div>
+        <Label htmlFor="abuse-action-select">Action</Label>
+        <Select value={action} onValueChange={setAction}>
+          <SelectTrigger id="abuse-action-select" data-testid="abuse-account-action-select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ACTION_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="abuse-action-reason">Reason (optional)</Label>
+        <Input
+          id="abuse-action-reason"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          data-testid="abuse-account-action-reason"
+        />
+      </div>
+      <Button
+        onClick={() => void submitAction(row.userId!)}
+        disabled={saving}
+        data-testid={`abuse-account-action-submit-${row.userId}`}
+      >
+        {saving ? 'Saving…' : 'Apply action'}
+      </Button>
+    </div>
+  )
+
+  const columns = React.useMemo<ColumnDef<AbuseSignalRow>[]>(() => [
+    {
+      id: 'type',
+      header: 'Type',
+      sortable: true,
+      groupable: true,
+      priority: 'primary',
+      value: (row) => row.type,
+      cell: (row) => row.type,
+    },
+    { id: 'severity', header: 'Severity', value: (row) => row.severity, cell: (row) => row.severity },
+    {
+      id: 'user',
+      header: 'User',
+      priority: 'secondary',
+      value: (row) => row.userId,
+      // Deliberately not a monospace face: DESIGN.md:221 reserves it for literal code and keys, and
+      // an opaque id rendered in a table column is neither. `truncate` does the alignment work.
+      cell: (row) => <span className="truncate text-xs">{row.userId ?? '—'}</span>,
+    },
+    {
+      id: 'stage',
+      header: 'Stage',
+      priority: 'secondary',
+      value: (row) => row.stage?.stage ?? null,
+      cell: (row) => row.stage?.stage ?? '—',
+    },
+    {
+      id: 'createdAt',
+      header: 'Created',
+      sortable: true,
+      align: 'end',
+      value: (row) => row.createdAt,
+      cell: (row) => new Date(row.createdAt).toLocaleString(),
+    },
+  ], [])
 
   return (
     <div data-testid="abuse-console" className="space-y-8">
@@ -113,87 +210,37 @@ export function AbuseConsole() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recent abuse signals</h2>
-          <Button variant="secondary" onClick={load} disabled={loading} data-testid="abuse-console-refresh">
+          <Button variant="secondary" onClick={() => void load(search)} disabled={loading} data-testid="abuse-console-refresh">
             {loading ? 'Loading…' : 'Refresh'}
           </Button>
         </div>
 
-        {signals && signals.length === 0 && <p className="text-sm text-bh-text-muted">No abuse signals recorded.</p>}
-
-        {signals && signals.length > 0 && (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Abuse signals table, scrollable">
-            <table className="w-full text-sm" data-testid="abuse-signals-table">
-              <thead>
-                <tr className="text-left text-bh-text-dim border-b border-bh-border">
-                  <th className="py-2">Type</th>
-                  <th className="py-2">Severity</th>
-                  <th className="py-2">User</th>
-                  <th className="py-2">Stage</th>
-                  <th className="py-2">Created</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {signals.map((signal) => {
-                  const stageInfo = signal.userId ? stageByUserId[signal.userId] : null
-                  return (
-                    <React.Fragment key={signal.id}>
-                      <tr className="border-b border-bh-border/50" data-testid={`abuse-signal-row-${signal.id}`}>
-                        <td className="py-2">{signal.type}</td>
-                        <td className="py-2">{signal.severity}</td>
-                        <td className="py-2 font-mono text-xs">{signal.userId ?? '—'}</td>
-                        <td className="py-2">{stageInfo?.stage ?? '—'}</td>
-                        <td className="py-2">{new Date(signal.createdAt).toLocaleString()}</td>
-                        <td className="py-2 text-right">
-                          {signal.userId && (
-                            <Button
-                              variant="secondary"
-                              onClick={() => {
-                                setActingSignalId(actingSignalId === signal.id ? null : signal.id)
-                                setReason('')
-                              }}
-                              data-testid={`abuse-account-action-toggle-${signal.userId}`}
-                            >
-                              Act on account
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                      {signal.userId && actingSignalId === signal.id && (
-                        <tr>
-                          <td colSpan={6} className="py-3">
-                            <div className="card p-3 space-y-3">
-                              <div>
-                                <Label htmlFor="abuse-action-select">Action</Label>
-                                <Select value={action} onValueChange={setAction}>
-                                  <SelectTrigger id="abuse-action-select" data-testid="abuse-account-action-select">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ACTION_OPTIONS.map((opt) => (
-                                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label htmlFor="abuse-action-reason">Reason (optional)</Label>
-                                <Input id="abuse-action-reason" value={reason} onChange={(e) => setReason(e.target.value)} data-testid="abuse-account-action-reason" />
-                              </div>
-                              <Button onClick={() => submitAction(signal.userId!)} disabled={saving} data-testid="abuse-account-action-submit">
-                                {saving ? 'Saving…' : 'Apply action'}
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          label="Recent abuse signals"
+          columns={columns}
+          page={page}
+          query={search.query}
+          onQueryChange={(query: TableQuery) => setSearch((current) => ({
+            ...current,
+            query,
+            // A cursor is bound to the sort it was minted for, so a query change starts over.
+            page: { ...current.page, cursor: null },
+          }))}
+          rowTestId={(row) => `abuse-signal-row-${row.id}`}
+          status={loading && !loaded ? 'loading' : error ? 'error' : 'ready'}
+          error={{ message: error ?? '', onRetry: () => void load(search) }}
+          onLoadMore={() => {
+            if (!page.nextCursor || loading) return
+            void load({ ...search, page: { ...search.page, cursor: page.nextCursor } }, true)
+          }}
+          filterLabels={ABUSE_SIGNAL_FILTER_LABELS}
+          expansion={(row) => row.userId ? renderAccountAction(row) : null}
+          emptyState={(
+            <div className="px-4 py-12 text-center text-sm text-bh-text-muted" data-testid="abuse-signals-empty">
+              No abuse signals recorded.
+            </div>
+          )}
+        />
       </section>
 
       <section className="space-y-3">
@@ -219,7 +266,6 @@ export function AbuseConsole() {
         )}
       </section>
 
-      {loading && !signals && <p className="text-sm text-bh-text-muted">Loading…</p>}
     </div>
   )
 }

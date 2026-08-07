@@ -19,8 +19,22 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/**
+ * The feed is a `PageResult` now, and each row carries its own `stage`.
+ *
+ * It used to be `{ signals, stageByUserId }` — a flat array plus a side map the component joined.
+ * Phase 3 moved the console onto the shared table shell, so the route answers rows/nextCursor/
+ * total/facets like every other paged surface and annotates the stage onto the row it belongs to.
+ */
 function feedResponse(signals: unknown[], stageByUserId: Record<string, unknown>) {
-  return new Response(JSON.stringify({ signals, stageByUserId }), { status: 200 })
+  const rows = signals.map((signal) => ({
+    ...(signal as Record<string, unknown>),
+    stage: stageByUserId[(signal as { userId?: string }).userId ?? ''] ?? null,
+  }))
+  return new Response(
+    JSON.stringify({ rows, nextCursor: null, total: rows.length, facets: {} }),
+    { status: 200 },
+  )
 }
 
 function clustersResponse(clusters: unknown[]) {
@@ -55,10 +69,13 @@ describe('AbuseConsole', () => {
     vi.stubGlobal('fetch', fetchMock)
     await mount()
 
-    const table = document.querySelector('[data-testid="abuse-signals-table"]')
-    expect(table).not.toBeNull()
-    expect(table?.textContent).toContain('seat_overuse')
-    expect(table?.textContent).toContain('warned')
+    // The ARIA grid replaced the `<table>`; the row test id is unchanged, which is the point of
+    // `rowTestId` being a required prop.
+    const grid = document.querySelector('[role="grid"]')
+    expect(grid).not.toBeNull()
+    expect(document.querySelector('[data-testid="abuse-signal-row-sig-1"]')).not.toBeNull()
+    expect(grid?.textContent).toContain('seat_overuse')
+    expect(grid?.textContent).toContain('warned')
   })
 
   it('shows an empty state when there are no signals or clusters', async () => {
@@ -102,10 +119,12 @@ describe('AbuseConsole', () => {
     vi.stubGlobal('fetch', fetchMock)
     await mount()
 
-    const toggle = document.querySelector<HTMLButtonElement>('[data-testid="abuse-account-action-toggle-user-1"]')!
+    // The row's own expand control, provided by the shell, replaced the hand-rolled toggle — the
+    // per-row form itself is unchanged and still lives in the expansion slot.
+    const toggle = document.querySelector<HTMLButtonElement>('[data-testid="abuse-signal-row-sig-1-expand"]')!
     await act(async () => { toggle.click() })
 
-    const submit = document.querySelector<HTMLButtonElement>('[data-testid="abuse-account-action-submit"]')!
+    const submit = document.querySelector<HTMLButtonElement>('[data-testid="abuse-account-action-submit-user-1"]')!
     expect(submit).not.toBeNull()
 
     await act(async () => {

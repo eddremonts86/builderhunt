@@ -2146,6 +2146,12 @@ export const abuseSignals = pgTable(
     index('abuse_signals_user_id_created_idx').on(table.userId, table.createdAt),
     index('abuse_signals_organization_id_created_idx').on(table.organizationId, table.createdAt),
     index('abuse_signals_type_created_idx').on(table.type, table.createdAt),
+    // Keyset sort indexes for the admin console (phase 3, plan 08). The three above cannot serve
+    // it: each leads with a column the console does not filter by, and none trails the tiebreaker,
+    // so the planner sorts the whole feed to return fifty rows. They are kept — the per-user and
+    // per-organization lookups they exist for still use them.
+    index('abuse_signals_created_id_idx').on(table.createdAt, table.id),
+    index('abuse_signals_type_created_id_idx').on(table.type, table.id),
     check(
       'abuse_signals_type_check',
       sql`${table.type} in (

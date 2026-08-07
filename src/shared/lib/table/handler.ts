@@ -80,6 +80,52 @@ export async function tablePageHandler<Row>(
   }
 }
 
+export interface PlatformTablePageContext {
+  search: TableSearch
+  request: Request
+}
+
+export interface PlatformTablePageHandlerOptions<Row> {
+  capability: TableCapability
+  request: Request
+  load: (context: PlatformTablePageContext) => Promise<PageResult<Row>>
+}
+
+/**
+ * The same sequence for a platform-admin table.
+ *
+ * Admin consoles read global tables — `abuse_signals` has no `organization_id` to scope by, and
+ * putting one there would be wrong: the console's job is to see across tenants. So there is no
+ * `withTenantContext` here, and the capability carries no `organizationColumn`, which is what makes
+ * `buildKeysetPage` skip the tenant predicate rather than silently filter by an empty setting.
+ *
+ * The authorization is `requirePlatformAdminPrincipal`, and it still runs before the parse.
+ */
+export async function platformTablePageHandler<Row>(
+  options: PlatformTablePageHandlerOptions<Row>,
+): Promise<Response> {
+  try {
+    const { requirePlatformAdminPrincipal } = await import('~/shared/lib/auth/platform-admin')
+    await requirePlatformAdminPrincipal(options.request)
+
+    const url = new URL(options.request.url)
+    const search = tableSearchSchema(searchParamsToRecord(url.searchParams))
+    return Response.json(await options.load({ search, request: options.request }))
+  } catch (error) {
+    if (error instanceof TableQueryError || error instanceof TableCursorError) {
+      return Response.json({ error: error.message }, { status: 400 })
+    }
+    if (error instanceof TablePageError) {
+      return Response.json({ error: error.message }, { status: error.status })
+    }
+    const { platformAdminErrorResponse } = await import('~/shared/lib/auth/platform-admin')
+    const denied = platformAdminErrorResponse(error)
+    if (denied) return denied
+    console.error(`Platform table page error (${options.capability.table}):`, error)
+    return Response.json({ error: 'Failed to load page' }, { status: 500 })
+  }
+}
+
 /** `URLSearchParams` → the record shape `tableSearchSchema` reads, repeated keys as arrays. */
 export function searchParamsToRecord(params: URLSearchParams): Record<string, unknown> {
   const record: Record<string, unknown> = {}
