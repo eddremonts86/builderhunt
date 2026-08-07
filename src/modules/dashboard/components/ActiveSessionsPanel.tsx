@@ -2,8 +2,12 @@ import * as React from 'react'
 import { Laptop, LogOut, ShieldAlert, Sparkles } from 'lucide-react'
 import { authClient } from '~/shared/lib/auth/client'
 import { Button } from '~/components/ui'
+import { DataTable } from '~/shared/components/table'
+import { emptyTableSearch } from '~/shared/lib/table/query-url'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import type { PageResult } from '~/shared/lib/table/types'
 
-export interface ActiveSessionEntry {
+export interface ActiveSessionEntry extends Record<string, unknown> {
   id: string
   token: string
   isCurrent: boolean
@@ -97,18 +101,94 @@ export function ActiveSessionsPanel() {
     }
   }
 
+  /**
+   * A page that is always the whole list.
+   *
+   * Sessions are model-bounded — a person has as many as they have devices — so there is no cursor
+   * and no keyset endpoint. The shell renders a `PageResult` it is handed, and for a bounded list
+   * one page is the last page: `nextCursor: null`, `total` the length. That is the cheap form of
+   * this migration, and it is the honest one; inventing pagination here would be machinery for a
+   * list that cannot grow.
+   */
+  const page: PageResult<ActiveSessionEntry> = React.useMemo(() => ({
+    rows: sessions ?? [],
+    nextCursor: null,
+    total: sessions?.length ?? 0,
+    facets: {},
+  }), [sessions])
+
+  const columns = React.useMemo<ColumnDef<ActiveSessionEntry>[]>(() => [
+    {
+      id: 'device',
+      header: 'Device',
+      priority: 'primary',
+      value: (entry) => deviceLabel(entry),
+      cell: (entry) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-medium">{deviceLabel(entry)}</span>
+          {entry.isCurrent && (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-bh-success" data-testid="current-session-badge">
+              This device
+            </span>
+          )}
+          {entry.isNewDevice && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-bh-accent" data-testid="new-device-badge">
+              <Sparkles className="h-3 w-3" aria-hidden="true" />
+              New
+            </span>
+          )}
+          {entry.trustState === 'flagged' && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-bh-danger" data-testid="flagged-device-badge">
+              <ShieldAlert className="h-3 w-3" aria-hidden="true" />
+              Flagged
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: 'lastActive',
+      header: 'Last active',
+      align: 'end',
+      priority: 'secondary',
+      value: (entry) => entry.lastActiveAt,
+      cell: (entry) => relativeTime(entry.lastActiveAt),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      align: 'end',
+      priority: 'secondary',
+      // Per-row, and it stays per-row: revoking a session is not a bulk operation, and a
+      // multi-select over "which of my devices to sign out" is a worse affordance than a button.
+      cell: (entry) => entry.isCurrent ? null : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => void signOutSession(entry.token)}
+          disabled={busyToken === entry.token}
+          className="shrink-0"
+          data-testid={`sign-out-btn-${entry.id}`}
+        >
+          {busyToken === entry.token ? 'Signing out…' : 'Sign out'}
+        </Button>
+      ),
+    },
+  ], [busyToken])
+
   return (
     <section className="card p-5" data-testid="active-sessions-panel">
       {/* `flex-wrap`: "Sign out everywhere else" is a long label on a `shrink-0` button, which pushed the
           document 32px past a 320px viewport. It drops below the heading there and sits beside it everywhere
           else — `shrink-0` stays, because squeezing that particular label is worse than moving it. */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="font-semibold flex items-center gap-2">
-            <Laptop className="w-4 h-4 text-bh-accent" aria-hidden="true" />
+          <h2 className="flex items-center gap-2 font-semibold">
+            <Laptop className="h-4 w-4 text-bh-accent" aria-hidden="true" />
             Active sessions
           </h2>
-          <p className="text-sm text-bh-text-muted mt-1">
+          <p className="mt-1 text-sm text-bh-text-muted">
             Devices currently signed in to your account.
           </p>
         </div>
@@ -122,74 +202,31 @@ export function ActiveSessionsPanel() {
             className="shrink-0"
             data-testid="sign-out-others-btn"
           >
-            <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+            <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
             {busyAll ? 'Signing out…' : 'Sign out everywhere else'}
           </Button>
         )}
       </div>
 
       {error && (
-        <div className="text-sm text-bh-danger mb-3" data-testid="active-sessions-error">{error}</div>
+        <div className="mb-3 text-sm text-bh-danger" data-testid="active-sessions-error">{error}</div>
       )}
 
-      {!sessions && !error && (
-        <p className="text-sm text-bh-text-muted" data-testid="active-sessions-loading">Loading…</p>
-      )}
-
-      {sessions && sessions.length === 0 && (
-        <p className="text-sm text-bh-text-muted" data-testid="active-sessions-empty">No active sessions.</p>
-      )}
-
-      {sessions && sessions.length > 0 && (
-        <ul className="space-y-2" data-testid="active-sessions-list">
-          {sessions.map((entry) => (
-            <li
-              key={entry.id}
-              className="flex items-center justify-between gap-3 py-2 border-b border-bh-border/40 last:border-b-0"
-              data-testid={`session-row-${entry.id}`}
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-medium text-bh-text">
-                  {deviceLabel(entry)}
-                  {entry.isCurrent && (
-                    <span className="text-[10px] uppercase tracking-wider font-bold text-bh-success" data-testid="current-session-badge">
-                      This device
-                    </span>
-                  )}
-                  {entry.isNewDevice && (
-                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-bh-accent" data-testid="new-device-badge">
-                      <Sparkles className="w-3 h-3" aria-hidden="true" />
-                      New
-                    </span>
-                  )}
-                  {entry.trustState === 'flagged' && (
-                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-bh-danger" data-testid="flagged-device-badge">
-                      <ShieldAlert className="w-3 h-3" aria-hidden="true" />
-                      Flagged
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-bh-text-muted">
-                  Last active {relativeTime(entry.lastActiveAt)}
-                </p>
-              </div>
-              {!entry.isCurrent && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => signOutSession(entry.token)}
-                  disabled={busyToken === entry.token}
-                  className="shrink-0"
-                  data-testid={`sign-out-btn-${entry.id}`}
-                >
-                  {busyToken === entry.token ? 'Signing out…' : 'Sign out'}
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <DataTable
+        label="Active sessions"
+        columns={columns}
+        page={page}
+        query={emptyTableSearch().query}
+        // Nothing to change: no column is sortable, filterable or groupable on a list this size.
+        onQueryChange={() => {}}
+        rowTestId={(entry) => `session-row-${entry.id}`}
+        status={!sessions && !error ? 'loading' : 'ready'}
+        emptyState={(
+          <div className="px-4 py-8 text-center text-sm text-bh-text-muted" data-testid="active-sessions-empty">
+            No active sessions.
+          </div>
+        )}
+      />
     </section>
   )
 }
