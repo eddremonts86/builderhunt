@@ -98,6 +98,35 @@ Verification rejects a mismatched table, sort descriptor, or organization. A rej
 - `grep -rn 'perPage\|limit: 30' src` still shows the old call sites; this plan does not touch
   them, and plan 13 asserts they are gone.
 
+## Frozen after plan 07 (2026-08-07)
+
+Proven against a real surface — sprint results, 214 rows, real keyset pages in a browser — and
+frozen for plans 08–12. Three things the first caller changed, all recorded here so the next reader
+knows the fixture-era shape is gone:
+
+1. **`validateSearch` returns the flat params, not a parsed `TableSearch`.** TanStack Router
+   re-serializes whatever `validateSearch` returns, so returning the parsed object put
+   `?query=%7B%22search%22…%7D` in the address bar. `pickTableSearchParams` was added; the component
+   calls `tableSearchSchema` itself. The readable URL survives.
+2. **Single-value filters serialize as a plain string.** `?filter.country=Japan` rather than
+   `?filter.country=["Japan"]`, because the router JSON-encodes arrays and one-value filters are
+   the overwhelming majority. The API request URL still uses repeated params, which is what the
+   server reads.
+3. **`ColumnRef` — a filterable value that is not a column.** `profile->>'country'` is a jsonb key,
+   and the location facet this surface has always shown is computed from it. Filtering and grouping
+   only; a sortable expression would need an expression index, and the sort-index guard matches by
+   column name, so it would report the sort as backed when nothing backs it.
+
+Two gaps the contract still does not close, both deliberate:
+
+- **No range filters.** `TableQuery.filters` is set membership. Sprint results' "minimum followers"
+  threshold is a surface-owned parameter that reaches SQL through `KeysetPageOptions.scope`. Growing
+  the shared contract a range operator for one table is how a contract ends up shaped by its first
+  caller — the thing this plan exists to avoid.
+- **One search term, not a keyword list.** The AI refiner returns keywords with OR semantics; they
+  are joined into the single `search` term. That is the one behaviour the sprint-results migration
+  does not reproduce exactly, and it is named in plan 07's tasks rather than left to be discovered.
+
 ## Resolved edge cases
 
 - **No cursor.** `cursor: null` means page one; the sort comes from the capability's default.

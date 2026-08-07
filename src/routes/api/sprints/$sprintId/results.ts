@@ -1,32 +1,44 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
-import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
-import { withTenantContext } from '~/shared/lib/db/tenant-context'
+
+import { annotateTrackedResults } from '~/lib/sprints/results'
+import { findSprint, pageSprintResults } from '~/lib/sprints/service'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
+import { sprintResultsCapability } from '~/shared/lib/table/capabilities/sprint-results'
+import { tablePageHandler, TablePageError } from '~/shared/lib/table/handler'
 import { getTrackedKeySet } from '~/shared/lib/tracked-builders'
-import { SOURCE_NAMES } from '~/lib/sources/types'
-import { findSprint, listSprintResults } from '~/lib/sprints/service'
-import {
-  annotateTrackedResults,
-  computeLocationFacets,
-  filterSprintResults,
-  sortSprintResults,
-  type SprintResultRow,
-} from '~/lib/sprints/results'
 
-const QuerySchema = z.object({
-  cursor: z.coerce.number().int().min(0).default(0),
-  limit: z.coerce.number().int().min(1).max(100).default(30),
-  sort: z.enum(['score', 'date']).default('score'),
-  keywords: z.string().optional(),
-  sources: z.string().optional(),
-  country: z.string().optional(),
-  minFollowers: z.coerce.number().int().optional(),
+/**
+ * One page of a sprint's results.
+ *
+ * ## What this used to do
+ *
+ * Read every result for the sprint, then filter, sort and slice them in Node behind a base64
+ * *offset* it called a cursor. Three problems, in increasing order of how long they take to notice:
+ * it costs O(all results) per request; the offset shifts under concurrent inserts, so a row
+ * inserted mid-paging is served twice or skipped; and "sorted by score" meant sorted within
+ * whatever slice happened to be loaded.
+ *
+ * Filtering, sorting, grouping, counting and faceting now all happen in Postgres, through the one
+ * keyset builder.
+ *
+ * ## The two cursors in this feature
+ *
+ * `sprint.cursor` is **sourcing progress** — which variant and page the worker has reached. It
+ * feeds a progress bar and is untouched here. `PageRequest.cursor` is pagination. They are
+ * unrelated, and the names are kept distinct so a later reader does not conflate them.
+ */
+
+/**
+ * The one filter the shared table contract cannot express.
+ *
+ * `TableQuery.filters` models set membership. A minimum-followers threshold is a range, and growing
+ * the shared contract a range operator for one surface is how a contract ends up shaped by its
+ * first caller. So the surface owns this parameter: validated here, bound as a parameter there.
+ */
+const SurfaceParams = z.object({
+  minFollowers: z.coerce.number().int().min(0).max(100_000_000).optional(),
 })
-
-function encodeCursor(offset: number): string {
-  return Buffer.from(String(offset), 'utf8').toString('base64')
-}
 
 export const Route = createFileRoute('/api/sprints/$sprintId/results')({
   component: () => null,
@@ -35,71 +47,32 @@ export const Route = createFileRoute('/api/sprints/$sprintId/results')({
       // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
       ANY: methodNotAllowed(['GET']),
 
-      GET: async ({ request, params }) => {
-        try {
-          const principal = await requireTenantPrincipal(request)
-          const url = new URL(request.url)
-          const rawCursor = url.searchParams.get('cursor')
-          const decodedCursor = rawCursor ? Number(Buffer.from(rawCursor, 'base64').toString('utf8')) : 0
-          if (rawCursor && (!Number.isInteger(decodedCursor) || decodedCursor < 0)) {
-            return Response.json({ error: 'Invalid cursor' }, { status: 400 })
-          }
+      GET: async ({ request, params }) => tablePageHandler({
+        capability: sprintResultsCapability,
+        request,
+        load: async ({ principal, transaction, search }) => {
+          const sprint = await findSprint(transaction, principal.organizationId, params.sprintId)
+          if (!sprint) throw new TablePageError(404, 'Sprint not found')
 
-          const parsedQuery = QuerySchema.omit({ cursor: true }).safeParse(Object.fromEntries(url.searchParams))
-          if (!parsedQuery.success) {
-            return Response.json({ error: 'Invalid query', details: parsedQuery.error.flatten() }, { status: 400 })
-          }
-          const sourcesFilter = parsedQuery.data.sources
-            ?.split(',')
-            .map((value) => value.trim())
-            .filter((value): value is (typeof SOURCE_NAMES)[number] => (SOURCE_NAMES as readonly string[]).includes(value))
-          if (parsedQuery.data.sources && (!sourcesFilter || sourcesFilter.length === 0)) {
-            return Response.json({ error: 'Invalid source filter' }, { status: 400 })
-          }
-          const filter = {
-            keywords: parsedQuery.data.keywords?.split(',').map((value) => value.trim()).filter(Boolean) ?? [],
-            sources: sourcesFilter,
-            country: parsedQuery.data.country,
-            minFollowers: parsedQuery.data.minFollowers,
-          }
+          const surface = SurfaceParams.safeParse(
+            Object.fromEntries(new URL(request.url).searchParams),
+          )
+          if (!surface.success) throw new TablePageError(400, 'Invalid minFollowers')
 
-          const { sprint, rows } = await withTenantContext(principal, async (tx) => {
-            const sprintRecord = await findSprint(tx, principal.organizationId, params.sprintId)
-            if (!sprintRecord) return { sprint: null, rows: [] as SprintResultRow[] }
-            const records = await listSprintResults(tx, principal.organizationId, params.sprintId)
-            return {
-              sprint: sprintRecord,
-              rows: records.map((record): SprintResultRow => ({
-                id: record.id,
-                source: record.source,
-                sourceId: record.sourceId,
-                profile: record.profile as SprintResultRow['profile'],
-                matchedVariant: record.matchedVariant,
-                score: record.score,
-                createdAt: record.createdAt.toISOString(),
-              })),
-            }
+          const page = await pageSprintResults(transaction, {
+            sprintId: params.sprintId,
+            query: search.query,
+            page: search.page,
+            minFollowers: surface.data.minFollowers,
           })
-          if (!sprint) return Response.json({ error: 'Sprint not found' }, { status: 404 })
 
-          const facets = computeLocationFacets(rows.map((row) => row.profile))
-          const filtered = sortSprintResults(filterSprintResults(rows, filter), parsedQuery.data.sort)
-          const page = filtered.slice(decodedCursor, decodedCursor + parsedQuery.data.limit)
-          const nextOffset = decodedCursor + page.length
-          const nextCursor = nextOffset < filtered.length ? encodeCursor(nextOffset) : null
-
-          const trackedKeySet = await withTenantContext(principal, (tx) => getTrackedKeySet(tx, principal.organizationId))
-          const items = annotateTrackedResults(page, trackedKeySet)
-
-          return Response.json({ items, nextCursor, facets, total: filtered.length })
-        } catch (error) {
-          if (error instanceof TenantAuthorizationError) {
-            return Response.json({ error: error.message }, { status: error.status })
-          }
-          console.error('Sprint results error:', error)
-          return Response.json({ error: 'Failed to fetch sprint results' }, { status: 500 })
-        }
-      },
+          // `tracked` is the viewer's own state, never a persisted per-row column — the same
+          // convention `/api/search/builders` uses. It annotates the page, so it costs one read
+          // per request rather than one per row.
+          const trackedKeySet = await getTrackedKeySet(transaction, principal.organizationId)
+          return { ...page, rows: annotateTrackedResults(page.rows, trackedKeySet) }
+        },
+      }),
     },
   },
 })

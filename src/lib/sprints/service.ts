@@ -3,10 +3,14 @@
 // an explicit `organizationId` and scopes every query by it (defense in
 // depth alongside the composite FK), matching the `organization-alerts.ts`
 // convention. No cross-organization access is possible through this module.
-import { and, count, desc, eq, sql } from 'drizzle-orm'
+import { and, count, desc, eq, sql, type SQL } from 'drizzle-orm'
 import type { TenantTransaction } from '~/shared/lib/db/client'
 import { randomId } from '~/lib/utils'
+import type { SprintResultRow } from '~/lib/sprints/results'
 import { sourcingSprints, sprintResults } from '~/shared/lib/db/schema'
+import { sprintResultsCapability } from '~/shared/lib/table/capabilities/sprint-results'
+import { buildKeysetPage } from '~/shared/lib/table/keyset'
+import type { PageRequest, PageResult, TableQuery } from '~/shared/lib/table/types'
 import {
   DEFAULT_SPRINT_QUOTA,
   type CreateSprintInput,
@@ -201,22 +205,60 @@ export async function countSprintResults(transaction: TenantTransaction, organiz
   return row?.value ?? 0
 }
 
-export async function listSprintResults(
+export interface SprintResultPageOptions {
+  sprintId: string
+  query: TableQuery
+  page: PageRequest
+  /**
+   * Minimum follower count, from the surface's own control.
+   *
+   * Not part of `TableQuery`, which models set-membership filters. It is parsed and validated by
+   * the route, and reaches SQL as a bound parameter inside a `scope` predicate — see
+   * `KeysetPageOptions.scope`.
+   */
+  minFollowers?: number
+}
+
+/**
+ * One page of a sprint's results, ordered, filtered and counted by Postgres.
+ *
+ * Replaces `listSprintResults`, which read every row for a sprint and left the route to filter,
+ * sort and slice them in memory behind a base64 *offset* it called a cursor. That worked because
+ * sprints are small today; it is O(all results) per request, and the slice moved under concurrent
+ * inserts, so a row could appear on two pages or on none.
+ */
+export async function pageSprintResults(
   transaction: TenantTransaction,
-  organizationId: string,
-  sprintId: string,
-): Promise<SprintResultRecord[]> {
-  const rows = await transaction.select().from(sprintResults)
-    .where(and(eq(sprintResults.organizationId, organizationId), eq(sprintResults.sprintId, sprintId)))
-    .orderBy(desc(sprintResults.createdAt))
-  return rows.map((row) => ({
-    id: row.id,
-    sprintId: row.sprintId,
-    source: row.source,
-    sourceId: row.sourceId,
-    profile: row.profile as Record<string, unknown>,
-    matchedVariant: row.matchedVariant,
-    score: row.score,
-    createdAt: row.createdAt,
-  }))
+  options: SprintResultPageOptions,
+): Promise<PageResult<SprintResultRow>> {
+  const scope: SQL[] = [eq(sprintResults.sprintId, options.sprintId)]
+  if (options.minFollowers !== undefined) {
+    // `followersCount` lives in the profile document. Cast before comparing, or Postgres compares
+    // text and "9" sorts above "10".
+    scope.push(sql`coalesce((${sprintResults.profile}->>'followersCount')::int, 0) >= ${options.minFollowers}`)
+  }
+
+  return buildKeysetPage<SprintResultRow>(transaction, sprintResultsCapability, options.query, options.page, {
+    scope,
+    select: {
+      id: sprintResults.id,
+      source: sprintResults.source,
+      sourceId: sprintResults.sourceId,
+      profile: sprintResults.profile,
+      matchedVariant: sprintResults.matchedVariant,
+      score: sprintResults.score,
+      createdAt: sprintResults.createdAt,
+    },
+    // The explicit field allowlist the output-minimisation rule asks for: named here, never a raw
+    // ORM row handed to `Response.json`.
+    mapRow: (row) => ({
+      id: row.id as string,
+      source: row.source as string,
+      sourceId: row.sourceId as string,
+      profile: row.profile as SprintResultRow['profile'],
+      matchedVariant: row.matchedVariant as string,
+      score: row.score as number,
+      createdAt: (row.createdAt as Date).toISOString(),
+    }),
+  })
 }

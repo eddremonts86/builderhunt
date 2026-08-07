@@ -22,6 +22,21 @@ import type { PageResult, TableSearch } from './types'
  * out of reach.
  */
 
+/**
+ * A failure the surface's own `load` wants to answer with a specific status.
+ *
+ * A sprint that does not exist is a 404, not a 500 — but `load` runs inside the handler, so it
+ * needs a way to say so that is distinguishable from "something went wrong". Anything else thrown
+ * is a 500 with a generic message, because an unexpected error's text is not a thing to hand to a
+ * caller.
+ */
+export class TablePageError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+    this.name = 'TablePageError'
+  }
+}
+
 export interface TablePageContext {
   principal: TenantPrincipal
   transaction: TenantTransaction
@@ -56,6 +71,9 @@ export async function tablePageHandler<Row>(
     }
     if (error instanceof TableQueryError || error instanceof TableCursorError) {
       return Response.json({ error: error.message }, { status: 400 })
+    }
+    if (error instanceof TablePageError) {
+      return Response.json({ error: error.message }, { status: error.status })
     }
     console.error(`Table page error (${options.capability.table}):`, error)
     return Response.json({ error: 'Failed to load page' }, { status: 500 })

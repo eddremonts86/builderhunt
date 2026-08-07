@@ -151,7 +151,7 @@ function SprintsListPage() {
         <ul className="space-y-3">
           {sprints.map((sprint) => (
             <li key={sprint.id} className="card p-4 flex items-center justify-between gap-4" data-testid="sprint-row">
-              <Link to="/sprints/$sprintId" params={{ sprintId: sprint.id }} className="min-w-0 flex-1">
+              <Link to="/sprints/$sprintId" params={{ sprintId: sprint.id }} search={{}} className="min-w-0 flex-1">
                 <p className="font-medium text-bh-text truncate">{sprint.name}</p>
                 <p className="text-xs text-bh-text-dim">
                   {STATUS_LABEL[sprint.status]} · {sprint.resultCount} candidates found · last run{' '}

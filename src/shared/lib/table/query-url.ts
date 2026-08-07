@@ -119,7 +119,11 @@ export function serializeTableSearch(search: TableSearch): Record<string, string
 
   for (const [id, values] of Object.entries(search.query.filters)) {
     if (values.length === 0) continue
-    params[`${FILTER_PREFIX}${id}`] = values
+    // A single value is emitted as a plain string rather than a one-element array. It reads the
+    // same to `tableSearchSchema`, and it is the difference between `?filter.country=Japan` and
+    // `?filter.country=%5B%22Japan%22%5D` in the address bar — TanStack Router JSON-encodes arrays,
+    // and one-value filters are the overwhelming majority.
+    params[`${FILTER_PREFIX}${id}`] = values.length === 1 ? values[0] : values
   }
 
   return params
@@ -136,6 +140,38 @@ export function tableSearchToParams(search: TableSearch): URLSearchParams {
     params.set(key, value)
   }
   return params
+}
+
+/**
+ * The flat search params, filtered down to the ones the table understands.
+ *
+ * This exists because of how TanStack Router works: whatever `validateSearch` *returns* is what the
+ * router serializes back into the URL. Returning a `TableSearch` would put
+ * `?query=%7B%22search%22...%7D` in the address bar — a JSON blob where `?sort=score:desc` was
+ * supposed to be, and the readable, linkable URL this whole codec exists for would be gone.
+ *
+ * So a route's `validateSearch` returns *these* — the flat params, unchanged in shape — and the
+ * component turns them into a `TableSearch` with `tableSearchSchema`. The router keeps serializing
+ * exactly what it parsed.
+ */
+export type TableSearchParams = Record<string, string | string[] | undefined>
+
+export function pickTableSearchParams(search: Record<string, unknown>): TableSearchParams {
+  const picked: TableSearchParams = {}
+  for (const [key, raw] of Object.entries(search)) {
+    const recognised = key === 'q' || key === 'sort' || key === 'group' || key === 'as'
+      || key === 'cursor' || key.startsWith(FILTER_PREFIX)
+    if (!recognised) continue
+    if (Array.isArray(raw)) {
+      const values = raw.map(readString).filter((value): value is string => value !== null && value !== '')
+      if (values.length > 0) picked[key] = values
+      continue
+    }
+    const value = readString(raw)
+    // An empty parameter is the absence of one; keeping it would put `?q=` in every URL.
+    if (value !== null && value !== '') picked[key] = value
+  }
+  return picked
 }
 
 /** An empty table's state — page one, no search, no filters, no sort, default renderer. */

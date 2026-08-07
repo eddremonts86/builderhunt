@@ -23,8 +23,10 @@ export type { ColumnDef } from './columns'
 export type { CursorExpectation, CursorValue, TableCursorPayload } from './cursor'
 export {
   emptyTableSearch,
+  pickTableSearchParams,
   serializeTableSearch,
   tableSearchSchema,
   tableSearchToParams,
+  type TableSearchParams,
 } from './query-url'
 export type { PageRequest, PageResult, TableQuery, TableSearch } from './types'

@@ -4,6 +4,8 @@ import type { PgColumn } from 'drizzle-orm/pg-core'
 import {
   capabilityTable,
   FACET_VALUE_LIMIT,
+  isColumnRef,
+  refSql,
   type SortTerm,
   type TableCapability,
 } from './capability'
@@ -59,8 +61,17 @@ export type KeysetTransaction = {
 
 export interface KeysetPageOptions<Row> {
   /**
-   * Predicates the surface requires, never client-controlled — `eq(sprintResults.sprintId, id)`
-   * and nothing derived from a query string.
+   * Predicates the **surface** owns, rather than ones the client-facing allowlist resolves.
+   *
+   * `eq(sprintResults.sprintId, id)` is the obvious kind. The less obvious kind is a filter that
+   * the shared `TableQuery` deliberately cannot express — sprint results has a "minimum followers"
+   * threshold, and `TableQuery.filters` models set membership, not ranges. Rather than grow the
+   * shared contract a range operator for one surface (which is how a contract ends up shaped by
+   * its first caller's accident, the thing plan 02 set out to avoid), the surface parses and
+   * validates that parameter itself and hands the predicate down here.
+   *
+   * The safety property is unchanged either way: nothing in here is resolved from a client-supplied
+   * *id*, and every value is a bound parameter.
    */
   scope?: SQL[]
   /** The projection. Sort columns and the tiebreaker are added internally to build the cursor. */
@@ -81,8 +92,33 @@ interface ResolvedSort {
  * An unknown id throws. It deliberately does not fall back to `defaultSort`: a fallback teaches
  * a caller that a typo is harmless, and hides the bug until the day the id matters.
  */
-function resolveSort(capability: TableCapability, requested: TableQuery['sort']): ResolvedSort {
-  const source = requested.length > 0 ? requested : capability.defaultSort
+function resolveSort(
+  capability: TableCapability,
+  requested: TableQuery['sort'],
+  groupBy: string | null = null,
+): ResolvedSort {
+  const requestedSort = requested.length > 0 ? requested : capability.defaultSort
+
+  /*
+   * A grouped table has to be ordered by the group column first.
+   *
+   * Found on the first real surface: grouping sprint results by `source` while sorting by `score`
+   * produced **36 group headers for 50 rows**, because the renderer starts a group wherever the
+   * value changes and an unrelated sort interleaves the sources. Technically it obeyed "grouping
+   * never changes which rows a page contains"; practically it was unreadable.
+   *
+   * So the group column leads the `ORDER BY`. This does change which rows land on page one, and
+   * that is the point — a group split across five pages is not a group. The spec's edge case is
+   * about *membership*: search and filters narrow the set, grouping still does not.
+   *
+   * Only when the group column is also sortable, which is also the only way it can be indexed. A
+   * groupable-but-not-sortable column (a jsonb path, say) degrades to run detection, and the
+   * capability author should make it sortable if the grouping matters.
+   */
+  const source = groupBy !== null && groupBy in capability.sortable
+    && !requestedSort.some((term) => term.id === groupBy)
+    ? [{ id: groupBy, dir: requestedSort[0]?.dir ?? 'asc' }, ...requestedSort]
+    : requestedSort
 
   const directions = new Set(source.map((term) => term.dir))
   if (directions.size > 1) {
@@ -144,9 +180,15 @@ function filterPredicates(capability: TableCapability, filters: TableQuery['filt
         throw new TableQueryError(`Unknown value for filter ${id}: ${rejected.join(', ')}`)
       }
     }
-    // `inArray` binds every value as a parameter. A value full of quotes and keywords changes the
-    // parameter list and nothing structural — asserted in table-keyset-isolation.test.ts.
-    predicates.set(id, inArray(entry.column, values) as SQL)
+    // `inArray` binds every value as a parameter, and accepts an expression as readily as a column
+    // — so a jsonb path filters the same way. A value full of quotes and keywords changes the
+    // parameter list and nothing structural; asserted in table-keyset-isolation.test.ts.
+    //
+    // Narrowed at the call site rather than passed as a union: `inArray`'s three overloads each
+    // take one shape, and a union matches none of them.
+    predicates.set(id, isColumnRef(entry.column)
+      ? inArray(entry.column.sql, values)
+      : inArray(entry.column, values) as SQL)
   }
   return predicates
 }
@@ -259,11 +301,11 @@ export function planKeysetPage(
   page: PageRequest,
   context: { organizationId: string | null; scope?: SQL[] },
 ): KeysetPlan {
-  const sort = resolveSort(capability, query.sort)
-
   if (query.groupBy !== null && !capability.groupable.includes(query.groupBy)) {
     throw new TableQueryError(`Unknown group column: ${query.groupBy}`)
   }
+
+  const sort = resolveSort(capability, query.sort, query.groupBy)
 
   const base: SQL[] = []
   if (capability.organizationColumn && context.organizationId) {
@@ -383,12 +425,13 @@ async function computeFacets(
     const others = [...filters.entries()].filter(([key]) => key !== id).map(([, predicate]) => predicate)
     const conditions = [...base, ...others]
 
+    const expression = refSql(entry.column)
     const rows = (await tx
-      .select({ value: sql<string>`${entry.column}::text`, count: count() })
+      .select({ value: sql<string>`${expression}::text`, count: count() })
       .from(table)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(entry.column)
-      .orderBy(desc(count()), asc(entry.column))
+      .groupBy(expression)
+      .orderBy(desc(count()), asc(expression))
       // A facet is a list read like any other.
       .limit(FACET_VALUE_LIMIT)) as Array<{ value: string | null; count: number }>
 

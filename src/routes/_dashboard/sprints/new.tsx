@@ -488,6 +488,7 @@ function NewSprintWizard() {
                   <Link
                     to="/sprints/$sprintId"
                     params={{ sprintId: draft.savedSprintId }}
+                    search={{}}
                     className="text-xs text-bh-accent inline-flex items-center gap-1 shrink-0"
                   >
                     <Check className="w-3.5 h-3.5" aria-hidden="true" /> Saved

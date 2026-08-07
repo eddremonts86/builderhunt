@@ -1,4 +1,4 @@
-import { getTableName, type Table } from 'drizzle-orm'
+import { getTableName, type SQL, type Table } from 'drizzle-orm'
 import type { PgColumn } from 'drizzle-orm/pg-core'
 
 /**
@@ -28,8 +28,38 @@ export interface SortableColumn {
   nullsLast?: boolean
 }
 
+/**
+ * A value that lives inside a column rather than being one — a key in a jsonb document.
+ *
+ * `sprint_results.profile->>'country'` is the case that forced this: the location facet the sprint
+ * results surface has always shown is computed from a jsonb key, and `PgColumn` cannot name it. The
+ * alternative was to drop the facet, which would have been a feature regression disguised as a
+ * migration.
+ *
+ * Filtering and grouping only. **Not sortable**: a sortable expression needs an expression index
+ * behind it, and `capability-index.ts` matches indexes by column name — it would report a jsonb
+ * path as backed when nothing backs it, which is worse than refusing the sort.
+ */
+export interface ColumnRef {
+  /** Stable identifier, for error messages. Not a database column name. */
+  name: string
+  sql: SQL
+}
+
+export type FilterableRef = PgColumn | ColumnRef
+
+/** True for the expression form. */
+export function isColumnRef(value: FilterableRef): value is ColumnRef {
+  return 'sql' in value && !('table' in value)
+}
+
+/** The SQL for either form, for a `WHERE` or a `GROUP BY`. */
+export function refSql(value: FilterableRef): SQL | PgColumn {
+  return isColumnRef(value) ? value.sql : value
+}
+
 export interface FilterableColumn {
-  column: PgColumn
+  column: FilterableRef
   /** When present, a value outside this list is a 400 — the filter is an enum, not free text. */
   values?: readonly string[]
   /**
@@ -148,6 +178,9 @@ export function defineTableCapability(capability: TableCapability): TableCapabil
     if (getTableName(entry.column.table as Table) !== base) foreign.push(`sortable.${id}`)
   }
   for (const [id, entry] of Object.entries(capability.filterable)) {
+    // An expression is written against this table by construction — it is a `sql` template the
+    // capability's author composed from this table's columns — so there is nothing to compare.
+    if (isColumnRef(entry.column)) continue
     if (getTableName(entry.column.table as Table) !== base) foreign.push(`filterable.${id}`)
   }
   for (const column of capability.searchable) {

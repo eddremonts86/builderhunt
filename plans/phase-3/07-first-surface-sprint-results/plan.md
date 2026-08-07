@@ -1,6 +1,6 @@
 # Plan — sprint results, end to end
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md), [`04-sort-indexes`](../04-sort-indexes/spec.md), [`05-table-shell`](../05-table-shell/spec.md), [`06-row-virtualization`](../06-row-virtualization/spec.md)
 > **Blocks**: [`08-migrate-admin-surfaces`](../08-migrate-admin-surfaces/spec.md), [`09-migrate-platform-content`](../09-migrate-platform-content/spec.md), [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Reality check**: Two files change (`src/routes/api/sprints/$sprintId/results.ts`, `src/routes/_dashboard/sprints/$sprintId/index.tsx`) plus `src/lib/sprints/service.ts`. One new e2e spec.

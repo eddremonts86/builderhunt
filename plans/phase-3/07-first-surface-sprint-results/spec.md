@@ -1,6 +1,6 @@
 # Specification — sprint results, end to end
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md), [`04-sort-indexes`](../04-sort-indexes/spec.md), [`05-table-shell`](../05-table-shell/spec.md), [`06-row-virtualization`](../06-row-virtualization/spec.md)
 > **Blocks**: [`08-migrate-admin-surfaces`](../08-migrate-admin-surfaces/spec.md), [`09-migrate-platform-content`](../09-migrate-platform-content/spec.md), [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Reality check**: `src/routes/api/sprints/$sprintId/results.ts:82-85` reads every result via `listSprintResults`, then filters, sorts and slices in memory, returning a base64 *offset* as `nextCursor`. `sprint_results_sprint_created_idx` already exists. `src/lib/sprints/results.ts` holds pure filter/sort helpers with their own unit tests. In `src/routes/_dashboard/sprints/$sprintId/index.tsx`, `sprint.cursor` is the sprint's **progress** cursor feeding a progress bar — unrelated to pagination.

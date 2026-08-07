@@ -45,6 +45,12 @@ const guardPatterns = [
   // src/lib/scheduling/capability-context.ts and drizzle/0077-0078. Allowlisting these as "public"
   // would be the wrong model: they are authenticated, just not by a user session.
   { name: 'scheduling-capability', pattern: /withCapabilityRequest|withCapabilityContext/ },
+  // A table page route hands the whole sequence to `tablePageHandler`, which calls
+  // `requireTenantPrincipal` before it parses anything and opens `withTenantContext` around the
+  // load — see src/shared/lib/table/handler.ts. The guard is there rather than in the route file,
+  // which is the point of having one; listing it here is the same call as `withCapabilityRequest`
+  // above, and allowlisting these routes as "public" would be plainly wrong.
+  { name: 'table-page', pattern: /tablePageHandler/ },
 ]
 
 async function collectRouteFiles(dir) {

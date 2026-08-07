@@ -79,6 +79,7 @@ export function SprintsWidget({ sprints }: { sprints: readonly SprintListItem[] 
                   <Link
                     to="/sprints/$sprintId"
                     params={{ sprintId: sprint.id }}
+                    search={{}}
                     className="block px-6 py-3 transition-colors hover:bg-bh-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <span className="flex items-center gap-2">
