@@ -69,7 +69,25 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # The `postgres` service above is pinned to pg18, but Ubuntu's default
+      # `postgresql-client` is 16 and `pg_dump` refuses to dump a server newer
+      # than itself. `scripts/db/restore-test.ts` has a `docker exec` fallback
+      # for exactly this mismatch, but it looks for a container named
+      # `builderhunt-db` and an Actions service container gets a generated name,
+      # so the fallback cannot apply here — the client has to match on the host.
+      # This is not cosmetic: "Restore rehearsal" is an early step, and its
+      # failure skips lint, type-check, unit tests, E2E, build and every gate
+      # after it, so the whole job reports red without having checked anything.
+      - name: Install the PostgreSQL 18 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+          pg_dump --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:migration-integrity
       - run: pnpm exec drizzle-kit check
