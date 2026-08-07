@@ -91,6 +91,19 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
 
   /** Per-table extra row content — an inline edit form, for instance. The shell knows nothing about it. */
   expansion?: (row: Row) => React.ReactNode
+  /**
+   * Which row is expanded, when the surface wants to own it.
+   *
+   * Pass both this and `onExpandedChange` and the shell stops keeping its own flag. Needed when
+   * opening a row means something to the surface — on `admin/incidents`, expanding a row *is*
+   * "edit this incident", and the page has to load it into its form.
+   *
+   * It is compared against **`rowId`**, which defaults to `rowTestId`. A surface whose test ids are
+   * prefixed must pass `rowId` too, or it will hold a raw id while the shell looks for a prefixed
+   * one and no row will ever open.
+   */
+  expandedRowId?: string | null
+  onExpandedChange?: (rowId: string | null) => void
   /** Shown when the unfiltered set is empty. */
   emptyState?: React.ReactNode
   /** Human labels for filter ids, used by the chips, the command sheet and the filtered-empty copy. */
@@ -161,6 +174,8 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     selectAllMatching,
     bulkActions,
     expansion,
+    expandedRowId,
+    onExpandedChange,
     emptyState,
     filterLabels,
     className,
@@ -265,6 +280,8 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     keyboard,
     onPrimaryAction,
     expansion,
+    expandedRowId,
+    onExpandedChange,
     entries,
     window: virtual.items,
     totalSize: virtual.totalSize,

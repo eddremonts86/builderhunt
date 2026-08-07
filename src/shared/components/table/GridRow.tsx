@@ -21,10 +21,25 @@ interface GridRowProps<Row> {
  * `aria-rowcount`, and that drift is invisible to everyone who is not using a screen reader.
  */
 export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
-  const { columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction, expansion } = context
+  const { columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction, expansion, expandedRowId, onExpandedChange } = context
   const id = rowId(row)
   const selected = selection.isSelected(id)
-  const [expanded, setExpanded] = React.useState(false)
+
+  /**
+   * Expansion is the shell's state unless the surface claims it.
+   *
+   * Incidents needs the second form: opening a row *is* "edit this incident", and the surface has
+   * to load that incident into its form when it opens. With the shell owning the flag, the surface
+   * would have had to mirror it — and a component that mirrors another component's state is how the
+   * old markup ended up keeping a row and a form in sync by hand.
+   */
+  const controlled = onExpandedChange !== undefined
+  const [uncontrolledExpanded, setUncontrolledExpanded] = React.useState(false)
+  const expanded = controlled ? expandedRowId === id : uncontrolledExpanded
+  const setExpanded = (next: boolean) => {
+    if (controlled) onExpandedChange(next ? id : null)
+    else setUncontrolledExpanded(next)
+  }
 
   // The selection checkbox is a grid column, so it shifts every data column's `aria-colindex` by
   // one. Computing it here rather than in each renderer is what keeps the two in step.
@@ -94,7 +109,7 @@ export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
           <div role="gridcell" aria-colindex={ariaColIndex(columns.length + columnOffset)} className="flex items-center">
             <button
               type="button"
-              onClick={() => setExpanded((open) => !open)}
+              onClick={() => setExpanded(!expanded)}
               aria-expanded={expanded}
               aria-label={expanded ? 'Collapse row' : 'Expand row'}
               data-testid={`${rowTestId(row)}-expand`}

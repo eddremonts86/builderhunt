@@ -30,6 +30,9 @@ export interface RendererContext<Row> {
   keyboard: TableKeyboardResult
   onPrimaryAction?: (row: Row) => void
   expansion?: (row: Row) => React.ReactNode
+  /** Set together with `onExpandedChange` to let the surface own which row is open. */
+  expandedRowId?: string | null
+  onExpandedChange?: (rowId: string | null) => void
 
   /**
    * The flat list of rows and group headers, and the slice of it that is mounted.
