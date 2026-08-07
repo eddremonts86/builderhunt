@@ -31,9 +31,11 @@ seeded e2e database and assert the plan contains an index scan and no `Sort` nod
 Plan 04's unit test proves an index was *declared*; only `EXPLAIN` proves the planner *uses* it —
 a `NULLS LAST` mismatch satisfies the first and fails the second.
 
-**3. No hand-written table.** `grep -rl '<table' src` must return only the two prose pages
-(`src/routes/_landing/pricing.tsx`, `src/routes/_landing/legal/cookies.tsx`) and FullCalendar's own
-markup in `src/modules/calendar/components/CalendarPage.tsx`.
+**3. Every data-grid surface is registered.** `scripts/check-table-surfaces.mjs` owns an explicit
+inventory of data grids and semantic non-grid `<table>` uses. A data grid must name its capability
+and `DataTable` consumer; a semantic exemption must name why it is not an interactive row collection
+(pricing/cookies prose, email markup, chart geometry, summary cards, third-party calendar markup).
+Raw grep is evidence for updating the inventory, not the gate itself.
 
 ## Documentation
 
@@ -53,13 +55,15 @@ table section describes what shipped, not what was planned.
 - `pnpm ci:local` green with all three gates active.
 - Adding a deliberate unbounded read fails the build; removing it passes.
 - Adding a sortable column with no index fails plan 04's unit test **and** the `EXPLAIN` assertion.
-- `grep -rn 'perPage\|limit: 30' src` returns nothing outside `constants.ts`.
+- SQL-owned list routes contain no offset/page-number pagination; provider-backed connectors may
+  retain bounded upstream page parameters only behind plan 11's signed continuation adapter.
 - A new contributor can add a table by reading `README.md` and one existing capability.
 
 ## Resolved edge cases
 
-- **A legitimate unbounded read added later.** The `unbounded-read-ok` comment with a reason. The
-  gate's job is to make the decision explicit, not to forbid it.
+- **A legitimate complete-set read added later.** Prefer an explicit model bound or batch loop. The
+  `unbounded-read-ok` comment is reserved for cases that truly cannot be bounded and must name the
+  reviewed maximum/cardinality reason; it is not a generic escape hatch.
 - **`EXPLAIN` output differing between Postgres versions.** Assert on the presence of an index scan
   and the absence of a sort node, not on exact plan text.
 - **A capability with no `defaultSort` reachable in e2e** (the file-backed blog). Exempt via the

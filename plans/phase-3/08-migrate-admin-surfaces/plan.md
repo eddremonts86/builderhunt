@@ -3,13 +3,14 @@
 > **Status**: `pending`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: Seven UI files plus their capabilities. No new indexes expected; confirm per surface against plan 04's guard.
+> **Reality check**: Nine UI surfaces plus their capabilities. `/admin/plan-requests` is deleted;
+> integrations, metrics, and operations are the live replacements in this inventory. Confirm indexes
+> and read bounds per surface against plans 01 and 04.
 
 ## Sequence
 
-One surface per commit, hardest first within the group: `AbuseConsole` (a real `<table>` with the
-most columns), then `admin/incidents` and `admin/plan-requests` (which have row actions and
-selection), then the four small ones.
+One surface per commit, hardest first within the group: `AbuseConsole`, integrations, metrics and
+operations (the real `<table>` users), then incidents, then the four small account surfaces.
 
 Hardest first, because if the shell cannot express `AbuseConsole` the group should stop and fix the
 shell rather than migrate four easy surfaces and discover it on the fifth.

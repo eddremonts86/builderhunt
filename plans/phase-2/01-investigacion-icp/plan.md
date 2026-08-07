@@ -2,7 +2,8 @@
 
 > **Status**: `pending`
 > **Depends on**: nothing
-> **Blocks**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md), [`06-landing-segmentada`](../06-landing-segmentada/spec.md)
+> **Blocks**: nothing — participant-dependent work lives in
+> [`phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/plan.md).
 > **Reality check**: La landing en `src/modules/landing/components/HomePage.tsx` contiene casos de
 > uso, pero no constituye validación. Las métricas actuales de onboarding agregan usuarios y no
 > distinguen objetivos.
@@ -14,33 +15,15 @@
 - preparar guion neutral, consentimiento y scorecard;
 - capturar baseline actual de adquisición y activación.
 
-## Fase 2 — entrevistar
+## Fase 2 — congelar el baseline
 
-- ejecutar primero hiring, porque coincide mejor con el producto actual;
-- ejecutar investing sin presentar capacidades que todavía no existen;
-- ejecutar building separando valor de red y willingness-to-pay;
-- sintetizar después de cada bloque de cinco para detectar saturación o sesgo.
+- registrar las consultas, ventanas temporales y fuentes de cada métrica disponible;
+- marcar explícitamente las métricas que aún no están instrumentadas;
+- enlazar el paquete y el baseline desde el plan post-launch que ejecutará las entrevistas.
 
-## Fase 3 — probar mensajes
-
-- crear tres variantes de propuesta de valor;
-- realizar tests moderados de comprensión;
-- medir qué cree la persona que hace BuilderHunt, para quién es y cuál sería su siguiente acción;
-- descartar mensajes que requieren explicación verbal.
-
-## Fase 4 — decidir
-
-- puntuar los segmentos con la misma rúbrica;
-- clasificar cada uno como primario, experimento o lado de oferta;
-- definir buyer, usuario final y pagador;
-- cerrar nombres y valores internos de la taxonomía.
-
-## Fase 5 — handoff
-
-- entregar contratos y eventos propuestos a segmentación;
-- entregar mensajes, objeciones y CTA a landing;
-- entregar criterios de activación a onboarding/dashboard;
-- registrar preguntas no resueltas para rondas posteriores.
+La contratación de participantes, las entrevistas, los tests moderados, la síntesis y la decisión
+se ejecutan en phase 5. Mantenerlos aquí duplicaría tareas y volvería a bloquear cinco planes con
+trabajo externo que no puede completarse antes de lanzar.
 
 ## Riesgos y mitigaciones
 
@@ -57,4 +40,3 @@
 No hay cambios de runtime. Si la evidencia contradice la taxonomía propuesta, se reemplazan los
 valores antes de crear migraciones. Si solo hiring supera el umbral, el MVP captura un objetivo
 principal y mantiene los demás como experimentos de landing, no como ramas completas.
-

@@ -364,29 +364,21 @@ export function HomePage() {
                   icon: Bell,
                   title: 'Keyword alerts',
                   desc: 'Set the filters once. We send an email or RSS ping the moment a new builder matches. No daily digest, just the hits that matter.',
-                  image: '/landing-assets/alerts-inbox.jpg',
-                  imageAlt: 'A notification arriving for a new matching builder.',
                 },
                 {
                   icon: FileText,
                   title: 'Private notes',
                   desc: 'Stash private context on any builder: outreach status, where you met them, why they matter. Only you see them.',
-                  image: '/landing-assets/notes.jpg',
-                  imageAlt: 'A notebook with handwritten context next to a builder profile.',
                 },
                 {
                   icon: Download,
                   title: 'CSV / JSON export',
                   desc: 'Export any shortlist to CSV or JSON. Pipe it into Notion, Airtable, your ATS, or a spreadsheet. No lock-in.',
-                  image: '/landing-assets/export.jpg',
-                  imageAlt: 'A spreadsheet with builder profiles and export columns.',
                 },
                 {
                   icon: Shield,
                   title: 'No tracking, no spam',
                   desc: 'We don\'t message builders on your behalf and we don\'t sell profile data. You find them, you reach out. That\'s the whole model.',
-                  image: '/landing-assets/privacy.jpg',
-                  imageAlt: 'A private folder representing your data stays your data.',
                 },
               ].map((f) => (
                 <article key={f.title} className="card card-premium-glow bg-bh-surface p-6 flex flex-col justify-between overflow-hidden">
@@ -397,14 +389,6 @@ export function HomePage() {
                     <h3 className="text-lg font-bold text-bh-text mb-2">{f.title}</h3>
                     <p className="text-bh-text-muted text-sm leading-relaxed">{f.desc}</p>
                   </div>
-                  {/* Real photo replaces the fake-UI pill (§9.F ban). Seeded by
-                      section so the asset is reproducible. */}
-                  <img
-                    src={f.image}
-                    alt={f.imageAlt}
-                    loading="lazy"
-                    className="mt-5 w-full h-28 object-cover rounded-lg"
-                  />
                 </article>
               ))}
             </div>

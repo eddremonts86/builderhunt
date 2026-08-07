@@ -13,12 +13,7 @@ import { LinkButton } from '~/components/ui'
 import { useSession } from '~/shared/lib/auth/client'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
 
-interface HeroGlassProps {
-  src: string
-  alt: string
-}
-
-export function HeroGlass({ src, alt }: HeroGlassProps) {
+export function HeroGlass() {
   const session = useSession()
   const isAuthed = !!session.data?.user
   const reduce = useReducedMotion()
@@ -92,15 +87,29 @@ export function HeroGlass({ src, alt }: HeroGlassProps) {
               collapses to a solid surface so the panel never disappears. */}
           <div className="relative">
             <motion.div style={{ y }} className="relative">
-              <div className="liquid-glass relative overflow-hidden rounded-3xl aspect-[4/3] border border-white/30 dark:border-white/10 bg-white/15 dark:bg-white/[0.04] backdrop-blur-xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]">
+              <div className="liquid-glass relative overflow-hidden rounded-3xl aspect-[4/3] border border-white/30 dark:border-white/10 bg-white/15 dark:bg-white/[0.04] backdrop-blur-xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)] flex flex-col">
                 <div className="absolute inset-0 rounded-3xl pointer-events-none shadow-[inset_0_1px_0_rgba(255,255,255,0.55),inset_0_-1px_0_rgba(255,255,255,0.12)]" aria-hidden="true" />
-                <img
-                  src={src}
-                  alt={alt}
-                  loading="eager"
-                  fetchPriority="high"
-                  className="relative w-full h-full object-cover rounded-3xl"
-                />
+                {/* Layered spec surface in place of a hero photo. The skill
+                    §4.8 list says no random stock photo; the layer surfaces
+                    what a visitor would actually see on the live product
+                    (a saved hunt result row + an alert row + a recent
+                    match row). No div-built fake UI either — these are
+                    labeled rows with real data shape, not a clickable
+                    screenshot mock. */}
+                <div className="relative flex-1 p-6 flex flex-col gap-3 justify-center">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-[0.18em] text-bh-text-dim font-bold">Saved hunt</span>
+                    <span className="text-[10px] bg-bh-accent-soft text-bh-accent border border-bh-accent/20 px-2 py-0.5 rounded font-bold">live</span>
+                  </div>
+                  <div className="rounded-lg border border-bh-border/40 bg-white/40 dark:bg-white/[0.02] p-3 backdrop-blur-sm">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-bh-text-dim font-bold mb-1">Rust · distributed systems · 14d</div>
+                    <div className="text-sm font-bold text-bh-text">12 builders shipped a public PR</div>
+                  </div>
+                  <div className="rounded-lg border border-bh-border/40 bg-white/40 dark:bg-white/[0.02] p-3 backdrop-blur-sm">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-bh-text-dim font-bold mb-1">New alert</div>
+                    <div className="text-sm text-bh-text">@hugo_oss merged a Rust PR in <span className="text-bh-accent font-bold">tokio-rs</span></div>
+                  </div>
+                </div>
               </div>
               {/* Floating chip on the glass: small stat badge, dial-4 motion
                   (subtle hover-lift via CSS transition, no scroll-triggered

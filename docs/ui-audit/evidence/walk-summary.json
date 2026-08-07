@@ -1,1 +1,1778 @@
-{}
+{
+  "platform-admin": [
+    {
+      "route": "/",
+      "file": "src/routes/_landing/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/",
+      "consoleErrors": [],
+      "consoleWarnings": [
+        "Warning: Error in route match: __root__/"
+      ],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/root.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/pricing",
+      "file": "src/routes/_landing/pricing.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/pricing",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/pricing.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/security",
+      "file": "src/routes/_landing/security.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/security",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/security.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/status",
+      "file": "src/routes/_landing/status.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/status",
+      "consoleErrors": [
+        "%o\n\n%s\n\n%s\n Error: Invariant failed: Could not find an active match from \"/_dashboard\"\n    at useMatch (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useMatch.js?v=ca08bbe4:46:45)\n    at useRouteContext (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useRouteContext.js?v=ca08bbe4:4:9)\n    at DashboardLayoutInner (http://localhost:3010/src/modules/dashboard/ui/shell/DashboardLayout.tsx:34:19)\n    at Object.react_stack_bottom_frame (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:12866:12)\n    at renderWithHooks (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:4213:19)\n    at updateFunctionComponent (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:5569:16)\n    at beginWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:6140:20)\n    at runWithFiberInDEV (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:851:66)\n    at performUnitOfWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8429:92)\n    at workLoopSync (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8325:37) The above error occurred in the <DashboardLayoutInner> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl."
+      ],
+      "consoleWarnings": [
+        "Warning: Error in route match: __root__/"
+      ],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/status.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/roadmap",
+      "file": "src/routes/_landing/roadmap.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/roadmap",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/roadmap.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/crawler",
+      "file": "src/routes/_landing/crawler.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/crawler",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/crawler.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/changelog",
+      "file": "src/routes/_landing/changelog/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/changelog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/changelog.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/changelog/:slug",
+      "file": "src/routes/_landing/changelog/$slug.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/changelog/:slug",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/changelog/%3Aslug"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/changelog_slug.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/blog",
+      "file": "src/routes/_landing/blog/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/blog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/blog.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/blog/:slug",
+      "file": "src/routes/_landing/blog/$slug.tsx",
+      "status": 404,
+      "finalUrl": "http://localhost:3010/blog/:slug",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/blog/:slug"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/blog_slug.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/explore",
+      "file": "src/routes/_landing/explore/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/explore?q=&type=people",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/explore.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/legal/cookies",
+      "file": "src/routes/_landing/legal/cookies.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/cookies",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/legal_cookies.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/legal/imprint",
+      "file": "src/routes/_landing/legal/imprint.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/imprint",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/legal_imprint.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/legal/privacy",
+      "file": "src/routes/_landing/legal/privacy.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/privacy",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/legal_privacy.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/legal/terms",
+      "file": "src/routes/_landing/legal/terms.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/terms",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/legal_terms.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/privacy/remove",
+      "file": "src/routes/_landing/privacy/remove.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/privacy/remove",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/privacy_remove.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/sign-in",
+      "file": "src/routes/auth/sign-in.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/sign-in",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/auth_sign-in.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/sign-up",
+      "file": "src/routes/auth/sign-up.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/sign-up",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/auth_sign-up.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/forgot",
+      "file": "src/routes/auth/forgot.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/forgot",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/auth_forgot.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/reset",
+      "file": "src/routes/auth/reset.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/reset",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/auth_reset.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/welcome",
+      "file": "src/routes/onboarding/welcome.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/welcome",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/onboarding_welcome.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/search",
+      "file": "src/routes/onboarding/search.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/search",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/onboarding_search.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/save",
+      "file": "src/routes/onboarding/save.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/save?q=",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/onboarding_save.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/success",
+      "file": "src/routes/onboarding/success.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/success",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/onboarding_success.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/builders/:builderId",
+      "file": "src/routes/builders/$builderId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/builders/:builderId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 451 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/builders/:builderId",
+        "451 http://localhost:3010/api/builders/:builderId/views"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/builders_builderId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/portfolio/:claimId",
+      "file": "src/routes/portfolio/$claimId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/portfolio/:claimId",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/portfolio_claimId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/r/:slug",
+      "file": "src/routes/r/$slug.tsx",
+      "status": 404,
+      "finalUrl": "http://localhost:3010/r/:slug",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/r/:slug"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/r_slug.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/schedule/:invitationId",
+      "file": "src/routes/schedule/$invitationId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/schedule/:invitationId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [
+        "The resource http://localhost:3010/fonts/inter-latin-wght-normal.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+      ],
+      "failedRequests": [
+        "404 http://localhost:3010/api/public/scheduling/:invitationId"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/schedule_invitationId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/team/invite/:invitationId",
+      "file": "src/routes/team/invite/$invitationId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/team/invite/:invitationId",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/team_invite_invitationId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/dashboard",
+      "file": "src/routes/_dashboard/dashboard/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/dashboard",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/dashboard.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/search",
+      "file": "src/routes/_dashboard/search/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/search?q=&mode=keyword",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/search.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/alerts",
+      "file": "src/routes/_dashboard/alerts.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/alerts",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/alerts.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/calendar",
+      "file": "src/routes/_dashboard/calendar/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/calendar?view=month&q=",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/calendar.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/lists",
+      "file": "src/routes/_dashboard/lists/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/lists",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/lists.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/lists/:listId",
+      "file": "src/routes/_dashboard/lists/$listId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/lists/:listId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/lists/:listId",
+        "404 http://localhost:3010/api/lists/:listId/items"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/lists_listId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/sprints",
+      "file": "src/routes/_dashboard/sprints/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/sprints",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/sprints.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/sprints/new",
+      "file": "src/routes/_dashboard/sprints/new.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/sprints/new",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/sprints_new.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/sprints/:sprintId",
+      "file": "src/routes/_dashboard/sprints/$sprintId/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/sprints/:sprintId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/sprints/:sprintId",
+        "404 http://localhost:3010/api/sprints/:sprintId/results?sort=score"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/sprints_sprintId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/interviews",
+      "file": "src/routes/_dashboard/interviews/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/interviews.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/interviews/invitations",
+      "file": "src/routes/_dashboard/interviews/invitations.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews/invitations?status=all",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/interviews_invitations.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/interviews/:interviewId",
+      "file": "src/routes/_dashboard/interviews/$interviewId/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews/:interviewId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/interviews/:interviewId/brief",
+        "404 http://localhost:3010/api/interviews/:interviewId/report",
+        "404 http://localhost:3010/api/interviews/:interviewId/segments"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/interviews_interviewId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/interviews/:interviewId/live",
+      "file": "src/routes/_dashboard/interviews/$interviewId/live.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews/:interviewId/live",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/interviews/:interviewId/session"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/interviews_interviewId_live.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/exports",
+      "file": "src/routes/_dashboard/exports/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/exports",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/exports.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/solutions",
+      "file": "src/routes/_dashboard/solutions/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/solutions",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/solutions.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/me",
+      "file": "src/routes/_dashboard/me/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/me",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/me.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/builder/:builderId",
+      "file": "src/routes/_dashboard/builder/$builderId/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/builder/:builderId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 451 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/builders/:builderId",
+        "451 http://localhost:3010/api/builders/:builderId/views"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/builder_builderId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/team/activity",
+      "file": "src/routes/_dashboard/team/activity.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/team/activity",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/team_activity.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/team",
+      "file": "src/routes/_dashboard/settings/team.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/team",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/settings_team.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/billing",
+      "file": "src/routes/_dashboard/settings/billing/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/billing",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/settings_billing.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/billing/return",
+      "file": "src/routes/_dashboard/settings/billing/return.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/billing/return",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/settings_billing_return.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/privacy",
+      "file": "src/routes/_dashboard/settings/privacy.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/privacy",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/settings_privacy.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/security",
+      "file": "src/routes/_dashboard/settings/security.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/security",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/settings_security.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin",
+      "file": "src/routes/_dashboard/admin/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/metrics",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/admin/abuse",
+      "file": "src/routes/_dashboard/admin/abuse.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/abuse",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_abuse.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/access-requests",
+      "file": "src/routes/_dashboard/admin/access-requests.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/access-requests",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_access-requests.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/billing",
+      "file": "src/routes/_dashboard/admin/billing.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/billing",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_billing.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/changelog",
+      "file": "src/routes/_dashboard/admin/changelog.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/changelog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_changelog.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/claims",
+      "file": "src/routes/_dashboard/admin/claims.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/claims",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_claims.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/content",
+      "file": "src/routes/_dashboard/admin/content.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/content?tab=blog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_content.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/admin/disputes",
+      "file": "src/routes/_dashboard/admin/disputes.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/disputes",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_disputes.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/incidents",
+      "file": "src/routes/_dashboard/admin/incidents.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/incidents",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_incidents.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/integrations",
+      "file": "src/routes/_dashboard/admin/integrations.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/integrations",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_integrations.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/metrics",
+      "file": "src/routes/_dashboard/admin/metrics.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/metrics",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_metrics.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/operations",
+      "file": "src/routes/_dashboard/admin/operations.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/operations",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_operations.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/refunds",
+      "file": "src/routes/_dashboard/admin/refunds.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/refunds",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_refunds.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/roadmap",
+      "file": "src/routes/_dashboard/admin/roadmap.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/roadmap",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_roadmap.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/solutions-gold-set",
+      "file": "src/routes/_dashboard/admin/solutions-gold-set.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/solutions-gold-set",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_solutions-gold-set.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/sources",
+      "file": "src/routes/_dashboard/admin/sources.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/sources",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_sources.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/users",
+      "file": "src/routes/_dashboard/admin/users.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/users",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/desktop-light/admin_users.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/",
+      "file": "src/routes/_landing/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/root.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/pricing",
+      "file": "src/routes/_landing/pricing.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/pricing",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/pricing.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/security",
+      "file": "src/routes/_landing/security.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/security",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/security.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/status",
+      "file": "src/routes/_landing/status.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/status",
+      "consoleErrors": [
+        "%o\n\n%s\n\n%s\n Error: Invariant failed: Could not find an active match from \"/_dashboard\"\n    at useMatch (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useMatch.js?v=ca08bbe4:46:45)\n    at useRouteContext (http://localhost:3010/node_modules/.pnpm/@tanstack+react-router@1.170.18_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/@tanstack/react-router/dist/esm/useRouteContext.js?v=ca08bbe4:4:9)\n    at DashboardLayoutInner (http://localhost:3010/src/modules/dashboard/ui/shell/DashboardLayout.tsx:34:19)\n    at Object.react_stack_bottom_frame (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:12866:12)\n    at renderWithHooks (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:4213:19)\n    at updateFunctionComponent (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:5569:16)\n    at beginWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:6140:20)\n    at runWithFiberInDEV (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:851:66)\n    at performUnitOfWork (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8429:92)\n    at workLoopSync (http://localhost:3010/node_modules/.vite/deps/react-dom_client.js?v=ca08bbe4:8325:37) The above error occurred in the <DashboardLayoutInner> component. React will try to recreate this component tree from scratch using the error boundary you provided, CatchBoundaryImpl."
+      ],
+      "consoleWarnings": [
+        "Warning: Error in route match: __root__/"
+      ],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/status.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/roadmap",
+      "file": "src/routes/_landing/roadmap.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/roadmap",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/roadmap.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/crawler",
+      "file": "src/routes/_landing/crawler.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/crawler",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/crawler.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/changelog",
+      "file": "src/routes/_landing/changelog/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/changelog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/changelog.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/changelog/:slug",
+      "file": "src/routes/_landing/changelog/$slug.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/changelog/:slug",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/changelog/%3Aslug"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/changelog_slug.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/blog",
+      "file": "src/routes/_landing/blog/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/blog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/blog.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/blog/:slug",
+      "file": "src/routes/_landing/blog/$slug.tsx",
+      "status": 404,
+      "finalUrl": "http://localhost:3010/blog/:slug",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/blog/:slug"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/blog_slug.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/explore",
+      "file": "src/routes/_landing/explore/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/explore?q=&type=people",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/explore.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/legal/cookies",
+      "file": "src/routes/_landing/legal/cookies.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/cookies",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/legal_cookies.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/legal/imprint",
+      "file": "src/routes/_landing/legal/imprint.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/imprint",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/legal_imprint.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/legal/privacy",
+      "file": "src/routes/_landing/legal/privacy.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/privacy",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/legal_privacy.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/legal/terms",
+      "file": "src/routes/_landing/legal/terms.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/legal/terms",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/legal_terms.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/privacy/remove",
+      "file": "src/routes/_landing/privacy/remove.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/privacy/remove",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/privacy_remove.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/sign-in",
+      "file": "src/routes/auth/sign-in.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/sign-in",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/auth_sign-in.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/sign-up",
+      "file": "src/routes/auth/sign-up.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/sign-up",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/auth_sign-up.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/forgot",
+      "file": "src/routes/auth/forgot.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/forgot",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/auth_forgot.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/auth/reset",
+      "file": "src/routes/auth/reset.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/auth/reset",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/auth_reset.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/welcome",
+      "file": "src/routes/onboarding/welcome.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/welcome",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/onboarding_welcome.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/search",
+      "file": "src/routes/onboarding/search.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/search",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/onboarding_search.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/save",
+      "file": "src/routes/onboarding/save.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/save?q=",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/onboarding_save.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/onboarding/success",
+      "file": "src/routes/onboarding/success.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/onboarding/success",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/onboarding_success.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/builders/:builderId",
+      "file": "src/routes/builders/$builderId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/builders/:builderId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 451 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/builders/:builderId",
+        "451 http://localhost:3010/api/builders/:builderId/views"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/builders_builderId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/portfolio/:claimId",
+      "file": "src/routes/portfolio/$claimId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/portfolio/:claimId",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/portfolio_claimId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/r/:slug",
+      "file": "src/routes/r/$slug.tsx",
+      "status": 404,
+      "finalUrl": "http://localhost:3010/r/:slug",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/r/:slug"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/r_slug.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/schedule/:invitationId",
+      "file": "src/routes/schedule/$invitationId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/schedule/:invitationId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [
+        "The resource http://localhost:3010/fonts/inter-latin-wght-normal.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally."
+      ],
+      "failedRequests": [
+        "404 http://localhost:3010/api/public/scheduling/:invitationId"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/schedule_invitationId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/team/invite/:invitationId",
+      "file": "src/routes/team/invite/$invitationId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/team/invite/:invitationId",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/team_invite_invitationId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/dashboard",
+      "file": "src/routes/_dashboard/dashboard/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/dashboard",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/dashboard.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/search",
+      "file": "src/routes/_dashboard/search/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/search?q=&mode=keyword",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/search.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/alerts",
+      "file": "src/routes/_dashboard/alerts.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/alerts",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/alerts.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/calendar",
+      "file": "src/routes/_dashboard/calendar/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/calendar?view=month&q=",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/calendar.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/lists",
+      "file": "src/routes/_dashboard/lists/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/lists",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/lists.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/lists/:listId",
+      "file": "src/routes/_dashboard/lists/$listId.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/lists/:listId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/lists/:listId/items",
+        "404 http://localhost:3010/api/lists/:listId"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/lists_listId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/sprints",
+      "file": "src/routes/_dashboard/sprints/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/sprints",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/sprints.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/sprints/new",
+      "file": "src/routes/_dashboard/sprints/new.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/sprints/new",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/sprints_new.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/sprints/:sprintId",
+      "file": "src/routes/_dashboard/sprints/$sprintId/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/sprints/:sprintId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/sprints/:sprintId",
+        "404 http://localhost:3010/api/sprints/:sprintId/results?sort=score"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/sprints_sprintId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/interviews",
+      "file": "src/routes/_dashboard/interviews/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/interviews.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/interviews/invitations",
+      "file": "src/routes/_dashboard/interviews/invitations.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews/invitations?status=all",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/interviews_invitations.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/interviews/:interviewId",
+      "file": "src/routes/_dashboard/interviews/$interviewId/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews/:interviewId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/interviews/:interviewId/brief",
+        "404 http://localhost:3010/api/interviews/:interviewId/report",
+        "404 http://localhost:3010/api/interviews/:interviewId/segments"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/interviews_interviewId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/interviews/:interviewId/live",
+      "file": "src/routes/_dashboard/interviews/$interviewId/live.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/interviews/:interviewId/live",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/interviews/:interviewId/session"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/interviews_interviewId_live.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/exports",
+      "file": "src/routes/_dashboard/exports/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/exports",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/exports.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/solutions",
+      "file": "src/routes/_dashboard/solutions/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/solutions",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/solutions.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/me",
+      "file": "src/routes/_dashboard/me/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/me",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/me.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/builder/:builderId",
+      "file": "src/routes/_dashboard/builder/$builderId/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/builder/:builderId",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 ()",
+        "Failed to load resource: the server responded with a status of 451 ()"
+      ],
+      "consoleWarnings": [],
+      "failedRequests": [
+        "404 http://localhost:3010/api/builders/:builderId",
+        "451 http://localhost:3010/api/builders/:builderId/views"
+      ],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/builder_builderId.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/team/activity",
+      "file": "src/routes/_dashboard/team/activity.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/team/activity",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/team_activity.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/team",
+      "file": "src/routes/_dashboard/settings/team.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/team",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/settings_team.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/billing",
+      "file": "src/routes/_dashboard/settings/billing/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/billing",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/settings_billing.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/billing/return",
+      "file": "src/routes/_dashboard/settings/billing/return.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/billing/return",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/settings_billing_return.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/privacy",
+      "file": "src/routes/_dashboard/settings/privacy.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/privacy",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/settings_privacy.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/settings/security",
+      "file": "src/routes/_dashboard/settings/security.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/settings/security",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/settings_security.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin",
+      "file": "src/routes/_dashboard/admin/index.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/metrics",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/admin/abuse",
+      "file": "src/routes/_dashboard/admin/abuse.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/abuse",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_abuse.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/access-requests",
+      "file": "src/routes/_dashboard/admin/access-requests.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/access-requests",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_access-requests.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/billing",
+      "file": "src/routes/_dashboard/admin/billing.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/billing",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_billing.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/changelog",
+      "file": "src/routes/_dashboard/admin/changelog.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/changelog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_changelog.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/claims",
+      "file": "src/routes/_dashboard/admin/claims.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/claims",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_claims.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/content",
+      "file": "src/routes/_dashboard/admin/content.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/content?tab=blog",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_content.light.png",
+      "redirected": true,
+      "notes": []
+    },
+    {
+      "route": "/admin/disputes",
+      "file": "src/routes/_dashboard/admin/disputes.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/disputes",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_disputes.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/incidents",
+      "file": "src/routes/_dashboard/admin/incidents.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/incidents",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_incidents.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/integrations",
+      "file": "src/routes/_dashboard/admin/integrations.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/integrations",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_integrations.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/metrics",
+      "file": "src/routes/_dashboard/admin/metrics.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/metrics",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_metrics.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/operations",
+      "file": "src/routes/_dashboard/admin/operations.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/operations",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_operations.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/refunds",
+      "file": "src/routes/_dashboard/admin/refunds.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/refunds",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_refunds.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/roadmap",
+      "file": "src/routes/_dashboard/admin/roadmap.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/roadmap",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_roadmap.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/solutions-gold-set",
+      "file": "src/routes/_dashboard/admin/solutions-gold-set.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/solutions-gold-set",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_solutions-gold-set.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/sources",
+      "file": "src/routes/_dashboard/admin/sources.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/sources",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_sources.light.png",
+      "redirected": false,
+      "notes": []
+    },
+    {
+      "route": "/admin/users",
+      "file": "src/routes/_dashboard/admin/users.tsx",
+      "status": 200,
+      "finalUrl": "http://localhost:3010/admin/users",
+      "consoleErrors": [],
+      "consoleWarnings": [],
+      "failedRequests": [],
+      "screenshotLight": "/Users/edd/Projects/eddremonts86/builderhunt/docs/ui-audit/evidence/platform-admin/mobile-375/admin_users.light.png",
+      "redirected": false,
+      "notes": []
+    }
+  ]
+}

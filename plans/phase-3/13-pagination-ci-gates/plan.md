@@ -12,13 +12,15 @@
 2. **Flip it and wire it** into `pnpm ci:local` and `.github/workflows/quality.yml`, beside the
    existing `security:route-coverage` step.
 3. **Add the `EXPLAIN` assertion**, which needs the seeded e2e database.
-4. **Documentation last**, describing what shipped rather than what was planned —
+4. **Add the table-surface inventory gate**, classifying every current raw `<table>` use and every
+   migrated `DataTable` consumer.
+5. **Documentation last**, describing what shipped rather than what was planned —
    `docs/visual-system.md` states that the code wins when the two disagree.
 
 ## Prove each gate can fail
 
 A gate never seen red is a gate nobody trusts. Each of the three is deliberately tripped once —
-an unbounded read added and removed, a sortable column without an index, a `<table>` in a new file —
+an unbounded read added and removed, a sortable column without an index, an unregistered data grid —
 and the failure is confirmed before the plan closes.
 
 ## Risks

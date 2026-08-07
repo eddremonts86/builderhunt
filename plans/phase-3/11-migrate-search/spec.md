@@ -1,62 +1,77 @@
-# Specification — migrate search onto the shell
+# Specification — migrate search onto the table shell
 
 > **Status**: `pending`
 > **Depends on**: [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: `src/modules/search/components/SearchPage.tsx` is 1,666 lines — the largest component in the app. It is the only surface with existing infinite scroll (`SearchPage.tsx:395-441`, page-counting with `page`/`perPage`/`hasMore` and an `IntersectionObserver` at 200px `rootMargin`), the only one with client-side sorting (`sortBy` at line 152, applied at 488-497), and it appends into a growing array at line 418 with no virtualization. It has two backends: `/api/search/builders` and `/api/search/semantic`.
+> **Reality check**: `SearchPage.tsx` is 1,666 lines and appends pages without virtualization.
+> Keyword search fans out to third-party APIs in `src/lib/search.ts`; it is not a SQL table and
+> cannot use `buildKeysetPage`. Semantic search has a local pgvector leg plus a federated fallback.
 
 ## Problem
 
-Search is where the current approach is most visibly strained: a client-side sort over an
-infinitely-scrolled partial list, which sorts only what has loaded and presents the result as a
-ranking. It is also the surface where virtualization matters most, because it is the one people
-scroll for minutes.
+Search sorts a partial, infinitely growing client array and presents it as a complete ranking. The
+DOM grows without a bound. The earlier plan draft proposed passing both endpoints through the SQL
+keyset builder, which is impossible for federated APIs and would erase source-health semantics.
 
 ## Goal
 
-Search on the shell, with pagination and sorting server-side, and the semantic ranking preserved
-exactly.
+Render keyword and semantic search through the shared shell and virtualizer, move every available
+sort/filter to the backend that owns the full result set, and preserve the exact current relevance
+ordering and degraded-source reporting.
 
-## Non-goals
+## Backend contracts
 
-- **Changing relevance or scoring.** The semantic pipeline's ranking is the product; this plan does
-  not touch how results are ordered by relevance.
-- **Merging the two backends.** Keyword and semantic stay separate endpoints.
-- **Splitting the 1,666-line component.** Tempting and out of scope. Extracting the result list is
-  in scope; refactoring the filter panel, source toggles and semantic mode switch is not.
+### Federated keyword search
 
-## Semantic ranking as a pass-through
+The federation remains provider-backed. It returns at most `TABLE_PAGE_SIZE` rows and an opaque,
+signed continuation bound to the normalized query, filters, enabled-source snapshot and access
+scope. The continuation contains only bounded per-source continuation/page state; it never contains
+client-supplied column names. Sources that expose only numeric pages remain best-effort under
+concurrent upstream changes, and the response says `consistency: 'provider-best-effort'` rather than
+claiming keyset stability.
 
-The core design question. Semantic search produces a **ranked set of ids** from a vector query;
-that ranking cannot be expressed as an `ORDER BY` over a column, so it cannot be a `TableQuery`
-sort.
+Because the federation cannot know the total without exhausting every upstream, it returns
+`total: null`. It supports `relevance` only. A header for followers/date is not sortable in keyword
+mode unless the backend first materializes the complete set; sorting a loaded prefix is forbidden.
 
-The ranked id set is therefore passed to `buildKeysetPage` as an **opaque pre-filter**, and the
-capability declares a relevance sort that means "preserve the order of the supplied id set". The
-keyset tiebreaker still applies within equal relevance so pages remain stable.
+### Semantic search
 
-Attempting to translate semantic relevance into the generic sort vocabulary would either lose the
-ranking or leak vector internals into the URL. Neither is acceptable, so it stays a pass-through.
+The local pgvector leg pages in SQL by total order `(distance, source, source_id)` and uses a signed
+public/tenant cursor bound to the query-vector hash and filters. It can report an exact total only if
+measured cheaply; otherwise `total: null` is honest. The hybrid/federated fallback uses the keyword
+continuation contract and keeps its mode explicit.
+
+Semantic relevance stays the default. A secondary column sort is offered only on a materialized
+bounded candidate set whose completeness is known; otherwise it is hidden, not performed on one
+page.
+
+## UI scope
+
+Extract the result collection and shell adapter from `SearchPage.tsx`; leave the filter panel,
+source toggles and semantic-mode controls in place. Changing query, mode, source or filter clears the
+continuation and loaded rows before requesting page one. Preserve source health/degraded messaging,
+tracked state, cards, actions and all current test ids.
 
 ## Success metrics
 
-- `grep -n 'perPage\|hasMore\|IntersectionObserver' src/modules/search/components/SearchPage.tsx`
-  returns nothing.
-- The client-side `sortBy` block (currently lines 152 and 488-497) is gone; sorting is a
-  `TableQuery`.
-- Semantic and keyword modes both paginate, and the first page of semantic results is **identical**
-  to today's for the same query — asserted against a recorded fixture, not eyeballed.
-- Scrolling a large result set holds DOM node count flat (the virtualizer from plan 06).
-- Existing search e2e specs green.
+- Keyword and semantic first-page ids match recorded seeded fixtures exactly.
+- No client-side sort touches the loaded result array.
+- Every response holds at most `TABLE_PAGE_SIZE` rows and uses the correct continuation contract.
+- 500 loaded fixture rows keep the rendered DOM window bounded.
+- Changing any query control cannot reuse an old cursor.
+- Existing search e2e, source-health, fallback, tracking and entitlement tests stay green.
+
+## Non-goals
+
+- Changing scoring, fusion, semantic thresholds, provider selection or source-health behavior.
+- Claiming keyset consistency for third-party APIs that do not provide it.
+- Fabricating a total count.
+- Refactoring the entire `SearchPage.tsx`.
 
 ## Resolved edge cases
 
-- **Switching from semantic to keyword mid-scroll.** A new query, so the cursor is dropped and the
-  list refetches from page one.
-- **Sorting semantic results by followers.** Allowed: the pre-filter narrows to the ranked set, and
-  the requested column orders within it. The UI must not imply this is still relevance order.
-- **A ranked id set larger than one page.** The pre-filter carries the whole set; the keyset
-  predicate walks it. If the set is large enough that passing it becomes the bottleneck, record that
-  rather than silently truncating.
-- **Zero semantic results.** The empty state, not the filtered-empty state — the query matched
-  nothing, no filter excluded anything.
+- A provider fails on page two: keep loaded rows, show its failed status, and allow retry.
+- Semantic falls back mid-query: mode and continuation kind change together; the old cursor is invalid.
+- An enabled source is disabled between pages: the source snapshot mismatch rejects the old cursor
+  and restarts at page one, so cached rows from the disabled source are not served.
+- Zero results with failed sources is a degraded empty state, not proof that nobody matched.

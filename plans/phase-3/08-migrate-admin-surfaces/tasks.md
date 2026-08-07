@@ -3,7 +3,8 @@
 > **Status**: `pending`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: Add each surface to `tests/e2e/data-tables.spec.ts`'s parameter list as it lands.
+> **Reality check**: Add each applicable surface to `tests/e2e/data-tables.spec.ts` as it lands.
+> `/admin/plan-requests` is intentionally gone; never recreate it.
 
 - [ ] **Migrate the abuse console**
   - Files: `src/modules/dashboard/components/AbuseConsole.tsx`,
@@ -20,12 +21,18 @@
     started-at (default) and status.
   - Verify: create an incident, edit it, confirm the public `/status` page still reflects it.
 
-- [ ] **Migrate plan requests, with the first bulk action**
-  - Files: `src/routes/_dashboard/admin/plan-requests.tsx`,
-    `src/shared/lib/table/capabilities/plan-requests.ts`
-  - Do: `DataTable` with selection plus an approve/deny bulk action over the **loaded** selection.
-    Do not offer "select all matching" unless the endpoint accepts a predicate token.
-  - Verify: select several rows, apply a bulk action, confirm only the selected rows changed.
+- [ ] **Migrate integrations, metrics, and operations tables**
+  - Files: `src/modules/admin/integrations/IntegrationsPage.tsx`,
+    `src/modules/admin/metrics/AdminMetricsPage.tsx`,
+    `src/modules/admin/operations/OperationsPage.tsx`,
+    `src/shared/lib/table/capabilities/platform-integrations.ts`,
+    `src/shared/lib/table/capabilities/platform-metrics.ts`,
+    `src/shared/lib/table/capabilities/platform-operations.ts`
+  - Do: migrate only real row collections to platform-scoped capabilities and `DataTable`;
+    charts/cards remain semantic charts/cards. Preserve health, run-action, audit and error behavior.
+    Classify and bound each backing read before migration. Never recreate the retired plan-request queue.
+  - Verify: platform-admin e2e covers sorting/filtering and existing actions for all three; read-path
+    detector does not increase; `rg "plan-requests" src/routes` returns nothing.
 
 - [ ] **Migrate the four small surfaces**
   - Files: `src/modules/dashboard/components/ActiveSessionsPanel.tsx`,

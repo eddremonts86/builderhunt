@@ -7,22 +7,22 @@
 
 - [ ] **Write the detector in report-only mode**
   - Files: `scripts/check-unbounded-reads.mjs`, `package.json`
-  - Do: walk `src/**/*.{ts,tsx}`; flag exported functions whose body has a Drizzle list read
-    (`.select({`, `.select()`, `db.select`, `tx.select`, `findMany(`) and no `.limit(`. Strip
-    `(Buffer|Array|Object|Set|Map).from(` before matching. Exclude scalar aggregates (`count(`,
-    `sum(`, `` sql`count ``). Honour `// unbounded-read-ok: <reason>`. Print
-    `{"unbounded":N,"aggregates":M,"exempted":K}` and **exit 0**.
+  - Do: use the installed TypeScript compiler API to visit Drizzle list-query chains and `findMany`
+    calls in exported functions, non-exported helpers and route-handler objects. Associate `.limit()`
+    with the same query chain; exclude scalar aggregates structurally, not by file-wide regex. Honour
+    `// unbounded-read-ok: <reason>` on the exact statement. Print commit SHA, counts and file/line/kind
+    entries as JSON and **exit 0**.
   - Verify: `node scripts/check-unbounded-reads.mjs` prints the JSON and exits 0; add
     `"check:unbounded": "node scripts/check-unbounded-reads.mjs"` to `package.json`.
 
-- [ ] **Validate the detector against the survey baseline**
+- [ ] **Validate the detector against synthetic and historical cases**
   - Files: `scripts/check-unbounded-reads.mjs`
-  - Do: the survey found ≈50 request-serving reads, 13 worker scans and 11 aggregates. If the
-    detector reports a materially different number, find out which side is wrong before
-    continuing. Add a deliberate unbounded read to a scratch file and confirm the count rises
-    by 1, then remove it.
-  - Verify: count is within a couple of entries of 50 and every difference is explained in the
-    commit message, not averaged away.
+  - Do: add scratch fixtures for an exported repository function, nested route handler,
+    non-exported helper, scalar aggregate, two queries in one function where only one is limited,
+    and an approved comment. Compare the fresh output with the old survey and investigate every
+    difference, but never force the count to match history.
+  - Verify: each positive fixture increments exactly once, each negative fixture increments zero,
+    scratch files are removed, and the committed classification records the current git SHA.
 
 - [ ] **Classify every unbounded read**
   - Files: this file (the table below)
@@ -50,7 +50,8 @@
 
     **Model-bounded** — ceiling fixed by the data model; `.limit(n)` plus a comment naming why:
     `repositories/public-surface-indexing.ts` (`getSurfaceDirectives`,
-    `listSurfaceIndexingForAdmin` — exactly `SEO_SURFACES.length`, seeded by `drizzle/0083`) ·
+    `listSurfaceIndexingForAdmin` — exactly `SEO_SURFACES.length`, seeded by
+    `drizzle/0083_public_surface_indexing_grants.sql`) ·
     `organization-lifecycle.ts` (`listMyOrganizations`, `listInvitationsForEmail`) ·
     `repositories/account-privacy.ts` (`listOwnedOrganizationsWithOtherMembers`) ·
     `repositories/billing-ledger.ts` (`listAllocationsForReservation`) ·
@@ -70,7 +71,8 @@
     `repositories/builder-claims.ts` (`listPublishedPortfolioClaimIds`) ·
     `repositories/profile-removal.ts` (`listActiveSuppressions`) ·
     `repositories/public-radars.ts` (`listAllPublicRadarSlugs`) ·
-    plus the 13 worker scans, which already lease-batch and need only an explicit `.limit(BATCH)`
+    plus every worker scan in the fresh inventory; lease-batched scans need an explicit
+    `.limit(BATCH)` rather than a redesign
 
 - [ ] **Record the detector's known blind spots**
   - Files: `01-read-path-audit/spec.md`

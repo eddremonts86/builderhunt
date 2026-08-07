@@ -1,51 +1,65 @@
-# Tasks — migrate search onto the shell
+# Tasks — migrate search onto the table shell
 
 > **Status**: `pending`
 > **Depends on**: [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: `SearchPage.tsx` is 1,666 lines; its scroll loop is at 395-441 and its client sort at 152 and 488-497.
+> **Reality check**: Keyword search is a live federation, not a Drizzle query. Semantic search has
+> both SQL and federation legs. Preserve source health, degradation and fallback metadata.
 
-- [ ] **Record today's ranking as a fixture before changing anything**
-  - Files: `tests/e2e/fixtures/search-ranking.json`
-  - Do: capture the first page of results for one fixed keyword query and one fixed semantic query
-    against a seeded database — ids in order. This is how "ranking preserved" becomes checkable.
-  - Verify: the fixture is deterministic across two runs on the same seed.
+- [ ] **Record deterministic before-images of both search modes**
+  - Files: `tests/e2e/fixtures/search-ranking.json`, `tests/e2e/search.spec.ts`
+  - Do: capture ordered first-page ids and source-health/mode metadata for a fixed keyword query and
+    semantic query against the seeded harness before changing code. Normalize timestamps/durations;
+    do not hide source order or health.
+  - Verify: two consecutive runs produce byte-identical fixture content.
 
-- [ ] **Declare the search capability**
-  - Files: `src/shared/lib/table/capabilities/search-builders.ts`
-  - Do: sortable relevance (default), score, followers and last-active; filterable source, country
-    and language; `tiebreaker` the builder id. Relevance means "preserve the order of the supplied
-    id set", not an `ORDER BY` over a column.
-  - Verify: plan 04's guard passes — add any missing index here rather than dropping the sort.
+- [ ] **Define a signed, bounded provider continuation**
+  - Files: `src/lib/search-continuation.ts`, `tests/unit/lib/search-continuation.test.ts`
+  - Do: encode version, normalized-query fingerprint, mode, filters, access scope, enabled-source
+    snapshot and bounded per-source continuation/page state. Sign with the existing server signing
+    secret and HMAC pattern. Reject tampering, expiry, query/filter/mode/scope/source mismatch and
+    oversized payloads. Never accept a DB column name.
+  - Verify: unit tests cover every rejection independently and round-trip every active connector's
+    continuation shape; token size stays below the documented HTTP-header/query limit.
 
-- [ ] **Paginate keyword search server-side**
-  - Files: `src/routes/api/search/builders.ts`
-  - Do: route through `tablePageHandler` + `buildKeysetPage`. Replace `page`/`perPage`/`hasMore`
-    with a cursor and `total`.
-  - Verify: page 1 and page 2 share no ids; the first page matches the keyword half of the recorded
-    fixture exactly.
+- [ ] **Return bounded keyword pages without inventing keyset guarantees**
+  - Files: `src/lib/search.ts`, `src/routes/api/search/builders.ts`,
+    `tests/unit/routes/api/search-builders.test.ts`
+  - Do: replace public `page/perPage` with the signed continuation at the route boundary while
+    preserving provider-specific paging internally. Clamp each response to `TABLE_PAGE_SIZE`, return
+    `total: null`, `consistency: 'provider-best-effort'`, next cursor, source statuses and degraded
+    flag. Keep relevance as the only global sort.
+  - Verify: two pages are bounded; query/source/filter cursor reuse is 400; disabled sources are not
+    served from cache; source timeout/failure still yields partial results with truthful status.
 
-- [ ] **Paginate semantic search as a pre-filter pass-through**
-  - Files: `src/routes/api/search/semantic.ts`
-  - Do: the vector query still produces a ranked id set. Pass that set to `buildKeysetPage` as an
-    **opaque pre-filter** and let the capability's relevance sort preserve its order. Do not
-    translate relevance into the generic sort vocabulary — that would either lose the ranking or
-    leak vector internals into the URL.
-  - Verify: the first page matches the semantic half of the recorded fixture **exactly**, id for id,
-    in order.
+- [ ] **Keyset-page the local semantic leg and preserve hybrid fallback**
+  - Files: `src/lib/semantic/semantic-search.ts`,
+    `src/shared/lib/repositories/public-builder-embeddings.ts`,
+    `src/routes/api/search/semantic.ts`,
+    `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts`
+  - Do: replace local pgvector offset paging with a total-order cursor over distance, source and
+    source id, bound to query-vector hash and filters. When local results degrade to federation,
+    switch atomically to the provider-continuation kind and keep `mode` explicit. Never pass a
+    federated result set to `buildKeysetPage`.
+  - Verify: seeded pages have no duplicate ids; a row inserted between local pages does not duplicate
+    or skip the original snapshot boundary; tampered/cross-query cursor fails; keyword fallback and
+    entitlement tests stay green.
 
-- [ ] **Move the result list onto the shell**
-  - Files: `src/modules/search/components/SearchPage.tsx`
-  - Do: replace the result list with `DataTable`. Delete the `sortBy` state (line 152) and its
-    client-side application (488-497), and the `IntersectionObserver` loop (395-441) — but only
-    after the shell's loop is in place, so scrolling is never broken in between. Leave the filter
-    panel, source toggles and semantic mode switch alone; they are out of scope.
-  - Verify: `grep -n 'perPage\|hasMore\|IntersectionObserver\|sortBy' src/modules/search/components/SearchPage.tsx`
-    returns nothing; existing search e2e specs green.
+- [ ] **Adapt both modes to the shared shell contract**
+  - Files: `src/shared/lib/table/capabilities/search-builders.ts`,
+    `src/modules/search/components/SearchPage.tsx`,
+    `tests/unit/modules/search/components/SearchPage.test.tsx`
+  - Do: define a non-SQL/provider-backed capability for keyword mode and a semantic adapter for the
+    local leg. Use `PageResult` with `total: null` where unknowable, preserve cards/actions/test ids,
+    and clear rows/cursor on every query/mode/filter/source change. Remove client sorting of the
+    loaded prefix; hide unsupported sort controls.
+  - Verify: component tests cover reset, degraded empty, retry-with-loaded-rows and unknown total;
+    grep confirms no loaded-results `.sort()` remains in `SearchPage.tsx`.
 
-- [ ] **Confirm the DOM stays flat while scrolling**
-  - Files: `tests/e2e/data-tables.spec.ts`
-  - Do: add search to the shared spec's parameter list, so the virtualization and focus-survival
-    assertions cover the surface where they matter most.
-  - Verify: `pnpm test:e2e tests/e2e/data-tables.spec.ts` green with search included; run twice via
-    `pnpm test:e2e:repeat` to catch flakiness.
+- [ ] **Prove ranking, bounded DOM, and source semantics end to end**
+  - Files: `tests/e2e/data-tables.spec.ts`, `tests/e2e/search.spec.ts`
+  - Do: add both modes to the shared shell suite; compare first-page ids with the before-image;
+    load 500 fixture rows and assert the rendered window stays bounded; exercise keyboard focus,
+    tracking, provider failure on page two, mode switch and filter reset.
+  - Verify: `pnpm test:e2e tests/e2e/search.spec.ts tests/e2e/data-tables.spec.ts` is green twice via
+    `pnpm test:e2e:repeat`; `pnpm test:a11y` is green.

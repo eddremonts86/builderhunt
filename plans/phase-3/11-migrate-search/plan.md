@@ -1,39 +1,32 @@
-# Plan — migrate search onto the shell
+# Plan — migrate search onto the table shell
 
 > **Status**: `pending`
 > **Depends on**: [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: One 1,666-line component and two API routes. Sequenced last because it is the only surface with all three problems at once — client sorting, its own infinite scroll, and a non-column ranking.
+> **Reality check**: One UI component, two routes, the federation, and the pgvector repository.
+> The SQL keyset engine applies only to the local semantic leg.
 
 ## Sequence
 
-1. **Record a fixture of today's first page** for a fixed semantic query and a fixed keyword query,
-   before changing anything. That fixture is how "ranking preserved" becomes checkable instead of
-   asserted.
-2. **Keyword mode first** — it is an ordinary `TableQuery`.
-3. **Semantic mode second**, as a pre-filter pass-through.
-4. **Delete the old scroll loop** only once both modes page correctly.
-
-Recording the fixture first is the whole safety net. Migrating relevance-ranked search without a
-before-image is how ranking regressions ship unnoticed.
-
-## Why last
-
-Sequenced after 08–10 so the shell has already absorbed sixteen other surfaces' requirements. Any
-slot, renderer or capability feature search needs that does not exist yet is more likely to be a
-real gap than a shell design mistake at that point.
+1. Record deterministic keyword and semantic first-page fixtures plus source-health metadata.
+2. Define and adversarially test the signed provider-continuation contract.
+3. Page the local semantic leg by `(distance, source, source_id)` and preserve hybrid fallback.
+4. Adapt both response shapes to `PageResult` (`total: null` where unknowable).
+5. Move the result collection onto `DataTable`/virtualization and remove partial client sorting.
+6. Exercise query/mode/filter changes, degraded sources, tracking and long scroll in the browser.
 
 ## Risks
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Semantic ranking changes subtly and nobody notices | Medium | **High** — relevance is the product | A recorded fixture of today's first page, compared exactly; ranking is a pass-through, never translated into a sort |
-| Passing a large ranked id set becomes the bottleneck | Medium | Medium | Measure it; if the set is large, record the limit reached rather than silently truncating |
-| The 1,666-line component resists extraction and the change sprawls | High | Medium | Scope is the result list only; the filter panel, source toggles and semantic switch are explicitly out of scope |
-| Removing the old `IntersectionObserver` loop breaks scroll behaviour people rely on | Medium | Medium | The shell's loop replaces it before the old one is deleted, so both are never absent at once |
-| Sorting semantic results implies they are still relevance-ordered | Medium | Low — but misleading | The toolbar shows the active sort explicitly; relevance is a named sort option, not an implicit default that survives a column click |
+| Relevance changes subtly | Medium | High | Seeded ordered fixtures captured before edits and compared id-for-id |
+| A SQL cursor is falsely imposed on external APIs | High in the old draft | High | Separate signed provider continuation with explicit best-effort consistency |
+| Source-health or fallback metadata disappears in a generic adapter | Medium | High | Metadata is part of the adapter contract and covered by route/e2e tests |
+| Cursor survives a changed query or enabled-source set | Medium | High | Signature binds normalized query, mode, filters, scope and source snapshot |
+| UI still sorts only loaded rows | Medium | High | Non-relevance sort is unavailable until backend completeness is real; grep plus e2e gate |
 
 ## Rollback
 
-One surface, one commit, two API routes. The recorded fixture also serves as the regression check
-for a revert: if the reverted first page does not match the fixture, something else changed.
+The two server contracts and UI adapter land in separate commits. Reverting the UI restores the old
+consumer; reverting a continuation keeps the preceding bounded response contract intact. No schema
+migration is required unless measurements justify persistent search sessions, which is out of scope.

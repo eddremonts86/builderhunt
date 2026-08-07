@@ -1,7 +1,7 @@
 # Plan de entrega — landing segmentada
 
 > **Status**: `pending`
-> **Depends on**: [`01-investigacion-icp`](../01-investigacion-icp/spec.md), [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Se extiende el sistema público actual y sus componentes; no se crea una app de
 > marketing separada.
@@ -55,4 +55,3 @@
 Desactivar selector y rutas segmentadas, retirar sitemap entries y conservar home actual. Los hints
 ya persistidos siguen siendo preferencias válidas, pero onboarding usa fallback si el segmento se
 retira de la taxonomía.
-

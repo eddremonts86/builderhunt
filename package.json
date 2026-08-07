@@ -17,6 +17,7 @@
     "assets:check": "node scripts/check-performance-budgets.mjs",
     "plans:check-order": "node scripts/check-plan-order.mjs",
     "plans:check-tasks": "node scripts/check-plan-tasks.mjs",
+    "plans:check-readiness": "node scripts/check-phase-readiness.mjs phase-2 phase-3 && pnpm plans:check-tasks",
     "test:coverage": "vitest run --coverage",
     "test:unit": "vitest run tests/unit",
     "test:ai-live": "AI_LIVE_SMOKE=true SENSITIVE_AI_ENABLED=true vitest run tests/unit/shared/lib/ai/live-provider-smoke.test.ts",
