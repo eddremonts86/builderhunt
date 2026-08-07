@@ -50,7 +50,10 @@ const guardPatterns = [
   // load — see src/shared/lib/table/handler.ts. The guard is there rather than in the route file,
   // which is the point of having one; listing it here is the same call as `withCapabilityRequest`
   // above, and allowlisting these routes as "public" would be plainly wrong.
-  { name: 'table-page', pattern: /tablePageHandler/ },
+  // Matches `tablePageHandler` and `platformTablePageHandler` alike — the capital `T` in the
+  // platform variant is why an earlier `/tablePageHandler/` missed it, and the admin users route
+  // (whose only handler is that call) reported as unguarded.
+  { name: 'table-page', pattern: /\b(?:platformT|t)ablePageHandler\b/ },
 ]
 
 async function collectRouteFiles(dir) {

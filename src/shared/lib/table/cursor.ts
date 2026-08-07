@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 
 import { env } from '~/shared/lib/env'
+import type { TableQuery } from './types'
 
 /**
  * Keyset cursors, signed.
@@ -20,7 +21,39 @@ import { env } from '~/shared/lib/env'
  * `index.ts` does not re-export these functions — see the note there.
  */
 
-const PREFIX = 'builderhunt:table-cursor:v1:'
+/**
+ * `v2`, because the payload gained a field.
+ *
+ * Bumping the version means a `v1` cursor fails on the signature rather than on a missing field —
+ * a clean 400 and a refetch from page one, instead of a confusing decode error. Cursors are
+ * short-lived and never stored, so invalidating every outstanding one costs a single refetch.
+ */
+const PREFIX = 'builderhunt:table-cursor:v2:'
+
+/**
+ * A short, stable digest of the parts of a query that change *which rows exist*.
+ *
+ * The cursor already carried the sort, because paging into a different ordering is obviously
+ * wrong. It did not carry the filter or the search term, and that was the same bug wearing a
+ * quieter coat: a cursor minted under `filter.source=github` and presented with
+ * `filter.source=gitlab` was accepted, and the keyset predicate then resumed from a row's position
+ * in an ordering the new filter does not produce — so rows are skipped or repeated. No tenant
+ * boundary is crossed, which is exactly why it would have gone unnoticed.
+ *
+ * Filter values are sorted before hashing because `filters[id]` is a set: `[a, b]` and `[b, a]`
+ * are the same query and must produce the same fingerprint, or a chip re-ordered by a click would
+ * invalidate a valid cursor.
+ *
+ * Sixteen base64url characters is 96 bits — far more than enough to distinguish the handful of
+ * filter combinations a session visits, and short enough to keep the cursor a URL parameter.
+ */
+export function queryFingerprint(query: Pick<TableQuery, 'search' | 'filters'>): string {
+  const filters = Object.keys(query.filters)
+    .sort()
+    .map((id) => `${id}=${[...query.filters[id]].sort().join('|')}`)
+    .join(';')
+  return createHash('sha256').update(`${query.search.trim()}\u0000${filters}`).digest('base64url').slice(0, 16)
+}
 
 /** A single `ORDER BY` value. Dates are ISO strings by the time they get here — JSON has no Date. */
 export type CursorValue = string | number | boolean | null
@@ -34,12 +67,16 @@ export interface TableCursorPayload {
   o: string | null
   /** The last row's values, in the order of the sort descriptor's terms. */
   k: CursorValue[]
+  /** `queryFingerprint` of the filter and search this page was produced under. */
+  q: string
 }
 
 export interface CursorExpectation {
   table: string
   sort: string
   organizationId: string | null
+  /** `queryFingerprint` of the filter and search being asked for now. */
+  query: string
 }
 
 /**
@@ -115,12 +152,14 @@ export function verifyTableCursor(
   if (typeof payload.s !== 'string') throw new TableCursorError('missing sort descriptor')
   if (payload.o !== null && typeof payload.o !== 'string') throw new TableCursorError('missing organization')
   if (!Array.isArray(payload.k)) throw new TableCursorError('missing key tuple')
+  if (typeof payload.q !== 'string') throw new TableCursorError('missing query fingerprint')
 
   // The signature already proves this server minted it. These checks prove it was minted for the
   // question being asked now.
   if (payload.t !== expected.table) throw new TableCursorError('table mismatch')
   if (payload.s !== expected.sort) throw new TableCursorError('sort mismatch')
   if (payload.o !== expected.organizationId) throw new TableCursorError('organization mismatch')
+  if (payload.q !== expected.query) throw new TableCursorError('filter or search mismatch')
 
   for (const value of payload.k) {
     const kind = typeof value
@@ -129,7 +168,7 @@ export function verifyTableCursor(
     }
   }
 
-  return { t: payload.t, s: payload.s, o: payload.o, k: payload.k as CursorValue[] }
+  return { t: payload.t, s: payload.s, o: payload.o, k: payload.k as CursorValue[], q: payload.q }
 }
 
 /** The canonical sort descriptor a cursor is bound to. Must match what plan 03 orders by. */

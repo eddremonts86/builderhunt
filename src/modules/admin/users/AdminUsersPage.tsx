@@ -4,6 +4,10 @@ import { Users, Edit3, X, Save, ExternalLink, ShieldCheck, AlertTriangle } from 
 import { PLAN_PRICING, type PlanTier } from '~/shared/lib/billing-shared'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { Button } from '~/components/ui/button'
+import { DataTable } from '~/shared/components/table'
+import { emptyTableSearch, tableSearchToParams } from '~/shared/lib/table/query-url'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import type { PageResult, TableQuery, TableSearch } from '~/shared/lib/table/types'
 
 type BillingProvenance = 'canonical' | 'manual_exception' | 'expired_exception' | 'no_organization'
 
@@ -28,7 +32,7 @@ interface UserBillingSummary {
  * Everything the operator needs is in `billing`, together with the provenance saying whether Stripe or an
  * operator put it there. Two sources for one question is what produced this.
  */
-interface UserRow {
+interface UserRow extends Record<string, unknown> {
   userId: string
   name: string
   email: string
@@ -84,8 +88,11 @@ function BillingCell({ billing }: { billing: UserBillingSummary | null }) {
   )
 }
 
+const EMPTY_PAGE: PageResult<UserRow> = { rows: [], nextCursor: null, total: 0, facets: {} }
+
 export function AdminUsersPage() {
-  const [users, setUsers] = React.useState<UserRow[]>([])
+  const [page, setPage] = React.useState<PageResult<UserRow>>(EMPTY_PAGE)
+  const [search, setSearch] = React.useState<TableSearch>(() => emptyTableSearch())
   const [loading, setLoading] = React.useState(true)
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [form, setForm] = React.useState<{ plan: PlanTier; planEndsAt: string; reason: string }>({
@@ -96,17 +103,25 @@ export function AdminUsersPage() {
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
-  const [filter, setFilter] = React.useState('')
 
-  const load = React.useCallback(async () => {
+  /**
+   * The search runs in Postgres now.
+   *
+   * It used to be `users.filter(...)` over whatever the browser held, and the endpoint returned
+   * **every user in the system** to make that work. Typing an email that belongs to a user the
+   * page had not loaded returned nothing — the same answer as "no such user", which is the
+   * difference between slow and wrong.
+   */
+  const load = React.useCallback(async (next: TableSearch, append = false) => {
+    setLoading(true)
     try {
-      const res = await fetch('/api/admin/users', { credentials: 'include' })
+      const res = await fetch(`/api/admin/users?${tableSearchToParams(next).toString()}`, { credentials: 'include' })
       if (!res.ok) {
         setError(`Failed to load: ${res.status}`)
         return
       }
-      const data = await res.json()
-      setUsers(Array.isArray(data.users) ? data.users : [])
+      const data = await res.json() as PageResult<UserRow>
+      setPage((current) => append ? { ...data, rows: [...current.rows, ...data.rows] } : data)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -114,11 +129,13 @@ export function AdminUsersPage() {
     }
   }, [])
 
+  const searchKey = JSON.stringify(tableSearchToParams(search).toString())
   React.useEffect(() => {
-    load()
-  }, [load])
+    void load(search)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKey])
 
-  const startEdit = (u: UserRow) => {
+  const startEdit = React.useCallback((u: UserRow) => {
     setEditingId(u.userId)
     // Seeded from the canonical entitlement. `pro_max` is deliberately not offered — only a real Stripe
     // subscription can produce it — so an organization already on it starts the form at `free` rather than at a
@@ -131,11 +148,7 @@ export function AdminUsersPage() {
     setForm({ plan, planEndsAt: endsAt, reason: '' })
     setError(null)
     setSuccess(null)
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-  }
+  }, [])
 
   const save = async () => {
     if (!editingId) return
@@ -161,7 +174,7 @@ export function AdminUsersPage() {
       if (!res.ok) throw new Error(`Failed: ${res.status}`)
       setSuccess('Manual grant recorded (audited).')
       setEditingId(null)
-      await load()
+      await load(search)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -169,9 +182,101 @@ export function AdminUsersPage() {
     }
   }
 
-  const filtered = users.filter(
-    (u) => !filter || u.email.toLowerCase().includes(filter.toLowerCase()) || u.name.toLowerCase().includes(filter.toLowerCase()),
+  /**
+   * The manual-grant form, in the row's expansion slot.
+   *
+   * It used to replace three of the row's five cells in place, which is why the file carried a
+   * comment explaining how the column count still added up. As an expansion it is just a form under
+   * the row, and the row keeps showing what it always shows.
+   */
+  const renderGrantForm = (user: UserRow) => (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-bh-text">Manual grant for {user.email}</p>
+      <Select value={form.plan} onValueChange={(v) => setForm({ ...form, plan: v as PlanTier })}>
+        <SelectTrigger data-testid="admin-user-plan-select">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="free">Free</SelectItem>
+          <SelectItem value="pro">Pro</SelectItem>
+          <SelectItem value="team">Team</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-[10px] text-bh-text-dim">Pro Max is Stripe-only — never manually grantable.</p>
+      <Input
+        type="date"
+        value={form.planEndsAt}
+        onChange={(event) => setForm({ ...form, planEndsAt: event.target.value })}
+        data-testid="admin-user-ends-at"
+      />
+      <Input
+        type="text"
+        value={form.reason}
+        onChange={(event) => setForm({ ...form, reason: event.target.value })}
+        placeholder="Reason (required — shown in the audit log)"
+        className="w-full text-xs"
+        data-testid="admin-user-reason"
+      />
+      <Button
+        type="button"
+        onClick={() => void save()}
+        disabled={busy || form.reason.trim().length === 0}
+        variant="primary"
+        size="sm"
+        data-testid="admin-user-save"
+      >
+        <Save className="h-3 w-3" aria-hidden="true" />
+        Save grant
+      </Button>
+    </div>
   )
+
+  const columns = React.useMemo<ColumnDef<UserRow>[]>(() => [
+    {
+      id: 'name',
+      header: 'User',
+      sortable: true,
+      priority: 'primary',
+      value: (user) => user.name,
+      cell: (user) => (
+        <span className="min-w-0">
+          <span className="block truncate font-medium text-bh-text">{user.name}</span>
+          <span className="block truncate text-xs text-bh-text-dim">{user.email}</span>
+        </span>
+      ),
+    },
+    {
+      id: 'billing',
+      header: 'Organization & entitlement',
+      value: (user) => user.billing?.entitlementTier ?? null,
+      cell: (user) => <BillingCell billing={user.billing} />,
+    },
+    {
+      id: 'endsAt',
+      header: 'Ends at',
+      align: 'end',
+      priority: 'secondary',
+      value: (user) => user.billing?.trialEndsAt ?? user.billing?.currentPeriodEnd ?? null,
+      cell: (user) => (
+        <span data-testid={`admin-user-ends-at-${user.userId}`}>
+          {user.billing?.trialEndsAt
+            ? <span title="Expiry set on a manual grant">{new Date(user.billing.trialEndsAt).toLocaleDateString()}</span>
+            : user.billing?.currentPeriodEnd
+              ? <span title="End of the current Stripe billing period">{new Date(user.billing.currentPeriodEnd).toLocaleDateString()}</span>
+              : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'createdAt',
+      header: 'Joined',
+      sortable: true,
+      align: 'end',
+      priority: 'secondary',
+      value: (user) => user.createdAt,
+      cell: (user) => new Date(user.createdAt).toLocaleDateString(),
+    },
+  ], [])
 
   return (
     <div data-testid="admin-users-page">
@@ -190,14 +295,11 @@ export function AdminUsersPage() {
             </Link>.
           </p>
         </div>
-        <Input
-          type="text"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter by name or email…"
-          className="w-64"
-          data-testid="admin-users-filter"
-        />
+        {/*
+          The name/email search moved into the table toolbar, where it reaches Postgres instead of
+          filtering the loaded rows. The id stays so anything driving the page by it still finds a
+          search box, and points at the one that works.
+        */}
       </header>
 
       {error && (
@@ -207,131 +309,39 @@ export function AdminUsersPage() {
         <div className="card border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="admin-users-success">{success}</div>
       )}
 
-      <div className="card table-scroll p-0" tabIndex={0} role="region" aria-label="Users table, scrollable">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-bh-border text-left text-xs uppercase tracking-wider text-bh-text-dim">
-              <th className="px-3 py-2">User</th>
-              <th className="px-3 py-2">Organization &amp; entitlement</th>
-              <th className="px-3 py-2">Ends at</th>
-              <th className="px-3 py-2">Joined</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="text-center py-6 text-bh-text-muted">Loading…</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-6 text-bh-text-muted">No users found.</td></tr>
-            ) : (
-              filtered.map((u) => (
-                <tr key={u.userId} className="border-b border-bh-border/40" data-testid={`admin-user-row-${u.userId}`}>
-                  {editingId === u.userId ? (
-                    <>
-                      <td className="px-3 py-2">
-                        <p className="font-medium text-bh-text">{u.name}</p>
-                        <p className="text-xs text-bh-text-dim">{u.email}</p>
-                      </td>
-                      <td className="px-3 py-2"><BillingCell billing={u.billing} /></td>
-                      {/* Tier, expiry and reason share one cell: the row now has five columns, matching the
-                          header, since the duplicate per-user "Manual grant" column is gone. */}
-                      <td className="px-3 py-2">
-                        <Select
-                          value={form.plan}
-                          onValueChange={(v) => setForm({ ...form, plan: v as PlanTier })}
-                        >
-                          <SelectTrigger data-testid="admin-user-plan-select">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="free">Free</SelectItem>
-                            <SelectItem value="pro">Pro</SelectItem>
-                            <SelectItem value="team">Team</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-[10px] text-bh-text-dim mt-1">Pro Max is Stripe-only — never manually grantable.</p>
-                        <Input
-                          type="date"
-                          value={form.planEndsAt}
-                          onChange={(e) => setForm({ ...form, planEndsAt: e.target.value })}
-                          className="mt-1"
-                          data-testid="admin-user-ends-at"
-                        />
-                        <Input
-                          type="text"
-                          value={form.reason}
-                          onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                          placeholder="Reason (required — shown in the audit log)"
-                          className="mt-1 w-full text-xs"
-                          data-testid="admin-user-reason"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-bh-text-dim text-xs">
-                        {new Date(u.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            onClick={save}
-                            disabled={busy || form.reason.trim().length === 0}
-                            variant="primary"
-                            size="sm"
-                            data-testid="admin-user-save"
-                          >
-                            <Save className="w-3 h-3" aria-hidden="true" />
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={cancelEdit}
-                            variant="ghost"
-                            size="sm"
-                          >
-                            <X className="w-3 h-3" aria-hidden="true" />
-                          </Button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-3 py-2">
-                        <p className="font-medium text-bh-text">{u.name}</p>
-                        <p className="text-xs text-bh-text-dim">{u.email}</p>
-                      </td>
-                      <td className="px-3 py-2"><BillingCell billing={u.billing} /></td>
-                      <td className="px-3 py-2 text-bh-text-muted text-xs" data-testid={`admin-user-ends-at-${u.userId}`}>
-                        {u.billing?.trialEndsAt
-                          ? <span title="Expiry set on a manual grant">{new Date(u.billing.trialEndsAt).toLocaleDateString()}</span>
-                          : u.billing?.currentPeriodEnd
-                            ? <span title="End of the current Stripe billing period">{new Date(u.billing.currentPeriodEnd).toLocaleDateString()}</span>
-                            : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-bh-text-dim text-xs">
-                        {new Date(u.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Button
-                          type="button"
-                          onClick={() => startEdit(u)}
-                          variant="ghost"
-                          size="sm"
-                          data-testid="admin-user-edit"
-                        >
-                          <Edit3 className="w-3 h-3" aria-hidden="true" />
-                          Edit
-                        </Button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        label="Platform users"
+        columns={columns}
+        page={page}
+        query={search.query}
+        onQueryChange={(query: TableQuery) => setSearch((current) => ({
+          ...current,
+          query,
+          page: { ...current.page, cursor: null },
+        }))}
+        rowTestId={(user) => `admin-user-row-${user.userId}`}
+        rowId={(user) => user.userId}
+        status={loading && page.rows.length === 0 ? 'loading' : 'ready'}
+        onLoadMore={() => {
+          if (!page.nextCursor || loading) return
+          void load({ ...search, page: { ...search.page, cursor: page.nextCursor } }, true)
+        }}
+        expansion={renderGrantForm}
+        expandedRowId={editingId}
+        onExpandedChange={(rowId) => {
+          const user = rowId ? page.rows.find((candidate) => candidate.userId === rowId) : null
+          if (user) startEdit(user)
+          else setEditingId(null)
+        }}
+        emptyState={(
+          <div className="px-4 py-12 text-center text-sm text-bh-text-muted" data-testid="admin-users-empty">
+            No users found.
+          </div>
+        )}
+      />
 
       <p className="text-xs text-bh-text-dim mt-4">
-        Total: {users.length} {users.length === 1 ? 'user' : 'users'}.
+        Total: {page.total} {page.total === 1 ? 'user' : 'users'}.
         Manual-grant pricing reference: {PLAN_PRICING.pro.monthly}/mo Pro, {PLAN_PRICING.team.monthly}/mo Team.
       </p>
     </div>

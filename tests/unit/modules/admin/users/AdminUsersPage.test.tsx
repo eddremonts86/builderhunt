@@ -32,6 +32,29 @@ function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 500): Respon
  * fixture that still supplied it made the bug invisible here. A fixture richer than the response it stands in
  * for is not a fixture, it is a second implementation.
  */
+/**
+ * The endpoint answers a `PageResult` now.
+ *
+ * Phase 3 plan 10 bounded this read: it used to return every user in the system, and the page
+ * filtered them in the browser. `pricing` left the payload too — `AdminUsersPage` imports the
+ * constants from `billing-shared.ts`, so the wire copy was never read.
+ */
+function pageOf(rows: unknown[]) {
+  return { rows, nextCursor: null, total: rows.length, facets: {} }
+}
+
+/**
+ * The row's own expand control opens the manual-grant form.
+ *
+ * There used to be a per-row `admin-user-edit` button that swapped three cells of the row for
+ * inputs. Phase 3 moved the form into the table shell's expansion slot, and the shell renders the
+ * control — so the id is `<rowTestId>-expand`. The form's own ids (`admin-user-plan-select`,
+ * `admin-user-ends-at`, `admin-user-reason`, `admin-user-save`) are unchanged.
+ */
+function openGrantForm(userId = USERS[0].userId) {
+  return (testId(`admin-user-row-${userId}-expand`) as HTMLButtonElement)
+}
+
 const USERS = [
   {
     userId: 'u-canonical', name: 'Canonical Carl', email: 'carl@test.invalid', createdAt: '2027-01-01T00:00:00.000Z',
@@ -70,7 +93,7 @@ function testId(id: string): Element | null {
 
 describe('AdminUsersPage', () => {
   it('distinguishes canonical, manual-exception, expired-exception, and no-organization fixtures', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ users: USERS })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(pageOf(USERS))))
     await render()
 
     expect(testId('admin-user-billing-canonical')?.textContent).toContain('Pro Max')
@@ -80,7 +103,7 @@ describe('AdminUsersPage', () => {
   })
 
   it('links to Billing Operations, never presenting this page as Stripe subscription editing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ users: USERS })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(pageOf(USERS))))
     await render()
 
     const link = testId('admin-users-billing-link') as HTMLAnchorElement
@@ -92,10 +115,10 @@ describe('AdminUsersPage', () => {
   })
 
   it('requires a reason before a manual grant can be saved', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ users: USERS })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(pageOf(USERS))))
     await render()
 
-    await act(async () => (testId('admin-user-edit') as HTMLButtonElement)?.click())
+    await act(async () => openGrantForm().click())
     expect((testId('admin-user-save') as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -112,13 +135,13 @@ describe('AdminUsersPage', () => {
      * rather than post the current one.
      */
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({ users: USERS }))
+      .mockResolvedValueOnce(jsonResponse(pageOf(USERS)))
       .mockResolvedValueOnce(jsonResponse({ ok: true, to: 'free' }))
-      .mockResolvedValueOnce(jsonResponse({ users: USERS }))
+      .mockResolvedValueOnce(jsonResponse(pageOf(USERS)))
     vi.stubGlobal('fetch', fetchMock)
     await render()
 
-    await act(async () => (container!.querySelectorAll('[data-testid="admin-user-edit"]')[0] as HTMLButtonElement).click())
+    await act(async () => openGrantForm().click())
     const reasonInput = testId('admin-user-reason') as HTMLInputElement
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
@@ -140,12 +163,12 @@ describe('AdminUsersPage', () => {
 
   it('surfaces a step-up rejection distinctly rather than a fake success', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({ users: USERS }))
+      .mockResolvedValueOnce(jsonResponse(pageOf(USERS)))
       .mockResolvedValueOnce(jsonResponse({ error: 'Recent re-authentication required' }, false, 401))
     vi.stubGlobal('fetch', fetchMock)
     await render()
 
-    await act(async () => (container!.querySelectorAll('[data-testid="admin-user-edit"]')[0] as HTMLButtonElement).click())
+    await act(async () => openGrantForm().click())
     const reasonInput = testId('admin-user-reason') as HTMLInputElement
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!

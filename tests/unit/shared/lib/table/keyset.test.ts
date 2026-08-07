@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { env } from '~/shared/lib/env'
 import { defineTableCapability } from '~/shared/lib/table/capability'
 import { TABLE_PAGE_SIZE } from '~/shared/lib/table/constants'
-import { createTableCursor } from '~/shared/lib/table/cursor'
+import { createTableCursor, queryFingerprint } from '~/shared/lib/table/cursor'
 import { planKeysetPage, TableQueryError, TIEBREAKER_ID } from '~/shared/lib/table/keyset'
 import { emptyTableSearch } from '~/shared/lib/table/query-url'
 import { organizationDeletionRequests, sprintResults } from '~/shared/lib/db/schema'
@@ -96,7 +96,7 @@ describe('no OFFSET, ever', () => {
   it('emits a row-value tuple comparison instead', () => {
     const first = planKeysetPage(capability, query(), page(), context)
     const cursor = createTableCursor(
-      { t: 'sprint_results', s: first.sort.descriptor, o: ORG, k: [7, 'result_7'] },
+      { t: 'sprint_results', s: first.sort.descriptor, o: ORG, k: [7, 'result_7'], q: queryFingerprint(query()) },
       SECRET,
     )
     const next = planKeysetPage(capability, query(), page({ cursor }), context)
@@ -237,7 +237,7 @@ describe('a nullable sort column', () => {
   function cursorFor(tuple: Array<string | number | null>) {
     const plan = planKeysetPage(nullable, query(), page(), context)
     return createTableCursor(
-      { t: 'organization_deletion_requests', s: plan.sort.descriptor, o: ORG, k: tuple },
+      { t: 'organization_deletion_requests', s: plan.sort.descriptor, o: ORG, k: tuple, q: queryFingerprint(query()) },
       SECRET,
     )
   }
@@ -266,9 +266,31 @@ describe('a nullable sort column', () => {
 })
 
 describe('a cursor that does not match the request', () => {
+  /**
+   * The plan-level half of the filter binding: `planKeysetPage` mints the fingerprint from the
+   * query it was given and checks the presented cursor against it, so the refusal happens before
+   * any SQL is built.
+   */
+  it('is refused when the filter changed since it was minted', () => {
+    const plan = planKeysetPage(capability, query(), page(), context)
+    const cursor = createTableCursor(
+      { t: 'sprint_results', s: plan.sort.descriptor, o: ORG, k: [7, 'r'], q: queryFingerprint(query()) },
+      SECRET,
+    )
+    expect(() => planKeysetPage(
+      capability,
+      query({ filters: { source: ['github'] } }),
+      page({ cursor }),
+      context,
+    )).toThrow(/filter or search mismatch/)
+  })
+
   it('is refused when its tuple is the wrong length', () => {
     const plan = planKeysetPage(capability, query(), page(), context)
-    const short = createTableCursor({ t: 'sprint_results', s: plan.sort.descriptor, o: ORG, k: [7] }, SECRET)
+    const short = createTableCursor(
+      { t: 'sprint_results', s: plan.sort.descriptor, o: ORG, k: [7], q: queryFingerprint(query()) },
+      SECRET,
+    )
     expect(() => planKeysetPage(capability, query(), page({ cursor: short }), context))
       .toThrow(/Cursor does not match the sort/)
   })

@@ -628,6 +628,10 @@
     "0156_abuse_signals_keyset_indexes": {
       "sql": "206e3d638771c065d2bb109ec52a77dec8073e3538f9069bb8a1590de548c8b7",
       "snapshot": "de4cf867666052035bfb98ecc2c53382803cbdde6b2daf9768a5fcd51fad178c"
+    },
+    "0157_platform_users_keyset_indexes": {
+      "sql": "8ec7c4147dcf294e87abf640dcdd1c0b29c9ff609fcf995e2216c7e8290f90c8",
+      "snapshot": "748515b708335f4e60239ca2634de8cee36163a9d815f939f7263c645fd6ec8e"
     }
   }
 }

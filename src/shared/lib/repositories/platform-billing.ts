@@ -1,6 +1,9 @@
 import { and, count, desc, eq, gte, ne, sql } from 'drizzle-orm'
 import { platformDb } from '../db/client'
 import { authUsers, onboardingProgress } from '../db/schema'
+import { platformUsersCapability } from '../table/capabilities/platform-users'
+import { buildKeysetPage } from '../table/keyset'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 import { DELETED_USER_SENTINEL_ID } from './account-privacy'
 
 /*
@@ -110,7 +113,15 @@ export async function getPlatformUserBillingSummary(
   }
 }
 
-export interface PlatformUserWithBilling {
+/** One `auth_users` row as the admin list shows it, before the billing summary is attached. */
+export interface PlatformUserRow extends Record<string, unknown> {
+  userId: string
+  name: string
+  email: string
+  createdAt: string
+}
+
+export interface PlatformUserWithBilling extends Record<string, unknown> {
   userId: string
   name: string
   email: string
@@ -131,6 +142,40 @@ export interface PlatformUserWithBilling {
  * call per user (bounded by the admin page's own page size, same shape as `listLatestJobRuns`'s
  * per-key fan-out), since the underlying read is a SECURITY DEFINER function call, not a joinable
  * table this connection has a grant on. */
+/**
+ * One keyset page of users, each with the billing summary the admin list shows.
+ *
+ * `listPlatformUsersWithBilling` above reads **every user in the system** and then does one billing
+ * lookup per user — the worst entry in the phase-1 audit. It is kept only for callers that
+ * genuinely need the whole set; the admin list is not one of them, and its search now runs in
+ * Postgres over every user rather than over the fifty the browser happened to hold.
+ */
+export async function pagePlatformUsersWithBilling(
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<PlatformUserWithBilling>> {
+  const result = await buildKeysetPage<PlatformUserRow>(platformDb, platformUsersCapability, query, page, {
+    select: {
+      userId: authUsers.id,
+      name: authUsers.name,
+      email: authUsers.email,
+      createdAt: authUsers.createdAt,
+    },
+    mapRow: (row) => ({
+      userId: row.userId as string,
+      name: row.name as string,
+      email: row.email as string,
+      createdAt: (row.createdAt as Date).toISOString(),
+    }),
+  })
+
+  // One billing lookup per row of the *page*, not per user in the system. Same query as before,
+  // bounded by the page size.
+  const now = new Date()
+  const billing = await Promise.all(result.rows.map((user) => getPlatformUserBillingSummary(user.userId, now)))
+  return { ...result, rows: result.rows.map((user, index) => ({ ...user, billing: billing[index] ?? null })) }
+}
+
 export async function listPlatformUsersWithBilling(): Promise<PlatformUserWithBilling[]> {
   const users = await listPlatformUsers()
   const now = new Date()

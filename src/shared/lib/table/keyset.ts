@@ -10,7 +10,13 @@ import {
   type TableCapability,
 } from './capability'
 import { TABLE_PAGE_SIZE } from './constants'
-import { createTableCursor, sortDescriptor, verifyTableCursor, type CursorValue } from './cursor'
+import {
+  createTableCursor,
+  queryFingerprint,
+  sortDescriptor,
+  verifyTableCursor,
+  type CursorValue,
+} from './cursor'
 import type { PageRequest, PageResult, TableQuery } from './types'
 
 /**
@@ -291,6 +297,8 @@ export interface KeysetPlan {
   filtered: SQL[]
   /** `filtered` + the keyset predicate. What the page selects. */
   rowConditions: SQL[]
+  /** Digest of the filter and search, minted into the next cursor and checked on the presented one. */
+  fingerprint: string
   order: SQL[]
   limit: number
 }
@@ -321,11 +329,13 @@ export function planKeysetPage(
   // The cursor is bound to the table, the sort and the organization. Presenting one from another
   // sort would page from the middle of a different ordering; from another organization it would
   // ask "what comes after this row" about rows the caller cannot see.
+  const fingerprint = queryFingerprint(query)
   const cursorTuple = page.cursor
     ? verifyTableCursor(page.cursor, {
       table: capability.table,
       sort: sort.descriptor,
       organizationId: context.organizationId,
+      query: fingerprint,
     }).k
     : null
   if (cursorTuple && cursorTuple.length !== sort.terms.length) {
@@ -338,6 +348,7 @@ export function planKeysetPage(
     filters,
     filtered,
     rowConditions: cursorTuple ? [...filtered, keysetPredicate(sort, cursorTuple)] : filtered,
+    fingerprint,
     order: orderBy(sort),
     // Page size is the server's, not the caller's.
     limit: Math.max(1, Math.min(page.limit || TABLE_PAGE_SIZE, TABLE_PAGE_SIZE)),
@@ -389,6 +400,7 @@ export async function buildKeysetPage<Row>(
       s: sort.descriptor,
       o: organizationId,
       k: sort.terms.map((_, index) => toCursorValue(last[`__k${index}`])),
+      q: plan.fingerprint,
     })
     : null
 

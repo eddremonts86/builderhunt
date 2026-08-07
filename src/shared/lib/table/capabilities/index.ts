@@ -11,4 +11,5 @@
  */
 
 export { abuseSignalsCapability, ABUSE_SIGNAL_FILTER_LABELS } from './abuse-signals'
+export { platformUsersCapability } from './platform-users'
 export { sprintResultsCapability, SPRINT_RESULT_FILTER_LABELS } from './sprint-results'

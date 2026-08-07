@@ -26,15 +26,27 @@ const tsvector = customType<{ data: string; driverData: string; notNull: true }>
   dataType: () => 'tsvector',
 })
 
-export const authUsers = pgTable('auth_users', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  emailVerified: boolean('email_verified').default(false).notNull(),
-  image: text('image'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+export const authUsers = pgTable(
+  'auth_users',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    email: text('email').notNull().unique(),
+    emailVerified: boolean('email_verified').default(false).notNull(),
+    image: text('image'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  // Keyset sort indexes for the platform-admin user list (phase 3, plan 10). Better-auth's own
+  // schema indexes nothing here but the primary key and the email unique constraint, because it
+  // looks users up by one or the other. An admin list ordered by creation date over every user in
+  // the system is a different access pattern, and without these Postgres sorts the whole table to
+  // return fifty rows.
+  (table) => [
+    index('auth_users_created_id_idx').on(table.createdAt, table.id),
+    index('auth_users_name_id_idx').on(table.name, table.id),
+  ],
+)
 
 export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
