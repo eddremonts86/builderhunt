@@ -1,6 +1,6 @@
 # Specification — row virtualization
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`05-table-shell`](../05-table-shell/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Reality check**: `src/modules/search/components/SearchPage.tsx` already appends pages into a growing array (`setResults((prev) => [...prev, ...newOnes.filter(…)])`, `SearchPage.tsx:418`) with no virtualization, so a long session accumulates unbounded DOM. The shell from plan 05 renders every loaded row.
@@ -46,11 +46,20 @@ markup is structurally valid — only an explicit assertion does.
 
 ## Density
 
-Row height comes from the existing dashboard density preference
-(`src/modules/dashboard/ui/bento/useBentoDensity.ts`, stored at `bh.dashboard.density`):
-`comfortable` 40px, `compact` 34px. That hook reads localStorage in an effect rather than during
-render, and its comment explains why — reading during render costs a hydration mismatch. The same
-constraint applies here.
+Row height is `comfortable` 40px, `compact` 34px, exported as `ROW_HEIGHT` from
+`useTableVirtual.ts` and selected by a `density` prop on `DataTable`.
+
+**It is not the dashboard's density preference, and the paragraph that said it was is wrong on both
+counts.** `useBentoDensity` returns a `BentoDensity`, which is `'bento' | 'sections'` — a layout
+mode for the dashboard's widget grid, not a row height; binding to it would mean switching the
+dashboard from bento to sections silently changed the row height of every table in the app. And it
+no longer reads `localStorage`: the preference moved to a server-backed, per-organization document
+(`useDashboardPreferences`), so the hydration constraint this section described no longer exists,
+and the hook needs `TenantQueryProvider` — which the public surfaces in plan 09 are not inside.
+
+There is currently **no persisted table-density preference**. Adding one is a field on the
+preferences document plus a migration, and it belongs with the first surface that wants it rather
+than with the virtualizer. Until then every table renders `comfortable`.
 
 ## Success metrics
 
@@ -66,8 +75,13 @@ constraint applies here.
 
 - **Group headers inside a virtualized list.** Group rows are items in the virtual list, not
   separate DOM outside it, so their sticky offsets stay correct while scrolling.
-- **The board renderer.** Scrolls horizontally with independently short columns; virtualization is
-  applied per column or skipped, and skipping is recorded rather than left implicit.
+- **The board renderer. Skipped, deliberately.** `DataTable` excludes `renderer === 'board'` from
+  virtualization unconditionally — passing `virtualize: true` does not override it — and a test
+  asserts that. Per-lane virtualization would mean one virtualizer per lane, each against its own
+  scroll container, and the shared `aria-rowindex` sequence would then have to be reconciled across
+  several independent windows. The board is a triage view over lanes that are individually short;
+  it is not where thousands of rows accumulate. If a lane ever does grow that large, the honest fix
+  is a page per lane, not a virtualizer per lane.
 - **Selection of rows that are not rendered.** Selection is keyed by row id, never by DOM
   presence, so scrolling never changes what is selected.
 - **Scroll restoration after a sort change.** The window resets to the top, because the row that

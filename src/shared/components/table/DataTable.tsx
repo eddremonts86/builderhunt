@@ -13,6 +13,7 @@ import type { PageResult, TableQuery } from '~/shared/lib/table/types'
 import { cn } from '~/shared/lib/utils'
 
 import { GridRow } from './GridRow'
+import { buildTableEntries } from './entries'
 import { SelectionBar } from './SelectionBar'
 import { TableCommandSheet } from './TableCommandSheet'
 import { TableToolbar } from './TableToolbar'
@@ -34,6 +35,7 @@ import { FilteredEmptyState } from './states/FilteredEmptyState'
 import { SkeletonRows } from './states/SkeletonRows'
 import { useTableKeyboard, type TableNavigationMode } from './useTableKeyboard'
 import { useTableSelection, type SelectAllMatching } from './useTableSelection'
+import { ROW_HEIGHT, useTableVirtual, type TableDensity } from './useTableVirtual'
 
 /**
  * One table, for all nineteen of them.
@@ -94,7 +96,28 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
   /** Human labels for filter ids, used by the chips, the command sheet and the filtered-empty copy. */
   filterLabels?: Record<string, string>
   className?: string
+
+  /** Row height. The table's own concept, not the dashboard's bento/sections preference. */
+  density?: TableDensity
+  /**
+   * Render only the visible window.
+   *
+   * On by default above `VIRTUALIZATION_THRESHOLD` loaded rows. A surface can force it off — the
+   * board renderer does, because its lanes scroll horizontally and are individually short.
+   */
+  virtualize?: boolean
+  /** Height of the scroll viewport. Virtualization needs a bounded container to window against. */
+  maxHeight?: number | string
 }
+
+/**
+ * Below this many loaded rows, windowing costs more than it saves.
+ *
+ * An absolutely-positioned canvas and a scroll subscription for thirty rows is machinery in
+ * exchange for nothing, and it makes the DOM harder to read in the browser inspector for every
+ * small table in the app.
+ */
+export const VIRTUALIZATION_THRESHOLD = 100
 
 const RENDERERS = {
   table: TableRenderer,
@@ -141,10 +164,14 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     emptyState,
     filterLabels,
     className,
+    density = 'comfortable',
+    virtualize,
+    maxHeight,
   } = props
 
   const [commandOpen, setCommandOpen] = React.useState(false)
   const searchRef = React.useRef<HTMLInputElement>(null)
+  const scrollRef = React.useRef<HTMLDivElement>(null)
 
   const rows = page.rows
 
@@ -196,6 +223,35 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     onReachEnd: onLoadMore,
   })
 
+  const entries = React.useMemo(
+    () => buildTableEntries({
+      rows,
+      columns: visibleColumns,
+      query,
+      facets: page.facets,
+      rowId,
+      grouped: renderer === 'grouped',
+    }),
+    [rows, visibleColumns, query, page.facets, rowId, renderer],
+  )
+
+  // The board arranges its own lanes and is excluded below; it never reaches the virtualizer.
+  const virtualized = (virtualize ?? entries.length > VIRTUALIZATION_THRESHOLD) && renderer !== 'board'
+
+  // The focused row is a row index; the virtualizer measures entries, and a group header shifts the
+  // two apart. Translating here is what makes the focus pin land on the right entry.
+  const focusedEntryIndex = entries.findIndex(
+    (entry) => entry.kind === 'row' && entry.index === keyboard.position.row,
+  )
+
+  const virtual = useTableVirtual({
+    count: entries.length,
+    scrollRef,
+    rowHeight: ROW_HEIGHT[density],
+    focusedIndex: focusedEntryIndex,
+    enabled: virtualized,
+  })
+
   const context: RendererContext<Row> = {
     columns: visibleColumns,
     page,
@@ -209,6 +265,10 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     keyboard,
     onPrimaryAction,
     expansion,
+    entries,
+    window: virtual.items,
+    totalSize: virtual.totalSize,
+    virtualized,
   }
 
   function toggleSort(column: ColumnDef<Row>) {
@@ -258,8 +318,13 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         aria-colcount={visibleColumns.length + (selectable ? 1 : 0) + (expansion ? 1 : 0)}
         aria-busy={isLoading || undefined}
         onKeyDown={keyboard.onKeyDown}
+        ref={scrollRef}
         className="table-scroll"
+        // Virtualization needs a bounded viewport to window against; an unbounded container is
+        // always "fully visible" and every row stays mounted.
+        style={virtualized ? { maxHeight: maxHeight ?? '70vh', overflowY: 'auto' } : undefined}
         data-testid="data-table"
+        data-virtualized={virtualized ? 'true' : undefined}
       >
         <div
           role="row"

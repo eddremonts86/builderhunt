@@ -273,3 +273,73 @@ describe('page size', () => {
     expect(TABLE_PAGE_SIZE).toBe(50)
   })
 })
+
+describe('virtualization', () => {
+  const manyRows: Result[] = Array.from({ length: 500 }, (_, index) => ({
+    id: `v${index}`,
+    source: index % 2 === 0 ? 'github' : 'gitlab',
+    score: 500 - index,
+  }))
+  const manyPage: PageResult<Result> = { rows: manyRows, nextCursor: null, total: 500, facets: {} }
+
+  /**
+   * Pagination bounds what the database returns. It does not bound what the browser holds:
+   * infinite scroll appends, and a minute of scrolling leaves thousands of rows paying for every
+   * later render, hover and re-sort.
+   */
+  it('renders a window, not five hundred rows', () => {
+    const dom = render({ page: manyPage, virtualize: true })
+    const rendered = dom.querySelectorAll('[data-testid^="result-v"]')
+    expect(rendered.length).toBeGreaterThan(0)
+    expect(rendered.length).toBeLessThan(100)
+  })
+
+  it('still reports the full total, so a screen reader is not told the list is short', () => {
+    const dom = render({ page: manyPage, virtualize: true })
+    expect(dom.querySelector('[role="grid"]')?.getAttribute('aria-rowcount')).toBe('501')
+  })
+
+  /** Announcing "row 3 of 500" for the third row *of the window* is the failure axe cannot see. */
+  it('gives each rendered row its absolute index, not its position in the window', () => {
+    const dom = render({ page: manyPage, virtualize: true })
+    const rendered = [...dom.querySelectorAll('[data-testid^="result-v"]')]
+    for (const element of rendered) {
+      const id = element.getAttribute('data-testid')!.replace('result-v', '')
+      expect(element.getAttribute('aria-rowindex')).toBe(String(Number(id) + 2))
+    }
+  })
+
+  it('gives the scrolling content the height of the whole list', () => {
+    const dom = render({ page: manyPage, virtualize: true })
+    expect(dom.querySelector('[data-testid="table-virtual-canvas"]')).not.toBeNull()
+  })
+
+  /** Machinery for thirty rows costs more than it saves, and clutters the inspector for every small table. */
+  it('is off below the threshold', () => {
+    const dom = render()
+    expect(dom.querySelector('[data-virtualized]')).toBeNull()
+    expect(dom.querySelector('[data-testid="table-virtual-canvas"]')).toBeNull()
+    expect(dom.querySelectorAll('[data-testid^="result-r"]').length).toBeGreaterThanOrEqual(3)
+  })
+
+  /** The board's lanes scroll horizontally and are individually short — see the spec's recorded decision. */
+  it('is never applied to the board renderer', () => {
+    const dom = render({ page: manyPage, renderer: 'board', virtualize: true })
+    expect(dom.querySelector('[data-virtualized]')).toBeNull()
+  })
+
+  it('keeps the focused row mounted after the window scrolls past it', () => {
+    const dom = render({ page: manyPage, virtualize: true })
+    const grid = dom.querySelector('[role="grid"]') as HTMLElement
+
+    // Move the focus far down the list; the window is still at the top.
+    for (let press = 0; press < 30; press += 1) {
+      act(() => grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+    }
+
+    const focusable = [...dom.querySelectorAll('[role="gridcell"][tabindex="0"]')]
+    expect(focusable.length).toBe(1)
+    // Without the pin this row would be unmounted and focus would have fallen to <body>.
+    expect(focusable[0].closest('[role="row"]')?.getAttribute('aria-rowindex')).toBe('32')
+  })
+})

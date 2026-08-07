@@ -1,6 +1,6 @@
 # Plan — row virtualization
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`05-table-shell`](../05-table-shell/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Reality check**: One new dependency (`@tanstack/react-virtual`) and one hook plus a change inside `DataTable`. No surface changes.
