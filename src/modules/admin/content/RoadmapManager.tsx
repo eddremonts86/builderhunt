@@ -8,13 +8,19 @@
  * defined by a file in `content/roadmap/`.
  */
 import * as React from 'react'
-import { ArrowDown, ArrowUp, Map, Plus, Save, Trash2, X } from 'lucide-react'
+// `Map` is aliased: the lucide icon shadows the global `Map` constructor, and
+// `new Map<string, number>()` below silently resolved to the React component.
+import { ArrowDown, ArrowUp, Map as MapIcon, Plus, Save, Trash2, X } from 'lucide-react'
 import { Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { Button } from '~/components/ui/button'
+import { DataTable } from '~/shared/components/table'
+import { emptyTableSearch } from '~/shared/lib/table/query-url'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import type { PageResult, TableQuery } from '~/shared/lib/table/types'
 
 type RoadmapStatus = 'planned' | 'in_progress' | 'shipped'
 
-export interface RoadmapItem {
+export interface RoadmapItem extends Record<string, unknown> {
   id: string
   title: string
   description: string | null
@@ -82,7 +88,7 @@ export function RoadmapManager() {
     setCreatingNew(true)
   }
 
-  const startEdit = (item: RoadmapItem) => {
+  const startEdit = React.useCallback((item: RoadmapItem) => {
     setForm({
       title: item.title,
       description: item.description ?? '',
@@ -92,7 +98,7 @@ export function RoadmapManager() {
       sortOrder: item.sortOrder,
     })
     setEditingId(item.id)
-  }
+  }, [])
 
   const create = async () => {
     if (!form.title.trim()) return setError('Title required')
@@ -150,7 +156,7 @@ export function RoadmapManager() {
     }
   }
 
-  const remove = async (id: string) => {
+  const remove = React.useCallback(async (id: string) => {
     if (!confirm('Delete this roadmap item?')) return
     try {
       await fetch(`/api/admin/roadmap/${id}`, {
@@ -161,9 +167,9 @@ export function RoadmapManager() {
     } catch (e) {
       setError(String(e))
     }
-  }
+  }, [load])
 
-  const moveSort = async (id: string, current: number, delta: number) => {
+  const moveSort = React.useCallback(async (id: string, current: number, delta: number) => {
     const target = current + delta
     try {
       await fetch(`/api/admin/roadmap/${id}`, {
@@ -176,17 +182,167 @@ export function RoadmapManager() {
     } catch (e) {
       setError(String(e))
     }
-  }
+  }, [load])
 
   const counts = STATUS_OPTIONS.map((s) => ({ ...s, count: items.filter((i) => i.status === s.value).length }))
   const visible = statusFilter === 'all' ? items : items.filter((i) => i.status === statusFilter)
+
+  const [query, setQuery] = React.useState<TableQuery>(() => emptyTableSearch().query)
+
+  /**
+   * The complete item set, filtered and sorted in the browser.
+   *
+   * `/api/admin/roadmap` returns every item, so this is sorting complete data rather than the fifty
+   * rows that happened to load — the distinction phase 3 is about. Default order is `sortOrder`,
+   * which is the whole point of a roadmap and what the move-up/move-down buttons edit.
+   */
+  const page: PageResult<RoadmapItem> = React.useMemo(() => {
+    const term = query.search.trim().toLowerCase()
+    const statusFilterValues = query.filters.status ?? []
+
+    const searched = term === ''
+      ? items
+      : items.filter((item) =>
+        item.title.toLowerCase().includes(term) || (item.description ?? '').toLowerCase().includes(term))
+    let rows = statusFilterValues.length > 0
+      ? searched.filter((item) => statusFilterValues.includes(item.status))
+      : searched
+
+    const sortTerm = query.sort[0]
+    rows = [...rows].sort((a, b) => {
+      if (!sortTerm) return a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)
+      const direction = sortTerm.dir === 'asc' ? 1 : -1
+      const left = sortTerm.id === 'title' ? a.title : sortTerm.id === 'status' ? a.status : String(a.sortOrder).padStart(8, '0')
+      const right = sortTerm.id === 'title' ? b.title : sortTerm.id === 'status' ? b.status : String(b.sortOrder).padStart(8, '0')
+      // Same tiebreaker rule as the SQL builder: without it two items sharing a status have no
+      // defined order and the list reshuffles on every render.
+      return left === right ? a.id.localeCompare(b.id) : (left < right ? -1 : 1) * direction
+    })
+
+    // Counted before the status filter, so a chip says what it would add rather than zero.
+    const statusCounts = new Map<string, number>()
+    for (const item of searched) statusCounts.set(item.status, (statusCounts.get(item.status) ?? 0) + 1)
+
+    return {
+      rows,
+      nextCursor: null,
+      total: rows.length,
+      facets: {
+        status: STATUS_OPTIONS
+          .filter((option) => statusCounts.has(option.value))
+          .map((option) => ({ value: option.value, count: statusCounts.get(option.value) ?? 0 })),
+      },
+    }
+  }, [items, query])
+
+  const columns = React.useMemo<ColumnDef<RoadmapItem>[]>(() => [
+    {
+      id: 'order',
+      header: 'Order',
+      // The move buttons edit `sortOrder`, so they live in the column that shows it.
+      cell: (item) => (
+        <span className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void moveSort(item.id, item.sortOrder, -1)}
+            className="btn-icon"
+            aria-label={`Move ${item.title} up`}
+            data-testid="admin-roadmap-move-up"
+          >
+            <ArrowUp className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void moveSort(item.id, item.sortOrder, 1)}
+            className="btn-icon"
+            aria-label={`Move ${item.title} down`}
+            data-testid="admin-roadmap-move-down"
+          >
+            <ArrowDown className="h-3 w-3" />
+          </button>
+          <span className="tabular-nums text-xs text-bh-text-dim">{item.sortOrder}</span>
+        </span>
+      ),
+      sortable: true,
+      value: (item) => item.sortOrder,
+    },
+    {
+      id: 'title',
+      header: 'Item',
+      sortable: true,
+      priority: 'primary',
+      value: (item) => item.title,
+      cell: (item) => (
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="truncate font-medium">{item.title}</span>
+            {item.id.startsWith(FILE_MANAGED_PREFIX) && (
+              <span
+                className="rounded border border-bh-cyan/30 bg-bh-cyan/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bh-cyan-text"
+                title={`Defined by content/roadmap/${item.id.slice(FILE_MANAGED_PREFIX.length)}.md — edits here are overwritten by the next content:sync`}
+              >
+                in git
+              </span>
+            )}
+          </span>
+          {item.description && (
+            <span className="block truncate text-xs text-bh-text-muted">{item.description}</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      sortable: true,
+      groupable: true,
+      value: (item) => item.status,
+      cell: (item) => (
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+          item.status === 'shipped' ? 'text-bh-success'
+            : item.status === 'in_progress' ? 'text-bh-warning' : 'text-bh-text-dim'
+        }`}>
+          {item.status}
+        </span>
+      ),
+    },
+    {
+      id: 'category',
+      header: 'Category',
+      priority: 'detail',
+      value: (item) => item.category,
+      cell: (item) => item.category ?? '—',
+    },
+    {
+      id: 'shipEstimate',
+      header: 'Estimate',
+      priority: 'secondary',
+      value: (item) => item.shipEstimate,
+      cell: (item) => item.shipEstimate ?? '—',
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      align: 'end',
+      cell: (item) => (
+        <span className="flex items-center gap-2">
+          <Button type="button" onClick={() => startEdit(item)} variant="secondary" size="sm" data-testid="admin-roadmap-edit">
+            Edit
+          </Button>
+          <Button type="button" onClick={() => void remove(item.id)} variant="secondary" size="sm" data-testid="admin-roadmap-delete">
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        </span>
+      ),
+    },
+  ], [moveSort, startEdit, remove])
 
   return (
     <div data-testid="admin-roadmap-page">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Map className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+            <MapIcon className="w-6 h-6 text-bh-accent" aria-hidden="true" />
             Roadmap
             <span className="text-sm font-normal text-bh-text-dim">({items.length})</span>
           </h1>
@@ -209,27 +365,13 @@ export function RoadmapManager() {
         </Button>
       </header>
 
-      <div className="flex items-center gap-2 flex-wrap mb-4" data-testid="admin-roadmap-filters">
-        <Button
-          type="button"
-          size="sm"
-          variant={statusFilter === 'all' ? 'primary' : 'secondary'}
-          onClick={() => setStatusFilter('all')}
-        >
-          All ({items.length})
-        </Button>
-        {counts.map((s) => (
-          <Button
-            key={s.value}
-            type="button"
-            size="sm"
-            variant={statusFilter === s.value ? 'primary' : 'secondary'}
-            onClick={() => setStatusFilter(statusFilter === s.value ? 'all' : s.value)}
-            data-testid={`admin-roadmap-filter-${s.value}`}
-          >
-            {s.label} ({s.count})
-          </Button>
-        ))}
+      {/*
+        The status filter is the shell's facet chips now, in the toolbar. This element stays so the
+        id `admin-roadmap-filters` keeps meaning "the filter controls" for anything driving the page
+        by it, and it points at where they went rather than pretending they are still here.
+      */}
+      <div className="sr-only" data-testid="admin-roadmap-filters">
+        Status filters are in the table toolbar below.
       </div>
 
       {error && (
@@ -357,93 +499,22 @@ export function RoadmapManager() {
         </div>
       )}
 
-      <div className="space-y-2">
-        {loading ? (
-          <p className="text-sm text-bh-text-muted">Loading…</p>
-        ) : items.length === 0 ? (
-          <p className="text-sm text-bh-text-muted">No roadmap items yet.</p>
-        ) : (
-          visible.map((i) => (
-            <div
-              key={i.id}
-              className="card p-4 flex items-start gap-3"
-              data-testid={`admin-roadmap-row-${i.id}`}
-            >
-              <div className="flex flex-col gap-1">
-                <button
-                  type="button"
-                  onClick={() => moveSort(i.id, i.sortOrder, -1)}
-                  className="btn-icon"
-                  aria-label="Move up"
-                  data-testid="admin-roadmap-move-up"
-                >
-                  <ArrowUp className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveSort(i.id, i.sortOrder, 1)}
-                  className="btn-icon"
-                  aria-label="Move down"
-                  data-testid="admin-roadmap-move-down"
-                >
-                  <ArrowDown className="w-3 h-3" />
-                </button>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className={`text-[10px] uppercase tracking-wider font-bold ${
-                    i.status === 'shipped' ? 'text-bh-success' :
-                    i.status === 'in_progress' ? 'text-bh-warning' : 'text-bh-text-dim'
-                  }`}>
-                    {i.status}
-                  </span>
-                  {i.shipEstimate && (
-                    <span className="text-[10px] text-bh-text-dim">· {i.shipEstimate}</span>
-                  )}
-                  {i.category && (
-                    <span className="text-[10px] text-bh-text-dim">· {i.category}</span>
-                  )}
-                  <span className="text-[10px] text-bh-text-dim">· order {i.sortOrder}</span>
-                  {i.id.startsWith(FILE_MANAGED_PREFIX) && (
-                    <span
-                      className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border border-bh-cyan/30 bg-bh-cyan/10 text-bh-cyan-text"
-                      title={`Defined by content/roadmap/${i.id.slice(FILE_MANAGED_PREFIX.length)}.md — edits here are overwritten by the next content:sync`}
-                    >
-                      in git
-                    </span>
-                  )}
-                </div>
-                <p className="font-semibold text-sm">{i.title}</p>
-                {i.description && (
-                  <p className="text-xs text-bh-text-muted mt-1 line-clamp-2">
-                    {i.description}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  type="button"
-                  onClick={() => startEdit(i)}
-                  variant="secondary"
-                  size="sm"
-                  data-testid="admin-roadmap-edit"
-                >
-                  Edit
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => remove(i.id)}
-                  variant="secondary"
-                  size="sm"
-                  data-testid="admin-roadmap-delete"
-                >
-                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                </Button>
-              </div>
-            </div>
-          ))
+      <DataTable
+        label="Roadmap items"
+        columns={columns}
+        page={page}
+        query={query}
+        onQueryChange={setQuery}
+        rowTestId={(item) => `admin-roadmap-row-${item.id}`}
+        rowId={(item) => item.id}
+        status={loading ? 'loading' : 'ready'}
+        filterLabels={{ status: 'Status' }}
+        emptyState={(
+          <div className="px-4 py-12 text-center text-sm text-bh-text-muted" data-testid="admin-roadmap-empty">
+            No roadmap items yet.
+          </div>
         )}
-      </div>
+      />
     </div>
   )
 }

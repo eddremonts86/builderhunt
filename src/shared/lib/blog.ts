@@ -22,7 +22,16 @@ export interface BlogPost {
   file: string
 }
 
-export interface BlogPostSummary {
+/**
+ * A **type alias**, not an interface, and that is load-bearing.
+ *
+ * The admin blog library renders these through `DataTable`, whose row generic is constrained to
+ * `Record<string, unknown>` (TanStack Table v9's `RowData`). An interface is not assignable to an
+ * index-signature type; a type alias of an object literal is. Adding `extends Record<string,
+ * unknown>` to the interface would work for the table and break `blog-data.ts` — a server function's
+ * return type is checked for serializability, and an index signature makes that check fail.
+ */
+export type BlogPostSummary = {
   slug: string
   title: string
   description: string
