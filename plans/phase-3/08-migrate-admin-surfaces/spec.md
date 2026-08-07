@@ -1,6 +1,6 @@
 # Specification — migrate the admin and account surfaces
 
-> **Status**: `pending`
+> **Status**: `partially-implemented`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: Seven surfaces render rows today with no shared behaviour: `src/modules/dashboard/components/AbuseConsole.tsx` (a real `<table>`), `src/routes/_dashboard/admin/incidents.tsx`, `admin/plan-requests.tsx`, `src/modules/dashboard/components/ActiveSessionsPanel.tsx`, `src/routes/_dashboard/settings/privacy.tsx`, `me/index.tsx`, `src/modules/scheduling/components/InvitationStatus.tsx`. Their reads are already narrow, so this is mostly presentation.
@@ -26,6 +26,14 @@ All seven on the shell, so the visible payoff of plans 02–07 arrives before th
   not grow with usage, has no sort, filter, selection or per-row action, and is read-only. `<table>`
   is the correct element for exactly that, and an ARIA grid is not — a grid promises keyboard
   traversal that would have nowhere to go. **Left alone.**
+
+- **`InvitationStatus` — audited, and it is not a grid either.**
+  `src/modules/scheduling/components/InvitationStatus.tsx:107` is a list of per-status cards, not
+  rows: a `draft` shows a recipient address and a resume link, a `booked` one shows a timestamp and
+  three different destinations, and the fields present differ per status. There are no columns to
+  align, because no two rows show the same fields. A one-column grid holding a card gains the ARIA
+  semantics of a list that already exists and aligns nothing. **Left alone**, with the same
+  reasoning as `HygieneCard`.
 
 - **`admin/plan-requests` — the surface no longer exists.** `plan_requests` was dropped on
   2026-08-03 along with `plans` and `plan_changes` (`schema.ts:1058-1067`: the pre-organization
