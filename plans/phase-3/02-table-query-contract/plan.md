@@ -1,6 +1,6 @@
 # Plan — the table query contract
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md), [`05-table-shell`](../05-table-shell/spec.md)
 > **Reality check**: All new files under `src/shared/lib/table/`. Nothing in the app imports them when this plan closes.
