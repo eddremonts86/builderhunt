@@ -60,6 +60,14 @@ jobs:
       APP_URL: http://localhost:3000
       VITE_APP_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      # Both default to 'false' in env.ts and `.env.example` turns them on, which is
+      # how they are on every developer machine. CI has no `.env`, so it ran the whole
+      # calendar and scheduling surface switched off: `tests/e2e/calendar.spec.ts` and
+      # `scheduling.spec.ts` were asserting against `503 dependency_unavailable`
+      # instead of the routes they were written for. Only these two differ from their
+      # defaults in `.env.example`; the interview flags below them stay off here too.
+      CALENDAR_ENABLED: 'true'
+      SCHEDULING_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -87,7 +95,16 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
-          pg_dump --version
+          # Installing the package is not enough. `/usr/bin/pg_dump` is Debian's
+          # pg_wrapper, which dispatches to the *default cluster's* version, and the
+          # runner image ships a PostgreSQL 16 server — so `pg_dump --version` still
+          # reported 16.14 with 18.4 sitting installed beside it. Putting the
+          # versioned client directory first is what actually decides the binary, and
+          # it covers psql, createdb and pg_restore in the same move.
+          echo /usr/lib/postgresql/18/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/18/bin/pg_dump --version
+      - name: Confirm pg_dump now matches the server major
+        run: pg_dump --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:migration-integrity
       - run: pnpm exec drizzle-kit check
