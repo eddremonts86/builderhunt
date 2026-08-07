@@ -128,15 +128,15 @@ Covered by F1 — this is the root cause, F1 is the symptom. Listed separately s
 
 ### F7 — `TypeError: Failed to fetch` on `/` after hydration (P2)
 
-**Symptom.** Console reports `TypeError: Failed to fetch at @tanstack/start-client-core`. Happens post-hydration on the landing page (and likely other pages).
+**Symptom.** Console reports `TypeError: Failed to fetch at @tanstack/start-client-core`. Happens post-hydration on the landing page.
 
-**Evidence.** `walk-summary.json` → `/` owner/platform-admin console errors include this `TypeError`.
+**Evidence.** `walk-summary.json` → `/` owner/admin/member/platform-admin console errors include `TypeError: Failed to fetch at serverFnFetcher`. Stack only points at `client-rpc/serverFnFetcher`.
 
-**Recommendation.** Likely a TanStack-Start client-core dev-mode artefact (HMR socket closure). Verify on a production build (`pnpm build && pnpm preview`) before fixing; if it persists in production, file upstream. Skip in this pass if dev-only.
+**Root cause.** The walker navigates with `waitUntil: 'domcontentloaded'`, then closes the browser context ~5s later. The landing page fires a TanStack-Start serverFn during hydration; the in-flight fetch is aborted when the context closes. This is a **walker artefact**, not a product defect. No human user closes the tab in that race window.
 
-**Acceptance.** No `Failed to fetch` console errors on the production build.
+**Recommendation.** Mark as **NOT A BUG**. The walker should either `await serverFnFetcher` results or skip console-error attribution for errors whose stack starts in `client-rpc/`. No code change needed in the app. Documented here so a future audit doesn't re-raise it.
 
-**Regression risk.** Low.
+**Status.** Closed.
 
 ### F8 — Greyscale test not run (gap, not a defect)
 
