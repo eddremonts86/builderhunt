@@ -14,6 +14,9 @@ import {
   billingTermsAcceptances,
   organizationMembers,
 } from '../db/schema'
+import { billingRefundsCapability } from '../table/capabilities/billing-refunds'
+import { buildKeysetPage } from '../table/keyset'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 
 /**
  * Tenant-scoped data access for the 7 billing record types a checkout/summary
@@ -671,6 +674,14 @@ export async function createBillingRefundRequest(
   return row
 }
 
+/**
+ * Every refund an organization has ever requested.
+ *
+ * Unbounded, and deliberately kept so: its remaining callers are aggregates over one organization
+ * — the accounting export, the operations-metrics roll-up, the owner's billing summary — which need
+ * the whole set to produce a total, and a page of fifty would make each of them wrong rather than
+ * slow. The **review queue** is not one of those; it reads `pageBillingRefunds` below.
+ */
 export async function listBillingRefunds(
   transaction: TenantTransaction,
   organizationId: string,
@@ -687,6 +698,48 @@ export async function listBillingRefunds(
     .from(billingRefunds)
     .where(eq(billingRefunds.organizationId, organizationId))
     .orderBy(desc(billingRefunds.createdAt))
+}
+
+/** The review queue's wire shape — `BillingRefundRecord` with the timestamp already serialized. */
+export interface BillingRefundPageRow extends Record<string, unknown> {
+  id: string
+  organizationId: string
+  policyDecision: string
+  amountCents: number
+  state: string
+  createdAt: string
+}
+
+/**
+ * One keyset page of the operator review queue.
+ *
+ * Must run inside `withPlatformOrganization` (or any other tenant context): the capability declares
+ * `organizationColumn`, so `buildKeysetPage` reads `app.organization_id` back out of the
+ * transaction and throws if it is unset, rather than querying with RLS's `current_setting` empty.
+ */
+export async function pageBillingRefunds(
+  transaction: TenantTransaction,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<BillingRefundPageRow>> {
+  return buildKeysetPage<BillingRefundPageRow>(transaction, billingRefundsCapability, query, page, {
+    select: {
+      id: billingRefunds.id,
+      organizationId: billingRefunds.organizationId,
+      policyDecision: billingRefunds.policyDecision,
+      amountCents: billingRefunds.amountCents,
+      state: billingRefunds.state,
+      createdAt: billingRefunds.createdAt,
+    },
+    mapRow: (row) => ({
+      id: row.id as string,
+      organizationId: row.organizationId as string,
+      policyDecision: row.policyDecision as string,
+      amountCents: row.amountCents as number,
+      state: row.state as string,
+      createdAt: (row.createdAt as Date).toISOString(),
+    }),
+  })
 }
 
 /** The complete row — `BillingRefundRecord` above is deliberately narrower (the read-only billing-summary DTO's shape); processing/deciding a refund (§8 task 4) needs every column. */

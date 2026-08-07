@@ -1,0 +1,2 @@
+CREATE INDEX "billing_refunds_org_created_id_idx" ON "billing_refunds" USING btree ("organization_id","created_at","id");--> statement-breakpoint
+CREATE INDEX "billing_refunds_org_amount_id_idx" ON "billing_refunds" USING btree ("organization_id","amount_cents","id");

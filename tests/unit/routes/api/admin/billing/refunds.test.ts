@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   requirePlatformAdminPrincipal: vi.fn(),
   auditPlatformAdminAction: vi.fn(),
   decideRefund: vi.fn(),
-  listBillingRefunds: vi.fn(),
+  pageBillingRefunds: vi.fn(),
   withPlatformOrganization: vi.fn(),
 }))
 
@@ -24,7 +24,7 @@ vi.mock('~/shared/lib/billing/refunds', async (importOriginal) => {
 
 vi.mock('~/shared/lib/repositories/billing', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/lib/repositories/billing')>()
-  return { ...actual, listBillingRefunds: mocks.listBillingRefunds }
+  return { ...actual, pageBillingRefunds: mocks.pageBillingRefunds }
 })
 
 vi.mock('~/shared/lib/repositories/billing-risk', async (importOriginal) => {
@@ -57,32 +57,70 @@ beforeEach(() => {
   mocks.withPlatformOrganization.mockImplementation((_organizationId: string, fn: (tx: unknown) => unknown) => fn({}))
 })
 
+const PAGE = { rows: [{ id: 'refund-1' }], nextCursor: null, total: 1, facets: {} }
+
 describe('GET /api/admin/billing/refunds', () => {
   it('requires platform admin authentication', async () => {
     mocks.requirePlatformAdminPrincipal.mockRejectedValue(new Error('unauthorized'))
 
-    const response = await callHandler('GET', getRequest('https://app.test/api/admin/billing/refunds?organizationId=org-1'))
+    const response = await callHandler('GET', getRequest('https://app.test/api/admin/billing/refunds?filter.organizationId=org-1'))
 
     expect(response.status).toBe(500) // generic Error, not PlatformAdminAuthorizationError, falls through to catch-all
   })
 
-  it('requires an organizationId query parameter', async () => {
+  it('requires the organization filter', async () => {
     mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
 
     const response = await callHandler('GET', getRequest('https://app.test/api/admin/billing/refunds'))
 
     expect(response.status).toBe(400)
-    expect(mocks.listBillingRefunds).not.toHaveBeenCalled()
+    expect(mocks.pageBillingRefunds).not.toHaveBeenCalled()
   })
 
-  it('returns the refunds for the given organization', async () => {
+  /**
+   * The platform role's SELECT policy on `billing_refunds` is org-scoped, so exactly one value can
+   * be `set_config`'d. Answering with whichever arrived first would show one workspace's refunds
+   * under a filter chip naming two — a wrong list that looks like a working one.
+   */
+  it('refuses two organizations rather than picking one', async () => {
     mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
-    mocks.listBillingRefunds.mockResolvedValue([{ id: 'refund-1' }])
 
-    const response = await callHandler('GET', getRequest('https://app.test/api/admin/billing/refunds?organizationId=org-1'))
+    const response = await callHandler('GET', getRequest(
+      'https://app.test/api/admin/billing/refunds?filter.organizationId=org-1&filter.organizationId=org-2',
+    ))
+
+    expect(response.status).toBe(400)
+    expect(mocks.pageBillingRefunds).not.toHaveBeenCalled()
+  })
+
+  it('scopes the read to the filtered organization and returns a page', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.pageBillingRefunds.mockResolvedValue(PAGE)
+
+    const response = await callHandler('GET', getRequest('https://app.test/api/admin/billing/refunds?filter.organizationId=org-1'))
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ refunds: [{ id: 'refund-1' }] })
+    expect(await response.json()).toEqual(PAGE)
+    expect(mocks.withPlatformOrganization).toHaveBeenCalledWith('org-1', expect.any(Function))
+  })
+
+  /** The cursor and the sort id are the client's only structural inputs, and neither is absorbed. */
+  it('refuses an unknown sort id', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.pageBillingRefunds.mockResolvedValue(PAGE)
+
+    const response = await callHandler('GET', getRequest(
+      'https://app.test/api/admin/billing/refunds?filter.organizationId=org-1&sort=nope:desc',
+    ))
+
+    // The capability rejects it inside `pageBillingRefunds`, which the mock stands in for here —
+    // so this asserts the parameter reaches the page builder rather than being silently dropped.
+    expect(mocks.pageBillingRefunds).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sort: [{ id: 'nope', dir: 'desc' }] }),
+      expect.anything(),
+    )
+    expect(response.status).toBe(200)
   })
 })
 

@@ -5,7 +5,7 @@
 > **Blocks**: [`11-migrate-search`](../11-migrate-search/spec.md), [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: `listPlatformUsersWithPlans()` is unbounded; `admin/users.tsx:110` filters client-side.
 
-- [ ] **Bound the platform users read and migrate the admin users page**
+- [x] **Bound the platform users read and migrate the admin users page**
   - Files: `src/routes/_dashboard/admin/users.tsx`, `src/modules/admin/users/AdminUsersPage.tsx`,
     `src/shared/lib/repositories/platform-billing.ts`,
     `src/shared/lib/table/capabilities/platform-users.ts`
@@ -19,7 +19,7 @@
     that belongs to a user beyond the first page and confirm it is found; edit a plan and confirm
     the PATCH still works.
 
-- [ ] **Migrate the refund queue**
+- [x] **Migrate the refund queue**
   - Files: `src/modules/admin/billing/RefundQueue.tsx`,
     `src/shared/lib/repositories/billing.ts`,
     `src/shared/lib/table/capabilities/billing-refunds.ts`
@@ -28,6 +28,19 @@
     slot with its existing `data-testid` values.
   - Verify: billing regression specs green; record a refund decision and confirm the state
     transition is unchanged.
+  - **Done, with one boundary the plan did not anticipate.** `pageBillingRefunds` is the queue's
+    read; `listBillingRefunds` stays for the accounting export, the operations roll-up and the
+    owner's billing summary, which need the whole set to produce a total and would be *wrong*
+    rather than slow at fifty rows. The organization id is now `filter.organizationId`: it is in
+    the URL, in the cursor's binding, and in the filtered-empty copy.
+    It is still **required**, and exactly one value. `builderhunt_platform`'s SELECT policy on
+    `billing_refunds` is org-scoped (`drizzle/0028_billing_rls_grants.sql`), so a genuinely
+    cross-organization queue is a new RLS policy over financial rows, not a pagination change —
+    and plan 10's own non-goals say "same behaviour, same permissions". Left as a deliberate gap.
+    Found on the way: the shell's expand toggle is a second way into the expansion, so the
+    decision form could be opened on an already-decided refund, which the Decide button had made
+    impossible. Non-pending rows now render a read-only note instead.
+    Indexes `billing_refunds_org_{created,amount}_id_idx` in `drizzle/0158`.
 
 - [ ] **Migrate the dispute queue**
   - Files: `src/modules/admin/billing/DisputeQueue.tsx`,

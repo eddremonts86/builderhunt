@@ -1825,6 +1825,12 @@ export const billingRefunds = pgTable(
   (table) => [
     uniqueIndex('billing_refunds_organization_id_id_unique').on(table.organizationId, table.id),
     uniqueIndex('billing_refunds_org_idempotency_unique').on(table.organizationId, table.idempotencyKey),
+    // Keyset sorts for the operator review queue (plans/phase-3/10). The organization column leads
+    // because the platform role's RLS policy scopes every read by it, and the tiebreaker trails the
+    // sort column immediately because that is the shape a `(created_at, id) < (:a, :b)` tuple
+    // comparison satisfies with one range scan. Asserted by capability-index.test.ts.
+    index('billing_refunds_org_created_id_idx').on(table.organizationId, table.createdAt, table.id),
+    index('billing_refunds_org_amount_id_idx').on(table.organizationId, table.amountCents, table.id),
     foreignKey({
       columns: [table.organizationId, table.subscriptionId],
       foreignColumns: [billingSubscriptions.organizationId, billingSubscriptions.id],

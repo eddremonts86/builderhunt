@@ -2,14 +2,17 @@ import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { REFUND_POLICY_DECISIONS } from '~/shared/lib/billing-shared'
 import { decideRefund, RefundError, type RefundErrorCode } from '~/shared/lib/billing/refunds'
 import { withPlatformOrganization } from '~/shared/lib/repositories/billing-risk'
-import { listBillingRefunds } from '~/shared/lib/repositories/billing'
+import { pageBillingRefunds } from '~/shared/lib/repositories/billing'
+import { billingRefundsCapability } from '~/shared/lib/table/capabilities/billing-refunds'
+import { platformTablePageHandler, TablePageError } from '~/shared/lib/table/handler'
 
 const DecideRefundBody = z.object({
   organizationId: z.string().min(1),
   refundId: z.string().min(1),
-  policyDecision: z.enum(['full_unused_pack', 'partial_pack_operator', 'full_subscription_invoice', 'partial_subscription_operator']),
+  policyDecision: z.enum(REFUND_POLICY_DECISIONS),
   amountCents: z.number().int().nonnegative(),
   creditRevocationUnits: z.number().int().positive().optional(),
   revisedServiceEndAt: z.string().datetime().optional(),
@@ -40,21 +43,33 @@ export const Route = createFileRoute('/api/admin/billing/refunds')({
       // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
       ANY: methodNotAllowed(['GET', 'PUT']),
 
-      GET: async ({ request }) => {
-        try {
-          await requirePlatformAdminPrincipal(request)
-          const organizationId = new URL(request.url).searchParams.get('organizationId')
-          if (!organizationId) return Response.json({ error: 'organizationId query parameter is required' }, { status: 400 })
-
-          const refunds = await withPlatformOrganization(organizationId, (tx) => listBillingRefunds(tx, organizationId))
-          return Response.json({ refunds })
-        } catch (err) {
-          const response = platformAdminErrorResponse(err)
-          if (response) return response
-          console.error('admin refunds read error:', err)
-          return Response.json({ error: 'Failed' }, { status: 500 })
-        }
-      },
+      /**
+       * One keyset page of the queue, for one organization.
+       *
+       * The organization arrives as `?filter.organizationId=…` rather than as its own parameter,
+       * and that is the whole shape of this change. It used to be a precondition: supply an id and
+       * the route read **every** refund that organization had ever requested. Now it is a filter
+       * dimension like any other — it lives in the table's state, so it is in the URL, it is part
+       * of what the cursor is bound to, and an empty result under a typed id renders the
+       * filtered-empty state instead of "this organization has no refunds".
+       *
+       * It is still required, and exactly one value: `builderhunt_platform`'s SELECT policy on
+       * `billing_refunds` is org-scoped (drizzle/0028), so the read has to be scoped to one
+       * organization before it runs. Two values cannot both be `set_config`'d, and answering with
+       * whichever came first would silently show one workspace's refunds under a filter naming two.
+       */
+      GET: async ({ request }) => platformTablePageHandler({
+        capability: billingRefundsCapability,
+        request,
+        load: ({ search }) => {
+          const selected = search.query.filters.organizationId ?? []
+          if (selected.length !== 1) {
+            throw new TablePageError(400, 'Exactly one filter.organizationId is required')
+          }
+          return withPlatformOrganization(selected[0], (tx) =>
+            pageBillingRefunds(tx, search.query, search.page))
+        },
+      }),
       PUT: async ({ request }) => {
         try {
           const principal = await requirePlatformAdminPrincipal(request)

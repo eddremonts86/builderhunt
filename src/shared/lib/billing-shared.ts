@@ -152,3 +152,26 @@ export interface LimitCheck {
   plan: PlanTier
   resource: LimitResource
 }
+
+/**
+ * The refund vocabulary, in one place.
+ *
+ * These four policies were written out three times — the `billing_refunds_policy_check`
+ * constraint, the review route's zod enum, and the operator form's option list — and the state set
+ * twice. Three copies of an enum is three chances for one of them to fall behind, and the review
+ * queue's filter chips would have made a fourth. The check constraint stays where it is (it is
+ * SQL), but everything in TypeScript reads these.
+ */
+export const REFUND_POLICY_DECISIONS = [
+  'full_unused_pack',
+  'partial_pack_operator',
+  'full_subscription_invoice',
+  'partial_subscription_operator',
+] as const
+
+export type RefundPolicyDecision = (typeof REFUND_POLICY_DECISIONS)[number]
+
+/** `repair_needed` is the worker's "there was no PaymentIntent to refund against" — see billing/refunds.ts. */
+export const REFUND_STATES = ['pending', 'succeeded', 'failed', 'repair_needed'] as const
+
+export type RefundState = (typeof REFUND_STATES)[number]

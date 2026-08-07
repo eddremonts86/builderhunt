@@ -261,3 +261,208 @@ test.describe('billing operations — guarded actions', () => {
     }
   })
 })
+
+/**
+ * The refund review queue, after plans/phase-3/10 moved it onto the table shell.
+ *
+ * The organization id used to be a precondition — supply one, press Load, receive **every** refund
+ * that organization had ever requested. It is a filter dimension now, which is what these assert:
+ * that the read is a bounded keyset page, that the id reaching the query is the one in the URL, and
+ * that recording a decision still does exactly what it did.
+ */
+test.describe('refund queue — a bounded, filterable page', () => {
+  /** Enough that page one is a page. */
+  const SEEDED_REFUNDS = 60
+
+  async function seedRefunds(): Promise<string[]> {
+    const ids: string[] = []
+    for (let index = 0; index < SEEDED_REFUNDS; index += 1) {
+      const id = `e2e-refund-${harness.workerIndex}-${String(index).padStart(3, '0')}`
+      await harness.sql`
+        insert into billing_refunds (id, organization_id, requested_by_user_id, idempotency_key, policy_decision, amount_cents, state, created_at)
+        values (
+          ${id}, ${harness.organization.organizationId}, ${harness.owner.userId!}, ${`e2e-idem-${id}`},
+          ${index % 2 === 0 ? 'full_unused_pack' : 'partial_pack_operator'},
+          ${(index + 1) * 100},
+          ${index % 3 === 0 ? 'succeeded' : 'pending'},
+          now() - (${index} * interval '1 hour')
+        )
+      `
+      ids.push(id)
+    }
+    return ids
+  }
+
+  async function clearRefunds(): Promise<void> {
+    await harness.sql`delete from billing_refunds where id like ${`e2e-refund-${harness.workerIndex}-%`}`
+  }
+
+  const queueUrl = (extra = '') =>
+    `/api/admin/billing/refunds?filter.organizationId=${encodeURIComponent(harness.organization.organizationId)}${extra}`
+
+  test('answers a bounded page with a total over the whole filtered set', async () => {
+    await seedRefunds()
+    try {
+      const response = await harness.admin.api!.get(queueUrl())
+      expect(response.status()).toBe(200)
+      const page = await response.json()
+
+      expect(page.rows.length).toBe(50)
+      // Not `rows.length`: the count has to describe the query, or every "50 of N" label lies.
+      expect(page.total).toBe(SEEDED_REFUNDS)
+      expect(page.nextCursor).toBeTruthy()
+      // Newest first, which is the capability's default sort.
+      expect(new Date(page.rows[0].createdAt).getTime())
+        .toBeGreaterThan(new Date(page.rows[1].createdAt).getTime())
+    } finally {
+      await clearRefunds()
+    }
+  })
+
+  test('walks every refund exactly once across pages', async () => {
+    await seedRefunds()
+    try {
+      const seen = new Set<string>()
+      let cursor: string | null = null
+      let guard = 0
+      do {
+        const url: string = queueUrl(cursor ? `&cursor=${encodeURIComponent(cursor)}` : '')
+        const page = await (await harness.admin.api!.get(url)).json()
+        for (const row of page.rows as Array<{ id: string }>) {
+          expect(seen.has(row.id), `refund ${row.id} served twice`).toBe(false)
+          seen.add(row.id)
+        }
+        cursor = page.nextCursor
+        guard += 1
+      } while (cursor && guard < 10)
+
+      expect(seen.size).toBe(SEEDED_REFUNDS)
+    } finally {
+      await clearRefunds()
+    }
+  })
+
+  /**
+   * The organization is a filter, and the filter is what scopes the read.
+   *
+   * `builderhunt_platform`'s SELECT policy on `billing_refunds` is org-scoped, so the id has to be
+   * present and singular before there is a query to run. Two values cannot both be `set_config`'d,
+   * and answering with whichever arrived first would show one workspace's refunds under a chip
+   * naming two.
+   */
+  test('refuses a missing or ambiguous organization filter', async () => {
+    expect((await harness.admin.api!.get('/api/admin/billing/refunds')).status()).toBe(400)
+    expect((await harness.admin.api!.get(
+      '/api/admin/billing/refunds?filter.organizationId=org-a&filter.organizationId=org-b',
+    )).status()).toBe(400)
+  })
+
+  test('a state filter narrows the total, and its own facet count does not collapse', async () => {
+    await seedRefunds()
+    try {
+      const page = await (await harness.admin.api!.get(queueUrl('&filter.state=pending'))).json()
+
+      expect(page.total).toBeLessThan(SEEDED_REFUNDS)
+      expect([...new Set(page.rows.map((row: { state: string }) => row.state))]).toEqual(['pending'])
+      // Computed with the *other* dimensions applied and this one's not, so the chip says what each
+      // option would add rather than reporting the filtered set back to itself.
+      const states = page.facets.state as Array<{ value: string; count: number }>
+      expect(states.find((facet) => facet.value === 'succeeded')?.count).toBeGreaterThan(0)
+    } finally {
+      await clearRefunds()
+    }
+  })
+
+  test('a cursor from one organization is refused against another', async () => {
+    await seedRefunds()
+    try {
+      const first = await (await harness.admin.api!.get(queueUrl())).json()
+      const replayed = await harness.admin.api!.get(
+        `/api/admin/billing/refunds?filter.organizationId=some-other-org&cursor=${encodeURIComponent(first.nextCursor)}`,
+      )
+      expect(replayed.status()).toBe(400)
+    } finally {
+      await clearRefunds()
+    }
+  })
+
+  test('an unknown sort id is refused rather than absorbed', async () => {
+    const response = await harness.admin.api!.get(queueUrl('&sort=totally-not-a-column:desc'))
+    expect(response.status()).toBe(400)
+    expect((await response.json()).error).toContain('Unknown sort column')
+  })
+
+  test('the queue is unavailable to a non-platform-admin', async () => {
+    expect((await harness.owner.api!.get(queueUrl())).status()).toBe(403)
+  })
+
+  test('an operator loads a queue from its URL and records a decision on a pending refund', async ({ browser }) => {
+    const ids = await seedRefunds()
+    // Index 1 is pending (only every third is `succeeded`).
+    const pendingId = ids[1]
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(
+        page,
+        `${harness.baseURL}/admin/refunds?filter.organizationId=${encodeURIComponent(harness.organization.organizationId)}`,
+      )
+      await dismissOverlays(page)
+
+      const grid = page.locator('[role="grid"]')
+      // `total + 1` for the header row, which carries aria-rowindex 1.
+      await expect(grid).toHaveAttribute('aria-rowcount', String(SEEDED_REFUNDS + 1))
+      // The page is bounded even though the count is not.
+      expect(await page.locator('[role="row"][data-testid^="refund-row-"]').count()).toBe(50)
+
+      await page.getByTestId(`refund-decide-${pendingId}`).click()
+      await page.getByTestId('refund-amount-input').fill('250')
+      await page.getByTestId('refund-submit-decision').click()
+
+      await expect(page.getByTestId('refund-submit-decision')).toHaveCount(0)
+
+      const [decided] = await harness.sql`
+        select policy_decision, amount_cents, operator_user_id, state from billing_refunds where id = ${pendingId}
+      `
+      expect(decided.operator_user_id).toBe(harness.admin.userId!)
+      expect(decided.amount_cents).toBe(250)
+      // Unchanged by design: the operator records the decision, the billing worker sends it to
+      // Stripe and moves the state. This route has never done the second thing.
+      expect(decided.state).toBe('pending')
+    } finally {
+      await context.close()
+      await clearRefunds()
+    }
+  })
+
+  /** A typed organization with no refunds is a different fact from an organization never chosen. */
+  test('an organization with no refunds shows the filtered-empty state, naming the filter', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/admin/refunds?filter.organizationId=no-such-organization`)
+      await dismissOverlays(page)
+
+      const emptyState = page.getByTestId('table-filtered-empty')
+      await expect(emptyState).toBeVisible()
+      await expect(emptyState).toContainText('no-such-organization')
+      await expect(page.getByTestId('refund-queue-prompt')).toHaveCount(0)
+    } finally {
+      await context.close()
+    }
+  })
+
+  test('no organization chosen is the blank state, and asks for one', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/admin/refunds`)
+      await dismissOverlays(page)
+
+      await expect(page.getByTestId('refund-queue-prompt')).toBeVisible()
+      await expect(page.getByTestId('table-filtered-empty')).toHaveCount(0)
+    } finally {
+      await context.close()
+    }
+  })
+})
