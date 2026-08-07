@@ -138,7 +138,11 @@ function mapCheckoutSession(session: Stripe.Checkout.Session, priceId: string): 
     // This adapter never creates 'setup' mode Checkout Sessions itself (see CreateCheckoutSessionInput's
     // narrower CheckoutMode); a defensively-retrieved session in that mode has no meaningful mapping
     // onto our domain, so it collapses to 'payment' rather than throwing on a read path.
-    mode: session.mode === 'setup' ? 'payment' : session.mode,
+    //
+    // Tested positively for the one mode we do create, because stripe's own union carries an
+    // `OtherString` arm for modes added after this SDK version. Excluding 'setup' would leave that
+    // arm assignable to CheckoutMode, so an unrecognised future mode would flow through untranslated.
+    mode: session.mode === 'subscription' ? 'subscription' : 'payment',
     status: session.status ?? 'open',
     url: session.url ?? '',
     priceId,
@@ -146,7 +150,9 @@ function mapCheckoutSession(session: Stripe.Checkout.Session, priceId: string): 
     createdAt,
     updatedAt: createdAt,
     automaticTax: session.automatic_tax?.enabled ?? false,
-    billingAddressCollection: session.billing_address_collection ?? 'auto',
+    // Same `OtherString` arm as `mode` above: `?? 'auto'` only replaces null, so an unrecognised
+    // collection setting would reach a field this domain declares as 'auto' | 'required'.
+    billingAddressCollection: session.billing_address_collection === 'required' ? 'required' : 'auto',
     taxIdCollection: session.tax_id_collection?.enabled ?? false,
     allowPromotionCodes: session.allow_promotion_codes ?? false,
     paymentMethodTypes: session.payment_method_types ?? [],

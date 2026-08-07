@@ -56,10 +56,15 @@ function DueLabel({ dueAt }: { dueAt: string }) {
  * here by accident.
  */
 function DismissButton({ item }: { item: DashboardActionItem }) {
-  const dismiss = item.dismissAction
-  if (!dismiss) return null
+  // Both hooks run before the guard below on purpose. An item can gain or lose its
+  // `dismissAction` between renders — a queue row that arrives without one and is
+  // refetched with one is the ordinary case — and returning before the hooks made
+  // React see a different hook count for the same component across those renders.
   const [pending, setPending] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+
+  const dismiss = item.dismissAction
+  if (!dismiss) return null
 
   const onClick = async () => {
     setPending(true)

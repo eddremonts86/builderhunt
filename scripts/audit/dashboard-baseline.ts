@@ -104,7 +104,6 @@ async function captureBaseline(page: Page, route: string, vp: ViewportSpec): Pro
   const requests: { url: string; status: number; bytes: number }[] = []
   const consoleErrors: string[] = []
   let bytes = 0
-  let cls = 0
 
   page.on('console', (msg) => {
     if (msg.type() === 'error') consoleErrors.push(msg.text())
@@ -138,7 +137,7 @@ async function captureBaseline(page: Page, route: string, vp: ViewportSpec): Pro
     timeout: 30_000,
   })
 
-  let status: number | null = null
+  let status: number | null
   try {
     const response = await navigationPromise
     status = response?.status() ?? null
@@ -174,7 +173,9 @@ async function captureBaseline(page: Page, route: string, vp: ViewportSpec): Pro
       loadMs: Math.round(nav.loadEventEnd - nav.startTime),
     }
   })
-  cls = await page.evaluate(() => (window as unknown as { __cls?: number }).__cls ?? 0)
+  // Declared here rather than beside `bytes` above: every return that precedes this line
+  // reports `cls: null` instead of the accumulator, so there is nothing to initialise.
+  const cls = await page.evaluate(() => (window as unknown as { __cls?: number }).__cls ?? 0)
 
   // Screenshot
   const slug = `${vp.label}-dashboard`.replace(/[^a-zA-Z0-9_-]/g, '-')

@@ -18,6 +18,8 @@
  * matrix is exhaustively covered against the real business logic in
  * `src/shared/lib/dashboard/...`; we re-state the seam guarantees here.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Route as OverviewRoute } from '~/routes/api/dashboard/overview'
 
@@ -84,11 +86,8 @@ describe('GET /api/dashboard/overview — security gates', () => {
     // client-supplied organizationId would be a TypeScript error because
     // the property does not exist on `Request`. This test pins that
     // contract by reading the source.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require('node:fs') as typeof import('node:fs')
-    const path = require('node:path') as typeof import('node:path')
-    const src = fs.readFileSync(
-      path.join(process.cwd(), 'src/routes/api/dashboard/overview.ts'),
+    const src = readFileSync(
+      join(process.cwd(), 'src/routes/api/dashboard/overview.ts'),
       'utf8',
     )
     // The handler must not read organizationId off the request.
