@@ -40,7 +40,18 @@ export function CookieBanner() {
   React.useEffect(() => {
     const existing = readConsent()
     if (!existing) {
-      setVisible(true)
+      // Delay so the banner does not cover the hero on first paint.
+      // Mobile users see it sooner (1.5s) since they scroll faster;
+      // desktop users get 3s so they read the hero copy first.
+      // `prefers-reduced-motion` users get the shorter delay because
+      // they are not distracted by the entry animation.
+      const reduce = typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      const isMobile = typeof window !== 'undefined' &&
+        window.matchMedia?.('(max-width: 768px)').matches
+      const delay = reduce ? 800 : isMobile ? 1500 : 3000
+      const id = window.setTimeout(() => setVisible(true), delay)
+      return () => window.clearTimeout(id)
     }
   }, [])
 
