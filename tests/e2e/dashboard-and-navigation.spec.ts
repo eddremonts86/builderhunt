@@ -13,6 +13,14 @@
  * auth or cross-tenant data through them.
  */
 import { test, expect } from 'playwright/test'
+import { loadHarnessEnv } from './harness/load-env'
+
+// `e2eEnv()` reads the database URLs straight off `process.env`, and Playwright does not hand a
+// worker process the dev server's environment. The interview specs get this for free because
+// `harness/fixtures/interviews.ts` calls it at module scope; these two reach the harness directly,
+// so without this line `e2eEnv()` threw on a missing DATABASE_URL before `beforeAll` could seed,
+// and every test in the file reported `Cannot read properties of undefined`.
+loadHarnessEnv()
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
@@ -68,7 +76,11 @@ test.describe('dashboard personas — Wave 0 baseline', () => {
   test('activeRecruiter owns a team-tier workspace', async () => {
     expect(fx.activeRecruiter.role).toBe('owner')
     expect(fx.recruiterOrg.tier).toBe('team')
-    expect(fx.recruiterOrg.organizationId).toMatch(/^org_/)
+    // Ownership, not id shape. This asserted `/^org_/`, and organization ids are bare nanoids —
+    // `rw2hdfD0pgZXbqucRqXN7vXs4roz7fK8` is a real one. The prefix never existed, so the assertion
+    // could only ever fail; it had simply never run, because the E2E step was unreachable in CI.
+    expect(fx.recruiterOrg.organizationId).toBeTruthy()
+    expect(fx.activeRecruiter.ownedOrganizationIds).toContain(fx.recruiterOrg.organizationId)
   })
 
   test('orgMember is bound to the recruiter org with role=member', async () => {

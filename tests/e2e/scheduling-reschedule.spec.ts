@@ -24,6 +24,7 @@
  */
 import { expect, test } from 'playwright/test'
 
+import { publicSlotRange } from './harness/clock'
 import { uniqueId } from './harness/ids'
 import {
   candidateContext,
@@ -76,7 +77,8 @@ test.afterAll(async () => {
   await stopInterviewHarness(harness)
 })
 
-const SLOT_RANGE = { from: '2026-07-27T00:00:00.000Z', to: '2026-08-10T00:00:00.000Z' }
+// Anchored to the wall clock, not `E2E_FIXED_TIME` — see `publicSlotRange`.
+const SLOT_RANGE = publicSlotRange()
 
 interface Slot { slotId: string; startsAt: string; endsAt: string }
 type CandidateContext = Awaited<ReturnType<typeof candidateContext>>

@@ -19,6 +19,14 @@
  * + app server, never the shared dev database.
  */
 import { test, expect } from 'playwright/test'
+import { loadHarnessEnv } from './harness/load-env'
+
+// `e2eEnv()` reads the database URLs straight off `process.env`, and Playwright does not hand a
+// worker process the dev server's environment. The interview specs get this for free because
+// `harness/fixtures/interviews.ts` calls it at module scope; these two reach the harness directly,
+// so without this line `e2eEnv()` threw on a missing DATABASE_URL before `beforeAll` could seed,
+// and every test in the file reported `Cannot read properties of undefined`.
+loadHarnessEnv()
 import postgres from 'postgres'
 import { acquireWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace } from './harness/cache'
