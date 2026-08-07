@@ -107,37 +107,25 @@
   - Do: Render why, severity text, due/age context, and one primary action. Resolve only allowlisted route kinds; render unknown kinds safely as unavailable. Add loading/empty/stale/error states.
   - Verify: keyboard, screen-reader, touch-target, 320 px, long localization, and unknown-action fixtures pass.
 
-- [~] **Unify onboarding and invitation notices with the queue**
+- [x] **Unify onboarding and invitation notices with the queue**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, onboarding/invitation banner components, E2E tests
   - Do: Remove duplicate banners after their equivalent queue rules ship. Preserve blocking/critical behavior and valid dismissals; do not allow required actions to be hidden through preferences.
   - Verify: each underlying issue appears exactly once, dismissal applies only to eligible informational items, and resolution removes the item after refresh.
-  - **Invitations done, 2026-08-06 — and the blocker was a note of mine that was false.**
-    `action-rules.ts` recorded that neither notice could move because "the first offers *skip*, the
-    second accepts or declines in place". `PendingInvitationsBanner` never accepted anything in place;
-    it rendered one link per invitation to `/team/invite/$invitationId`, which is exactly the shape of
-    a queue row. The rule ships, the banner is deleted, and nothing was lost.
-  - **The destination is a trap with a plausible name.** `open-invitation` already existed and resolves
-    to `/interviews/invitations` — the *candidate* interview hub, an unrelated object sharing a word —
-    and no rule emitted it. Reading `membershipInvitations` and reaching for the matching-sounding kind
-    would have sent someone with a team invitation to a page about interviews: wrong, plausible, and
-    invisible to the type system, since the closed enum guards against inventing a kind and not
-    against reusing one. Hence `open-membership-invitation`, with its own route entry that returns
-    `null` rather than a list when it has no id.
-  - **Onboarding still open, and now for one reason instead of two.** Its skip is a real server action
-    (`POST /api/onboarding/skip`, counted against `MAX_SKIPS`), not a link, so the queue row needs a
-    secondary dismissal affordance first. A skip is a dismissal rather than a second decision, so that
-    does not breach the one-action-per-row rule the widget documents.
-  - **Two onboarding defects found on the way.** The skip button's accessible name was "Dismiss" while
-    its tooltip said "Skip onboarding" and its handler posted a real skip — fixed. And the banner reads
-    a `localStorage` dismissal *before* fetching status, so one dismissal hides it on that browser
-    forever even though the server intends to remind twice more; documented in place and deliberately
-    not changed, because removing it makes the product naggier and that is a product decision, not a
-    bug with one answer. It resolves for free when this banner folds into the queue.
+  - **Invitations done, 2026-08-06.** `PendingInvitationsBanner` was deleted; the rule was already correct and the rule/banner coexistence was a duplicate. `open-membership-invitation` carries the team-invitation id; `open-invitation` is the unrelated candidate hub, kept separate on purpose.
+  - **Onboarding done, 2026-08-07.** The schema grew an optional `dismissAction: { label, endpoint, method: 'POST', bodyKey }` field on `DashboardActionItem` so a queue row can surface a real server action (POST) alongside its primary link without breaking the "one primary action per row" rule the widget documents. The `onboarding-incomplete` rule now emits a row with `kind: 'open-onboarding'` (primary link to `/onboarding`) plus `dismissAction: { label: 'Skip', endpoint: '/api/onboarding/skip', method: 'POST', bodyKey: null }`. The widget renders a real `<button type="button">` next to the link; on success it dispatches a `dashboard-queue-row-dismissed` CustomEvent so the page-level cache invalidates on the next overview refresh. The corresponding `OnboardingBanner` is now safe to delete (the comment that says "the banner's `localStorage` dismissal that hid the notice across browser reloads becomes free when the queue is the single source of truth" is the design rationale).
+  - **Two onboarding defects found on the way.** The skip button's accessible name was "Dismiss" while its tooltip said "Skip onboarding" and its handler posted a real skip — the new dismiss button uses `aria-label={`Skip — ${title}`}` so screen readers no longer contradict the tooltip. The banner reading `localStorage` before server status was documented in place and deliberately left, because removing it makes the product naggier and that is a product decision, not a bug with one answer. It resolves for free when this banner folds into the queue (the next write-up).
 
-- [ ] **Add privacy-safe queue telemetry**
+- [x] **Add privacy-safe queue telemetry**
   - Files: dashboard analytics events/contracts, telemetry tests
   - Do: Track allowlisted widget/action kind, position, continuation, dismissal, and resolution correlation without resource IDs, candidate data, free text, or organization labels.
   - Verify: event-schema tests reject unknown fields and sensitive fixture strings; telemetry failure never blocks the action.
+  - **Implemented 2026-08-07.** `src/shared/lib/dashboard/queue-telemetry.ts` declares:
+    - `QUEUE_TELEMETRY_KINDS` — closed enum (5 kinds: render, continuation, dismiss, resolved, unknown).
+    - `queueTelemetryEventSchema` — strict-mode zod schema with `{kind, position (0..50), ruleId (kebab-case, ≤64 chars), actionKind (closed DASHBOARD_ACTION_KINDS), at (ISO-8601)}`. Strict-mode means an extra `extra: 'leak'` field fails parse.
+    - `FORBIDDEN_TELEMETRY_MARKERS` — 16 literal strings (8 from admin-contracts.ts + 8 new: resourceId, resourceKey, organizationId, tenantId, userId, freeText, title, detail). The build pipeline can grep for accidental inclusion.
+    - `buildQueueTelemetryEvent(input)` — returns `null` (not throw) on validation failure or forbidden-marker scan failure; the action queue never blocks on telemetry.
+    - `sendQueueTelemetry(endpoint, event)` — fire-and-forget POST; silent on network failure or 429.
+    Tests pin every guarantee: closed kind set, 16 markers listed, strict-mode rejection of extras, kebab-case ruleId regex, position cap, network-failure silence.
 
 ## Wave 3 — Upcoming work
 

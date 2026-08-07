@@ -197,6 +197,36 @@ export const dashboardActionItemSchema = z.object({
   /** When the thing is due or started, so the queue can order by time within a severity. */
   dueAt: z.iso.datetime().nullable(),
   action: dashboardActionSchema,
+  /**
+   * Optional secondary dismissal affordance.
+   *
+   * Required for `kind === 'open-onboarding'` rows because the
+   * onboarding banner's `Skip` button is a real server action
+   * (`POST /api/onboarding/skip`, counted against `MAX_SKIPS`)
+   * rather than a link, and the queue widget documents exactly one
+   * primary action per row. The skip is a dismissal rather than a
+   * second decision, so it does not violate that contract.
+   *
+   * For every other kind this is absent. The widget renders no UI
+   * when null.
+   *
+   * Default null at the schema level so existing callers that build
+   * `DashboardActionItem` literals do not have to thread the field
+   * through every site. Anything that wants a real dismiss action
+   * passes the field explicitly; the runtime never invents one.
+   */
+  dismissAction: z
+    .object({
+      label: z.string().min(1).max(40),
+      /** Server endpoint relative to the app root. POST is the only verb allowed. */
+      endpoint: z.string().regex(/^\/api\/[a-z0-9/_-]+$/),
+      /** Method is always POST — typed so a future contributor cannot accidentally allow GET. */
+      method: z.literal('POST'),
+      /** Optional body field name for `true`-style dismissals; `null` means no body. */
+      bodyKey: z.string().min(1).max(40).nullable(),
+    })
+    .nullable()
+    .default(null),
 })
 export type DashboardActionItem = z.infer<typeof dashboardActionItemSchema>
 

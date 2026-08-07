@@ -45,6 +45,66 @@ function DueLabel({ dueAt }: { dueAt: string }) {
   )
 }
 
+/**
+ * Secondary dismissal affordance. The button calls the configured POST
+ * endpoint and, on success, removes the row from the local cache so the
+ * queue reflects the server's new state on the next refresh.
+ *
+ * The button is rendered as a real `<button type="button">` (not a
+ * `<Link>`) because every `dismissAction` is a POST — the route is
+ * closed on purpose, so a future contributor cannot wire a GET request
+ * here by accident.
+ */
+function DismissButton({ item }: { item: DashboardActionItem }) {
+  const dismiss = item.dismissAction
+  if (!dismiss) return null
+  const [pending, setPending] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  const onClick = async () => {
+    setPending(true)
+    setError(null)
+    try {
+      const body = dismiss.bodyKey ? { [dismiss.bodyKey]: true } : undefined
+      const res = await fetch(dismiss.endpoint, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      if (!res.ok) {
+        setError('Could not dismiss. Try again.')
+        return
+      }
+      // A successful dismiss removes the row from the queue without a
+      // full refetch; the page-level cache invalidation runs on the
+      // next overview refresh. For a banner that needs to disappear
+      // immediately, the call site can dispatch a custom event here.
+      const event = new CustomEvent('dashboard-queue-row-dismissed', {
+        detail: { id: item.id },
+      })
+      window.dispatchEvent(event)
+    } catch {
+      setError('Could not dismiss. Try again.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      data-testid={`action-queue-dismiss-${item.id}`}
+      aria-label={`Skip — ${item.title}`}
+      className="inline-flex items-center rounded px-2 py-1 text-xs text-bh-text-muted hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 disabled:opacity-50"
+    >
+      {error ?? dismiss.label}
+    </button>
+  )
+}
+
 export function ActionQueueWidget({ items }: { items: readonly DashboardActionItem[] }) {
   return (
     <ol className="-mx-6 -mb-6 divide-y divide-bh-border border-t border-bh-border">
@@ -68,25 +128,29 @@ export function ActionQueueWidget({ items }: { items: readonly DashboardActionIt
               )}
             </div>
             {item.dueAt && <DueLabel dueAt={item.dueAt} />}
-            {href ? (
-              <Link
-                to={href}
-                className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-              >
-                {/* The row's title is the context; without it every link in the queue announces the
-                    same two words. */}
-                <span className="sr-only">{actionLabel(item.action.kind)} — {item.title}</span>
-                <span aria-hidden="true">{actionLabel(item.action.kind)}</span>
-                <ArrowRight className="h-3 w-3" aria-hidden="true" />
-              </Link>
-            ) : (
-              /*
-               * A kind this build does not know how to route. No button, and a plain note rather
-               * than a disabled control: a greyed-out button invites clicking and implies the action
-               * exists but is unavailable to *you*, which is a different and wrong statement.
-               */
-              <span className="shrink-0 text-xs text-bh-text-dim">Update to act on this</span>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {item.dismissAction && <DismissButton item={item} />}
+              {href ? (
+                <Link
+                  to={href}
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                  data-testid={`action-queue-link-${item.id}`}
+                >
+                  {/* The row's title is the context; without it every link in the queue announces the
+                      same two words. */}
+                  <span className="sr-only">{actionLabel(item.action.kind)} — {item.title}</span>
+                  <span aria-hidden="true">{actionLabel(item.action.kind)}</span>
+                  <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                </Link>
+              ) : (
+                /*
+                 * A kind this build does not know how to route. No button, and a plain note rather
+                 * than a disabled control: a greyed-out button invites clicking and implies the action
+                 * exists but is unavailable to *you*, which is a different and wrong statement.
+                 */
+                <span className="text-xs text-bh-text-dim">Update to act on this</span>
+              )}
+            </div>
           </li>
         )
       })}
