@@ -8,6 +8,18 @@ on:
 permissions:
   contents: read
 
+# One run per ref. Without this, every push to a branch with an open pull request started a
+# fresh run and cancelled nothing, so five were executing at once on 2026-08-07 — three of them
+# measuring commits that had already been superseded, at roughly 78 minutes of runner time each.
+# Two were the same commit twice, one from the push and one from opening the pull request.
+#
+# `deploy.yml` already guards itself this way, for a different reason: it serialises deploys with
+# `cancel-in-progress: false`, because cancelling a half-applied migration is worse than queueing.
+# Here the opposite is true — a superseded run tells you about code nobody is going to merge.
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
