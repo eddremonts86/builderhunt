@@ -1,0 +1,3 @@
+CREATE INDEX "sprint_results_org_sprint_created_id_idx" ON "sprint_results" USING btree ("organization_id","sprint_id","created_at","id");--> statement-breakpoint
+CREATE INDEX "sprint_results_org_sprint_score_id_idx" ON "sprint_results" USING btree ("organization_id","sprint_id","score","id");--> statement-breakpoint
+CREATE INDEX "sprint_results_org_sprint_source_id_idx" ON "sprint_results" USING btree ("organization_id","sprint_id","source","id");

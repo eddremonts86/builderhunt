@@ -1328,6 +1328,27 @@ export const sprintResults = pgTable(
   (table) => [
     unique('sprint_results_sprint_source_unique').on(table.sprintId, table.source, table.sourceId),
     index('sprint_results_sprint_created_idx').on(table.sprintId, table.createdAt),
+    // Keyset sort indexes (phase 3, plan 04). One per column the sprint-results capability makes
+    // sortable, shaped `(organization_id, sprint_id, sortColumn, id)`:
+    //
+    //   * `organization_id` leads because RLS adds that predicate to every query, and an index
+    //     that does not start with it cannot be walked.
+    //   * `sprint_id` follows because every read of this table is scoped to one sprint.
+    //   * `id` trails because it is the keyset tiebreaker, and a tuple comparison
+    //     `(score, id) < (:score, :id)` can only be answered by one index range scan when the
+    //     index ends in the same tiebreaker.
+    //
+    // `sprint_results_sprint_created_idx` above does *not* serve this purpose despite covering
+    // `created_at`: it leads with `sprint_id` rather than the tenant, and it has no trailing `id`,
+    // so the planner sorts after filtering. That is why the created-at composite below exists
+    // alongside it rather than instead of it — the older index still serves the worker's
+    // per-sprint scans, which carry no tenant predicate.
+    index('sprint_results_org_sprint_created_id_idx')
+      .on(table.organizationId, table.sprintId, table.createdAt, table.id),
+    index('sprint_results_org_sprint_score_id_idx')
+      .on(table.organizationId, table.sprintId, table.score, table.id),
+    index('sprint_results_org_sprint_source_id_idx')
+      .on(table.organizationId, table.sprintId, table.source, table.id),
     foreignKey({
       columns: [table.organizationId, table.sprintId],
       foreignColumns: [sourcingSprints.organizationId, sourcingSprints.id],

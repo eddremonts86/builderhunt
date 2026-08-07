@@ -70,6 +70,15 @@ export interface TableCapability {
    * Omitted for genuinely global tables (changelog, roadmap, public content).
    */
   organizationColumn?: PgColumn
+
+  /**
+   * This table is not in Postgres.
+   *
+   * The blog library reads the filesystem, so no index applies to it and the sort-index guard has
+   * nothing to check. Marked explicitly rather than skipped by a name pattern, so a table that is
+   * genuinely missing its indexes cannot be mistaken for one that never needed them.
+   */
+  nonSql?: true
 }
 
 /**

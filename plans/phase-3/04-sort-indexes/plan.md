@@ -1,9 +1,42 @@
 # Plan — an index behind every sortable column
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
-> **Reality check**: One generated migration (`drizzle/0115` at today's tip) plus one unit test. Reuses the 85 existing indexes wherever they already match.
+> **Reality check**: One generated migration (`drizzle/0155_table_sort_indexes.sql` — the tip was `0154`, not `0114`) plus `capability-index.ts` and 13 tests.
+
+## Audit result (2026-08-07)
+
+Task 1 asked for every `sortable` entry beside the index covering it. `TABLE_CAPABILITIES` is empty
+until plan 07, so the audit covers the one capability whose columns are already pinned down, in
+[`07-first-surface-sprint-results/tasks.md`](../07-first-surface-sprint-results/tasks.md).
+
+| Sortable column | Covered before | Now |
+|---|---|---|
+| `created_at` | **No.** `sprint_results_sprint_created_idx` leads with `sprint_id`, not the tenant, and has no trailing `id` | `sprint_results_org_sprint_created_id_idx` |
+| `score` | No index at all | `sprint_results_org_sprint_score_id_idx` |
+| `source` | Only `sprint_results_sprint_source_unique` `(sprint_id, source, source_id)` — wrong lead, wrong tail | `sprint_results_org_sprint_source_id_idx` |
+| `country` | n/a — lives in the `profile` jsonb, so no `PgColumn` can name it | **Not indexed.** See below |
+| `id` (tiebreaker) | `sprint_results_pkey` | unchanged |
+
+Two things this contradicts, both in the plans rather than in the database:
+
+1. **`sprint_results_sprint_created_idx` does not cover the default sort**, though plan 07's
+   reality-check line says it does. RLS puts `organization_id = current_setting(…)` in every query,
+   so an index that does not lead with the tenant cannot be walked; and without a trailing `id` the
+   keyset tuple comparison needs a sort above the scan anyway. The old index is kept: the worker's
+   per-sprint scans carry no tenant predicate and still use it.
+
+2. **`country` cannot be declared sortable at all** with the current contract. It is a key inside
+   the `profile` jsonb column and `SortableColumn.column` is a `PgColumn`. An expression index would
+   back it, but there is no way to declare the sort, so adding the index here would be provisioning
+   for something no capability can name. Plan 07 decides: drop `country` from `sortable`, or extend
+   the capability to carry SQL expressions.
+
+The other four migration plans (08–11) name their sortable columns only in prose. Rather than
+guess indexes for capabilities that do not exist, the guard makes each of them pay for its own
+migration when it registers — which is the "declaring a column sortable costs a migration" property
+this plan is for.
 
 ## Sequence
 

@@ -1,6 +1,6 @@
 # Specification — an index behind every sortable column
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Reality check**: `src/shared/lib/db/schema.ts` declares 85 indexes, several already the composite this plan needs — `sprint_results_sprint_created_idx`, `billing_ledger_entries_org_created_idx`, `organization_plan_changes_org_created_idx`. Sorting by score, followers, name or status is unindexed everywhere. The last migration is `drizzle/0114`, so this one is the next free index at execution time (`drizzle/0115` today); let `drizzle-kit generate` allocate it. `drizzle/migration-hashes.json` is an immutability manifest regenerated with `node scripts/db/verify-migration-integrity.mjs --write`.

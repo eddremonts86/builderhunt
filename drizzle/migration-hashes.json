@@ -620,6 +620,10 @@
     "0154_builder_profile_views_rls": {
       "sql": "fa69f52ee032225386d5dda27e72013f31e8f0318f09521b9f2602732ff1b61c",
       "snapshot": "bea18cf9d81d75b105f29b9d63b15860bc2ad3630311a6d81a1ef7b777dd5b2e"
+    },
+    "0155_table_sort_indexes": {
+      "sql": "a62a72534a3e44b4bf381b5818f0cd34db3279e1d0045f39a48d08a5f51ff13c",
+      "snapshot": "2e9d7b41079513a0fc1a9f1b48f858f5ee379cdf2435c857506fb7f9c7c40ff8"
     }
   }
 }
