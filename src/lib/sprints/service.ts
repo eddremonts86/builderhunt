@@ -3,12 +3,13 @@
 // an explicit `organizationId` and scopes every query by it (defense in
 // depth alongside the composite FK), matching the `organization-alerts.ts`
 // convention. No cross-organization access is possible through this module.
-import { and, count, desc, eq, sql, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import type { TenantTransaction } from '~/shared/lib/db/client'
 import { randomId } from '~/lib/utils'
 import type { SprintResultRow } from '~/lib/sprints/results'
 import { sourcingSprints, sprintResults } from '~/shared/lib/db/schema'
 import { sprintResultsCapability } from '~/shared/lib/table/capabilities/sprint-results'
+import { sprintsCapability } from '~/shared/lib/table/capabilities/sprints'
 import { buildKeysetPage } from '~/shared/lib/table/keyset'
 import type { PageRequest, PageResult, TableQuery } from '~/shared/lib/table/types'
 import {
@@ -67,6 +68,54 @@ function toRecord(row: typeof sourcingSprints.$inferSelect): SprintRecord {
     lastRunAt: row.lastRunAt,
     createdAt: row.createdAt,
     completedAt: row.completedAt,
+  }
+}
+
+/**
+ * One keyset page of the sprint list, each row carrying its result count.
+ *
+ * The count is a second query over the page's ids rather than the `leftJoin` + `groupBy` the
+ * unbounded version used. That join produced one row per *result* before collapsing — for an
+ * organization with a few thousand candidates across its sprints, the grouped scan was the
+ * expensive part of a query that returned a handful of rows.
+ */
+// unbounded-read-ok: the count query below carries no LIMIT because it does not need one — its
+// `inArray` is exactly this page's sprint ids, so its output is bounded by TABLE_PAGE_SIZE.
+export async function pageSprints(
+  transaction: TenantTransaction,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<SprintListItem>> {
+  const result = await buildKeysetPage<SprintRecord>(transaction, sprintsCapability, query, page, {
+    select: {
+      id: sourcingSprints.id,
+      organizationId: sourcingSprints.organizationId,
+      creatorUserId: sourcingSprints.creatorUserId,
+      name: sourcingSprints.name,
+      criteria: sourcingSprints.criteria,
+      variants: sourcingSprints.variants,
+      status: sourcingSprints.status,
+      quota: sourcingSprints.quota,
+      cursor: sourcingSprints.cursor,
+      lastRunAt: sourcingSprints.lastRunAt,
+      createdAt: sourcingSprints.createdAt,
+      completedAt: sourcingSprints.completedAt,
+    },
+    mapRow: (row) => toRecord(row as unknown as typeof sourcingSprints.$inferSelect),
+  })
+
+  if (result.rows.length === 0) return { ...result, rows: [] }
+
+  const counts = await transaction
+    .select({ sprintId: sprintResults.sprintId, value: count() })
+    .from(sprintResults)
+    .where(inArray(sprintResults.sprintId, result.rows.map((row) => row.id)))
+    .groupBy(sprintResults.sprintId)
+  const bySprint = new Map(counts.map((row) => [row.sprintId, row.value]))
+
+  return {
+    ...result,
+    rows: result.rows.map((row) => ({ ...row, resultCount: bySprint.get(row.id) ?? 0 })),
   }
 }
 

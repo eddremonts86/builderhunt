@@ -17,3 +17,4 @@ export { organizationInvitationsCapability, ORGANIZATION_INVITATION_FILTER_LABEL
 export { organizationMembersCapability, ORGANIZATION_MEMBER_FILTER_LABELS, ORGANIZATION_ROLES } from './organization-members'
 export { platformUsersCapability } from './platform-users'
 export { sprintResultsCapability, SPRINT_RESULT_FILTER_LABELS } from './sprint-results'
+export { sprintsCapability, SPRINT_FILTER_LABELS, SPRINT_STATUSES } from './sprints'

@@ -379,3 +379,155 @@ for (const surface of SURFACES) {
     })
   })
 }
+
+/**
+ * The sprints index, after plans/phase-3/10 moved it onto the shell.
+ *
+ * It lives here rather than in its own file because this harness already seeds a sprint with 500
+ * results — which is what makes the per-page result count worth asserting: the unbounded version
+ * computed it with a `leftJoin` + `groupBy` over every result of every sprint, and the paged one
+ * counts only the ids on the page.
+ */
+test.describe('sprints index', () => {
+  /** Enough sprints that page one is a page. */
+  const EXTRA_SPRINTS = 60
+
+  async function seedSprints(): Promise<string[]> {
+    const { sql, organization, owner } = harness
+    const ids: string[] = []
+    for (let index = 0; index < EXTRA_SPRINTS; index += 1) {
+      const id = `tables-extra-sprint-${harness.workerIndex}-${String(index).padStart(3, '0')}`
+      await sql`
+        insert into sourcing_sprints (id, organization_id, creator_user_id, name, criteria, variants, status, quota, cursor, last_run_at, created_at)
+        values (
+          ${id}, ${organization.organizationId}, ${owner.userId!}, ${`Extra sprint ${index}`},
+          ${sql.json({ skills: ['rust'], roles: [], seniority: 'unknown', locations: [], mustHaves: [] })},
+          ${sql.json([])},
+          ${(['active', 'paused', 'completed'])[index % 3]}, 1000,
+          ${sql.json({ page: 1, variantIndex: 0 })},
+          -- Every third sprint has never run, so the nullable sort has nulls to place.
+          ${index % 3 === 0 ? null : new Date(Date.UTC(2026, 7, 1 + (index % 27)))},
+          now() - (${index} * interval '1 hour')
+        )
+      `
+      ids.push(id)
+    }
+    return ids
+  }
+
+  async function clearSprints(): Promise<void> {
+    await harness.sql`delete from sourcing_sprints where id like ${`tables-extra-sprint-${harness.workerIndex}-%`}`
+  }
+
+  test('answers a bounded page whose result counts are per sprint', async () => {
+    await seedSprints()
+    try {
+      const page = await (await harness.owner.api!.get('/api/sprints')).json()
+
+      expect(page.rows.length).toBe(50)
+      expect(page.total).toBe(EXTRA_SPRINTS + 1)
+      expect(page.nextCursor).toBeTruthy()
+
+      // The seeded sprint is the only one with results, and it has all 500. A `leftJoin` that
+      // collapsed wrongly would spread that count across the page or lose it.
+      const withResults = page.rows.find((row: { id: string }) => row.id === sprintId)
+      const others = page.rows.filter((row: { id: string }) => row.id !== sprintId)
+      if (withResults) expect(withResults.resultCount).toBe(SEEDED_ROWS)
+      expect(others.every((row: { resultCount: number }) => row.resultCount === 0)).toBe(true)
+    } finally {
+      await clearSprints()
+    }
+  })
+
+  /**
+   * The plan asked for `lastRunAt` to be the default sort. `listSprints` ordered by `createdAt`,
+   * and the same plan asks the list to match its previous ordering — so `createdAt desc` stayed the
+   * default and this is the assertion that keeps it that way.
+   */
+  test('defaults to newest-created first, as the unbounded read did', async () => {
+    await seedSprints()
+    try {
+      const page = await (await harness.owner.api!.get('/api/sprints')).json()
+      expect(new Date(page.rows[0].createdAt).getTime())
+        .toBeGreaterThan(new Date(page.rows[1].createdAt).getTime())
+    } finally {
+      await clearSprints()
+    }
+  })
+
+  test('walks every sprint exactly once, including over the nulls of the last-run sort', async () => {
+    await seedSprints()
+    try {
+      for (const sort of ['', '&sort=lastRunAt:asc', '&sort=lastRunAt:desc']) {
+        const seen = new Set<string>()
+        let cursor: string | null = null
+        let guard = 0
+        do {
+          const url: string = `/api/sprints?x=1${sort}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+          const page = await (await harness.owner.api!.get(url)).json()
+          for (const row of page.rows as Array<{ id: string }>) {
+            expect(seen.has(row.id), `sprint ${row.id} served twice under "${sort}"`).toBe(false)
+            seen.add(row.id)
+          }
+          cursor = page.nextCursor
+          guard += 1
+        } while (cursor && guard < 10)
+
+        expect(seen.size, `sort "${sort}" lost a sprint`).toBe(EXTRA_SPRINTS + 1)
+      }
+    } finally {
+      await clearSprints()
+    }
+  })
+
+  test('status is a filter with facet counts, and refuses a value outside the enum', async () => {
+    await seedSprints()
+    try {
+      const page = await (await harness.owner.api!.get('/api/sprints?filter.status=paused')).json()
+      expect(page.rows.every((row: { status: string }) => row.status === 'paused')).toBe(true)
+      expect(page.total).toBeLessThan(EXTRA_SPRINTS + 1)
+      const statuses = page.facets.status as Array<{ value: string; count: number }>
+      expect(statuses.find((facet) => facet.value === 'active')?.count).toBeGreaterThan(0)
+
+      const refused = await harness.owner.api!.get('/api/sprints?filter.status=archived')
+      expect(refused.status()).toBe(400)
+      expect((await refused.json()).error).toContain('Unknown value for filter status')
+    } finally {
+      await clearSprints()
+    }
+  })
+
+  test('searches sprint names in Postgres, not over the loaded page', async () => {
+    await seedSprints()
+    try {
+      // `Extra sprint 59` sits beyond page one under the default sort; finding it proves the
+      // `ILIKE` runs over every row rather than the fifty the client would have held.
+      const page = await (await harness.owner.api!.get('/api/sprints?q=Extra%20sprint%2059')).json()
+      expect(page.rows.map((row: { name: string }) => row.name)).toEqual(['Extra sprint 59'])
+      expect(page.total).toBe(1)
+    } finally {
+      await clearSprints()
+    }
+  })
+
+  test('the page renders as a grid, bounded, with the whole count announced', async ({ browser }) => {
+    await seedSprints()
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/sprints`)
+      await dismissOverlays(page)
+
+      const grid = page.locator('[role="grid"]')
+      await expect(grid).toHaveAttribute('aria-rowcount', String(EXTRA_SPRINTS + 2))
+      expect(await page.locator('[role="row"][data-testid="sprint-row"]').count()).toBe(50)
+
+      // Sorting is a link, so the view is one.
+      await page.locator('[data-testid="table-sort-lastRunAt"]').click()
+      await expect(page).toHaveURL(/sort=lastRunAt/)
+    } finally {
+      await context.close()
+      await clearSprints()
+    }
+  })
+})

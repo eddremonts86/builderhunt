@@ -1,0 +1,2 @@
+CREATE INDEX "sourcing_sprints_org_created_id_idx" ON "sourcing_sprints" USING btree ("organization_id","created_at","id");--> statement-breakpoint
+CREATE INDEX "sourcing_sprints_org_last_run_id_idx" ON "sourcing_sprints" USING btree ("organization_id","last_run_at","id");

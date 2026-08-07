@@ -1328,6 +1328,11 @@ export const sourcingSprints = pgTable(
   (table) => [
     uniqueIndex('sourcing_sprints_organization_id_id_unique').on(table.organizationId, table.id),
     index('sourcing_sprints_org_status_last_run_idx').on(table.organizationId, table.status, table.lastRunAt),
+    // Keyset sorts for the sprints index (plans/phase-3/10). The index above cannot serve either:
+    // it puts `status` between the tenant and the sort column and never trails the tiebreaker, so
+    // an ordered walk over `(organization_id, …, id)` has nothing to follow.
+    index('sourcing_sprints_org_created_id_idx').on(table.organizationId, table.createdAt, table.id),
+    index('sourcing_sprints_org_last_run_id_idx').on(table.organizationId, table.lastRunAt, table.id),
     check('sourcing_sprints_status_check', sql`${table.status} in ('active', 'paused', 'completed')`),
   ],
 )

@@ -644,6 +644,10 @@
     "0160_team_keyset_indexes": {
       "sql": "2e7dc4e072d77e67e9cb970de0ef41143c5b0ac363928ef6f2df52f2c5a57caf",
       "snapshot": "b393fc47efb88174dfb6557b1eddf8faade53d595b5ac7cd0ce4c980c8c925ab"
+    },
+    "0161_sprints_keyset_indexes": {
+      "sql": "23864d21050d076c978235a30a9ad6905f4da4adccf8ca634fa9646b5b13d800",
+      "snapshot": "61741164aeb855a95e8f40d094fa455f8b9af0ff7d45036c817580664e43c6a2"
     }
   }
 }

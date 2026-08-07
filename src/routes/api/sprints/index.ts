@@ -6,7 +6,9 @@ import { rateLimit } from '~/shared/lib/rate-limit'
 import { SOURCING_SPRINT_LIMITS } from '~/shared/lib/billing-shared'
 import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
 import { createSprintSchema } from '~/shared/lib/sprints-shared'
-import { countActiveSprints, createSprint, listSprints } from '~/lib/sprints/service'
+import { countActiveSprints, createSprint, pageSprints } from '~/lib/sprints/service'
+import { sprintsCapability } from '~/shared/lib/table/capabilities/sprints'
+import { tablePageHandler } from '~/shared/lib/table/handler'
 
 export const Route = createFileRoute('/api/sprints/')({
   component: () => null,
@@ -15,15 +17,20 @@ export const Route = createFileRoute('/api/sprints/')({
       // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
       ANY: methodNotAllowed(['GET', 'POST']),
 
-      GET: async ({ request }) => {
-        try {
-          const principal = await requireTenantPrincipal(request)
-          const rows = await withTenantContext(principal, (tx) => listSprints(tx, principal.organizationId))
-          return Response.json(rows)
-        } catch (error) {
-          return sprintErrorResponse(error, 'Failed to fetch sprints')
-        }
-      },
+      /**
+       * One keyset page of the organization's sprints.
+       *
+       * The response is a `PageResult`, not the bare array it used to be. Both callers were
+       * updated with it — the sprints page and the dashboard's sprint tile — and the second is the
+       * one worth noting: it wrapped the response in an `asArray` helper that turns anything
+       * non-array into `[]`, so a shape change there would have blanked the tile with no error
+       * anywhere.
+       */
+      GET: async ({ request }) => tablePageHandler({
+        capability: sprintsCapability,
+        request,
+        load: ({ transaction, search }) => pageSprints(transaction, search.query, search.page),
+      }),
       POST: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)

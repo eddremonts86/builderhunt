@@ -966,9 +966,12 @@ export function DashboardPage() {
     // contained to its own widget, which then renders its empty state — the
     // alternative is one unavailable endpoint blanking the whole overview.
     const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : [])
+    // `/api/sprints` answers a `PageResult` now (plans/phase-3/10), so the rows are one level in.
+    // Worth being explicit about: `asArray` turns anything non-array into `[]`, so reading the
+    // envelope as the list would have emptied this tile with no error anywhere to notice.
     fetch('/api/sprints', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows) => setSprints(asArray<SprintListItem>(rows)))
+      .then((r) => (r.ok ? r.json() : { rows: [] }))
+      .then((page) => setSprints(asArray<SprintListItem>((page as { rows?: unknown }).rows)))
       .catch(() => setSprints([]))
     fetch('/api/alerts/triggers', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))

@@ -89,13 +89,28 @@
     `listOrganizationMembers` had no `ORDER BY` either — the same defect as `listDisputes`.
     Indexes `organization_{members,invitations}_org_*_id_idx` in `drizzle/0160`.
 
-- [ ] **Migrate the sprints index**
+- [x] **Migrate the sprints index**
   - Files: `src/routes/_dashboard/sprints/index.tsx`, `src/lib/sprints/service.ts`,
     `src/shared/lib/table/capabilities/sprints.ts`
   - Do: `listSprints` gains a cursor. Sortable last-run (default, descending) and status;
     `sourcing_sprints_org_status_last_run_idx` already exists and should back it — confirm with
     plan 04's guard.
   - Verify: the guard test passes with the new capability; the list matches the previous ordering.
+  - **Done — and this task contradicted itself, so the verify step won.** It asks for `lastRunAt`
+    as the default sort and, one line later, for the list to match its previous ordering.
+    `listSprints` ordered by `created_at desc`. Changing the default would have reordered the page
+    for every existing user, so `createdAt desc` stays the default and `lastRunAt` is a sort the
+    user can choose. Asserted in `data-tables.spec.ts` so it cannot drift back.
+    **`sourcing_sprints_org_status_last_run_idx` does not back either sort**, despite its name: it
+    puts `status` between the tenant and the sort column and never trails the tiebreaker. Plan 04's
+    guard rejected it, which is precisely what the guard is for — `drizzle/0161` adds the two real
+    ones. Status became a *filter* with facet counts rather than a sort: three chips that also say
+    how many of each beat an ordering over three enum values, and it saved a third index.
+    `resultCount` is now counted over the page's ids instead of a `leftJoin` + `groupBy` over every
+    result of every sprint.
+    `GET /api/sprints` answers a `PageResult` now, so the dashboard's sprint tile was updated with
+    it — it wrapped the response in an `asArray` helper that turns anything non-array into `[]`, so
+    the shape change would otherwise have blanked the tile silently.
 
 - [ ] **Migrate alerts, moving grouping to the server**
   - Files: `src/routes/_dashboard/alerts.tsx`,
