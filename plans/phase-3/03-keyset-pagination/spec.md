@@ -1,6 +1,6 @@
 # Specification — tenant-safe keyset pagination
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`02-table-query-contract`](../02-table-query-contract/spec.md)
 > **Blocks**: [`04-sort-indexes`](../04-sort-indexes/spec.md), [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Reality check**: `src/routes/api/sprints/$sprintId/results.ts:82-85` is the only cursor-shaped read and it filters, sorts and slices in memory over a full table read. Tenant context already exists (`withTenantContext`, `requireTenantPrincipal`) and RLS is forced after the 2026-07-27 cutover. `pnpm security:boundaries` and `scripts/check-tenant-boundaries.mjs` guard this area.

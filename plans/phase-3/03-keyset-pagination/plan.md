@@ -1,6 +1,6 @@
 # Plan — tenant-safe keyset pagination
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`02-table-query-contract`](../02-table-query-contract/spec.md)
 > **Blocks**: [`04-sort-indexes`](../04-sort-indexes/spec.md), [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Reality check**: New files under `src/shared/lib/table/`. No existing read path changes here; plan 07 is the first caller.
