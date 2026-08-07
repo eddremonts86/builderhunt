@@ -142,7 +142,7 @@
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/router-plugin": "^1.168.20",
     "@types/ioredis": "^5.0.0",
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.1.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
