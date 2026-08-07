@@ -122,7 +122,7 @@
     "marked": "^18.0.6",
     "motion": "^12.42.2",
     "openai": "^7.2.0",
-    "pdfjs-dist": "^6.1.200",
+    "pdfjs-dist": "^6.2.108",
     "playwright": "^1.61.1",
     "postgres": "^3.4.9",
     "react": "^19.2.8",
