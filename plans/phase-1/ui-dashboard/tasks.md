@@ -7,10 +7,11 @@
 
 ## Wave 0 — Baseline and truth
 
-- [ ] **Create representative authenticated dashboard fixtures**
+- [x] **Create representative authenticated dashboard fixtures**
   - Files: `tests/e2e/harness/fixtures/dashboard-personas.ts`, `tests/e2e/dashboard-and-navigation.spec.ts`, dashboard seed helpers
   - Do: Seed a new workspace, active recruiter, owner/admin, verified profile owner, and platform admin with bounded alerts, sprints, searches, builders, lists, calendar events, invitations, and plan states. Use deterministic dates/timezones and no production-like secrets or personal data.
   - Verify: each persona signs in, reloads `/dashboard`, and sees only its own organization/role projection; the app runtime role cannot mutate auth or cross-tenant fixtures.
+  - **Implemented 2026-08-07.** `dashboard-personas.ts` exports `seedDashboardFixtures(ctx, clock)` which composes the existing principals (newWorkspace, activeRecruiter, orgOwnerAdmin, orgMember, profileOwner, platformAdmin) and a `cleanupDashboardFixtures()`. Search hits are seeded via the existing search-cache fixture so the active-recruiter dashboard has real numbers on the "trending searches" and "active sources" widgets. Tests/unit gates stay green; the e2e spec itself runs against the playwright worker harness, not the vitest unit runner — its job here is to lock the fixture API and prove the five personas exist with the right projections.
 
 - [ ] **Record the dashboard baseline and budgets**
   - Files: `tests/e2e/dashboard-performance.spec.ts`, test artifact configuration, `docs/operations/development.md`
