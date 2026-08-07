@@ -640,6 +640,10 @@
     "0159_billing_disputes_keyset_indexes": {
       "sql": "3ca2da68de8a191207d6ca59051f0cce3b54f657c6cbb5cbe5db439845416377",
       "snapshot": "ba58d48f588668888eac0443eed849044e72fac96c23bee54cf58cbdefccd093"
+    },
+    "0160_team_keyset_indexes": {
+      "sql": "2e7dc4e072d77e67e9cb970de0ef41143c5b0ac363928ef6f2df52f2c5a57caf",
+      "snapshot": "b393fc47efb88174dfb6557b1eddf8faade53d595b5ac7cd0ce4c980c8c925ab"
     }
   }
 }

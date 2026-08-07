@@ -25,7 +25,15 @@ export interface OrganizationDangerZoneProps {
   isPersonal: boolean
   viewerRole: OrganizationRole
   viewerUserId: string
+  /**
+   * Candidates for the ownership picker, **not** the roster.
+   *
+   * A `<select>` cannot page, so this list is bounded server-side
+   * (`listOwnershipTransferCandidates`) rather than filtered out of every member the page happened
+   * to load. `transferCandidatesTruncated` says when the bound bit.
+   */
   members: OrganizationMemberDto[]
+  transferCandidatesTruncated?: boolean
   pendingDeletion: OrganizationDeletionStatusDto | null
   busy?: boolean
   error?: string | null
@@ -51,6 +59,7 @@ export function OrganizationDangerZone({
   viewerRole,
   viewerUserId,
   members,
+  transferCandidatesTruncated = false,
   pendingDeletion,
   busy = false,
   error = null,
@@ -186,6 +195,16 @@ export function OrganizationDangerZone({
               </Button>
             </div>
           </div>
+        )}
+
+        {viewerRole === 'owner' && transferCandidatesTruncated && (
+          // Saying so beats a list that simply ends. The picker holds the first hundred
+          // transferable members; an organization larger than that needs the transfer done by
+          // support rather than silently offered a truncated menu.
+          <p className="text-xs text-bh-warning" data-testid="transfer-candidates-truncated">
+            Showing the first {members.length} members. If the person you need is not listed, contact support to
+            complete the transfer.
+          </p>
         )}
 
         {transferPreviewOpen && (

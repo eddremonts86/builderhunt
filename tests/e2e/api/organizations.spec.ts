@@ -134,14 +134,21 @@ const ROUTES = [
   { method: 'DELETE', path: '/api/organizations', data: undefined },
   { method: 'POST', path: '/api/organizations/switch', data: { organizationId: 'org-anonymous-attempt' } },
   { method: 'GET', path: '/api/organizations/team', data: undefined },
+  { method: 'GET', path: '/api/organizations/team/members', data: undefined },
+  { method: 'GET', path: '/api/organizations/team/invitations', data: undefined },
   { method: 'DELETE', path: '/api/organizations/deletion', data: undefined },
 ] as const
 
-/** What `getTeamSnapshot` returns, narrowed to the fields asserted here. */
+/**
+ * What `getTeamSnapshot` returns, narrowed to the fields asserted here.
+ *
+ * `members` and `pendingInvitations` are no longer on it: the roster and the invitations are keyset
+ * pages of their own (plans/phase-3/10), fetched from `/api/organizations/team/{members,invitations}`.
+ */
 interface TeamSnapshot {
   organization: { id: string; name: string }
   viewerRole: string
-  members: Array<Record<string, unknown>>
+  seatUsage: { used: number; limit: number }
 }
 
 test.describe('anonymous access', () => {

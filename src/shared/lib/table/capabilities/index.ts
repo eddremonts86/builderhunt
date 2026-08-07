@@ -13,5 +13,7 @@
 export { abuseSignalsCapability, ABUSE_SIGNAL_FILTER_LABELS } from './abuse-signals'
 export { billingDisputesCapability, BILLING_DISPUTE_FILTER_LABELS, DISPUTE_OUTCOMES } from './billing-disputes'
 export { billingRefundsCapability, BILLING_REFUND_FILTER_LABELS } from './billing-refunds'
+export { organizationInvitationsCapability, ORGANIZATION_INVITATION_FILTER_LABELS, INVITABLE_ROLES } from './organization-invitations'
+export { organizationMembersCapability, ORGANIZATION_MEMBER_FILTER_LABELS, ORGANIZATION_ROLES } from './organization-members'
 export { platformUsersCapability } from './platform-users'
 export { sprintResultsCapability, SPRINT_RESULT_FILTER_LABELS } from './sprint-results'

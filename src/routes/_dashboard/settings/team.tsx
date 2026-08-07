@@ -6,6 +6,9 @@ import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { TeamSettingsPage } from '~/modules/dashboard/components/TeamSettingsPage'
 import type { InvitableRole, OrganizationSummaryDto, TeamSnapshotDto } from '~/shared/lib/organizations/contracts'
+import type { InvitationRow, MemberRow } from '~/modules/dashboard/components/TeamSettingsPage'
+import { emptyTableSearch, tableSearchToParams } from '~/shared/lib/table/query-url'
+import type { PageResult, TableSearch } from '~/shared/lib/table/types'
 
 export const Route = createFileRoute('/_dashboard/settings/team')({
   beforeLoad: async () => {
@@ -18,6 +21,19 @@ export const Route = createFileRoute('/_dashboard/settings/team')({
 
 async function fetchTeamSnapshot(): Promise<TeamSnapshotDto> {
   const res = await fetch('/api/organizations/team', { credentials: 'include' })
+  if (!res.ok) throw new Error('Could not load the team. Refresh the page to try again.')
+  return res.json()
+}
+
+/**
+ * The roster and the invitations are keyset pages now, fetched separately from the snapshot.
+ *
+ * They stay in component state rather than the URL, unlike the billing queues: this is one of
+ * several sections on a settings page, and two tables writing `?sort=` and `?cursor=` into the
+ * same address bar would collide on every parameter name they share.
+ */
+async function fetchTeamPage<Row>(path: string, search: TableSearch): Promise<PageResult<Row>> {
+  const res = await fetch(`${path}?${tableSearchToParams(search).toString()}`, { credentials: 'include' })
   if (!res.ok) throw new Error('Could not load the team. Refresh the page to try again.')
   return res.json()
 }
@@ -57,6 +73,8 @@ export async function switchToPersonalWorkspace(): Promise<void> {
   }
 }
 
+const EMPTY_PAGE = { rows: [], nextCursor: null, total: 0, facets: {} }
+
 function TeamSettingsRoute() {
   const { user } = Route.useRouteContext()
   const activeOrganizationId = useActiveOrganizationId()
@@ -74,9 +92,26 @@ function TeamSettingsRoute() {
   // TeamSettingsPage shows a manual-share fallback for exactly that invitation.
   const [devLinks, setDevLinks] = React.useState<Record<string, string>>({})
 
+  const [membersSearch, setMembersSearch] = React.useState<TableSearch>(() => emptyTableSearch())
+  const [invitationsSearch, setInvitationsSearch] = React.useState<TableSearch>(() => emptyTableSearch())
+
   const { data: snapshot, isLoading, error } = useQuery({
     queryKey: organizationQueryKey(activeOrganizationId, 'team'),
     queryFn: fetchTeamSnapshot,
+    enabled: activeOrganizationId !== null,
+  })
+
+  const membersParams = tableSearchToParams(membersSearch).toString()
+  const { data: membersPage, isLoading: membersLoading } = useQuery({
+    queryKey: [...organizationQueryKey(activeOrganizationId, 'team'), 'members', membersParams],
+    queryFn: () => fetchTeamPage<MemberRow>('/api/organizations/team/members', membersSearch),
+    enabled: activeOrganizationId !== null,
+  })
+
+  const invitationsParams = tableSearchToParams(invitationsSearch).toString()
+  const { data: invitationsPage, isLoading: invitationsLoading } = useQuery({
+    queryKey: [...organizationQueryKey(activeOrganizationId, 'team'), 'invitations', invitationsParams],
+    queryFn: () => fetchTeamPage<InvitationRow>('/api/organizations/team/invitations', invitationsSearch),
     enabled: activeOrganizationId !== null,
   })
 
@@ -84,6 +119,9 @@ function TeamSettingsRoute() {
 
   // Role changes and member removal don't touch the caller's own active
   // organization — just refetch the snapshot to show the updated member/role.
+  // Invalidating the snapshot key invalidates the two page queries with it: both are keyed by
+  // that array plus a suffix, and TanStack Query matches keys by prefix. Inviting someone has to
+  // refresh the invitations grid *and* the seat count, and they are three separate reads now.
   async function refreshSnapshot() {
     await queryClient.invalidateQueries({ queryKey: teamQueryKey })
   }
@@ -284,6 +322,14 @@ function TeamSettingsRoute() {
     <TeamSettingsPage
       snapshot={snapshot}
       viewerUserId={user.userId!}
+      membersPage={membersPage ?? EMPTY_PAGE}
+      membersSearch={membersSearch}
+      onMembersSearchChange={setMembersSearch}
+      membersLoading={membersLoading}
+      invitationsPage={invitationsPage ?? EMPTY_PAGE}
+      invitationsSearch={invitationsSearch}
+      onInvitationsSearchChange={setInvitationsSearch}
+      invitationsLoading={invitationsLoading}
       busy={busy}
       error={mutationError}
       devLinkByInvitationId={devLinks}

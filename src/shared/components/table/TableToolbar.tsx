@@ -18,6 +18,15 @@ export interface TableToolbarProps<Row> {
   onToggleColumn: (id: string) => void
   onOpenCommandSheet?: () => void
   searchRef?: React.Ref<HTMLInputElement>
+  /**
+   * Whether this table has anything to search.
+   *
+   * Defaults to true, because almost every capability declares `searchable` columns. The roster
+   * does not and cannot: the name and email a person would type live on `auth_users`, one join
+   * away from a capability that describes one table. A box that silently matches nothing is worse
+   * than no box — it reads as "no such member" for a member who is right there on page two.
+   */
+  searchable?: boolean
 }
 
 /**
@@ -29,7 +38,7 @@ export interface TableToolbarProps<Row> {
  * exactly one moment: when there is more than one page, which is always.
  */
 export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
-  const { columns, query, onQueryChange, facets, labels = {}, hiddenColumns, onToggleColumn, onOpenCommandSheet, searchRef } = props
+  const { columns, query, onQueryChange, facets, labels = {}, hiddenColumns, onToggleColumn, onOpenCommandSheet, searchRef, searchable = true } = props
   const [columnsOpen, setColumnsOpen] = React.useState(false)
 
   const groupable = columns.filter((column) => column.groupable)
@@ -49,19 +58,25 @@ export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-bh-border px-4 py-3">
-      <div className="relative min-w-[12rem] flex-1">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bh-text-muted" aria-hidden="true" />
-        <Input
-          ref={searchRef}
-          type="search"
-          value={query.search}
-          onChange={(event) => onQueryChange({ ...query, search: event.target.value })}
-          placeholder="Search…"
-          aria-label="Search rows"
-          className="pl-9"
-          data-testid="table-search"
-        />
-      </div>
+      {searchable
+        ? (
+          <div className="relative min-w-[12rem] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bh-text-muted" aria-hidden="true" />
+            <Input
+              ref={searchRef}
+              type="search"
+              value={query.search}
+              onChange={(event) => onQueryChange({ ...query, search: event.target.value })}
+              placeholder="Search…"
+              aria-label="Search rows"
+              className="pl-9"
+              data-testid="table-search"
+            />
+          </div>
+          )
+        // Still claims the row, so the chips and the column menu sit where they do on every other
+        // table rather than sliding left on this one alone.
+        : <div className="min-w-[12rem] flex-1" />}
 
       {Object.entries(facets).map(([id, values]) => (
         <div key={id} className="flex flex-wrap items-center gap-1" role="group" aria-label={labels[id] ?? id}>

@@ -1,0 +1,3 @@
+CREATE INDEX "organization_invitations_org_created_id_idx" ON "organization_invitations" USING btree ("organization_id","created_at","id");--> statement-breakpoint
+CREATE INDEX "organization_invitations_org_expires_id_idx" ON "organization_invitations" USING btree ("organization_id","expires_at","id");--> statement-breakpoint
+CREATE INDEX "organization_members_org_created_id_idx" ON "organization_members" USING btree ("organization_id","created_at","id");

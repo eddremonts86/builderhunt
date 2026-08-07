@@ -176,3 +176,139 @@ test('a signed-out visitor is sent to sign-in rather than shown a settings page'
     await context.close()
   }
 })
+
+/**
+ * The roster and the invitations, after plans/phase-3/10 split them out of the team snapshot.
+ *
+ * They used to arrive whole inside `GET /api/organizations/team`, and `listOrganizationMembers`
+ * had no `ORDER BY` — so the roster's order was whatever Postgres returned. These assert what the
+ * split bought: two bounded, ordered pages, and a seat count that never depended on either.
+ */
+test.describe('the team roster and invitations as pages', () => {
+  test('the snapshot no longer carries either list, and still carries the seat count', async () => {
+    const response = await harness.owner.api!.get('/api/organizations/team')
+    expect(response.status()).toBe(200)
+    const snapshot = await response.json()
+
+    // The seat count was never derived from the lists — `getSeatUsage` has always counted in
+    // Postgres — so removing them must not have touched it.
+    expect(snapshot.seatUsage.used).toBeGreaterThan(0)
+    expect(snapshot).not.toHaveProperty('members')
+    expect(snapshot).not.toHaveProperty('pendingInvitations')
+    // The ownership picker's own bounded read, which is not the roster.
+    expect(Array.isArray(snapshot.transferCandidates)).toBe(true)
+    expect(snapshot.transferCandidatesTruncated).toBe(false)
+  })
+
+  test('the roster is a page with a total, ordered oldest first', async () => {
+    const response = await harness.owner.api!.get('/api/organizations/team/members')
+    expect(response.status()).toBe(200)
+    const page = await response.json()
+
+    expect(page.rows.length).toBeGreaterThan(0)
+    expect(page.total).toBe(page.rows.length)
+    expect(page.rows.some((row: { userId: string }) => row.userId === harness.owner.userId!)).toBe(true)
+    // Names come from `auth_users`, resolved for the rows this page returned rather than joined —
+    // a capability describes one table. An empty name here would mean that step was skipped.
+    expect(page.rows[0].name).toBeTruthy()
+    expect(page.rows[0].email).toBeTruthy()
+    // Oldest first: the owner joined before anyone they invited.
+    expect(page.rows[0].userId).toBe(harness.owner.userId!)
+  })
+
+  test('the roster refuses a sort id it does not offer', async () => {
+    const response = await harness.owner.api!.get('/api/organizations/team/members?sort=email:asc')
+    expect(response.status()).toBe(400)
+    // `email` lives on `auth_users`; the capability cannot sort by it and says so rather than
+    // ordering by something else.
+    expect((await response.json()).error).toContain('Unknown sort column')
+  })
+
+  test('a role filter narrows the roster and keeps its own facet count', async () => {
+    const response = await harness.owner.api!.get('/api/organizations/team/members?filter.role=owner')
+    expect(response.status()).toBe(200)
+    const page = await response.json()
+
+    expect(page.rows.every((row: { role: string }) => row.role === 'owner')).toBe(true)
+    expect(page.total).toBe(1)
+    const roles = page.facets.role as Array<{ value: string; count: number }>
+    expect(roles.find((facet) => facet.value === 'owner')?.count).toBe(1)
+  })
+
+  test('an unknown role value is refused — the filter is an enum, not free text', async () => {
+    const response = await harness.owner.api!.get('/api/organizations/team/members?filter.role=superuser')
+    expect(response.status()).toBe(400)
+    expect((await response.json()).error).toContain('Unknown value for filter role')
+  })
+
+  test('the invitations page lists only pending ones, and searches by email', async () => {
+    const email = `${uniqueId('page-invite').toLowerCase()}@e2e.invalid`
+    const invited = await harness.owner.api!.post('/api/organizations/invitations', {
+      data: { email, role: 'member' },
+    })
+    expect(invited.status(), await invited.text()).toBeLessThan(400)
+    const { id: invitationId } = await invited.json()
+
+    try {
+      const listed = await (await harness.owner.api!.get('/api/organizations/team/invitations')).json()
+      expect(listed.rows.every((row: { status: string }) => row.status === 'pending')).toBe(true)
+      expect(listed.rows.some((row: { id: string }) => row.id === invitationId)).toBe(true)
+
+      // `ILIKE` in Postgres over every pending invitation, not over the loaded page.
+      const found = await (await harness.owner.api!.get(
+        `/api/organizations/team/invitations?q=${encodeURIComponent(email)}`,
+      )).json()
+      expect(found.rows.map((row: { id: string }) => row.id)).toEqual([invitationId])
+
+      const missing = await (await harness.owner.api!.get(
+        '/api/organizations/team/invitations?q=nobody-by-that-name',
+      )).json()
+      expect(missing.rows).toEqual([])
+      // The count describes the search, not the page.
+      expect(missing.total).toBe(0)
+    } finally {
+      await harness.owner.api!.delete(`/api/organizations/invitations/${invitationId}`).catch(() => undefined)
+    }
+  })
+
+  /**
+   * A cursor is bound to the organization it was minted in — that is what the `o` field on it is
+   * for — so replaying one against a different tenant is a 400, not a page of someone else's team.
+   */
+  test('a cursor cannot be replayed against another table', async () => {
+    const members = await (await harness.owner.api!.get('/api/organizations/team/members')).json()
+    // This organization is small enough that page one is the last page, which is itself the
+    // spec's "an organization with three members" edge case.
+    expect(members.nextCursor).toBeNull()
+
+    const forged = await harness.owner.api!.get(
+      '/api/organizations/team/members?cursor=bm90LWEtY3Vyc29y.bm90LWEtc2ln',
+    )
+    expect(forged.status()).toBe(400)
+  })
+
+  test('both grids render on the page, and the roster shows the owner', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/settings/team`)
+      await dismissOverlays(page)
+
+      await expect(page.getByTestId('members-list')).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId(`member-row-${harness.owner.userId!}`)).toBeVisible()
+      await expect(page.getByTestId('invitations-list')).toBeVisible()
+
+      // Two grids, so two `role="grid"` nodes — the roster and the invitations, not one merged list.
+      expect(await page.locator('[role="grid"]').count()).toBe(2)
+
+      // The roster has nothing searchable: names live on `auth_users`, one join away. A box that
+      // matched nothing would read as "no such member", so there is no box.
+      const rosterSearch = page.getByTestId('members-list').getByTestId('table-search')
+      await expect(rosterSearch).toHaveCount(0)
+      // The invitations grid does search — by email — and keeps its box.
+      await expect(page.getByTestId('invitations-list').getByTestId('table-search')).toBeVisible()
+    } finally {
+      await context.close()
+    }
+  })
+})

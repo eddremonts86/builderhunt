@@ -104,6 +104,14 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
    */
   expandedRowId?: string | null
   onExpandedChange?: (rowId: string | null) => void
+  /**
+   * Whether the toolbar offers a search box. Defaults to true.
+   *
+   * Pass `false` when the capability declares no `searchable` columns — the box would accept text
+   * and match nothing, which reads as "not found" rather than "not searchable". The team roster is
+   * the case: names live on `auth_users`, and a capability describes one table.
+   */
+  searchable?: boolean
   /** Shown when the unfiltered set is empty. */
   emptyState?: React.ReactNode
   /** Human labels for filter ids, used by the chips, the command sheet and the filtered-empty copy. */
@@ -176,6 +184,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     expansion,
     expandedRowId,
     onExpandedChange,
+    searchable = true,
     emptyState,
     filterLabels,
     className,
@@ -321,6 +330,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         onToggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}
         onOpenCommandSheet={() => setCommandOpen(true)}
         searchRef={searchRef}
+        searchable={searchable}
       />
 
       {selectable && <SelectionBar selection={selection} total={page.total} actions={bulkActions} />}

@@ -6,11 +6,16 @@ import {
   canRemoveMember,
   isOwnerRole,
   type InvitableRole,
+  type InvitationSummaryDto,
+  type OrganizationMemberDto,
   type OrganizationRole,
   type TeamSnapshotDto,
   type TenantPrincipal,
 } from '~/shared/lib/organizations/contracts'
 import { Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { DataTable } from '~/shared/components/table'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import type { PageResult, TableQuery, TableSearch } from '~/shared/lib/table/types'
 import { OrganizationDangerZone } from './OrganizationDangerZone'
 
 /**
@@ -19,10 +24,31 @@ import { OrganizationDangerZone } from './OrganizationDangerZone'
  * itself gates on — so this component never invents its own authorization
  * rule. Mutation props are optional and default to no-ops so this renders
  * and tests standalone before task 5 wires real endpoints behind them.
+ *
+ * ## Two grids, not two lists
+ *
+ * The roster and the pending invitations arrived inside the snapshot, whole, and rendered as
+ * `<ul>`s. They are `DataTable`s over their own keyset pages now — different record types with
+ * different actions, so two grids rather than one merged people list. Every `data-testid` the old
+ * markup carried is kept, `members-list` and `invitations-list` included: several e2e specs drive
+ * this page by them, and a rename would turn a green suite red for a reason that has nothing to do
+ * with teams.
  */
 export interface TeamSettingsPageProps {
   snapshot: TeamSnapshotDto
   viewerUserId: string
+  /** One keyset page of the roster, with the query that produced it. */
+  membersPage: PageResult<MemberRow>
+  membersSearch: TableSearch
+  onMembersSearchChange: (next: TableSearch) => void
+  onMembersLoadMore?: () => void
+  membersLoading?: boolean
+  /** One keyset page of pending invitations, with the query that produced it. */
+  invitationsPage: PageResult<InvitationRow>
+  invitationsSearch: TableSearch
+  onInvitationsSearchChange: (next: TableSearch) => void
+  onInvitationsLoadMore?: () => void
+  invitationsLoading?: boolean
   busy?: boolean
   error?: string | null
   /** Set only for an invitation whose email was never actually sent (no email provider configured) — a manual-share fallback for exactly that invitation. */
@@ -41,13 +67,30 @@ export interface TeamSettingsPageProps {
   onRequestImmediateDeletion?: (confirmOrganizationName: string) => void | Promise<void>
 }
 
+/** `DataTable` rows must be index-signature compatible; the DTOs are otherwise unchanged. */
+export type MemberRow = OrganizationMemberDto & Record<string, unknown>
+export type InvitationRow = InvitationSummaryDto & Record<string, unknown>
+
 const ROLE_LABEL: Record<OrganizationRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
+
+const MEMBER_FILTER_LABELS: Record<string, string> = { role: 'Role' }
+const INVITATION_FILTER_LABELS: Record<string, string> = { role: 'Role' }
 
 function noop() {}
 
 export function TeamSettingsPage({
   snapshot,
   viewerUserId,
+  membersPage,
+  membersSearch,
+  onMembersSearchChange,
+  onMembersLoadMore,
+  membersLoading = false,
+  invitationsPage,
+  invitationsSearch,
+  onInvitationsSearchChange,
+  onInvitationsLoadMore,
+  invitationsLoading = false,
   busy = false,
   error = null,
   devLinkByInvitationId,
@@ -91,6 +134,169 @@ export function TeamSettingsPage({
   const canManageMembers = can(viewer, 'organization:manage-members')
   const seatsFull = snapshot.seatUsage.used >= snapshot.seatUsage.limit
 
+  const memberColumns = React.useMemo<ColumnDef<MemberRow>[]>(() => [
+    {
+      id: 'name',
+      header: 'Member',
+      priority: 'primary',
+      value: (member) => member.name,
+      cell: (member) => (
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">
+            {member.name}
+            {member.userId === viewerUserId && <span className="text-bh-text-dim font-normal"> (you)</span>}
+          </span>
+          <span className="block truncate text-xs text-bh-text-muted">{member.email}</span>
+        </span>
+      ),
+    },
+    {
+      id: 'role',
+      header: 'Role',
+      value: (member) => member.role,
+      cell: (member) => canChangeMemberRole(snapshot.viewerRole, member.role)
+        ? (
+          <div className="w-28 shrink-0">
+            <Select
+              value={member.role as InvitableRole}
+              disabled={busy}
+              onValueChange={(v) => (onChangeRole ?? noop)(member.userId, v as InvitableRole)}
+            >
+              <SelectTrigger
+                aria-label={`Change role for ${member.name}`}
+                className="text-xs"
+                data-testid={`role-select-${member.userId}`}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="member">Member</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          )
+        : (
+          <span className="text-[10px] uppercase tracking-wider font-bold text-bh-text-dim flex items-center gap-1">
+            {isOwnerRole(member.role) && <Crown className="w-3 h-3" aria-hidden="true" />}
+            {ROLE_LABEL[member.role]}
+          </span>
+          ),
+    },
+    {
+      id: 'joinedAt',
+      header: 'Joined',
+      sortable: true,
+      align: 'end',
+      priority: 'secondary',
+      value: (member) => member.joinedAt,
+      cell: (member) => new Date(member.joinedAt).toLocaleDateString(),
+    },
+    {
+      id: 'remove',
+      header: 'Remove',
+      align: 'end',
+      value: () => null,
+      cell: (member) => canRemoveMember(snapshot.viewerRole, viewerUserId, member)
+        ? (
+          <Button
+            type="button"
+            onClick={() => (onRemoveMember ?? noop)(member.userId)}
+            disabled={busy}
+            variant="ghost"
+            size="sm"
+            className="text-bh-danger"
+            aria-label={`Remove ${member.name}`}
+            data-testid={`remove-member-${member.userId}`}
+          >
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
+          </Button>
+          )
+        : null,
+    },
+  ], [busy, onChangeRole, onRemoveMember, snapshot.viewerRole, viewerUserId])
+
+  const invitationColumns = React.useMemo<ColumnDef<InvitationRow>[]>(() => [
+    {
+      id: 'email',
+      header: 'Invitee',
+      priority: 'primary',
+      value: (invitation) => invitation.email,
+      cell: (invitation) => (
+        <span className="min-w-0">
+          <span className="block truncate text-sm">{invitation.email}</span>
+          {devLinkByInvitationId?.[invitation.id] && (
+            <span className="block text-xs text-bh-warning">
+              Couldn't send the email — copy the link to share it manually.
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: 'role',
+      header: 'Role',
+      value: (invitation) => invitation.role,
+      cell: (invitation) => ROLE_LABEL[invitation.role],
+    },
+    {
+      id: 'expiresAt',
+      header: 'Expires',
+      sortable: true,
+      align: 'end',
+      value: (invitation) => invitation.expiresAt,
+      cell: (invitation) => new Date(invitation.expiresAt).toLocaleDateString(),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      align: 'end',
+      value: () => null,
+      cell: (invitation) => (
+        <span className="flex items-center justify-end gap-1">
+          {devLinkByInvitationId?.[invitation.id] && (
+            <Button
+              type="button"
+              onClick={() => copyInviteLink(invitation.id, devLinkByInvitationId[invitation.id])}
+              variant="ghost"
+              size="sm"
+              aria-label={`Copy invite link for ${invitation.email}`}
+              title={devLinkByInvitationId[invitation.id]}
+              data-testid={`copy-invitation-link-${invitation.id}`}
+            >
+              {copiedInvitationId === invitation.id
+                ? <Check className="w-3.5 h-3.5 text-bh-success" aria-hidden="true" />
+                : <Link2 className="w-3.5 h-3.5" aria-hidden="true" />}
+            </Button>
+          )}
+          <Button
+            type="button"
+            onClick={() => (onResendInvite ?? noop)(invitation.id)}
+            disabled={busy}
+            variant="ghost"
+            size="sm"
+            aria-label={`Resend invitation to ${invitation.email}`}
+            data-testid={`resend-invitation-${invitation.id}`}
+          >
+            <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            onClick={() => (onCancelInvite ?? noop)(invitation.id)}
+            disabled={busy}
+            variant="ghost"
+            size="sm"
+            className="text-bh-danger"
+            aria-label={`Cancel invitation to ${invitation.email}`}
+            data-testid={`cancel-invitation-${invitation.id}`}
+          >
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
+          </Button>
+        </span>
+      ),
+    },
+  ], [busy, copiedInvitationId, devLinkByInvitationId, onCancelInvite, onResendInvite])
+
   return (
     <div data-testid="team-settings-page">
       <header className="mb-6">
@@ -110,156 +316,64 @@ export function TeamSettingsPage({
       )}
 
       {/* Members */}
-      <section className="card p-5 mb-6" data-testid="members-section">
-        <h2 className="font-semibold flex items-center gap-2 mb-4">
+      <section className="mb-6" data-testid="members-section">
+        <h2 className="font-semibold flex items-center gap-2 mb-3">
           <Shield className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Members
         </h2>
-        <ul className="space-y-2" data-testid="members-list">
-          {snapshot.members.map((member) => {
-            const isSelf = member.userId === viewerUserId
-            const canChangeThisRole = canChangeMemberRole(snapshot.viewerRole, member.role)
-            const canRemoveThis = canRemoveMember(snapshot.viewerRole, viewerUserId, member)
-            return (
-              <li
-                key={member.userId}
-                className="flex items-center gap-3 py-2 border-b border-bh-border/40 last:border-0"
-                data-testid={`member-row-${member.userId}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {member.name}
-                    {isSelf && <span className="text-bh-text-dim font-normal"> (you)</span>}
-                  </p>
-                  <p className="text-xs text-bh-text-muted truncate">{member.email}</p>
-                </div>
-
-                {canChangeThisRole ? (
-                  // Fixed-width wrapper. This used to be *required* because
-                  // `.input-field` was unlayered CSS whose `width: 100%` beat a plain
-                  // Tailwind width utility on the trigger; that root cause is fixed
-                  // (it now lives in the `components` layer — see globals.css), so a
-                  // `w-28` directly on SelectTrigger would work too. Kept as-is
-                  // because it renders identically and this is not the place to
-                  // churn the team-settings layout.
-                  <div className="w-28 shrink-0">
-                    <Select
-                      value={member.role as InvitableRole}
-                      disabled={busy}
-                      onValueChange={(v) => (onChangeRole ?? noop)(member.userId, v as InvitableRole)}
-                    >
-                      <SelectTrigger
-                        aria-label={`Change role for ${member.name}`}
-                        className="text-xs"
-                        data-testid={`role-select-${member.userId}`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="member">Member</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-bh-text-dim flex items-center gap-1">
-                    {isOwnerRole(member.role) && <Crown className="w-3 h-3" aria-hidden="true" />}
-                    {ROLE_LABEL[member.role]}
-                  </span>
-                )}
-
-                {canRemoveThis && (
-                  <Button
-                    type="button"
-                    onClick={() => (onRemoveMember ?? noop)(member.userId)}
-                    disabled={busy}
-                    variant="ghost"
-                    size="sm"
-                    className="text-bh-danger"
-                    aria-label={`Remove ${member.name}`}
-                    data-testid={`remove-member-${member.userId}`}
-                  >
-                    <X className="w-3.5 h-3.5" aria-hidden="true" />
-                  </Button>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        <div data-testid="members-list">
+          <DataTable
+            label="Team members"
+            columns={memberColumns}
+            page={membersPage}
+            query={membersSearch.query}
+            onQueryChange={(query: TableQuery) => onMembersSearchChange({
+              ...membersSearch,
+              query,
+              page: { ...membersSearch.page, cursor: null },
+            })}
+            rowTestId={(member) => `member-row-${member.userId}`}
+            rowId={(member) => member.userId}
+            filterLabels={MEMBER_FILTER_LABELS}
+            // Names and emails live on `auth_users`, which this capability cannot reach — see
+            // `organization-members.ts`. A box that matched nothing would read as "no such member".
+            searchable={false}
+            status={membersLoading && membersPage.rows.length === 0 ? 'loading' : 'ready'}
+            onLoadMore={onMembersLoadMore}
+          />
+        </div>
       </section>
 
       {/* Pending invitations */}
       {canManageMembers && (
-        <section className="card p-5 mb-6" data-testid="invitations-section">
-          <h2 className="font-semibold flex items-center gap-2 mb-4">
+        <section className="mb-6" data-testid="invitations-section">
+          <h2 className="font-semibold flex items-center gap-2 mb-3">
             <Mail className="w-4 h-4 text-bh-accent" aria-hidden="true" />
             Pending invitations
           </h2>
-          {snapshot.pendingInvitations.length === 0 ? (
-            <p className="text-sm text-bh-text-muted" data-testid="no-invitations">No pending invitations.</p>
-          ) : (
-            <ul className="space-y-2 mb-4" data-testid="invitations-list">
-              {snapshot.pendingInvitations.map((invitation) => (
-                <li
-                  key={invitation.id}
-                  className="flex items-center gap-3 py-2 border-b border-bh-border/40 last:border-0"
-                  data-testid={`invitation-row-${invitation.id}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">{invitation.email}</p>
-                    <p className="text-xs text-bh-text-dim">
-                      {ROLE_LABEL[invitation.role]} · expires {new Date(invitation.expiresAt).toLocaleDateString()}
-                    </p>
-                    {devLinkByInvitationId?.[invitation.id] && (
-                      <p className="text-xs text-bh-warning mt-0.5">
-                        Couldn't send the email — copy the link to share it manually.
-                      </p>
-                    )}
-                  </div>
-                  {devLinkByInvitationId?.[invitation.id] && (
-                    <Button
-                      type="button"
-                      onClick={() => copyInviteLink(invitation.id, devLinkByInvitationId[invitation.id])}
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Copy invite link for ${invitation.email}`}
-                      title={devLinkByInvitationId[invitation.id]}
-                      data-testid={`copy-invitation-link-${invitation.id}`}
-                    >
-                      {copiedInvitationId === invitation.id ? (
-                        <Check className="w-3.5 h-3.5 text-bh-success" aria-hidden="true" />
-                      ) : (
-                        <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
-                      )}
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    onClick={() => (onResendInvite ?? noop)(invitation.id)}
-                    disabled={busy}
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Resend invitation to ${invitation.email}`}
-                    data-testid={`resend-invitation-${invitation.id}`}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => (onCancelInvite ?? noop)(invitation.id)}
-                    disabled={busy}
-                    variant="ghost"
-                    size="sm"
-                    className="text-bh-danger"
-                    aria-label={`Cancel invitation to ${invitation.email}`}
-                    data-testid={`cancel-invitation-${invitation.id}`}
-                  >
-                    <X className="w-3.5 h-3.5" aria-hidden="true" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="mb-4" data-testid="invitations-list">
+            <DataTable
+              label="Pending invitations"
+              columns={invitationColumns}
+              page={invitationsPage}
+              query={invitationsSearch.query}
+              onQueryChange={(query: TableQuery) => onInvitationsSearchChange({
+                ...invitationsSearch,
+                query,
+                page: { ...invitationsSearch.page, cursor: null },
+              })}
+              rowTestId={(invitation) => `invitation-row-${invitation.id}`}
+              rowId={(invitation) => invitation.id}
+              filterLabels={INVITATION_FILTER_LABELS}
+              status={invitationsLoading && invitationsPage.rows.length === 0 ? 'loading' : 'ready'}
+              onLoadMore={onInvitationsLoadMore}
+              emptyState={(
+                <p className="px-4 py-8 text-center text-sm text-bh-text-muted" data-testid="no-invitations">
+                  No pending invitations.
+                </p>
+              )}
+            />
+          </div>
 
           {canInvite && (
             <form
@@ -321,7 +435,11 @@ export function TeamSettingsPage({
         isPersonal={snapshot.organization.isPersonal}
         viewerRole={snapshot.viewerRole}
         viewerUserId={viewerUserId}
-        members={snapshot.members}
+        // The ownership picker is a `<select>` and cannot page, so it gets its own bounded read
+        // rather than a slice of whichever roster page happens to be loaded — see
+        // `listOwnershipTransferCandidates`.
+        members={snapshot.transferCandidates}
+        transferCandidatesTruncated={snapshot.transferCandidatesTruncated}
         pendingDeletion={snapshot.pendingDeletion}
         busy={busy}
         error={error}

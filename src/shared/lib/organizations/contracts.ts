@@ -25,12 +25,16 @@ import {
   listInvitationsForEmail,
   listMyOrganizations,
   listOrganizationMembers,
+  listOwnershipTransferCandidates,
   listPendingInvitations,
   OrganizationLifecycleError,
+  pageOrganizationInvitations,
+  pageOrganizationMembers,
   SeatLimitExceededError,
   STALE_SESSION_ERROR_MESSAGE,
 } from '../auth/organization-lifecycle'
 import { requireTenantPrincipal, TenantAuthorizationError } from '../auth/tenant-principal'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 
 export type { OrganizationRole, PermissionAction, ResourceAuthorizationContext, TenantPrincipal }
 export type { InvitableRole, MyOrganizationRecord }
@@ -102,7 +106,20 @@ export function toOrganizationSummaryDtoList(records: MyOrganizationRecord[]): O
   return records.map((record) => toOrganizationSummaryDto(record.organization, record.role, record.isPersonal))
 }
 
-export function toInvitationSummaryDto(invitation: InvitationRecord): InvitationSummaryDto {
+/**
+ * Typed as the five fields it reads rather than as `InvitationRecord`.
+ *
+ * The paged read does not select `organizationName` — it is the same value on every row of a
+ * page — so requiring the whole record would mean either a pointless column in the projection or
+ * a cast at the call site. Both callers satisfy this shape.
+ */
+export function toInvitationSummaryDto(invitation: {
+  id: string
+  email: string
+  role: InvitableRole
+  status: InvitationRecord['status']
+  expiresAt: Date
+}): InvitationSummaryDto {
   return {
     id: invitation.id,
     email: invitation.email,
@@ -152,23 +169,39 @@ export function toOrganizationDeletionStatusDto(record: OrganizationDeletionReco
   return { id: record.id, gracePeriodEndsAt: record.gracePeriodEndsAt.toISOString() }
 }
 
-/** Everything `TeamSettingsPage` needs for one render — the viewer's own role travels alongside so the client can gate controls with the same `can()` used server-side, never a hand-rolled role check. */
+/**
+ * Everything `TeamSettingsPage` needs that is **not** a list.
+ *
+ * The roster and the pending invitations used to be here, whole. They are two paged grids now
+ * (`GET /api/organizations/team/{members,invitations}`), so what stays is the per-render facts:
+ * who the viewer is, what the organization is, how many seats are in use, whether a deletion is
+ * pending.
+ *
+ * `seatUsage` was never derived from the lists — `getSeatUsage` has always counted in Postgres —
+ * so removing them changes nothing about it. `transferCandidates` is the one place that genuinely
+ * needed member rows: the danger zone's ownership `<select>`, which cannot page. It is bounded and
+ * says so.
+ *
+ * The viewer's own role travels alongside so the client can gate controls with the same `can()`
+ * used server-side, never a hand-rolled role check.
+ */
 export interface TeamSnapshotDto {
   organization: OrganizationSummaryDto
   viewerRole: OrganizationRole
-  members: OrganizationMemberDto[]
-  pendingInvitations: InvitationSummaryDto[]
   seatUsage: SeatUsageDto
+  /** Non-owner members ownership could be transferred to, capped at `TRANSFER_CANDIDATE_LIMIT`. */
+  transferCandidates: OrganizationMemberDto[]
+  /** True when the cap bit — the picker says so rather than ending silently. */
+  transferCandidatesTruncated: boolean
   /** Non-null only while this organization has a pending (not yet completed/cancelled) deletion request. */
   pendingDeletion: OrganizationDeletionStatusDto | null
 }
 
 /** Composes the foundation reads behind `GET /api/organizations/team` so the route stays a thin auth-then-serialize wrapper with no direct DB access of its own. */
 export async function getTeamSnapshot(principal: TenantPrincipal): Promise<TeamSnapshotDto | null> {
-  const [myOrganizations, members, pendingInvitations, seatUsage, deletionStatus] = await Promise.all([
+  const [myOrganizations, transfer, seatUsage, deletionStatus] = await Promise.all([
     listMyOrganizations(principal.userId),
-    listOrganizationMembers(principal.organizationId),
-    listPendingInvitations(principal.organizationId),
+    listOwnershipTransferCandidates(principal.organizationId),
     getSeatUsage(principal),
     getOrganizationDeletionStatus(principal.organizationId),
   ])
@@ -179,11 +212,31 @@ export async function getTeamSnapshot(principal: TenantPrincipal): Promise<TeamS
   return {
     organization: toOrganizationSummaryDto(mine.organization, mine.role, mine.isPersonal),
     viewerRole: principal.role,
-    members: members.map(toOrganizationMemberDto),
-    pendingInvitations: pendingInvitations.map(toInvitationSummaryDto),
     seatUsage: toSeatUsageDto(seatUsage),
+    transferCandidates: transfer.candidates.map(toOrganizationMemberDto),
+    transferCandidatesTruncated: transfer.truncated,
     pendingDeletion: deletionStatus ? toOrganizationDeletionStatusDto(deletionStatus) : null,
   }
+}
+
+/** One keyset page of the roster, as DTOs. */
+export async function getTeamMembersPage(
+  principal: TenantPrincipal,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<OrganizationMemberDto>> {
+  const result = await pageOrganizationMembers(principal.organizationId, query, page)
+  return { ...result, rows: result.rows.map(toOrganizationMemberDto) }
+}
+
+/** One keyset page of pending invitations, as DTOs. */
+export async function getTeamInvitationsPage(
+  principal: TenantPrincipal,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<InvitationSummaryDto>> {
+  const result = await pageOrganizationInvitations(principal.organizationId, query, page)
+  return { ...result, rows: result.rows.map(toInvitationSummaryDto) }
 }
 
 /**

@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { can, canManageTeamSettings, toInvitationSummaryDto, toOrganizationSummaryDto } from '~/shared/lib/organizations/contracts'
+import type { InvitationRecord } from '~/shared/lib/auth/organization-lifecycle'
 
 describe('organization contracts', () => {
   it('maps an organization record + role into a summary DTO with no extra fields', () => {
@@ -10,7 +11,10 @@ describe('organization contracts', () => {
   })
 
   it('maps an invitation record into a summary DTO without leaking inviterId/organizationId', () => {
-    const dto = toInvitationSummaryDto({
+    // The full record, through a variable: the mapper's parameter names only the five fields it
+    // reads, and an inline literal would be excess-property-checked against that rather than
+    // proving what this test is about — that the extra fields do not reach the DTO.
+    const record: InvitationRecord = {
       id: 'invite-1',
       organizationId: 'org-1',
       organizationName: 'Acme',
@@ -19,7 +23,8 @@ describe('organization contracts', () => {
       status: 'pending',
       expiresAt: new Date('2026-08-01T00:00:00Z'),
       inviterId: 'user-a',
-    })
+    }
+    const dto = toInvitationSummaryDto(record)
     expect(dto).toEqual({
       id: 'invite-1',
       email: 'a@example.com',

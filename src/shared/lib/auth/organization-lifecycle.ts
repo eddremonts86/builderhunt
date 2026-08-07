@@ -4,6 +4,8 @@ import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
 import type { OrganizationRole, TenantPrincipal } from '../authorization/permissions'
 import type { PlanStatus } from '../billing-shared'
 import type { EntitlementTier } from '../repositories/entitlements'
+import type { KeysetTransaction } from '../table/keyset'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 
 /**
  * Wraps the better-auth organization plugin's operations with the
@@ -1071,6 +1073,139 @@ export interface OrganizationMemberRecord {
   joinedAt: Date
 }
 
+/**
+ * Run one read on the auth-broker connection with a tenant setting the keyset builder can verify.
+ *
+ * `buildKeysetPage` refuses to build anything until it has read `app.organization_id` back out of
+ * its own transaction — see `keyset.ts`, where the point is spelled out: a builder that took the
+ * id from its caller and ran outside a tenant context would query with RLS's `current_setting`
+ * empty, and that is a cross-tenant read with nothing to notice.
+ *
+ * The reads below cannot run inside `withTenantContext`, because `builderhunt_app` has no grant on
+ * `organization_members`/`auth_users` after the auth broker split (drizzle/0007). So rather than
+ * hand the builder an unverifiable id, this actually sets the thing it checks for — the same shape
+ * as `withPlatformOrganization`, against `authDb`. If either table is ever given RLS, the policy
+ * finds the value already there.
+ */
+async function withAuthBrokerOrganization<TResult>(
+  organizationId: string,
+  operation: (transaction: KeysetTransaction) => Promise<TResult>,
+): Promise<TResult> {
+  const [{ sql }, { authDb }] = await Promise.all([import('drizzle-orm'), import('../db/auth-db')])
+  return authDb.transaction(async (transaction) => {
+    await transaction.execute(sql`select set_config('app.organization_id', ${organizationId}, true)`)
+    return operation(transaction as unknown as KeysetTransaction)
+  })
+}
+
+/** One keyset page of the roster, each row carrying the name and email the grid shows. */
+// unbounded-read-ok: the second select has no LIMIT because it does not need one — its `inArray`
+// takes exactly the ids the keyset page just returned, so it is bounded by TABLE_PAGE_SIZE.
+export async function pageOrganizationMembers(
+  organizationId: string,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<OrganizationMemberRecord>> {
+  const [{ inArray }, { authDb }, schema, { buildKeysetPage }, { organizationMembersCapability }] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+    import('../table/keyset'),
+    import('../table/capabilities/organization-members'),
+  ])
+  const { organizationMembers, authUsers } = schema
+
+  const result = await withAuthBrokerOrganization(organizationId, (transaction) =>
+    buildKeysetPage<{ userId: string; role: OrganizationRole; joinedAt: Date }>(
+      transaction,
+      organizationMembersCapability,
+      query,
+      page,
+      {
+        select: {
+          userId: organizationMembers.userId,
+          role: organizationMembers.role,
+          joinedAt: organizationMembers.createdAt,
+        },
+        mapRow: (row) => ({
+          userId: row.userId as string,
+          role: row.role as OrganizationRole,
+          joinedAt: row.joinedAt as Date,
+        }),
+      },
+    ))
+
+  // Names live on `auth_users`, one join away, and a capability describes one table. Resolved for
+  // the rows this page returned rather than for the whole roster — the same page-then-enrich shape
+  // as `pagePlatformUsersWithBilling`.
+  if (result.rows.length === 0) return { ...result, rows: [] }
+  const identities = await authDb
+    .select({ id: authUsers.id, name: authUsers.name, email: authUsers.email })
+    .from(authUsers)
+    .where(inArray(authUsers.id, result.rows.map((row) => row.userId)))
+  const byId = new Map(identities.map((identity) => [identity.id, identity]))
+
+  return {
+    ...result,
+    rows: result.rows.map((row) => ({
+      userId: row.userId,
+      // A membership whose user row vanished is a broken state, not a reason to drop the row from
+      // a roster that still counts it against the seat limit.
+      name: byId.get(row.userId)?.name ?? 'Unknown user',
+      email: byId.get(row.userId)?.email ?? '',
+      role: row.role,
+      joinedAt: row.joinedAt,
+    })),
+  }
+}
+
+/**
+ * Non-owner members the current owner could transfer ownership to, bounded.
+ *
+ * The danger zone's picker used to filter the whole roster in the browser. It is a `<select>`, not
+ * a grid — it cannot page — so the bound is explicit and the caller is told when it bit, rather
+ * than the list silently ending. An organization with more than this many transferable members is
+ * not a case this control is designed for, and saying so is better than quietly offering the
+ * first hundred as if they were all of them.
+ */
+export const TRANSFER_CANDIDATE_LIMIT = 100
+
+export async function listOwnershipTransferCandidates(
+  organizationId: string,
+): Promise<{ candidates: OrganizationMemberRecord[]; truncated: boolean }> {
+  const [{ and, eq, ne, asc }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationMembers, authUsers } = schema
+
+  const rows = await authDb
+    .select({
+      userId: organizationMembers.userId,
+      name: authUsers.name,
+      email: authUsers.email,
+      role: organizationMembers.role,
+      joinedAt: organizationMembers.createdAt,
+    })
+    .from(organizationMembers)
+    .innerJoin(authUsers, eq(authUsers.id, organizationMembers.userId))
+    .where(and(
+      eq(organizationMembers.organizationId, organizationId),
+      ne(organizationMembers.role, 'owner'),
+    ))
+    .orderBy(asc(organizationMembers.createdAt), asc(organizationMembers.id))
+    // One more than the limit, so "was there more" is an answer rather than a guess.
+    .limit(TRANSFER_CANDIDATE_LIMIT + 1)
+
+  const truncated = rows.length > TRANSFER_CANDIDATE_LIMIT
+  return {
+    candidates: (truncated ? rows.slice(0, TRANSFER_CANDIDATE_LIMIT) : rows)
+      .map((row) => ({ ...row, role: row.role as OrganizationRole })),
+    truncated,
+  }
+}
+
 /** Team settings' member list — same authDb rationale as `listMyOrganizations`: RLS-forced tables this read discovers the scope for. */
 export async function listOrganizationMembers(organizationId: string): Promise<OrganizationMemberRecord[]> {
   const [{ eq }, { authDb }, schema] = await Promise.all([
@@ -1128,6 +1263,56 @@ export async function resolveActorDisplayNames(
     .where(and(eq(organizationMembers.organizationId, organizationId), inArray(organizationMembers.userId, uniqueIds)))
 
   return new Map(rows.map((row) => [row.userId, row.name]))
+}
+
+/**
+ * One keyset page of pending invitations.
+ *
+ * `status = 'pending'` is the surface's own predicate rather than a filter dimension — see the
+ * capability. The organization *name* is not selected per row: it is the same value on every row
+ * of the page by construction, so the caller carries it once instead of sixty times over the wire.
+ */
+export async function pageOrganizationInvitations(
+  organizationId: string,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<Omit<InvitationRecord, 'organizationName'>>> {
+  const [{ eq }, schema, { buildKeysetPage }, { organizationInvitationsCapability }] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/schema'),
+    import('../table/keyset'),
+    import('../table/capabilities/organization-invitations'),
+  ])
+  const { organizationInvitations } = schema
+
+  return withAuthBrokerOrganization(organizationId, (transaction) =>
+    buildKeysetPage<Omit<InvitationRecord, 'organizationName'>>(
+      transaction,
+      organizationInvitationsCapability,
+      query,
+      page,
+      {
+        scope: [eq(organizationInvitations.status, 'pending')],
+        select: {
+          id: organizationInvitations.id,
+          organizationId: organizationInvitations.organizationId,
+          email: organizationInvitations.email,
+          role: organizationInvitations.role,
+          status: organizationInvitations.status,
+          expiresAt: organizationInvitations.expiresAt,
+          inviterId: organizationInvitations.inviterId,
+        },
+        mapRow: (row) => ({
+          id: row.id as string,
+          organizationId: row.organizationId as string,
+          email: row.email as string,
+          role: ((row.role as string | null) ?? 'member') as InvitableRole,
+          status: row.status as InvitationRecord['status'],
+          expiresAt: row.expiresAt as Date,
+          inviterId: row.inviterId as string,
+        }),
+      },
+    ))
 }
 
 /** Pending invitations only — accepted/rejected/canceled ones aren't actionable from Team settings. */

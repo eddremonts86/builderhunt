@@ -115,6 +115,9 @@ export const organizationMembers = pgTable(
     uniqueIndex('organization_members_org_user_unique').on(table.organizationId, table.userId),
     uniqueIndex('organization_members_one_owner_unique').on(table.organizationId).where(sql`${table.role} = 'owner'`),
     index('organization_members_user_idx').on(table.userId),
+    // Keyset sort for the team roster (plans/phase-3/10). The org-user unique index above cannot
+    // serve it: an ordered walk needs the sort column to follow the tenant, and `user_id` is not it.
+    index('organization_members_org_created_id_idx').on(table.organizationId, table.createdAt, table.id),
     check('organization_members_role_check', sql`${table.role} in ('owner', 'admin', 'member')`),
   ],
 )
@@ -134,6 +137,11 @@ export const organizationInvitations = pgTable(
   (table) => [
     index('organization_invitations_email_idx').on(table.organizationId, table.email),
     index('organization_invitations_expires_idx').on(table.expiresAt),
+    // Keyset sorts for the pending-invitations grid (plans/phase-3/10). `_expires_idx` above is
+    // the worker's global sweep over every organization's expiries and does not lead with the
+    // tenant, so it cannot serve a per-organization ordered walk.
+    index('organization_invitations_org_created_id_idx').on(table.organizationId, table.createdAt, table.id),
+    index('organization_invitations_org_expires_id_idx').on(table.organizationId, table.expiresAt, table.id),
     /**
      * At most one *pending* invitation per (organization, email).
      *

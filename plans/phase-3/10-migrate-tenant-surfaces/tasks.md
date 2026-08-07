@@ -61,7 +61,7 @@
     null placement follows the scan direction.
     Indexes `billing_disputes_org_{created,evidence_due}_id_idx` in `drizzle/0159`.
 
-- [ ] **Migrate team settings as two grids**
+- [x] **Migrate team settings as two grids**
   - Files: `src/modules/dashboard/components/TeamSettingsPage.tsx`,
     `src/shared/lib/auth/organization-lifecycle.ts`,
     `src/shared/lib/table/capabilities/{organization-members,organization-invitations}.ts`
@@ -69,6 +69,25 @@
     merged list — members and invitations are different record types.
   - Verify: invite someone, confirm the invitation grid updates; remove a member, confirm seat usage
     still recalculates.
+  - **Done. Three things the task did not anticipate:**
+    1. **The reads cannot run in a tenant transaction.** `builderhunt_app` has no grant on
+       `organization_members`/`auth_users` after the auth-broker split (drizzle/0007), so both go
+       through `authDb`. Rather than hand `buildKeysetPage` an organization id it cannot verify —
+       the exact loophole `requireOrganizationId` exists to close — `withAuthBrokerOrganization`
+       sets `app.organization_id` on the broker transaction, so the check finds it genuinely set.
+    2. **The roster cannot be searched, and now says so.** Name and email live on `auth_users`, one
+       join away from a capability that describes one table. `searchable: []` plus a new
+       `searchable={false}` on `DataTable`, because a box that matches nothing reads as "no such
+       member" for a member who is right there. Names still reach the page — resolved for the fifty
+       rows returned, the `pagePlatformUsersWithBilling` shape.
+    3. **The danger zone needed the list too.** Its ownership `<select>` cannot page, so it gets
+       `listOwnershipTransferCandidates` — non-owner members, capped at 100, with a
+       `transfer-candidates-truncated` notice when the cap bites. The snapshot no longer carries
+       `members`/`pendingInvitations` at all; `seatUsage` never depended on them (`getSeatUsage`
+       has always counted in Postgres), which is why removing them changed nothing about it.
+
+    `listOrganizationMembers` had no `ORDER BY` either — the same defect as `listDisputes`.
+    Indexes `organization_{members,invitations}_org_*_id_idx` in `drizzle/0160`.
 
 - [ ] **Migrate the sprints index**
   - Files: `src/routes/_dashboard/sprints/index.tsx`, `src/lib/sprints/service.ts`,

@@ -188,6 +188,8 @@ import { Route as ApiQueriesIdVisibilityRouteImport } from './routes/api/queries
 import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
 import { Route as ApiQueriesIdFeedCapabilityRouteImport } from './routes/api/queries/$id/feed-capability'
 import { Route as ApiPrivacyProfileRemovalVerifyRouteImport } from './routes/api/privacy/profile-removal/verify'
+import { Route as ApiOrganizationsTeamMembersRouteImport } from './routes/api/organizations/team/members'
+import { Route as ApiOrganizationsTeamInvitationsRouteImport } from './routes/api/organizations/team/invitations'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
 import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
 import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
@@ -1218,6 +1220,18 @@ const ApiPrivacyProfileRemovalVerifyRoute =
     path: '/verify',
     getParentRoute: () => ApiPrivacyProfileRemovalRoute,
   } as any)
+const ApiOrganizationsTeamMembersRoute =
+  ApiOrganizationsTeamMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => ApiOrganizationsTeamRoute,
+  } as any)
+const ApiOrganizationsTeamInvitationsRoute =
+  ApiOrganizationsTeamInvitationsRouteImport.update({
+    id: '/invitations',
+    path: '/invitations',
+    getParentRoute: () => ApiOrganizationsTeamRoute,
+  } as any)
 const ApiOrganizationsMembersMemberIdRoute =
   ApiOrganizationsMembersMemberIdRouteImport.update({
     id: '/api/organizations/members/$memberId',
@@ -1929,7 +1943,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/activity': typeof ApiOrganizationsActivityRoute
   '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
-  '/api/organizations/team': typeof ApiOrganizationsTeamRoute
+  '/api/organizations/team': typeof ApiOrganizationsTeamRouteWithChildren
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
@@ -2045,6 +2059,8 @@ export interface FileRoutesByFullPath {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/organizations/team/invitations': typeof ApiOrganizationsTeamInvitationsRoute
+  '/api/organizations/team/members': typeof ApiOrganizationsTeamMembersRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/feed-capability': typeof ApiQueriesIdFeedCapabilityRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
@@ -2211,7 +2227,7 @@ export interface FileRoutesByTo {
   '/api/organizations/activity': typeof ApiOrganizationsActivityRoute
   '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
-  '/api/organizations/team': typeof ApiOrganizationsTeamRoute
+  '/api/organizations/team': typeof ApiOrganizationsTeamRouteWithChildren
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
@@ -2327,6 +2343,8 @@ export interface FileRoutesByTo {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/organizations/team/invitations': typeof ApiOrganizationsTeamInvitationsRoute
+  '/api/organizations/team/members': typeof ApiOrganizationsTeamMembersRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/feed-capability': typeof ApiQueriesIdFeedCapabilityRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
@@ -2498,7 +2516,7 @@ export interface FileRoutesById {
   '/api/organizations/activity': typeof ApiOrganizationsActivityRoute
   '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
-  '/api/organizations/team': typeof ApiOrganizationsTeamRoute
+  '/api/organizations/team': typeof ApiOrganizationsTeamRouteWithChildren
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
@@ -2614,6 +2632,8 @@ export interface FileRoutesById {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/organizations/team/invitations': typeof ApiOrganizationsTeamInvitationsRoute
+  '/api/organizations/team/members': typeof ApiOrganizationsTeamMembersRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/feed-capability': typeof ApiQueriesIdFeedCapabilityRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
@@ -2900,6 +2920,8 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/organizations/team/invitations'
+    | '/api/organizations/team/members'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/feed-capability'
     | '/api/queries/$id/share'
@@ -3182,6 +3204,8 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/organizations/team/invitations'
+    | '/api/organizations/team/members'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/feed-capability'
     | '/api/queries/$id/share'
@@ -3468,6 +3492,8 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/organizations/team/invitations'
+    | '/api/organizations/team/members'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/feed-capability'
     | '/api/queries/$id/share'
@@ -3592,7 +3618,7 @@ export interface RootRouteChildren {
   ApiOrganizationsActivityRoute: typeof ApiOrganizationsActivityRoute
   ApiOrganizationsDeletionRoute: typeof ApiOrganizationsDeletionRouteWithChildren
   ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
-  ApiOrganizationsTeamRoute: typeof ApiOrganizationsTeamRoute
+  ApiOrganizationsTeamRoute: typeof ApiOrganizationsTeamRouteWithChildren
   ApiOrganizationsTransferOwnershipRoute: typeof ApiOrganizationsTransferOwnershipRoute
   ApiOrganizationsTransferOwnershipPreviewRoute: typeof ApiOrganizationsTransferOwnershipPreviewRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
@@ -4985,6 +5011,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPrivacyProfileRemovalVerifyRouteImport
       parentRoute: typeof ApiPrivacyProfileRemovalRoute
     }
+    '/api/organizations/team/members': {
+      id: '/api/organizations/team/members'
+      path: '/members'
+      fullPath: '/api/organizations/team/members'
+      preLoaderRoute: typeof ApiOrganizationsTeamMembersRouteImport
+      parentRoute: typeof ApiOrganizationsTeamRoute
+    }
+    '/api/organizations/team/invitations': {
+      id: '/api/organizations/team/invitations'
+      path: '/invitations'
+      fullPath: '/api/organizations/team/invitations'
+      preLoaderRoute: typeof ApiOrganizationsTeamInvitationsRouteImport
+      parentRoute: typeof ApiOrganizationsTeamRoute
+    }
     '/api/organizations/members/$memberId': {
       id: '/api/organizations/members/$memberId'
       path: '/api/organizations/members/$memberId'
@@ -6018,6 +6058,19 @@ const ApiOrganizationsDeletionRouteWithChildren =
     ApiOrganizationsDeletionRouteChildren,
   )
 
+interface ApiOrganizationsTeamRouteChildren {
+  ApiOrganizationsTeamInvitationsRoute: typeof ApiOrganizationsTeamInvitationsRoute
+  ApiOrganizationsTeamMembersRoute: typeof ApiOrganizationsTeamMembersRoute
+}
+
+const ApiOrganizationsTeamRouteChildren: ApiOrganizationsTeamRouteChildren = {
+  ApiOrganizationsTeamInvitationsRoute: ApiOrganizationsTeamInvitationsRoute,
+  ApiOrganizationsTeamMembersRoute: ApiOrganizationsTeamMembersRoute,
+}
+
+const ApiOrganizationsTeamRouteWithChildren =
+  ApiOrganizationsTeamRoute._addFileChildren(ApiOrganizationsTeamRouteChildren)
+
 interface ApiPrivacyProfileRemovalRouteChildren {
   ApiPrivacyProfileRemovalVerifyRoute: typeof ApiPrivacyProfileRemovalVerifyRoute
 }
@@ -6231,7 +6284,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOrganizationsActivityRoute: ApiOrganizationsActivityRoute,
   ApiOrganizationsDeletionRoute: ApiOrganizationsDeletionRouteWithChildren,
   ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
-  ApiOrganizationsTeamRoute: ApiOrganizationsTeamRoute,
+  ApiOrganizationsTeamRoute: ApiOrganizationsTeamRouteWithChildren,
   ApiOrganizationsTransferOwnershipRoute:
     ApiOrganizationsTransferOwnershipRoute,
   ApiOrganizationsTransferOwnershipPreviewRoute:
