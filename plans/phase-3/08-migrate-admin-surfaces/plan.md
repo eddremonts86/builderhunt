@@ -1,6 +1,6 @@
 # Plan — migrate the admin and account surfaces
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: Seven UI files plus their capabilities. No new indexes expected; confirm per surface against plan 04's guard.

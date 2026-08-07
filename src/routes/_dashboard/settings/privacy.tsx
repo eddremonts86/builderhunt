@@ -3,8 +3,12 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Download, Trash2, Shield, AlertTriangle, FileJson, CheckCircle2, Clock, X, Users } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button } from '~/components/ui/button'
+import { DataTable } from '~/shared/components/table'
+import { emptyTableSearch } from '~/shared/lib/table/query-url'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import type { PageResult } from '~/shared/lib/table/types'
 
-interface ExportRecord {
+interface ExportRecord extends Record<string, unknown> {
   id: string
   status: 'pending' | 'ready' | 'failed' | 'expired'
   expiresAt: string | null
@@ -173,6 +177,59 @@ function PrivacySettingsPage() {
     ? Math.max(0, Math.ceil((new Date(deletion.gracePeriodEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
     : 0
 
+  /**
+   * The five most recent exports, as a page that is always the last page.
+   *
+   * `.slice(0, 5)` was already the bound before this migration and it stays one: a person's export
+   * history is model-bounded, so `nextCursor` is null and `total` is what is shown. The shell gets
+   * the same list; what changes is that it now has a header, an empty state and keyboard access
+   * like every other list in the app.
+   */
+  const exportPage: PageResult<ExportRecord> = React.useMemo(() => {
+    const rows = exports.slice(0, 5)
+    return { rows, nextCursor: null, total: rows.length, facets: {} }
+  }, [exports])
+
+  const exportColumns = React.useMemo<ColumnDef<ExportRecord>[]>(() => [
+    {
+      id: 'status',
+      header: 'Status',
+      priority: 'primary',
+      value: (record) => record.status,
+      cell: (record) => (
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+          record.status === 'ready' ? 'text-bh-success'
+            : record.status === 'expired' ? 'text-bh-text-dim'
+              : record.status === 'failed' ? 'text-bh-danger' : 'text-bh-warning'
+        }`}>
+          {record.status}
+        </span>
+      ),
+    },
+    {
+      id: 'createdAt',
+      header: 'Requested',
+      value: (record) => record.createdAt,
+      cell: (record) => new Date(record.createdAt).toLocaleString(),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      align: 'end',
+      cell: (record) => record.status !== 'ready' ? null : (
+        <Button
+          type="button"
+          onClick={() => void downloadExport(record.id)}
+          variant="ghost"
+          size="sm"
+          data-testid={`export-download-${record.id}`}
+        >
+          Download
+        </Button>
+      ),
+    },
+  ], [])
+
   return (
     <div data-testid="privacy-settings-page">
       <header className="mb-6">
@@ -271,33 +328,18 @@ function PrivacySettingsPage() {
         </Button>
 
         {exports.length > 0 && (
-          <div className="mt-4 space-y-2" data-testid="export-list">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim">Past exports</h3>
-            {exports.slice(0, 5).map((e) => (
-              <div key={e.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-bh-border/40">
-                <span className={`text-[10px] uppercase tracking-wider font-bold ${
-                  e.status === 'ready' ? 'text-bh-success' :
-                  e.status === 'expired' ? 'text-bh-text-dim' :
-                  e.status === 'failed' ? 'text-bh-danger' : 'text-bh-warning'
-                }`}>
-                  {e.status}
-                </span>
-                <span className="text-bh-text-muted text-xs flex-1">
-                  {new Date(e.createdAt).toLocaleString()}
-                </span>
-                {e.status === 'ready' && (
-                  <Button
-                    type="button"
-                    onClick={() => downloadExport(e.id)}
-                    variant="ghost"
-                    size="sm"
-                    data-testid={`export-download-${e.id}`}
-                  >
-                    Download
-                  </Button>
-                )}
-              </div>
-            ))}
+          <div className="mt-4" data-testid="export-list">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-bh-text-dim">Past exports</h3>
+            <DataTable
+              label="Past data exports"
+              columns={exportColumns}
+              page={exportPage}
+              query={emptyTableSearch().query}
+              // Five rows of one's own export history: nothing to sort, filter or group.
+              onQueryChange={() => {}}
+              rowTestId={(record) => `export-row-${record.id}`}
+              rowId={(record) => record.id}
+            />
           </div>
         )}
       </section>

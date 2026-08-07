@@ -1,6 +1,6 @@
 # Specification — migrate the admin and account surfaces
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: Seven surfaces render rows today with no shared behaviour: `src/modules/dashboard/components/AbuseConsole.tsx` (a real `<table>`), `src/routes/_dashboard/admin/incidents.tsx`, `admin/plan-requests.tsx`, `src/modules/dashboard/components/ActiveSessionsPanel.tsx`, `src/routes/_dashboard/settings/privacy.tsx`, `me/index.tsx`, `src/modules/scheduling/components/InvitationStatus.tsx`. Their reads are already narrow, so this is mostly presentation.
@@ -35,6 +35,15 @@ All seven on the shell, so the visible payoff of plans 02–07 arrives before th
   semantics of a list that already exists and aligns nothing. **Left alone**, with the same
   reasoning as `HygieneCard`.
 
+- **`me/index` — audited, and it is not a grid.** `src/routes/_dashboard/me/index.tsx:175` renders
+  a card per claimed builder profile: avatar, verification badge, topic chips, and an inline edit
+  mode with topic editors and open-to selectors that replaces most of the card. Viewing and editing
+  show different fields, and there is no column alignment to be had between an avatar-plus-bio
+  block and another one. It is also model-bounded at one to three profiles. **Left alone**, same
+  reasoning as `HygieneCard` and `InvitationStatus`. The plan's "keep the several short lists as
+  separate grids" is the right instruction for a page that had several tabular lists; this page has
+  one list of editors.
+
 - **`admin/plan-requests` — the surface no longer exists.** `plan_requests` was dropped on
   2026-08-03 along with `plans` and `plan_changes` (`schema.ts:1058-1067`: the pre-organization
   billing model, 0 rows, every new request already refused by
@@ -63,7 +72,14 @@ and any shell assumption that only fits sprint results shows up here, while the 
 ## Success metrics
 
 - All seven appear in `tests/e2e/data-tables.spec.ts`'s parameter list and pass every assertion.
+  **Not met** — see the closing note in `tasks.md`. The harness authenticates as an organization
+  owner, the abuse console needs a platform admin, and two of these are components inside larger
+  pages rather than table routes.
 - `grep -rl '<table' src/modules/dashboard src/routes/_dashboard/admin` returns nothing.
+  **One left, correctly**: `src/modules/dashboard/ui/BarSeries.tsx:91` is an `sr-only` `<table>`
+  carrying the accessible text alternative for a bar chart — the data a sighted reader gets from the
+  bars. Removing it would take the chart's accessibility with it. A chart's data table is the one
+  place `<table>` markup in this directory is not a list waiting to be migrated.
 - Each surface's existing e2e or regression coverage still passes.
 - `node scripts/check-unbounded-reads.mjs` count does not increase.
 
