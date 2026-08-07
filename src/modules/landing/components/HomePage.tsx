@@ -34,10 +34,18 @@ export function HomePage() {
                   Find <span className="text-bh-accent">builders</span>,<br />
                   not just repos.
                 </h1>
-                <p className="text-lg md:text-xl text-bh-text-muted max-w-xl mb-8 animate-fade-in-up">
+                {/* The differentiator — activity scoring + builder-as-actor — used to live
+                    in the supporting paragraph below. Promote it to its own line directly
+                    under the H1 so first-time visitors register it before they read the
+                    full pitch. Impeccable fix-ui-ux C5. */}
+                <p className="text-base md:text-lg text-bh-text max-w-xl mb-4 font-medium animate-fade-in-up">
+                  Activity scored for recency — so the top of your results are the people
+                  <span className="text-bh-accent"> shipping right now</span>, not the ones who shipped last year.
+                </p>
+                <p className="text-sm md:text-base text-bh-text-muted max-w-xl mb-8 animate-fade-in-up">
                   BuilderHunt aggregates public activity from GitHub, Reddit, Hacker News, DEV.to and
-                  more, scores it for recency, and lets you save searches, get email alerts, and track
-                  the people shipping the work — not just the repositories.
+                  more, lets you save searches, get email alerts, and track the people behind the work —
+                  not just the repositories.
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mb-8 animate-fade-in-up">
                   {isAuthed ? (
@@ -54,9 +62,14 @@ export function HomePage() {
                           Start hunting <ArrowRight className="w-4 h-4" aria-hidden="true" />
                         </LinkButton>
                       </span>
+                      {/* Secondary CTA: drop the solid secondary variant. An outline
+                          button reads as "the other choice" without competing with the
+                          primary. Copy went from "Try it without an account" (implies
+                          friction) to "Browse builders" (describes the action and its
+                          destination — /explore). Impeccable fix-ui-ux C1. */}
                       <span onClick={() => trackConversionEvent('hero_explore_click', 'hero')}>
-                        <LinkButton to="/explore" variant="secondary" className="btn-lg" data-testid="hero-explore-cta">
-                          Try it without an account
+                        <LinkButton to="/explore" variant="ghost" className="btn-lg" data-testid="hero-explore-cta">
+                          Browse builders
                         </LinkButton>
                       </span>
                     </>
