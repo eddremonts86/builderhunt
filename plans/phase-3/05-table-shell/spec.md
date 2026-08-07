@@ -1,6 +1,6 @@
 # Specification — the table shell
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`02-table-query-contract`](../02-table-query-contract/spec.md)
 > **Blocks**: [`06-row-virtualization`](../06-row-virtualization/spec.md), [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Reality check**: 19 surfaces render tabular data with 5 different header treatments; 0 support keyboard navigation and 1 sorts. Design tokens, control heights, radii and both typefaces are fixed by `DESIGN.md` and `docs/visual-system.md`. `src/components/ui/` already provides `Button`, `Input`, `Select`, `Checkbox`, `Dialog` (Radix). `tests/regression/test-status-and-trust.mjs` drives existing rows by `data-testid`.
