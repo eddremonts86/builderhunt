@@ -71,6 +71,15 @@ jobs:
       # restore puts back, and at --workers=1 every spec shares the process it puts it back
       # into. Redundant, with a leak vector attached.
       CALENDAR_ENABLED: 'true'
+      # TEMPORARY DIAGNOSTIC — remove once the capability-exchange failure is understood.
+      #
+      # `POST /api/public/scheduling/:id/session` catches everything and answers a coded
+      # `invalid_input`, which is right for a public endpoint and useless to a reporter: the
+      # E2E log shows `capability exchange failed (400): {"error":"invalid_input"}` for ~45
+      # tests across scheduling, interviews, documents and billing-credits, with the actual
+      # exception sitting in a `console.error` no one reads. `harness/server.ts` forwards the
+      # worker server's output only when this is set, precisely for this situation.
+      E2E_SERVER_LOG: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
