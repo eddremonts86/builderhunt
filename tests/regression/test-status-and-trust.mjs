@@ -255,12 +255,33 @@ async function run() {
   await page.fill('input[type="password"]', 'TestPass1234!')
   await page.click('button[type="submit"]')
   await page.waitForTimeout(2000)
-  // Try to access admin endpoint
+  /*
+   * What this can assert depends on whether the sign-up above actually happened.
+   *
+   * With `ACCESS_ALLOWLIST_ENABLED=true` the app is invite-only and `/api/auth/sign-up/email`
+   * answers 403 — no session is created, so the fetch below is *anonymous* and 401 is the correct
+   * answer. The check used to assert 403 unconditionally and failed for that reason: it was
+   * asserting the authenticated-but-forbidden case while producing the unauthenticated one.
+   *
+   * So it asks the app what state it is in, and asserts the matching half of the contract
+   * (`resolvePlatformAdminPrincipal`: no session → 401, session but not an admin → 403). Both
+   * halves are also unit-tested in `tests/unit/shared/lib/auth/platform-admin.test.ts`; what this
+   * adds is that a real browser cannot reach the endpoint either way.
+   */
   const apiRes = await page.evaluate(async () => {
+    const session = await fetch('/api/auth/get-session', { credentials: 'include' })
+      .then((r) => r.json())
+      .catch(() => null)
     const r = await fetch('/api/admin/incidents', { credentials: 'include' })
-    return { status: r.status }
+    return { status: r.status, signedIn: Boolean(session?.user) }
   })
-  check('non-admin gets 403 on admin endpoint', apiRes.status === 403, `status: ${apiRes.status}`)
+  const expected = apiRes.signedIn ? 403 : 401
+  check(
+    apiRes.signedIn
+      ? 'signed-in non-admin gets 403 on admin endpoint'
+      : 'anonymous caller gets 401 on admin endpoint (sign-up is invite-only here)',
+    apiRes.status === expected,
+    `status: ${apiRes.status}, expected ${expected}`)
   // Try to access admin UI
   await page.goto(`${BASE}/admin/incidents`, { waitUntil: 'networkidle' })
   await page.waitForTimeout(1500)

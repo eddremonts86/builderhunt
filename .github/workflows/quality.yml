@@ -188,6 +188,16 @@ jobs:
           exit 1
       - name: Accessibility gate (axe-core, public + authenticated route matrix)
         run: pnpm test:a11y
+      # Runs against the same production preview as the accessibility gate, and after it, for two
+      # reasons: this script *writes* (it creates an incident, a changelog entry and a roadmap item,
+      # which is the point — it verifies they reach the public /status, /changelog and /roadmap
+      # pages), and an incident on the status page would change what the a11y gate renders.
+      #
+      # It was wired into nothing until 2026-08-07, which is how it stayed broken for weeks: it
+      # crashed at `page.selectOption` against a Radix `Select` and nobody saw it. A regression
+      # script no job runs is a file, not a gate.
+      - name: Status and trust regression (public status/changelog/roadmap + admin management)
+        run: pnpm test:status-trust
       - name: Conversion funnel instrumentation
         # Placed after the accessibility gate because both need the preview server started above — an earlier
         # position in this job has no server to talk to, which is where this step was first put by mistake.
