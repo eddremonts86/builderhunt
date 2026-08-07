@@ -193,8 +193,8 @@ export function HomePage() {
                 Three steps from keyword to shortlist.
               </h2>
               <p className="text-lg text-bh-text-muted">
-                Stop scrolling timelines. Define what you're looking for, let BuilderHunt
-                do the discovery, and only review the people worth your attention.
+                Pick keywords, let BuilderHunt cross-reference public activity across
+                sources, and review only the people worth your attention.
               </p>
             </div>
 
@@ -289,7 +289,7 @@ export function HomePage() {
                 Built for the people who build things.
               </h2>
               <p className="text-lg text-bh-text-muted">
-                No fluff. Every feature exists because it makes finding, scoring, and tracking
+                Every feature is here because it makes finding, scoring, or tracking
                 builders faster than doing it by hand.
               </p>
             </div>
@@ -314,7 +314,7 @@ export function HomePage() {
                   </div>
                   <h3 className="text-xl font-bold text-bh-text mb-2">Multi-source discovery</h3>
                   <p className="text-bh-text-muted text-sm leading-relaxed max-w-xl">
-                    GitHub stars, HN upvotes, Reddit karma, DEV.to posts: indexed and cross-referenced so you can see one person across all four signals.
+                    GitHub stars, HN upvotes, Reddit karma, DEV.to posts. We index them and dedupe by person, so a single profile shows up across all four.
                   </p>
                 </div>
 
@@ -342,7 +342,7 @@ export function HomePage() {
                   </div>
                   <h3 className="text-lg font-bold text-bh-text mb-2">Recency-weighted scoring</h3>
                   <p className="text-bh-text-muted text-sm leading-relaxed">
-                    A 7-day commit is worth more than a 3-year-old star pile. Scores decay on a half-life curve so the top of your results is the people shipping now.
+                    A 7-day commit is worth more than a 3-year-old star pile. Scores decay on a half-life curve, so the top of your results is whoever shipped most recently.
                   </p>
                 </div>
                 {/* SVG Visual: Decay Curve */}
@@ -363,25 +363,33 @@ export function HomePage() {
                 {
                   icon: Bell,
                   title: 'Keyword alerts',
-                  desc: 'Set it once. Get an email (or RSS feed) the moment a new builder matching your filters shows up. No daily digest, just signal.',
+                  desc: 'Set the filters once. We send an email or RSS ping the moment a new builder matches. No daily digest, just the hits that matter.',
+                  image: '/landing-assets/alerts-inbox.jpg',
+                  imageAlt: 'A notification arriving for a new matching builder.',
                 },
                 {
                   icon: FileText,
                   title: 'Private notes',
-                  desc: 'Attach private context to any builder (outreach status, where you met them, why they matter). Only you see them.',
+                  desc: 'Stash private context on any builder: outreach status, where you met them, why they matter. Only you see them.',
+                  image: '/landing-assets/notes.jpg',
+                  imageAlt: 'A notebook with handwritten context next to a builder profile.',
                 },
                 {
                   icon: Download,
                   title: 'CSV / JSON export',
-                  desc: 'One-click export of any shortlist. Pipe it into Notion, Airtable, your ATS, or a spreadsheet. No lock-in.',
+                  desc: 'Export any shortlist to CSV or JSON. Pipe it into Notion, Airtable, your ATS, or a spreadsheet. No lock-in.',
+                  image: '/landing-assets/export.jpg',
+                  imageAlt: 'A spreadsheet with builder profiles and export columns.',
                 },
                 {
                   icon: Shield,
                   title: 'No tracking, no spam',
-                  desc: 'We don\'t message builders on your behalf. We don\'t sell profile data. You find them, you reach out, the way it should be.',
+                  desc: 'We don\'t message builders on your behalf and we don\'t sell profile data. You find them, you reach out. That\'s the whole model.',
+                  image: '/landing-assets/privacy.jpg',
+                  imageAlt: 'A private folder representing your data stays your data.',
                 },
               ].map((f) => (
-                <article key={f.title} className="card card-premium-glow bg-bh-surface p-6 flex flex-col justify-between">
+                <article key={f.title} className="card card-premium-glow bg-bh-surface p-6 flex flex-col justify-between overflow-hidden">
                   <div>
                     <div className="w-10 h-10 rounded-lg bg-bh-cyan-soft border border-bh-cyan/20 flex items-center justify-center mb-4">
                       <f.icon className="w-5 h-5 text-bh-cyan" aria-hidden="true" />
@@ -389,6 +397,14 @@ export function HomePage() {
                     <h3 className="text-lg font-bold text-bh-text mb-2">{f.title}</h3>
                     <p className="text-bh-text-muted text-sm leading-relaxed">{f.desc}</p>
                   </div>
+                  {/* Real photo replaces the fake-UI pill (§9.F ban). Seeded by
+                      section so the asset is reproducible. */}
+                  <img
+                    src={f.image}
+                    alt={f.imageAlt}
+                    loading="lazy"
+                    className="mt-5 w-full h-28 object-cover rounded-lg"
+                  />
                 </article>
               ))}
             </div>
@@ -400,7 +416,7 @@ export function HomePage() {
           <div className="container">
             <div className="max-w-2xl mb-12">
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-bh-text">
-                Whoever you need to find, BuilderHunt finds first.
+                Whoever you need to find, we surface them first.
               </h2>
             </div>
 
@@ -437,7 +453,7 @@ export function HomePage() {
                 {[
                   {
                     persona: 'Open-source maintainers',
-                    pain: 'You are shipping a popular repository and need a few good co-maintainers, but the bar is high and the pool is wide.',
+                    pain: "You're shipping a popular repo and need a few good co-maintainers. The bar is high and the pool is wide.",
                     fix: 'Filter by language, country, and recent merged-PR velocity. Find people already shipping in your stack at the activity level you need.',
                     preview: (
                       <div className="border border-bh-border/60 rounded-xl p-4 bg-bh-bg/30 text-left font-sans">
@@ -553,7 +569,7 @@ export function HomePage() {
                 Signal from the places builders actually are.
               </h2>
               <p className="text-lg text-bh-text-muted">
-                Every source works out of the box. No setup, no API keys required from you.
+                Every source works out of the box. No setup, no API keys to bring.
               </p>
             </div>
 
@@ -580,7 +596,7 @@ export function HomePage() {
           <div className="container-narrow">
             <div className="text-center mb-12">
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-bh-text">
-                Common questions.
+                Common questions, answered.
               </h2>
             </div>
 
@@ -600,7 +616,7 @@ export function HomePage() {
                   `access_requests` approval queue, so the promise is false whenever production
                   has the flag on — and the flag exists to be turned on. The regression guard in
                   trust-claims.test.ts matches raw source, so don't restate the old phrasing. */}
-              Start on the Free plan (no credit card, no demo call). Set up your first hunt in
+              Start on the Free plan, no credit card, no demo call. Set up your first hunt in
               under a minute, and upgrade only when you outgrow the limits.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
