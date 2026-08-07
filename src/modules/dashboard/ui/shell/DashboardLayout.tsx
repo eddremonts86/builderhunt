@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useLocation, useNavigate, useRouteContext } from '@tanstack/react-router'
+import { useLocation, useNavigate, useMatch } from '@tanstack/react-router'
 import { signOut } from '~/shared/lib/auth/client'
 import { BackToTop } from '~/shared/components/BackToTop'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
@@ -28,13 +28,21 @@ import { resolveActiveArea, visibleAreas } from './nav-config'
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useRouteContext({ from: '/_dashboard' })
+  // Read admin flag from the `_dashboard` route context, but tolerate this
+  // layout being mounted outside that subtree (the public `/status` page
+  // reuses the dashboard shell for signed-in visitors so the org-switcher
+  // stays available). `useMatch` does not throw on a missing match; it
+  // returns `undefined`. We always call the hook (Rules of Hooks require a
+  // stable order), then narrow.
+  const match = useMatch({ from: '/_dashboard', shouldThrow: false }) as
+    | { user?: { isPlatformAdmin?: boolean } }
+    | undefined
+  const isAdmin = match?.user?.isPlatformAdmin ?? false
   // `isPlatformAdmin` is computed server-side in `beforeLoad` (see
   // `getAppAuthSession` in auth-session.ts) and surfaced via route context.
   // The previous version polled `/api/admin/incidents` from a `useEffect` to
   // decide whether to render the admin nav — every non-admin hit logged a
   // noisy 403 in the console and on the network panel (saas-review F6).
-  const isAdmin = user.isPlatformAdmin
   const [signingOut, setSigningOut] = React.useState(false)
   const [navOpen, setNavOpen] = React.useState(false)
   const [unreadAlertsCount, setUnreadAlertsCount] = React.useState(0)
