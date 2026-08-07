@@ -1,8 +1,8 @@
-# /fix-ui-ux consolidated findings — BuilderHunt
+# /fix-ui-ux consolidated findings. BuilderHunt
 
 - Generated: 2026-08-07 (Phase 1 → Phase 2 checkpoint)
-- Source: `docs/impeccable/audit.md` (5-dim technical) + `docs/impeccable/critique.md` (design review, ⚠️ DEGRADED — see below) + `docs/ui-audit/findings.md` (saas-review, already closed) + `docs/ui-audit/verification.md` (saas-review, before/after with commit hashes)
-- Surface scope: 5 core surfaces — `/`, `/builders/:builderId`, `/dashboard`, `/admin/metrics`, `/interviews/:interviewId/live`
+- Source: `docs/impeccable/audit.md` (5-dim technical) + `docs/impeccable/critique.md` (design review, ⚠️ DEGRADED. see below) + `docs/ui-audit/findings.md` (saas-review, already closed) + `docs/ui-audit/verification.md` (saas-review, before/after with commit hashes)
+- Surface scope: 5 core surfaces. `/`, `/builders/:builderId`, `/dashboard`, `/admin/metrics`, `/interviews/:interviewId/live`
 
 ## Provenance
 
@@ -14,15 +14,15 @@
 
 | Source | Score / band |
 | --- | --- |
-| Audit (5-dim) | 15/20 — Good. Weak dimensions: dark-mode evidence, mobile evidence, slop pass, visual hierarchy judgment. |
+| Audit (5-dim) | 15/20. Good. Weak dimensions: dark-mode evidence, mobile evidence, slop pass, visual hierarchy judgment. |
 | Critique (Nielsen 10) | 2.6/4 average over applicable heuristics. Acceptable, not strong. |
 | Saas-review (defects) | 0 open P0/P1. All closed + verified. |
 
-## Consolidated findings — P0 → P3
+## Consolidated findings. P0 → P3
 
 | id | sev | source | surface | file:line | symptom | repair verb | mech / decision |
 |---|---|---|---|---|---|---|---|
-| **C1** | **P1** | critique | `/` hero | `src/routes/_landing/index.tsx` (CTAs row) | Two CTAs ("Start hunting" + "Try it without an account") compete for the same first-click decision. Secondary CTA naming implies anonymous browse — copy and intent should align. | clarify | **mechanical** |
+| **C1** | **P1** | critique | `/` hero | `src/routes/_landing/index.tsx` (CTAs row) | Two CTAs ("Start hunting" + "Try it without an account") compete for the same first-click decision. Secondary CTA naming implies anonymous browse. copy and intent should align. | clarify | **mechanical** |
 | **C2** | **P1** | critique | `/` mid-page | `src/routes/_landing/index.tsx` (~ "How it works" section) | "How it works" describes 3 steps in text without a product screenshot in that section. Recognition-not-recall gap (Nielsen #6). | layout | **decision** |
 | **C3** | **P1** | critique | `/` mid-page | `src/routes/_landing/index.tsx` | ~9 sections; "How it works" + "Features" + "Sources" mid-block compete. 6-feature grid is dense at 1280 px. | distill | **decision** |
 | **C4** | **P1** | critique | `/` mid-page | `src/routes/_landing/index.tsx` (persona tabs) | Persona tabs (4) visually undifferentiated. No persona-specific proof (screenshot, stat). | layout | **decision** |
@@ -32,8 +32,8 @@
 | **C8** | **P2** | audit + critique | `/dashboard` | empty / loading / permission states not captured | Walker only captures default render. | onboard + clarify | **mechanical** (capture) |
 | **C9** | **P2** | critique | `/admin/metrics` | empty / degraded states not captured | Operator-facing dashboard needs explicit healthy / degraded / no-data states. | onboard | **decision** |
 | **C10** | **P2** | critique | `/interviews/:interviewId/live` | live console error recovery | Failed segment append must show in-session retry, not a silent toast. | harden | **decision** |
-| **C11** | **P2** | critique | whole app | forms + error copy | Sign-up / forgot / reset / billing / remove-profile forms, 404 page, 403 flash, 429 toasts, error boundary copy — not systematically audited. | clarify | **decision** |
-| **C12** | **P2** | audit + critique | whole app | slop catalog pass | emoji-as-icon, off-token colours, gradient overuse, mixed icon families — not yet evaluated against screenshots. | clarify + distill | **decision** |
+| **C11** | **P2** | critique | whole app | forms + error copy | Sign-up / forgot / reset / billing / remove-profile forms, 404 page, 403 flash, 429 toasts, error boundary copy. not systematically audited. | clarify | **decision** |
+| **C12** | **P2** | audit + critique | whole app | slop catalog pass | emoji-as-icon, off-token colours, gradient overuse, mixed icon families. not yet evaluated against screenshots. | clarify + distill | **decision** |
 | **C13** | **P3** | critique | `/admin/metrics` | counter labels | Re-verify on populated walk after `2b0aa726d`. | clarify | mechanical |
 | **C14** | **P3** | audit + critique | walker harness | `scripts/audit/saas-review-walk.ts` | Dev-only filter so `client-rpc/serverFnFetcher` errors are not counted as product bugs (closes saas-review F7 cleanly). | harden | **mechanical** |
 | **C15** | **P3** | audit + critique | walker harness | `scripts/audit/saas-review-walk.ts` | Turn on `SAAS_REVIEW_VIEWPORTS=both` so dark + mobile + tablet become baseline. | adapt | **mechanical** |
@@ -41,10 +41,10 @@
 | F10 | P1 | audit | whole app | dark mode evidence empty | `*.dark.png` evidence empty; DESIGN.md dark-mode claim unverified. | adapt | decision |
 | F11 | P1 | audit | whole app | mobile 375 px + tablet | not captured; touch-target ≥44×44 not measured | adapt | decision |
 | F12 | P1 | audit | whole app | state coverage | loading / empty / error / permission not systematically captured | onboard + clarify | decision |
-| F17 | P3 | audit | walker harness | (same as C14) | — | harden | mechanical |
-| F18 | P3 | audit | walker harness | (same as C15) | — | adapt | mechanical |
+| F17 | P3 | audit | walker harness | (same as C14) |. | harden | mechanical |
+| F18 | P3 | audit | walker harness | (same as C15) |. | adapt | mechanical |
 
-(F1–F8 collapsed — already fixed and verified, see `docs/ui-audit/verification.md`.)
+(F1–F8 collapsed. already fixed and verified, see `docs/ui-audit/verification.md`.)
 
 ## Repair-verb ownership map
 
@@ -61,7 +61,7 @@ Per `fix-ui-ux` Phase 2 mapping:
 | `optimize` | (none raised) |
 | `distill` | C3, C12 (partial) |
 
-**Excluded by fix-ui-ux rules** (aesthetic direction changes — not defects; offer only as follow-up):
+**Excluded by fix-ui-ux rules** (aesthetic direction changes. not defects; offer only as follow-up):
 `bolder`, `quieter`, `colorize`, `delight`, `animate`, `overdrive`, `craft`, `shape`, `extract`, `live`.
 
 ## Mechanical vs decision split
@@ -74,7 +74,7 @@ Per `fix-ui-ux` Phase 2 mapping:
 
 | Batch | Findings | Verb | Notes |
 | --- | --- | --- | --- |
-| **D** | C14 + C15 | harden + adapt | walker harness — `dev-only` filter + multi-viewport capture. Mechanical. No UI change. |
+| **D** | C14 + C15 | harden + adapt | walker harness. `dev-only` filter + multi-viewport capture. Mechanical. No UI change. |
 | **E** | C6 | adapt | re-walk with dark + 375 + tablet viewports now that walker supports it (depends on Batch D). |
 | **F** | C1 + C13 | clarify | mechanical copy fixes on landing CTA + admin counter labels. |
 | **G** | C5 | clarify | move "activity scoring + builder-as-actor" differentiator above the feature-grid fold. Decision needed on exact wording. |

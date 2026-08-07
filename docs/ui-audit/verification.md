@@ -1,6 +1,6 @@
-# /saas-review verification — BuilderHunt
+# /saas-review verification. BuilderHunt
 
-- Generated: 2026-08-06 (Phase 6 — closing the pass)
+- Generated: 2026-08-06 (Phase 6. closing the pass)
 - Scope: every UI screen walked × 4 roles = 280 (route, role) captures, re-run after each batch
 - Evidence: `docs/ui-audit/evidence/<role>/*.png` + `walk-summary.json` (re-written after each batch)
 
@@ -25,9 +25,9 @@ The 71 routes that still log console errors after the fixes are all attributable
 
 - **`404`** on legitimately missing IDs the walker sent as placeholder text (`:builderId`, `:sprintId`, `:listId`, `:invitationId`, `:interviewId`, `:blog/:slug`, `:r/:slug`). These are now 404s on the API side too, courtesy of F2 + the `interviewIdGuard` (UUID regex).
 - **`429`** on `/api/auth/get-session` because the walker re-signs-in 4 times in 10 minutes and the rate limiter is doing its job.
-- **`451`** on `/api/builders/:builderId/views` for builders whose profile is legally blocked from the viewer — the right answer.
-- **`403`** on `/api/billing/checkout/status` for `member` hitting `/settings/billing/return` — correct: members do not own billing.
-- **`TypeError: Failed to fetch` from `@tanstack/start-client-core/serverFnFetcher`** — walker artefact (tab closes mid-serverFn), not a product bug.
+- **`451`** on `/api/builders/:builderId/views` for builders whose profile is legally blocked from the viewer. the right answer.
+- **`403`** on `/api/billing/checkout/status` for `member` hitting `/settings/billing/return`. correct: members do not own billing.
+- **`TypeError: Failed to fetch` from `@tanstack/start-client-core/serverFnFetcher`**. walker artefact (tab closes mid-serverFn), not a product bug.
 
 ## What changed, by commit
 
@@ -39,7 +39,7 @@ The 71 routes that still log console errors after the fixes are all attributable
 | `dbbb38c1e` | F6 + F7-b | `auth-session.ts`, `DashboardLayout.tsx`, `src/shared/lib/api/interview-id.ts` + 5 interview endpoints | (a) `isPlatformAdmin` is computed server-side and surfaced via route context; the layout reads it instead of polling `/api/admin/incidents`. Every non-admin hit stops logging a 403. (b) `interviewIdGuard()` returns 404 for non-UUID `interviewId` in all 9 handlers across 5 endpoints, so a malformed id no longer reaches Postgres and trips `22P02`. |
 | `9a495663f` | F8 | `src/shared/lib/status.ts` | Memory threshold now 1024MB prod / 2048MB dev, overridable via `STATUS_MEMORY_LIMIT_MB`. Dev-mode SSR no longer trips the check and the public `/status` page no longer reports "degraded" in dev. |
 
-## Verification — exact commands and their real output
+## Verification. exact commands and their real output
 
 ```
 $ pnpm type-check
@@ -55,7 +55,7 @@ $ pnpm lint
 ✖ 114 problems (0 errors, 114 warnings)
 (0 errors; 113 of 114 warnings pre-existed before this pass, 1 new: an unused
 `requirePlatformAdminPage` reference before the inline guard was rewritten in
-the /admin index — that file no longer imports the helper it once had)
+the /admin index. That file no longer imports the helper it once had
 
 $ pnpm tsx --env-file-if-exists=.env scripts/audit/saas-review-walk.ts
 …
@@ -65,7 +65,7 @@ $ pnpm tsx --env-file-if-exists=.env scripts/audit/saas-review-walk.ts
   redirected:     73 routes             (up from 25, mostly admin redirects)
 ```
 
-`8 routes affected` is the remaining residue — all explainable per the
+`8 routes affected` is the remaining residue. all explainable per the
 breakdown above (404 / 429 / 451 / 403 / walker artefact). None are 5xx.
 
 ## Per-finding before / after (one-line summary)
@@ -95,5 +95,5 @@ breakdown above (404 / 429 / 451 / 403 / walker artefact). None are 5xx.
 
 1. Wire the walker to also capture mobile and dark-mode screenshots. One parameter change; the harness already supports it (`SAAS_REVIEW_VIEWPORTS=both`).
 2. Add a small "dev-only" filter in the walker so `client-rpc/serverFnFetcher` errors are not counted as product bugs (closes F7 cleanly).
-3. Run the `saas-expensive-ui` judgment pass against the existing screenshots — that's where hierarchy, typography and the slop catalog get evaluated.
+3. Run the `saas-expensive-ui` judgment pass against the existing screenshots. that's where hierarchy, typography and the slop catalog get evaluated.
 4. Build the per-screen worksheet from `saas-ui-audit/references/screen-worksheet.md` for the 5 highest-traffic screens (landing, /explore, /search, /dashboard, /admin/metrics) once the visual pass lands.

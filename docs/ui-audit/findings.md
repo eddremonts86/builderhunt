@@ -1,30 +1,30 @@
-# /saas-review findings — BuilderHunt
+# /saas-review findings. BuilderHunt
 
-- Generated: 2026-08-06 (Phase 4 — read-only, pending approval)
+- Generated: 2026-08-06 (Phase 4. read-only, pending approval)
 - Scope: whole app (70 UI screens walked × 4 roles = 280 captures)
 - Evidence: `docs/ui-audit/evidence/<role>/*.png` + `walk-summary.json`
 - Audit source: `saas-ui-audit` matrix (21 criteria)
 - Auth mode used: Mode B (`SAAS_REVIEW_*` test users seeded via `pnpm db:seed:test-users`)
 - Dev server: `http://localhost:3010` (port 3000 occupied by `whatsapp-bridge`; 3010 matches `APP_URL` which better-auth uses for trusted origins)
 
-## Executive summary — 8 findings (P0 first)
+## Executive summary. 8 findings (P0 first)
 
 | # | Sev | Title | Routes affected |
 | --- | --- | --- | --- |
 | F1 | **P0** | RootDocument renders inside itself on any error → `<html>` nested inside `<body>` → hydration error on **every page** | All 70 (the warning is logged for any route where the error branch fires, and on the happy path too) |
-| F2 | **P0** | `/blog/:slug` and `/r/:slug` return **500** for invalid slugs (e.g. `:slug`, trailing garbage) — should be 404 | `/blog/:slug`, `/r/:slug` |
+| F2 | **P0** | `/blog/:slug` and `/r/:slug` return **500** for invalid slugs (e.g. `:slug`, trailing garbage). should be 404 | `/blog/:slug`, `/r/:slug` |
 | F3 | **P0** | `RootErrorBoundary` wraps its content in `RootDocument`, which TanStack Router also wraps the shell around. Double-wrap is the source of F1. | All 70 (transitively) |
 | F4 | **P1** | "Mounting a new %s component when a previous one has not first unmounted" appears 3× per page load on every visited route. Hot-reload leftovers from prior run are not the cause (it's deterministic across cold navigations). | All 70 |
 | F5 | **P1** | `/admin/*` returns 500 for non platform-admin roles (owner / admin / member). Correct behaviour is a 403 page or redirect to `/dashboard`, not a raw 500. | 17 admin pages × 3 wrong roles = 51 wrong outcomes |
 | F6 | **P1** | `/dashboard` and several authenticated screens return **403** on at least one data fetch per visit. Likely an API that the role's org context can't read; the screen still renders but a widget shows an error toast or empty state. Visible to user as "something failed" with no context. | `/dashboard`, possibly more |
 | F7 | **P2** | `TypeError: Failed to fetch` thrown on `/` after hydration. Likely a TanStack-Start dev-mode race; production builds should be checked. | `/`, possibly other landing pages |
-| F8 | **P2** | Greyscale test not yet run across the app — design tokens are documented but the contrast/hierarchy-without-colour claim is unverified. | (gap, not a defect) |
+| F8 | **P2** | Greyscale test not yet run across the app. design tokens are documented but the contrast/hierarchy-without-colour claim is unverified. | (gap, not a defect) |
 
 **Total walked**: 280 (route, role) combinations. **HTTP failures**: 19 (all 500, no 4xx worth caring about except F5). **Routes with console errors**: 47 distinct routes (most are consequences of F1 + F4 + F5).
 
 ## Per-finding detail
 
-### F1 — RootDocument nested inside RootDocument (P0)
+### F1. RootDocument nested inside RootDocument (P0)
 
 **Symptom.** On every visited route, the React dev-mode console reports:
 
@@ -51,7 +51,7 @@ In HTML, <div> cannot be a child of <html>. This will cause a hydration error.
 
 **Damaged user job.** Every page in the app throws a hydration warning in dev. In production the warning is silent but React still does double-render work; React 19 in strict mode logs the same warning to production builds.
 
-**Severity.** P0 — this is the loudest defect in the whole app, it's been there since the root layout was written, and it touches every user-visible route.
+**Severity.** P0. this is the loudest defect in the whole app, it's been there since the root layout was written, and it touches every user-visible route.
 
 **Recommendation.** Two acceptable shapes (pick one):
 
@@ -64,15 +64,15 @@ The first is the standard TanStack Start pattern. Implementation: change `src/ro
 
 **Regression risk.** Low. Other components that read `document.getElementById('main-content')` (e.g. `src/shared/components/TosModal.tsx:50`) keep working because the outer shell's `<div id="main-content">` is still in the tree.
 
-### F2 — `/blog/:slug` and `/r/:slug` return 500 instead of 404 (P0)
+### F2. `/blog/:slug` and `/r/:slug` return 500 instead of 404 (P0)
 
 **Symptom.** Any non-conforming slug returns HTTP 500. Walker captured this with the literal `:slug` placeholder, but a malformed URL like `/blog/SOME_UPPER` or `/blog/`-with-trailing also fails the same way.
 
 **Evidence.**
 
 - `walk-summary.json` → `/blog/:slug` 500 across owner / admin / member; same for `/r/:slug`.
-- `src/shared/lib/blog-data.ts:4` — `const blogSlugSchema = z.string().regex(/^[a-z0-9-]{1,160}$/)`.
-- `src/shared/lib/blog-data.ts:11-22` — `getBlogPostPage` is a server function with `.validator(blogSlugSchema)`. Validation failure throws a Zod `invalid_format` error, which `createServerFn` propagates as 500.
+- `src/shared/lib/blog-data.ts:4`. `const blogSlugSchema = z.string().regex(/^[a-z0-9-]{1,160}$/)`.
+- `src/shared/lib/blog-data.ts:11-22`. `getBlogPostPage` is a server function with `.validator(blogSlugSchema)`. Validation failure throws a Zod `invalid_format` error, which `createServerFn` propagates as 500.
 - Console error from `/blog/:slug`: `Invalid string: must match "regex" /^[a-z0-9-]{1,160}$/` with `path: []`.
 
 **Damaged user job.** A real visitor following a stale or mistyped blog link gets the raw "Something went wrong" error boundary (which itself nests `<html>` per F1), instead of a "Post not found" 404 page. Crawlers see 500 and demote the URL.
@@ -86,23 +86,23 @@ The first is the standard TanStack Start pattern. Implementation: change `src/ro
 
 **Regression risk.** Low. The 404 branch is already in the loader.
 
-### F3 — `RootErrorBoundary` wraps with `RootDocument` (P0)
+### F3. `RootErrorBoundary` wraps with `RootDocument` (P0)
 
-Covered by F1 — this is the root cause, F1 is the symptom. Listed separately so it shows up as its own line in the report and gets reviewed on its own merit (someone might want a different layout for the error page later, e.g. with a different `<head>`).
+Covered by F1. this is the root cause, F1 is the symptom. Listed separately so it shows up as its own line in the report and gets reviewed on its own merit (someone might want a different layout for the error page later, e.g. with a different `<head>`).
 
-### F4 — "Mounting a new component when a previous one has not first unmounted" (P1)
+### F4. "Mounting a new component when a previous one has not first unmounted" (P1)
 
 **Symptom.** Every page logs this warning three times on first paint in dev.
 
 **Evidence.** `walk-summary.json` → 3 of the 6 console errors on `/` (owner, platform-admin) are this exact warning, full message truncated. React docs say this comes from rendering a component that owns global state (e.g. Radix `Dialog`, a `Toast.Provider`, or a `<form>`) while the previous instance is still alive.
 
-**Recommendation.** Triage needed: it's not blocking the page (status 200, content renders) but it is a deterministic warning across the whole app. Look at the top of the error stack — most likely a portal/portal-host whose anchor element gets remounted. Fix deferred to Phase 5 if the team agrees it's a real defect; could also be dev-mode-only (StrictMode double-mount).
+**Recommendation.** Triage needed: it's not blocking the page (status 200, content renders) but it is a deterministic warning across the whole app. Look at the top of the error stack. most likely a portal/portal-host whose anchor element gets remounted. Fix deferred to Phase 5 if the team agrees it's a real defect; could also be dev-mode-only (StrictMode double-mount).
 
 **Acceptance.** No "mounting a new" warning on a production build.
 
 **Regression risk.** Medium. Need to identify the component before committing a fix.
 
-### F5 — `/admin/*` returns 500 for non platform-admin roles (P1)
+### F5. `/admin/*` returns 500 for non platform-admin roles (P1)
 
 **Symptom.** Owner / admin / member hitting `/admin` get HTTP 500 instead of a 403 page or a redirect to `/dashboard`.
 
@@ -114,7 +114,7 @@ Covered by F1 — this is the root cause, F1 is the symptom. Listed separately s
 
 **Regression risk.** Low. Pattern exists, just inconsistent.
 
-### F6 — `/dashboard` and other authed screens log a 403 on first data fetch (P1)
+### F6. `/dashboard` and other authed screens log a 403 on first data fetch (P1)
 
 **Symptom.** `/dashboard` shows status 200 in the page navigation but logs one failed request with 403, which means a widget underneath fails to render and shows an error or empty state to the user.
 
@@ -124,9 +124,9 @@ Covered by F1 — this is the root cause, F1 is the symptom. Listed separately s
 
 **Acceptance.** No 4xx/5xx in the network panel for any role on the dashboard.
 
-**Regression risk.** Medium — depends on which API it is.
+**Regression risk.** Medium. depends on which API it is.
 
-### F7 — `TypeError: Failed to fetch` on `/` after hydration (P2)
+### F7. `TypeError: Failed to fetch` on `/` after hydration (P2)
 
 **Symptom.** Console reports `TypeError: Failed to fetch at @tanstack/start-client-core`. Happens post-hydration on the landing page.
 
@@ -138,7 +138,7 @@ Covered by F1 — this is the root cause, F1 is the symptom. Listed separately s
 
 **Status.** Closed.
 
-### F8 — Greyscale test not run (gap, not a defect)
+### F8. Greyscale test not run (gap, not a defect)
 
 The saas-ui-audit matrix calls for a greyscale contrast check on every primary action across every flow. I did not run it in this pass (Phase 2 walker captures colour screenshots, not desaturated ones). Listed as a gap, not a finding.
 
@@ -149,10 +149,10 @@ I am not re-scoring the whole matrix here; the deep visual work would need the a
 | Criterion (sample) | Score | Note |
 | --- | --- | --- |
 | 1. Purpose & hierarchy | unverified | screenshots only, no visual analysis in this pass |
-| 7. Errors & empty states | **1 (weak)** | F1 + F2 + F5 — error paths are broken or wrong-code |
-| 9. Permissions | **1 (weak)** | F5 — wrong role gets 500 instead of a permission page |
+| 7. Errors & empty states | **1 (weak)** | F1 + F2 + F5. error paths are broken or wrong-code |
+| 9. Permissions | **1 (weak)** | F5. wrong role gets 500 instead of a permission page |
 | 14. Data correctness | **2 (correct)** | F6 is the only flagged concern |
-| 18. Hydration & rendering | **0 (critical)** | F1 + F3 + F4 — hydration warning on every route |
+| 18. Hydration & rendering | **0 (critical)** | F1 + F3 + F4. hydration warning on every route |
 | 19. Console hygiene | **1 (weak)** | 47/70 routes have console errors |
 
 The full 21-criterion sweep belongs to a Phase 2b visual pass that I am explicitly deferring.
@@ -175,11 +175,11 @@ The full 21-criterion sweep belongs to a Phase 2b visual pass that I am explicit
 
 ## Change plan (small, independently revertible batches)
 
-- **Batch A — F1 + F3.** One commit: change `RootErrorBoundary` to render inner content only. Verify by re-walking and seeing the hydration warning disappear from `walk-summary.json`. Re-run `pnpm type-check && pnpm lint && pnpm test:unit`.
-- **Batch B — F2.** One commit per route family (`/blog/:slug`, `/r/:slug`): convert the validation failure to `notFound()`. Re-walk and confirm 404 instead of 500.
-- **Batch C — F5.** One commit: add `beforeLoad` guard on the admin route root so non platform-admin get redirected (or see a 403 component).
-- **Batch D — F6.** One commit after identifying which API the dashboard fetches that 403s.
-- **Batch E — F4 + F7.** Verify on `pnpm build && pnpm preview` first; then either fix or document as dev-only.
+- **Batch A. F1 + F3.** One commit: change `RootErrorBoundary` to render inner content only. Verify by re-walking and seeing the hydration warning disappear from `walk-summary.json`. Re-run `pnpm type-check && pnpm lint && pnpm test:unit`.
+- **Batch B. F2.** One commit per route family (`/blog/:slug`, `/r/:slug`): convert the validation failure to `notFound()`. Re-walk and confirm 404 instead of 500.
+- **Batch C. F5.** One commit: add `beforeLoad` guard on the admin route root so non platform-admin get redirected (or see a 403 component).
+- **Batch D. F6.** One commit after identifying which API the dashboard fetches that 403s.
+- **Batch E. F4 + F7.** Verify on `pnpm build && pnpm preview` first; then either fix or document as dev-only.
 
 Hard stop here. **Awaiting your approval before any code is written.**
 
