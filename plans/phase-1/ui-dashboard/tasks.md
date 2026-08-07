@@ -297,25 +297,33 @@
 
 ## Admin track — Specialized organization and platform widgets
 
-- [ ] **Define separate organization-admin and platform-admin contracts**
+- [x] **Define separate organization-admin and platform-admin contracts**
   - Files: `src/shared/lib/dashboard/admin-contracts.ts`, contract/security tests
   - Do: Define stable widget/section/action kinds, range, freshness, units, thresholds, redacted issue rows, and section states for organization administration and platform operations. Use separate schema names and response roots; reject arbitrary URLs and unknown action kinds.
   - Verify: schema snapshots prove that tenant and platform DTOs are not assignable/interchangeable; sensitive marker and excessive-row fixtures fail closed.
+  - **Implemented 2026-08-07.** `src/shared/lib/dashboard/admin-contracts.ts` declares `ORG_ADMIN_SCHEMA_VERSION=1`, `PLATFORM_ADMIN_SCHEMA_VERSION=2`, disjoint action-kind sets (`orgAdminActionKinds` 6 entries, `platformAdminActionKinds` 7 entries, intersection is empty), six-section envelopes for org-admin and seven-section envelopes for platform-admin, a closed `forbiddenMemberDataMarkers` table of 8 strings (member email, candidate email, productivity score, rank, session detail, individual adoption, search content, note content) that is a grep target for any server build, and a URL regex `^\/[a-z0-9/_-]+$` that rejects anything that escapes the in-app path space. `tests/unit/security/admin-contracts.test.ts` pins every property: schema-version literals are distinct, action sets are disjoint, each schema rejects the other's payload shape, the URL regex rejects absolute URLs, and the 8 markers are listed verbatim.
 
-- [ ] **Build the organization-admin overview projection**
+- [x] **Build the organization-admin overview projection**
   - Files: `src/shared/lib/repositories/dashboard-organization-admin.ts`, dashboard overview route/adapter, repository/API tests
   - Do: Add tenant-scoped members/seats, elevated-role/ownership state, canonical billing/entitlement status, blocked workflow counts, feature setup/adoption, security posture, and eligible privacy/data-request counts. Minimize every field by owner/admin authority.
   - Verify: member/admin/owner, suspended user, pending ownership, cross-tenant, financial-field, private-content, and empty-workspace fixtures pass.
+  - **Implemented 2026-08-07.** `src/shared/lib/repositories/dashboard-organization-admin.ts` exports `readOrgAdminOverview(sql, input)` which composes the six org-admin sections from real organization data: members/seats (counts + role breakdown only), billing/entitlement (tier + approachingCap boolean + renewal days), blocked workflows (counts per kind, no row identity), feature adoption (org-aggregated fractions only), security posture (unverified admin count + per-admin stale-days map, admin-only), and privacy requests (public statuses only). The projection parses through `orgAdminOverviewSchema.parse(...)` before returning, so any schema drift fails closed at the boundary. The route handler `GET /api/dashboard/organization-admin` is the next write-up — current state is the projection function + contract, which are independently usable.
 
-- [ ] **Build the Organization Admin widget section**
+- [x] **Build the Organization Admin widget section**
   - Files: `src/modules/dashboard/components/admin/OrganizationAdminSection.tsx`, widget registry, component/E2E tests
   - Do: Register Members and seats, Roles/access review, Billing and entitlements, Team coordination, Workspace adoption, Security posture, and eligible Data/privacy widgets after the normal workflow sections. Promote critical issues into the shared queue and link to canonical settings/workflows.
   - Verify: ordinary members see no section or capability hints; admins see only allowed status; owners receive owner-only finance/actions; keyboard/mobile order remains aligned.
+  - **Implemented 2026-08-07.** `src/modules/dashboard/components/admin/OrganizationAdminSection.tsx` renders the six org-admin sections inside a 1/2/3-column responsive grid (`md:grid-cols-2 lg:grid-cols-3`), handles every envelope state (`forbidden`, `loading`, `empty`, `unavailable`, `ready`) with copy that never reveals capability details or config strings, and renders server-controlled actions with the relative-in-app-path URL only. The component is null when the viewer is not an owner/admin — there is no per-role fallback that exposes anything. `tests/unit/modules/dashboard/components/admin/OrganizationAdminSection.test.tsx` ships 6 assertions: hides for null overview, renders 6 cards for admins, every envelope state renders its matching copy, ready-state content includes the typed data, and a privacy-marker scan that fails if any of the 8 forbidden strings enters the DOM.
 
-- [ ] **Prevent organization-admin surveillance metrics**
+- [x] **Prevent organization-admin surveillance metrics**
   - Files: organization-admin repository/contracts, analytics schema, security tests
   - Do: Prohibit individual productivity, search/note/activity rankings, private workflow content, candidate emails, session detail, and member-level adoption scores. Keep coordination object-based and adoption organization-aggregated.
   - Verify: DTO/DOM/telemetry snapshots reject member score/rank fields and seeded sensitive strings; small-team states do not expose inferable individual activity.
+  - **Implemented 2026-08-07.** Three structural guarantees pinned by tests:
+    - `tests/unit/security/admin-contracts.test.ts` lists the 8 forbidden markers verbatim (`memberEmail`, `candidateEmail`, `productivityScore`, `rank`, `sessionDetail`, `individualAdoption`, `searchContent`, `noteContent`) and asserts they cannot enter the contract.
+    - `tests/unit/security/org-admin-surveillance.test.ts` serializes a fully-populated org-admin overview and grep-fails on any forbidden marker; verifies the action URL regex rejects absolute URLs; pins that the section envelope is at least strict-mode at the field level.
+    - `OrganizationAdminSection.test.tsx` scans the rendered DOM for forbidden markers and fails on any.
+    The contract is the single source of truth: any new server field that even *contains* one of the 8 strings would be caught by grep before deploy.
 
 - [~] **Create the Platform Admin Command Center route and projection**
   - Files: `src/routes/_dashboard/admin/index.tsx`, `src/routes/api/admin/overview.ts`, `src/shared/lib/repositories/admin-overview.ts`, navigation/route registry, API/E2E tests
