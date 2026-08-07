@@ -44,6 +44,7 @@
     "db:backup": "tsx scripts/db/backup.ts",
     "db:restore": "tsx scripts/db/restore.ts",
     "db:restore-drill": "tsx scripts/db/restore-drill.ts",
+    "check:unbounded": "node scripts/check-unbounded-reads.mjs",
     "security:boundaries": "node scripts/check-tenant-boundaries.mjs",
     "security:route-coverage": "node scripts/check-route-coverage.mjs",
     "security:ui-route-graph": "node scripts/check-ui-route-graph.mjs",

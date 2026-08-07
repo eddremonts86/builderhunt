@@ -1,9 +1,9 @@
 # Specification — read-path audit and unbounded-read detector
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`12-bounded-reads-sweep`](../12-bounded-reads-sweep/spec.md), [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: `src/` contains ~137 bounded list reads and ~50 request-serving reads with no `.limit()`, plus 13 worker scans and 11 scalar aggregates. No script measures this today, so the number is a one-off survey rather than a tracked figure. `scripts/check-route-coverage.mjs` is the precedent for a repo-shape gate.
+> **Reality check**: `scripts/check-unbounded-reads.mjs` reports `{"unbounded":97,"aggregates":16,"exempted":0}` (2026-08-07), classified in full in [`tasks.md`](./tasks.md) as 38 page + 26 model-bounded + 33 batch. The pre-script survey said ≈50 + 13 worker scans + 11 aggregates; the reconciliation is in `tasks.md`, and the survey was the side that was wrong.
 
 ## Problem
 
@@ -39,7 +39,7 @@ It must handle three classes of false positive found during the survey:
 Output is machine-readable so later plans can assert on it:
 
 ```json
-{"unbounded":50,"aggregates":11,"exempted":0}
+{"unbounded":97,"aggregates":16,"exempted":0}
 ```
 
 ## The classification
@@ -48,9 +48,11 @@ Each unbounded read is assigned **page**, **model-bounded** or **batch** per the
 and committed as a table in this plan's `tasks.md`. That table is the work list for plans 10 and
 12; the mechanism chosen here is what those plans implement.
 
-The initial split from the survey is ≈23 page / ≈11 model-bounded / ≈10 batch. Confirming or
-correcting each row against the real source is the substance of this plan — a read classified
-`page` that actually must cover every row (a deletion, an export) becomes a bug in plan 12.
+The survey guessed ≈23 page / ≈11 model-bounded / ≈10 batch. The committed split, read against
+the real source, is **38 page / 26 model-bounded / 33 batch**. Confirming or correcting each row
+was the substance of this plan — a read classified `page` that actually must cover every row (a
+deletion, an export) becomes a bug in plan 12, so `batch` was the default whenever the consumer
+needed completeness and no data-model ceiling could be named.
 
 ## Success metrics
 
@@ -59,6 +61,43 @@ correcting each row against the real source is the substance of this plan — a 
   classification, with no unclassified remainder.
 - Re-running after adding a deliberate unbounded read increments the count by exactly 1.
 - No false positive from `Buffer.from`/`Array.from` and no aggregate counted as a list read.
+
+## Known blind spots
+
+The detector reads source text, so it sees the shapes it was told to look for and nothing else.
+Each of these is a way an unbounded read can exist in `src/` and be reported as absent. Plan 13's
+gate is worth exactly as much as this list is honest.
+
+1. **Reads inside a route handler.** Only exported *function* declarations and exported
+   `const … = () =>` bindings are examined. A TanStack route is `export const Route =
+   createFileRoute(…)({…})`, which matches neither, so every read written inline in a handler is
+   invisible — `src/routes/api/me/sessions/index.ts:48` (unbounded, bounded in practice only by
+   the caller's id array) and `src/routes/api/admin/solutions/gold-briefs.ts:46` (bounded, by a
+   `.limit(500)` the detector also cannot see).
+
+2. **A `.limit(` that bounds only part of the function.** The heuristic is "the body contains
+   `.limit(`", so one bounded lookup marks the whole function bounded. Nine functions in `src/`
+   have more selects than limits — run `node scripts/check-unbounded-reads.mjs --mixed`. The
+   consequential one is `src/shared/lib/repositories/account-privacy.ts:61`
+   `loadAccountExportSource`: it bounds its user and account lookups with `.limit(1)` and then
+   reads `builder_claim_requests` by email with no bound at all, inside the GDPR export path.
+
+3. **Raw `sql` templates and `db.execute`.** `src/shared/lib/repositories/platform-billing.ts:69`
+   `getPlatformUserBillingSummary` reads through `db.execute(sql\`select * from
+   platform_admin_user_billing_summary(…)\`)`. Whatever that Postgres function returns, this
+   script has no opinion about it.
+
+4. **Reads inside a non-exported helper.** `loadProjectableComponents`
+   (`src/lib/solutions/indexing/project-components.ts:131`) is where the projection sweep's read
+   actually lives; it is counted here only because its exported caller `projectComponents`
+   happens to contain a second, visible `.select`. A non-exported helper whose exported caller
+   has no select of its own would not be counted at all.
+
+5. **The relational `findMany({ limit })` form.** `LIST_READ` matches `.findMany(`, but
+   `HAS_LIMIT` matches `.limit(` — the relational API passes `limit` as an object property, so a
+   properly bounded `findMany` would be reported as unbounded. There are zero `findMany` call
+   sites in `src/` today, so this branch has never run against real code and should be treated as
+   untested rather than working.
 
 ## Resolved edge cases
 

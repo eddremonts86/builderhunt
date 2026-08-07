@@ -1,6 +1,6 @@
 # Plan — read-path audit and unbounded-read detector
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`12-bounded-reads-sweep`](../12-bounded-reads-sweep/spec.md), [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: New script only (`scripts/check-unbounded-reads.mjs`). No `src/` file changes.
