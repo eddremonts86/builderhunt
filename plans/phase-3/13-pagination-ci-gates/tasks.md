@@ -30,13 +30,16 @@
   - Verify: `pnpm test:e2e tests/e2e/data-tables.spec.ts` green; drop one of plan 04's indexes
     locally and confirm the assertion fails.
 
-- [ ] **Assert no hand-written table remains**
-  - Files: `scripts/check-unbounded-reads.mjs` (or a sibling check), `.github/workflows/quality.yml`
-  - Do: `grep -rl '<table' src` must return only `src/routes/_landing/pricing.tsx`,
-    `src/routes/_landing/legal/cookies.tsx` and `src/modules/calendar/components/CalendarPage.tsx`.
-    Also assert `grep -rn 'perPage\|limit: 30' src` returns nothing outside
-    `src/shared/lib/table/constants.ts`.
-  - Verify: both checks pass; add a `<table>` to a scratch component and confirm the check fails.
+- [ ] **Register every data-grid and semantic table surface**
+  - Files: `scripts/check-table-surfaces.mjs`, `package.json`,
+    `scripts/ci/local-quality.sh`, `.github/workflows/quality.yml`
+  - Do: inventory every `<table>` and every `DataTable` consumer. Data grids name a registered
+    capability; exemptions carry a non-empty reason and are limited to semantic prose/email/chart/
+    summary/third-party markup. Also reject offset/page-number pagination in BuilderHunt-owned SQL
+    list routes while allowing bounded provider pages only inside the plan-11 search adapter and
+    source connectors.
+  - Verify: `pnpm check:table-surfaces` passes; an unregistered scratch grid fails; a provider-style
+    page parameter in a SQL route fails; both pass again after scratch changes are removed.
 
 - [ ] **Document the table system**
   - Files: `DESIGN.md`, `docs/visual-system.md`

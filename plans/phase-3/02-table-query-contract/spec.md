@@ -55,11 +55,17 @@ export interface PageRequest {
 export interface PageResult<Row> {
   rows: Row[]
   nextCursor: string | null
-  /** Exact count of the filtered set — drives aria-rowcount and "50 of 214". */
-  total: number
+  /** Exact count when the backend can know it; null for federated/provider-backed results. */
+  total: number | null
   facets: Record<string, Array<{ value: string; count: number }>>
 }
 ```
+
+`total: null` is not zero and must never be rendered as such. It means the backend cannot know the
+complete cardinality without exhausting third-party APIs. The shell omits `aria-rowcount` and shows
+the loaded count plus whether another cursor exists. SQL-backed capabilities normally return an
+exact total; a capability may opt out only with a documented measurement showing count cost is
+material.
 
 `TABLE_PAGE_SIZE = 50` is exported from `src/shared/lib/table/constants.ts`. No route, component
 or repository may literal a page size — that is what lets the number change in one place.
@@ -81,19 +87,23 @@ comparison. It is **signed**, because an unsigned cursor is a way for a client t
 arbitrary column values into a comparison — the exact injection surface this design exists to
 close.
 
-Payload `{ t: table, s: sortDescriptor, o: organizationId, k: tuple }`, base64url, signed with
+Payload `{ t: table, s: sortDescriptor, q: queryFingerprint, a: accessScope, k: tuple }`, base64url, signed with
 `createHmac('sha256', secret).update('builderhunt:table-cursor:v1:' + payload)` and compared with
 `timingSafeEqual` — the same construction as `feed-capability.ts:33`, not a new scheme.
 
-Verification rejects a mismatched table, sort descriptor, or organization. A rejected cursor is a
-400; the shell drops it and refetches page one rather than rendering a mixed list.
+`accessScope` is one of `tenant:<organizationId>`, `account:<userId>`, `platform`, or `public` and
+is resolved by the server handler, never accepted from the client. `queryFingerprint` hashes the
+normalized search, filters, grouping, renderer-relevant mode and any opaque pre-filter identity.
+Verification rejects a mismatched table, sort descriptor, query fingerprint, or access scope. A
+rejected cursor is a 400; the shell drops it and refetches page one rather than rendering a mixed
+list. Changing any query control clears the cursor before navigation.
 
 ## Success metrics
 
 - `pnpm type-check` clean, with the data types importing nothing from `src/` except `env.ts`.
 - Round-trip property test passes over generated `TableQuery` values (`fast-check` is already a
   devDependency used elsewhere in the suite).
-- A tampered cursor, a cursor from another sort, and a cursor from another organization each
+- A tampered cursor, a cursor from another query/sort, and a cursor from another access scope each
   throw — asserted individually.
 - `grep -rn 'perPage\|limit: 30' src` still shows the old call sites; this plan does not touch
   them, and plan 13 asserts they are gone.
@@ -101,6 +111,7 @@ Verification rejects a mismatched table, sort descriptor, or organization. A rej
 ## Resolved edge cases
 
 - **No cursor.** `cursor: null` means page one; the sort comes from the capability's default.
-- **A cursor whose sort the URL no longer requests.** Signature payload mismatch → 400 → page one.
+- **A cursor whose query or sort the URL no longer requests.** Signature payload mismatch → 400
+  → page one; first-party UI clears the cursor when a control changes.
 - **`limit` above `TABLE_PAGE_SIZE`.** Clamped silently. A client cannot widen its own page.
 - **An empty `filters` value array.** Means "no filter on this dimension", not "match none".

@@ -11,8 +11,10 @@
   - Verify: tests de cada transición válida/inválida y fallback general.
 
 - [ ] **Migrar progreso de onboarding**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0116_segmented_onboarding.sql`, `drizzle/migration-hashes.json`
-  - Do: añadir flow version, step key y activación manteniendo compatibilidad v1.
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/*.sql` (new migration allocated by
+    `pnpm db:generate`), `drizzle/migration-hashes.json`
+  - Do: añadir flow version, step key y activación manteniendo compatibilidad v1; no fijar un
+    número de migración antes de ejecutar.
   - Verify: DB desechable migra filas not-started/in-progress/completed/skipped sin pérdida.
 
 - [ ] **Versionar contratos API**

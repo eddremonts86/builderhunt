@@ -45,7 +45,7 @@ anteriores son usuarios.
 
 | Orden | Plan | Resultado |
 |---|---|---|
-| 1 | [`01-investigacion-icp`](./01-investigacion-icp/spec.md) | ICPs y buyer personas validados |
+| 1 | [`01-investigacion-icp`](./01-investigacion-icp/spec.md) | Paquete de investigación y baseline listos para post-launch |
 | 2 | [`02-segmentacion-usuarios`](./02-segmentacion-usuarios/spec.md) | Contrato, persistencia, settings y analítica |
 | 3 | [`03-onboarding-segmentado`](./03-onboarding-segmentado/spec.md) | Activación diferente por objetivo |
 | 4 | [`04-dashboard-personalizado`](./04-dashboard-personalizado/spec.md) | Presets de widgets y acciones por segmento |
@@ -57,10 +57,8 @@ anteriores son usuarios.
 
 ```mermaid
 flowchart LR
-  R["01 Investigación ICP"] --> S["02 Segmentación"]
   S --> O["03 Onboarding"]
   S --> D["04 Dashboard"]
-  R --> L["06 Landing"]
   S --> L
   P["05 Roles internos"]
   S --> SP["07 Perfiles<br/>auto-gestionados"]
@@ -71,9 +69,10 @@ flowchart LR
   P1_37["phase-1/37<br/>portfolio-builder"] --> SP
 ```
 
-Roles internos puede ejecutarse independientemente, pero por riesgo de seguridad debe tener su
-propia revisión y despliegue. Landing puede empezar con prototipos después de investigación, pero la
-persistencia de la selección y el handoff a signup dependen del contrato de segmentación.
+Investigación y roles internos pueden ejecutarse independientemente. Las entrevistas y la decisión
+de ICP están en phase 5; phase 2 construye la taxonomía como hipótesis reversible. Roles internos,
+por riesgo de seguridad, mantiene revisión y despliegue gradual propios. El handoff de landing a
+signup depende solamente del contrato de segmentación.
 
 `07-perfiles-autogestionados` depende además de los planes `36-claimable-profiles`,
 `37-portfolio-builder` y `38-work-sample` de la fase 1 (modelos canónicos y DTOs públicos).
@@ -82,10 +81,9 @@ ni la ruta de promoción a claim.
 
 ## Orden recomendado de entrega
 
-### Ola A — aprender antes de construir
+### Ola A — preparar la medición y construir la hipótesis
 
-- ejecutar entrevistas y pruebas de mensaje;
-- decidir la taxonomía definitiva;
+- preparar el screener, el guion y el scorecard que usará phase 5;
 - establecer baseline de signup, activación y retención.
 
 ### Ola B — fuente de verdad

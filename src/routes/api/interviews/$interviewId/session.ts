@@ -30,6 +30,7 @@ import {
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
 import { assertJsonRequest, assertSameOrigin, CrossOriginError } from '~/shared/lib/security/same-origin'
+import { interviewIdGuard } from '~/shared/lib/api/interview-id'
 
 /**
  * The live interview session: read it, drive it, keep it alive (plan:
@@ -132,6 +133,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/session')({
       ANY: methodNotAllowed(['GET', 'POST']),
 
       GET: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           const principal = await requireTenantPrincipal(request)
           const result = await withTenantContext(principal, async (transaction) => {
@@ -189,6 +192,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/session')({
       },
 
       POST: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           assertSameOrigin(request)
           assertJsonRequest(request)

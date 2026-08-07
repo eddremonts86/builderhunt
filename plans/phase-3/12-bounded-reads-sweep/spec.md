@@ -3,7 +3,13 @@
 > **Status**: `pending`
 > **Depends on**: [`01-read-path-audit`](../01-read-path-audit/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: Roughly 21 of the 50 unbounded reads feed no table. `getSurfaceDirectives` reads exactly three rows (one per `SEO_SURFACES` entry, seeded by `drizzle/0083`). `hardDeleteAccountSubject` and `getAccountingExport` must cover every row by definition. The 13 worker scans already lease-batch via columns like `enrichment_jobs_worker_scan_idx` but declare no explicit limit.
+> **Reality check**: The original audit snapshot included non-table reads, but plan 01's fresh,
+> SHA-stamped detector output is authoritative at implementation time. `getSurfaceDirectives` is
+> model-bounded to one row per `SEO_SURFACES` entry, seeded by
+> `drizzle/0083_public_surface_indexing_grants.sql`. `hardDeleteAccountSubject` and
+> `getAccountingExport` must cover every row by definition. Worker scans already lease-batch via
+> indexes such as `enrichment_jobs_worker_scan_idx`, but any remaining scan must declare an
+> explicit bound.
 
 ## Problem
 
@@ -26,7 +32,8 @@ of a fact rather than a truncation. The limit gets a comment naming *why* n is t
 otherwise the next reader cannot tell a real bound from a guess:
 
 ```ts
-// SEO_SURFACES.length — one row per governed surface, seeded by drizzle/0083.
+// SEO_SURFACES.length — one row per governed surface, seeded by
+// drizzle/0083_public_surface_indexing_grants.sql.
 .limit(SEO_SURFACES.length)
 ```
 
@@ -43,8 +50,8 @@ set in memory. Candidates: `hardDeleteAccountSubject`, `getAccountingExport`,
 `listPendingBillingRefundsWithoutProviderRefund`, `listPublishedPortfolioClaimIds`,
 `listActiveSuppressions`, `listAllPublicRadarSlugs`.
 
-**Worker batch.** The 13 worker scans already process in leased batches; they need an explicit
-`.limit(BATCH)` and a comment, not a redesign.
+**Worker batch.** Worker scans already process in leased batches; every scan reported by the fresh
+inventory needs an explicit `.limit(BATCH)` and a comment, not a redesign.
 
 ## Non-goals
 

@@ -8,6 +8,7 @@ import { useSession } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
+import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
 export function HomePage() {
   const session = useSession()
@@ -34,10 +35,12 @@ export function HomePage() {
                   Find <span className="text-bh-accent">builders</span>,<br />
                   not just repos.
                 </h1>
-                <p className="text-lg md:text-xl text-bh-text-muted max-w-xl mb-8 animate-fade-in-up">
-                  BuilderHunt aggregates public activity from GitHub, Reddit, Hacker News, DEV.to and
-                  more, scores it for recency, and lets you save searches, get email alerts, and track
-                  the people shipping the work — not just the repositories.
+                {/* The differentiator — kept as a single sentence so the hero stays
+                    within the pre-flight cap of 4 text elements + 1+1 CTAs (§4.7).
+                    The full product pitch used to live below in a second paragraph;
+                    it is now part of the closing CTA copy on the page. */}
+                <p className="text-base md:text-lg text-bh-text max-w-xl mb-8 font-medium animate-fade-in-up">
+                  Activity scored for recency, so the top of your results are the people shipping right now.
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mb-8 animate-fade-in-up">
                   {isAuthed ? (
@@ -54,22 +57,19 @@ export function HomePage() {
                           Start hunting <ArrowRight className="w-4 h-4" aria-hidden="true" />
                         </LinkButton>
                       </span>
+                      {/* Secondary CTA: drop the solid secondary variant. An outline
+                          button reads as "the other choice" without competing with the
+                          primary. Copy went from "Try it without an account" (implies
+                          friction) to "Browse builders" (describes the action and its
+                          destination — /explore). Impeccable fix-ui-ux C1. */}
                       <span onClick={() => trackConversionEvent('hero_explore_click', 'hero')}>
-                        <LinkButton to="/explore" variant="secondary" className="btn-lg" data-testid="hero-explore-cta">
-                          Try it without an account
+                        <LinkButton to="/explore" variant="ghost" className="btn-lg" data-testid="hero-explore-cta">
+                          Browse builders
                         </LinkButton>
                       </span>
                     </>
                   )}
-                  <a href="#how-it-works" className="text-sm text-bh-text-muted hover:text-bh-text underline underline-offset-4">See how it works</a>
                 </div>
-                <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-bh-text-muted animate-fade-in">
-                  {['No credit card', 'OAuth-free', 'Email or RSS alerts'].map((t) => (
-                    <li key={t} className="flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-bh-success" aria-hidden="true" /> {t}
-                    </li>
-                  ))}
-                </ul>
               </div>
 
               <div className="relative animate-fade-in-up" style={{ animationDelay: '120ms' }}>
@@ -189,15 +189,12 @@ export function HomePage() {
         <section id="how-it-works" className="section">
           <div className="container">
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <span className="eyebrow-neutral mb-4 inline-flex">
-                <Target className="w-3.5 h-3.5" aria-hidden="true" /> How it works
-              </span>
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
                 Three steps from keyword to shortlist.
               </h2>
               <p className="text-lg text-bh-text-muted">
-                Stop scrolling timelines. Define what you're looking for, let BuilderHunt
-                do the discovery, and only review the people worth your attention.
+                Pick keywords, let BuilderHunt cross-reference public activity across
+                sources, and review only the people worth your attention.
               </p>
             </div>
 
@@ -210,7 +207,7 @@ export function HomePage() {
                   {
                     n: '01',
                     title: 'Define your hunt',
-                    desc: 'Pick keywords, sources, language and country filters. Save as many searches as you like — one per stack or persona.',
+                    desc: 'Pick keywords, sources, language and country filters. Save as many searches as you like, one per stack or persona.',
                     icon: Search,
                     preview: (
                       <div className="bg-bh-bg/50 border border-bh-border/60 rounded-xl p-3 text-left font-sans mt-4">
@@ -292,7 +289,7 @@ export function HomePage() {
                 Built for the people who build things.
               </h2>
               <p className="text-lg text-bh-text-muted">
-                No fluff. Every feature exists because it makes finding, scoring, and tracking
+                Every feature is here because it makes finding, scoring, or tracking
                 builders faster than doing it by hand.
               </p>
             </div>
@@ -303,32 +300,36 @@ export function HomePage() {
                 it. Tailwind's `grid-cols-1` is `repeat(1, minmax(0, 1fr))`, and the `minmax(0, ...)` is the
                 part that caps it at the container. */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Feature 1: Multi-source discovery (Bento Large) */}
-              <article className="card card-premium-glow md:col-span-2 flex flex-col justify-between bg-bh-surface p-6">
+              {/* Feature 1: Multi-source discovery (Bento Large).
+                  The original preview was a fake-UI div (central avatar + 3 source
+                  pills + connector lines), which is the #1 LLM-design Tell per
+                  `design-taste-frontend` §9.F "Fake product previews". Replace
+                  with a real seeded image that grounds the abstract claim in
+                  something a visitor can see. Picsum-seed by section name so the
+                  asset is reproducible and stable across rebuilds. */}
+              <article className="card card-premium-glow md:col-span-2 flex flex-col justify-between bg-bh-surface p-6 overflow-hidden">
                 <div>
                   <div className="w-10 h-10 rounded-lg bg-bh-cyan-soft border border-bh-cyan/20 flex items-center justify-center mb-4">
                     <Search className="w-5 h-5 text-bh-cyan" aria-hidden="true" />
                   </div>
                   <h3 className="text-xl font-bold text-bh-text mb-2">Multi-source discovery</h3>
                   <p className="text-bh-text-muted text-sm leading-relaxed max-w-xl">
-                    GitHub stars, HN upvotes, Reddit karma, DEV.to posts — indexed and cross-referenced so you can see one person across all four signals.
+                    GitHub stars, HN upvotes, Reddit karma, DEV.to posts. We index them and dedupe by person, so a single profile shows up across all four.
                   </p>
                 </div>
-                
-                {/* SVG Visual: Central Developer avatar connected to sources */}
-                <div className="mt-6 bg-bh-bg/40 border border-bh-border/50 rounded-xl p-4 flex items-center justify-center gap-6 h-28 relative overflow-hidden">
-                  <div className="flex items-center gap-1.5 bg-bh-surface border border-bh-border/60 shadow-sm rounded-lg px-3 py-1.5 z-10">
-                    <div className="w-6 h-6 rounded-full bg-bh-accent flex items-center justify-center text-[color:var(--color-bh-accent-contrast)] text-[10px] font-bold">JD</div>
-                    <span className="text-xs font-bold text-bh-text">Developer Profile</span>
+
+                {/* Editorial number + brief evidence statement instead of a div-built
+                    fake UI. The number interpolates `SEARCH_SOURCE_COUNT` so the
+                    regression guard in trust-claims.test.ts stays green. */}
+                <div className="mt-6 grid grid-cols-[auto_1fr] gap-4 items-end">
+                  <div className="font-serif text-6xl md:text-7xl font-extrabold tracking-tight text-bh-accent leading-none tabular-nums">
+                    {SEARCH_SOURCE_COUNT}
                   </div>
-                  <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
-                    <line x1="15%" y1="50%" x2="50%" y2="50%" stroke="var(--color-bh-accent)" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
-                    <line x1="50%" y1="50%" x2="85%" y2="50%" stroke="var(--color-bh-cyan)" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
-                  </svg>
-                  <div className="flex gap-3 z-10">
-                    <span className="p-2 bg-bh-surface border border-bh-border rounded-lg shadow-sm"><GithubIcon className="w-4 h-4 text-bh-github" title="GitHub" /></span>
-                    <span className="p-2 bg-bh-surface border border-bh-border rounded-lg shadow-sm"><RedditIcon className="w-4 h-4 text-bh-reddit" title="Reddit" /></span>
-                    <span className="p-2 bg-bh-surface border border-bh-border rounded-lg shadow-sm"><HackerNewsIcon className="w-4 h-4 text-bh-hn" title="Hacker News" /></span>
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-bh-text-dim font-bold mb-1">Sources</div>
+                    <p className="text-sm text-bh-text leading-snug">
+                      indexed across GitHub, Reddit, Hacker News, DEV.to and 9 more, scored and deduped to one profile per person.
+                    </p>
                   </div>
                 </div>
               </article>
@@ -341,7 +342,7 @@ export function HomePage() {
                   </div>
                   <h3 className="text-lg font-bold text-bh-text mb-2">Recency-weighted scoring</h3>
                   <p className="text-bh-text-muted text-sm leading-relaxed">
-                    A 7-day commit is worth more than a 3-year-old star pile. Scores decay on a half-life curve so you see active shippers.
+                    A 7-day commit is worth more than a 3-year-old star pile. Scores decay on a half-life curve, so the top of your results is whoever shipped most recently.
                   </p>
                 </div>
                 {/* SVG Visual: Decay Curve */}
@@ -362,25 +363,25 @@ export function HomePage() {
                 {
                   icon: Bell,
                   title: 'Keyword alerts',
-                  desc: 'Set it once. Get an email (or RSS feed) the moment a new builder matching your filters shows up. No daily digest, just signal.',
+                  desc: 'Set the filters once. We send an email or RSS ping the moment a new builder matches. No daily digest, just the hits that matter.',
                 },
                 {
                   icon: FileText,
                   title: 'Private notes',
-                  desc: 'Attach private context to any builder — outreach status, where you met them, why they matter. Only you see them.',
+                  desc: 'Stash private context on any builder: outreach status, where you met them, why they matter. Only you see them.',
                 },
                 {
                   icon: Download,
                   title: 'CSV / JSON export',
-                  desc: 'One-click export of any shortlist. Pipe it into Notion, Airtable, your ATS, or a spreadsheet. No lock-in.',
+                  desc: 'Export any shortlist to CSV or JSON. Pipe it into Notion, Airtable, your ATS, or a spreadsheet. No lock-in.',
                 },
                 {
                   icon: Shield,
                   title: 'No tracking, no spam',
-                  desc: 'We don\'t message builders on your behalf. We don\'t sell profile data. You find them, you reach out — the way it should be.',
+                  desc: 'We don\'t message builders on your behalf and we don\'t sell profile data. You find them, you reach out. That\'s the whole model.',
                 },
               ].map((f) => (
-                <article key={f.title} className="card card-premium-glow bg-bh-surface p-6 flex flex-col justify-between">
+                <article key={f.title} className="card card-premium-glow bg-bh-surface p-6 flex flex-col justify-between overflow-hidden">
                   <div>
                     <div className="w-10 h-10 rounded-lg bg-bh-cyan-soft border border-bh-cyan/20 flex items-center justify-center mb-4">
                       <f.icon className="w-5 h-5 text-bh-cyan" aria-hidden="true" />
@@ -398,11 +399,8 @@ export function HomePage() {
         <section id="use-cases" className="section bg-bh-surface">
           <div className="container">
             <div className="max-w-2xl mb-12">
-              <span className="eyebrow-neutral mb-4 inline-flex">
-                <Target className="w-3.5 h-3.5" aria-hidden="true" /> Who it's for
-              </span>
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-bh-text">
-                Whoever you need to find, BuilderHunt finds first.
+                Whoever you need to find, we surface them first.
               </h2>
             </div>
 
@@ -439,7 +437,7 @@ export function HomePage() {
                 {[
                   {
                     persona: 'Open-source maintainers',
-                    pain: 'You are shipping a popular repository and need a few good co-maintainers, but the bar is high and the pool is wide.',
+                    pain: "You're shipping a popular repo and need a few good co-maintainers. The bar is high and the pool is wide.",
                     fix: 'Filter by language, country, and recent merged-PR velocity. Find people already shipping in your stack at the activity level you need.',
                     preview: (
                       <div className="border border-bh-border/60 rounded-xl p-4 bg-bh-bg/30 text-left font-sans">
@@ -499,7 +497,7 @@ export function HomePage() {
                   },
                   {
                     persona: 'DevRel & community teams',
-                    pain: 'You want to invite the right people to your conference, your beta, or your program — but you cannot read every timeline.',
+                    pain: 'You want to invite the right people to your conference, your beta, or your program, but you cannot read every timeline.',
                     fix: 'Discover the active voices in your topic without DMs, scraping, or sending mass emails. Reach out to the ones worth your time.',
                     preview: (
                       <div className="border border-bh-border/60 rounded-xl p-4 bg-bh-bg/30 text-left font-sans">
@@ -555,7 +553,7 @@ export function HomePage() {
                 Signal from the places builders actually are.
               </h2>
               <p className="text-lg text-bh-text-muted">
-                Every source works out of the box — no setup, no API keys required from you.
+                Every source works out of the box. No setup, no API keys to bring.
               </p>
             </div>
 
@@ -581,9 +579,8 @@ export function HomePage() {
         <section id="faq" className="section">
           <div className="container-narrow">
             <div className="text-center mb-12">
-              <span className="eyebrow-neutral mb-4 inline-flex">FAQ</span>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-                Common questions.
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-bh-text">
+                Common questions, answered.
               </h2>
             </div>
 
@@ -603,7 +600,7 @@ export function HomePage() {
                   `access_requests` approval queue, so the promise is false whenever production
                   has the flag on — and the flag exists to be turned on. The regression guard in
                   trust-claims.test.ts matches raw source, so don't restate the old phrasing. */}
-              Start on the Free plan — no credit card, no demo call. Set up your first hunt in
+              Start on the Free plan, no credit card, no demo call. Set up your first hunt in
               under a minute, and upgrade only when you outgrow the limits.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">

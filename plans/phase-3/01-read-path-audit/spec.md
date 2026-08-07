@@ -3,7 +3,9 @@
 > **Status**: `pending`
 > **Depends on**: nothing
 > **Blocks**: [`12-bounded-reads-sweep`](../12-bounded-reads-sweep/spec.md), [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: `src/` contains ~137 bounded list reads and ~50 request-serving reads with no `.limit()`, plus 13 worker scans and 11 scalar aggregates. No script measures this today, so the number is a one-off survey rather than a tracked figure. `scripts/check-route-coverage.mjs` is the precedent for a repo-shape gate.
+> **Reality check**: Earlier counts (~50 request reads, 13 worker scans, 11 aggregates) are a
+> dated survey, not acceptance criteria. `src/` has changed since it was taken. This plan produces a
+> fresh inventory from the TypeScript AST and records its commit SHA; no script measures it today.
 
 ## Problem
 
@@ -25,9 +27,11 @@ demand so every later plan can prove it made progress.
 
 ## The detector
 
-`scripts/check-unbounded-reads.mjs` walks `src/**/*.{ts,tsx}`, and for each exported function
-whose body contains a Drizzle list read (`.select({`, `.select()`, `db.select`, `tx.select`,
-`findMany(`) reports it when the body has no `.limit(`.
+`scripts/check-unbounded-reads.mjs` walks `src/**/*.{ts,tsx}` with the installed TypeScript compiler
+API. It reports Drizzle list-query call chains and `findMany` calls that have no explicit bound,
+including queries inside non-exported helpers and route handlers. Regex over exported function bodies
+is explicitly rejected: it misses nested handlers and mistakes a `.limit()` on another query for a
+bound on the target query.
 
 It must handle three classes of false positive found during the survey:
 
@@ -36,10 +40,10 @@ It must handle three classes of false positive found during the survey:
 2. Scalar aggregates (`count(`, `sum(`, `sql\`count`) which return a number, not rows.
 3. Reviewed exceptions, via a `// unbounded-read-ok: <reason>` comment above the function.
 
-Output is machine-readable so later plans can assert on it:
+Output is machine-readable and includes file/line/kind entries so later plans can reconcile it:
 
 ```json
-{"unbounded":50,"aggregates":11,"exempted":0}
+{"commit":"<sha>","unbounded":0,"aggregates":0,"exempted":0,"entries":[]}
 ```
 
 ## The classification
@@ -54,10 +58,11 @@ correcting each row against the real source is the substance of this plan — a 
 
 ## Success metrics
 
-- `node scripts/check-unbounded-reads.mjs` runs in under 5 seconds and prints the JSON above.
+- `node scripts/check-unbounded-reads.mjs` runs in under 5 seconds and prints schema-valid JSON.
 - Its `unbounded` count equals the number of page + model-bounded + batch rows in the committed
   classification, with no unclassified remainder.
-- Re-running after adding a deliberate unbounded read increments the count by exactly 1.
+- Re-running after adding a deliberate unbounded read in a route handler and in a non-exported helper
+  increments the count by exactly 2.
 - No false positive from `Buffer.from`/`Array.from` and no aggregate counted as a list read.
 
 ## Resolved edge cases

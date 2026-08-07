@@ -25,7 +25,10 @@ Meanwhile 19 surfaces render tabular data, only 5 with `<table>`, exactly 1 with
    browser and calling it "sorted by score" is wrong, so filter, sort and group execute in SQL.
 4. **Every sort is a total order.** A tiebreaker column is appended to every `ORDER BY`, or a
    50-row page boundary landing inside a tie duplicates or drops rows.
-5. **Keyset, never `OFFSET`.** `OFFSET` is O(offset) and shifts under concurrent writes.
+5. **Keyset for SQL-owned growing lists.** `OFFSET` is forbidden on BuilderHunt database list
+   reads because it is O(offset) and shifts under concurrent writes. Federated third-party search
+   uses bounded provider continuation/page state because BuilderHunt cannot impose a database
+   keyset on APIs it does not own; that exception is explicit in plan 11.
 6. **A column is only sortable when an index backs it.** Enforced by a unit test and an `EXPLAIN`
    assertion, not by discipline.
 7. **A client never names a database column.** Sort and filter ids resolve through a per-table
@@ -35,15 +38,16 @@ Meanwhile 19 surfaces render tabular data, only 5 with `<table>`, exactly 1 with
 
 ## The three mechanisms
 
-"Paginate everything" is the right instinct and the wrong instruction for about a third of those
-50 reads: a deletion must cover every row, an accounting export must be complete, and a worker
-must process every enabled alert. So the rule is that every read declares its bound.
+"Paginate everything" is the right instinct and the wrong instruction for part of the original
+audit snapshot: a deletion must cover every row, an accounting export must be complete, and a
+worker must process every enabled alert. Plan 01 refreshes that inventory before implementation;
+the durable rule is that every read declares its bound.
 
 | Mechanism | For | Shape |
 |---|---|---|
-| **Page** | anything feeding a list UI that grows with usage | keyset cursor, `LIMIT 50`, `PageResult` |
+| **Page** | anything feeding a list UI that grows with usage | SQL keyset cursor, or signed provider continuation for federated APIs; `LIMIT 50`, `PageResult` |
 | **Model-bounded** | maximum fixed by the data model (the 3 rows of `public_surface_indexing`, a user's organizations, seats for one org-day) | `.limit(n)` plus a comment naming why n is the ceiling |
-| **Batch** | must cover everything (`hardDeleteAccountSubject`, `getAccountingExport`, the 13 worker scans) | chunked cursor loop, never materialising the set |
+| **Batch** | must cover everything (`hardDeleteAccountSubject`, `getAccountingExport`, and worker scans reported by the fresh inventory) | chunked cursor loop, never materialising the set |
 
 Scalar aggregates (`sumSettledUnitsSince`, `getPlatformAccountMetrics`) are exempt by nature —
 they return a number, not rows.

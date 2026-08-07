@@ -18,7 +18,7 @@ export const Route = createFileRoute('/_dashboard/settings/team')({
 
 async function fetchTeamSnapshot(): Promise<TeamSnapshotDto> {
   const res = await fetch('/api/organizations/team', { credentials: 'include' })
-  if (!res.ok) throw new Error('Failed to load team')
+  if (!res.ok) throw new Error('Could not load the team. Refresh the page to try again.')
   return res.json()
 }
 
@@ -143,7 +143,7 @@ function TeamSettingsRoute() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
       }),
-      'Failed to update member role',
+      'Could not update this member\'s role. Check the role you selected and try again.',
       refreshSnapshot,
     )
 
@@ -153,7 +153,7 @@ function TeamSettingsRoute() {
         method: 'DELETE',
         credentials: 'include',
       }),
-      'Failed to remove member',
+      'Could not remove this member. The organization owner can\'t be removed; transfer ownership first.',
       refreshSnapshot,
     )
 
@@ -163,7 +163,7 @@ function TeamSettingsRoute() {
         method: 'DELETE',
         credentials: 'include',
       }),
-      'Failed to leave organization',
+      'Could not leave the organization right now. Try again, or contact your admin.',
       leaveOrganizationContext,
     )
 
@@ -175,7 +175,7 @@ function TeamSettingsRoute() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetUserId }),
       }),
-      'Failed to transfer ownership',
+      'Could not transfer ownership. The target member must be an existing admin.',
       async (body) => {
         captureReferenceId(body, 'requestId')
         await refreshSnapshot()
@@ -185,7 +185,7 @@ function TeamSettingsRoute() {
   const handleRequestDeletion = () =>
     runMutation(
       () => fetch('/api/organizations', { method: 'DELETE', credentials: 'include' }),
-      'Failed to schedule organization deletion',
+      'Could not schedule the deletion. Verify the confirmation text matches the organization name exactly.',
       async (body) => {
         captureReferenceId(body, 'id')
         await refreshSnapshot()
@@ -195,7 +195,7 @@ function TeamSettingsRoute() {
   const handleCancelDeletion = () =>
     runMutation(
       () => fetch('/api/organizations/deletion', { method: 'DELETE', credentials: 'include' }),
-      'Failed to cancel organization deletion',
+      'Could not cancel the scheduled deletion. Try again from this page.',
       async (body) => {
         captureReferenceId(body, 'id')
         await refreshSnapshot()
@@ -213,7 +213,7 @@ function TeamSettingsRoute() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirmOrganizationName }),
       }),
-      'Failed to delete organization immediately',
+      'Could not delete the organization. Verify the confirmation text matches the organization name exactly.',
       leaveOrganizationContext,
     )
 
@@ -225,7 +225,7 @@ function TeamSettingsRoute() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, role }),
       }),
-      'Failed to send invitation',
+      'Could not send the invitation. Check the email and the role, then try again.',
       async (body) => {
         captureDevLink(body)
         await refreshSnapshot()
@@ -238,7 +238,7 @@ function TeamSettingsRoute() {
         method: 'DELETE',
         credentials: 'include',
       }),
-      'Failed to cancel invitation',
+      'Could not cancel this invitation. It may already be accepted or expired.',
       async () => {
         setDevLinks((prev) => {
           const next = { ...prev }

@@ -16,8 +16,10 @@
   - Verify: tests por cada rol/permiso y permiso desconocido.
 
 - [ ] **Crear tablas operacionales**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0118_platform_staff_roles.sql`, `drizzle/migration-hashes.json`
-  - Do: assignments, append-only audit, constraints y grants platform-only.
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/*.sql` (new migration allocated by
+    `pnpm db:generate`), `drizzle/migration-hashes.json`
+  - Do: assignments, append-only audit, constraints y grants platform-only; no hardcodear el
+    siguiente número de migración.
   - Verify: DB desechable demuestra que app/tenant roles no pueden leer tablas.
 
 - [ ] **Implementar principal y guards**
@@ -49,4 +51,3 @@
   - Files: `docs/operations/platform-rbac-rollout.md`, `docs/operations/platform-rbac-break-glass.md`
   - Do: rollout por dominio, checkpoint y ejercicio de recuperación.
   - Verify: suite completa, security boundaries, smoke con cinco roles y evidencia del ensayo.
-

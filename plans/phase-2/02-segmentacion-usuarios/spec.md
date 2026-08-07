@@ -1,7 +1,8 @@
 # Especificación — fundamento de segmentación de usuarios
 
 > **Status**: `pending`
-> **Depends on**: [`01-investigacion-icp`](../01-investigacion-icp/spec.md)
+> **Depends on**: nothing — the documented taxonomy is an explicitly provisional product hypothesis;
+> post-launch research may revise it but does not block implementation.
 > **Blocks**: [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../06-landing-segmentada/spec.md)
 > **Reality check**: `auth_users` y `onboarding_progress` existen en
 > `src/shared/lib/db/schema.ts`; `/me` existe en `src/routes/_dashboard/me/index.tsx`. No existe un
@@ -21,8 +22,8 @@ export const userSegmentSchema = z.enum(USER_SEGMENTS)
 export type UserSegment = z.infer<typeof userSegmentSchema>
 ```
 
-La taxonomía final debe reemplazar esta propuesta si investigación obtiene otra decisión antes de
-la migración.
+Una decisión posterior de investigación cambia la taxonomía mediante una migración versionada; no
+reinterpreta valores históricos.
 
 ## Modelo de datos
 
@@ -101,4 +102,3 @@ email, nombre, query literal ni datos de candidatos.
 - null fallback funciona;
 - tests prueban aislamiento entre usuarios;
 - métricas segmentadas no contienen PII.
-

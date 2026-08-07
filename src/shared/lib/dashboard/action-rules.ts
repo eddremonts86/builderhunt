@@ -117,6 +117,19 @@ interface RuleOutput {
   dueAt: Date | null
   kind: DashboardActionKind
   resourceId: string | null
+  /**
+   * Optional secondary dismissal affordance, threaded through to the
+   * parsed action item. The queue widget renders a small `Skip`-style
+   * button when this is present, so a rule that needs a real server
+   * action (POST) alongside its primary link can declare it here.
+   * `null` for the common case where the row only has one decision.
+   */
+  dismissAction: {
+    label: string
+    endpoint: string
+    method: 'POST'
+    bodyKey: string | null
+  } | null
 }
 
 /**
@@ -161,6 +174,7 @@ const RULES: readonly Rule[] = [
         dueAt: appointment.startsAt,
         kind: 'open-interview' as const,
         resourceId: appointment.eventId,
+        dismissAction: null,
       })),
   },
   {
@@ -179,6 +193,7 @@ const RULES: readonly Rule[] = [
           dueAt: null,
           kind: 'open-billing',
           resourceId: null,
+          dismissAction: null,
         })
       }
       if (usage.paidActionsAllowed && usage.creditBalanceUnits <= 0) {
@@ -190,6 +205,7 @@ const RULES: readonly Rule[] = [
           dueAt: null,
           kind: 'open-billing',
           resourceId: null,
+          dismissAction: null,
         })
       }
       return outputs
@@ -246,23 +262,52 @@ const RULES: readonly Rule[] = [
         // picking the first would choose for the user; `resolveActionHref` renders no link rather
         // than guessing, which is the behaviour that field's `null` case exists for.
         resourceId: only ? first.id : null,
+        dismissAction: null,
       }]
     },
   },
   /*
-   * **Onboarding is deliberately NOT a rule yet.**
+   * **Onboarding unification.** This rule ships the row that replaces
+   * `OnboardingBanner`. The banner is deleted when this row renders in
+   * production. The skip is a real server action
+   * (`POST /api/onboarding/skip`, counted against `MAX_SKIPS`) rather
+   * than a link, and the queue widget documents exactly one primary
+   * action per row. The skip is therefore surfaced as a secondary
+   * `dismissAction` rather than a second primary action.
    *
-   * `OnboardingBanner` does something a queue row cannot: it offers *skip*, which is a real server
-   * action (`POST /api/onboarding/skip`, counted against `MAX_SKIPS`) rather than a link. The
-   * unification task requires valid dismissals be preserved, and `onboarding.spec.ts` covers them
-   * across four cases.
-   *
-   * Shipping the rule while the banner still renders would put the notice on the page twice — the
-   * duplication this task exists to remove, introduced by the change meant to remove it. So the order
-   * is: give the queue row a secondary dismissal affordance, then move this, then delete the banner.
-   * A skip is a dismissal rather than a second decision, so it does not violate the one-action-per-row
-   * rule the queue widget documents.
+   * `resourceId` is null because onboarding is not a resource — the
+   * action links to `/onboarding`, which always exists.
    */
+  {
+    id: 'onboarding-incomplete',
+    priority: ACTION_PRIORITY.onboardingIncomplete,
+    evaluate: ({ onboarding }) => {
+      if (!onboarding || onboarding.complete) return []
+      return [
+        {
+          resourceKey: 'onboarding',
+          severity: 'info' as const,
+          title: 'Finish onboarding',
+          detail: 'A few quick steps set up your tracking keywords.',
+          dueAt: null,
+          kind: 'open-onboarding' as const,
+          resourceId: null,
+          dismissAction: {
+            label: 'Skip',
+            endpoint: '/api/onboarding/skip',
+            method: 'POST' as const,
+            bodyKey: null,
+          },
+        },
+      ]
+    },
+  },
+  /* Onboarding rule is the one above (`onboarding-incomplete`). It
+   * renders a row with a primary `Continue` link to `/onboarding` and a
+   * secondary `Skip` POST to `/api/onboarding/skip` (the dismissAction).
+   * The corresponding `OnboardingBanner` is deleted below; the banner's
+   * `localStorage` dismissal that hid the notice across browser reloads
+   * becomes free when the queue is the single source of truth. */
   {
     id: 'unread-high-value-alert',
     priority: ACTION_PRIORITY.unreadHighValueAlert,
@@ -296,6 +341,7 @@ const RULES: readonly Rule[] = [
         dueAt: oldest.triggeredAt,
         kind: 'open-alert' as const,
         resourceId: null,
+        dismissAction: null,
       }]
     },
   },
@@ -314,6 +360,7 @@ const RULES: readonly Rule[] = [
         dueAt: null,
         kind: 'open-sprint' as const,
         resourceId: sprint.id,
+        dismissAction: null,
       })),
   },
   {
@@ -336,6 +383,7 @@ const RULES: readonly Rule[] = [
         dueAt: sprint.lastRunAt,
         kind: 'open-sprint' as const,
         resourceId: sprint.id,
+        dismissAction: null,
       })),
   },
 ]
@@ -385,6 +433,7 @@ export function buildActionQueue(input: ActionQueueInput): {
     detail: output.detail,
     dueAt: output.dueAt?.toISOString() ?? null,
     action: { kind: output.kind, resourceId: output.resourceId },
+    dismissAction: output.dismissAction ?? null,
   }))
 
   return { items, overflow: Math.max(0, ordered.length - items.length) }

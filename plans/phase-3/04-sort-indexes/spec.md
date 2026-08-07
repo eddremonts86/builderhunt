@@ -3,7 +3,11 @@
 > **Status**: `pending`
 > **Depends on**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
-> **Reality check**: `src/shared/lib/db/schema.ts` declares 85 indexes, several already the composite this plan needs — `sprint_results_sprint_created_idx`, `billing_ledger_entries_org_created_idx`, `organization_plan_changes_org_created_idx`. Sorting by score, followers, name or status is unindexed everywhere. The last migration is `drizzle/0114`, so this one is the next free index at execution time (`drizzle/0115` today); let `drizzle-kit generate` allocate it. `drizzle/migration-hashes.json` is an immutability manifest regenerated with `node scripts/db/verify-migration-integrity.mjs --write`.
+> **Reality check**: `src/shared/lib/db/schema.ts` currently declares 114 indexes; several already
+> match common sorts (`sprint_results_sprint_created_idx`,
+> `billing_ledger_entries_org_created_idx`, `organization_plan_changes_org_created_idx`). The
+> migration tip is `0154` on 2026-08-07 and may advance; `pnpm db:generate` must allocate the next
+> free number. `drizzle/migration-hashes.json` is the immutability manifest.
 
 ## Problem
 
@@ -46,8 +50,9 @@ locally — a table scan over 200 rows is instant.
 
 ## Success metrics
 
-- The generated migration (`drizzle/0115_*.sql` at today's tip) contains only `CREATE INDEX` statements.
-- `pnpm test:migrations:local` and `pnpm test:migration-integrity` green at 116 migrations.
+- The generated next-free migration contains only `CREATE INDEX` statements.
+- `pnpm test:migrations:local` and `pnpm test:migration-integrity` are green at the count reported
+  by the manifest at execution time.
 - The guard test fails when a bogus sortable entry is added and passes when it is removed.
 - `EXPLAIN` on each capability's `defaultSort` shows an index scan and no `Sort` node above the
   limit — asserted in plan 13, which has a seeded database to run it against.

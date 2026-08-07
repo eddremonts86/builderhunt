@@ -18,6 +18,28 @@ import type { Page } from 'playwright/test'
 /** Stable default so a bare run is deterministic without any exports. */
 export const DEFAULT_E2E_FIXED_TIME = '2026-07-24T09:00:00.000Z'
 
+/**
+ * A slot window for the public scheduling routes, anchored to the **wall clock**.
+ *
+ * The one place in this harness that must not use the fixed clock. `slots.ts` and
+ * `findInvitationByCapabilityHash` both call `new Date()`, so the availability service only ever
+ * offers times in the real future — whatever `E2E_FIXED_TIME` says. `scheduling.spec.ts` and
+ * `scheduling-reschedule.spec.ts` each pinned an absolute window instead, written on 2026-07-28 as
+ * `2026-07-27 → 2026-08-10`. It worked for ten days and then decayed: by the evening of 2026-08-07
+ * the only dates left inside it were that Friday past 17:00, a weekend the policy excludes, and the
+ * Monday before 09:00 — so every slots query answered `[]` and twelve booking tests failed on
+ * "the availability policy produces slots", which reads like a product regression and is not one.
+ *
+ * Fourteen days forward always contains weekdays, so the window cannot empty out again.
+ */
+export function publicSlotRange(days = 14): { from: string; to: string } {
+  const from = new Date()
+  return {
+    from: from.toISOString(),
+    to: new Date(from.getTime() + days * 24 * 60 * 60_000).toISOString(),
+  }
+}
+
 export interface ClockOffset {
   days?: number
   hours?: number

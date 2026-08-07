@@ -11,6 +11,7 @@ import { findSubmissionByInvitation } from '~/shared/lib/repositories/scheduling
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
 import { briefContextForEvent } from '~/lib/interviews/brief-context'
+import { interviewIdGuard } from '~/shared/lib/api/interview-id'
 
 /**
  * Read and generate the interview brief (plan:
@@ -44,6 +45,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/')({
       ANY: methodNotAllowed(['GET', 'POST']),
 
       GET: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           const principal = await requireTenantPrincipal(request)
           const result = await withTenantContext(principal, async (transaction) => {
@@ -91,6 +94,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/')({
       },
 
       POST: async ({ request, params }) => {
+        const guard = interviewIdGuard(params.interviewId)
+        if (guard) return guard
         try {
           if (env.SENSITIVE_AI_ENABLED !== 'true' && env.CANDIDATE_UPLOADS_ENABLED !== 'true') {
             // Both switches off means the feature is not deployed here at all. With only the AI switch

@@ -8,6 +8,18 @@ on:
 permissions:
   contents: read
 
+# One run per ref. Without this, every push to a branch with an open pull request started a
+# fresh run and cancelled nothing, so five were executing at once on 2026-08-07 — three of them
+# measuring commits that had already been superseded, at roughly 78 minutes of runner time each.
+# Two were the same commit twice, one from the push and one from opening the pull request.
+#
+# `deploy.yml` already guards itself this way, for a different reason: it serialises deploys with
+# `cancel-in-progress: false`, because cancelling a half-applied migration is worse than queueing.
+# Here the opposite is true — a superseded run tells you about code nobody is going to merge.
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -57,9 +69,35 @@ jobs:
       DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
       DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
       DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+      # Not optional here, despite being optional in the app.
+      #
+      # `capability-db.ts` falls back to the worker URL when this is unset, and
+      # `workerDatabaseUrls` only applies its `forceRole` when the source URL names a user
+      # that is *not* already a base role. The worker URL names one, so the fallback kept
+      # `builderhunt_worker` and the public candidate flow connected as the worker.
+      # drizzle/0078 revokes EXECUTE on `scheduling_resolve_capability` from that role and
+      # grants it to `builderhunt_capability`, so every capability exchange raised
+      # `permission denied for function`, which the route catches and reports as a coded
+      # `invalid_input` — about 45 failures across scheduling, interviews, documents and
+      # billing-credits, all reading as one unexplained 400.
+      #
+      # Reproduced locally by removing this variable alone: scheduling.spec.ts goes from 5
+      # failures to 10, with the `permission denied` visible in the server log.
+      DATABASE_CAPABILITY_URL: postgresql://builderhunt_capability:test-capability-password@127.0.0.1:5432/builderhunt_security_test_ci
       APP_URL: http://localhost:3000
       VITE_APP_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      # Defaults to 'false' in env.ts; `.env.example` turns it on, which is how it is on
+      # every developer machine. CI has no `.env`, so it ran the calendar surface switched
+      # off and `tests/e2e/calendar.spec.ts` asserted against `503 dependency_unavailable`
+      # instead of the routes it was written for — eight of its eleven failures were that.
+      #
+      # Only CALENDAR_ENABLED belongs here. SCHEDULING_ENABLED is set by each spec that
+      # needs it, through `startInterviewHarness`'s `flags`, which snapshots the previous
+      # value and restores it on teardown. Setting it globally too would change what that
+      # restore puts back, and at --workers=1 every spec shares the process it puts it back
+      # into. Redundant, with a leak vector attached.
+      CALENDAR_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -69,7 +107,34 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # The `postgres` service above is pinned to pg18, but Ubuntu's default
+      # `postgresql-client` is 16 and `pg_dump` refuses to dump a server newer
+      # than itself. `scripts/db/restore-test.ts` has a `docker exec` fallback
+      # for exactly this mismatch, but it looks for a container named
+      # `builderhunt-db` and an Actions service container gets a generated name,
+      # so the fallback cannot apply here — the client has to match on the host.
+      # This is not cosmetic: "Restore rehearsal" is an early step, and its
+      # failure skips lint, type-check, unit tests, E2E, build and every gate
+      # after it, so the whole job reports red without having checked anything.
+      - name: Install the PostgreSQL 18 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+          # Installing the package is not enough. `/usr/bin/pg_dump` is Debian's
+          # pg_wrapper, which dispatches to the *default cluster's* version, and the
+          # runner image ships a PostgreSQL 16 server — so `pg_dump --version` still
+          # reported 16.14 with 18.4 sitting installed beside it. Putting the
+          # versioned client directory first is what actually decides the binary, and
+          # it covers psql, createdb and pg_restore in the same move.
+          echo /usr/lib/postgresql/18/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/18/bin/pg_dump --version
+      - name: Confirm pg_dump now matches the server major
+        run: pg_dump --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:migration-integrity
       - run: pnpm exec drizzle-kit check

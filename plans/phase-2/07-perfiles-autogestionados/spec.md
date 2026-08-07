@@ -2,17 +2,18 @@
 
 > **Status**: `pending`
 > **Depends on**:
+>   - [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md) (typed user preference contract)
 >   - [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md) (segmento `building` ya definido)
+>   - [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md) (existing dashboard registry and preferences)
+>   - [`06-landing-segmentada`](../06-landing-segmentada/spec.md) (typed building landing contract)
 >   - [`../phase-1/36-claimable-profiles/spec.md`](../../phase-1/36-claimable-profiles/spec.md) (modelo de `builder_claims` y DTOs públicos)
 >   - [`../phase-1/37-portfolio-builder/spec.md`](../../phase-1/37-portfolio-builder/spec.md) (superficie de portfolio público, esquema v1)
 >   - [`../phase-1/38-work-sample/spec.md`](../../phase-1/38-work-sample/spec.md) (modelo de evidencias/adjuntos)
-> **Blocks**:
->   - [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md) (necesita widgets para el segmento `building` que hoy no existen)
->   - [`06-landing-segmentada`](../06-landing-segmentada/spec.md) (la página `/for/builders` promete un flujo que este plan concreta)
+> **Blocks**: nothing
 > **Reality check**: El segmento `building` se describe en
 > `plans/phase-2/01-investigacion-icp/spec.md` y
 > `plans/phase-2/03-onboarding-segmentado/spec.md`, pero ambos asumen que el builder tiene una
-> huella pública que el conector de una de las 15 fuentes indexó. `claimable-profiles` y
+> huella pública que uno de los conectores activos indexó. `claimable-profiles` y
 > `portfolio-builder` requieren ambos una tupla `(source, sourceId)` canónica. No existe
 > ninguna ruta para una persona que no tiene perfil de GitHub, GitLab, Stack Overflow, ni
 > ninguna de las fuentes activas. Esa persona queda excluida de BuilderHunt por construcción,
@@ -22,7 +23,7 @@
 ## Problema
 
 BuilderHunt indexa actividad pública de developer. Si una persona no ha publicado código,
-preguntas, artículos, paquetes, modelos, ni nada en ninguna de las 15 fuentes activas, el
+preguntas, artículos, paquetes, modelos, ni nada en ninguna de las fuentes activas, el
 sistema no tiene nada que mostrar. Esa persona queda invisible aunque sea exactamente el
 perfil que un cliente busca: traductores es↔en↔fr con portfolio verificable, redactores
 técnicos, ilustradores, investigadores, consultores, abogados tech, operadores de comunidad,
@@ -185,20 +186,24 @@ migración. Se persiste junto al perfil solo el `id`; el `label` se resuelve en 
 Los adjuntos son el riesgo principal: uploads maliciosos son vectores clásicos. La capa
 debe ser consistente con la de enrichment, no improvisada.
 
+**Contrato actualizado contra HEAD (2026-08-07):** BuilderHunt ya tiene la implementación
+completa en `src/lib/storage/`, `src/lib/scheduling/document-worker.ts` y las rutas de documentos
+de scheduling. Este plan añade una política/tipo de propietario sobre esas primitivas. No crea
+`safeDeliverBlob`, `upload-validator`, `av-scan` ni un segundo árbol de storage.
+
 - Subida vía endpoint autenticado `POST /api/self-managed/attachments` con multipart,
   validado por Zod y por magic bytes (no solo por la extensión declarada).
 - Allowlist MIME estricta:
   `application/pdf`, `image/png`, `image/jpeg`, `image/webp`,
   `audio/mpeg`, `audio/wav`, `video/mp4`.
 - Tamaño máximo 25 MB por adjunto, 12 adjuntos por perfil.
-- Almacenamiento en object storage (S3 / R2) bajo prefijo
-  `self-managed/{userId}/{attachmentId}/{filename}`, nunca en el mismo bucket que
-  datos de builder con claim.
-- Sirviente pasa por `safeFetch`-equivalente (`safeDeliverBlob`): URL firmada de corta
-  duración (15 min), sin listar el bucket, sin redirects al bucket original.
+- Almacenamiento mediante `src/lib/storage/object-keys.ts`: primero bajo `quarantine/`, después
+  bajo `clean/`; la key usa IDs opacos y nunca el filename ni otro PII.
+- Descarga mediante el provider existente: URL firmada de cinco minutos solo para una fila `clean`
+  cuya object key también está bajo `clean/`; nunca se lista el bucket.
 - Antivirus / scan de malware: integra con el servicio ya presente en BuilderHunt (ver
   `docker/clamav/`) en cola asíncrona; adjuntos recién subidos quedan en estado
-  `pending_scan` y no se sirven hasta que el scan devuelva `clean`.
+  `pending` y no se sirven hasta que el scan devuelva `clean`.
 - Hash SHA-256 obligatorio; al subir el mismo checksum dos veces, el segundo intento
   apunta al storageKey existente (deduplicación).
 - Soft delete con `deletedAt`; el archivo físico se purga tras 30 días por una

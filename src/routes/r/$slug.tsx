@@ -14,8 +14,15 @@ interface RadarLoaderData {
   results: PublicSearchBuilder[]
 }
 
+// Mirrors `radarSlugSchema` inside `resolvePublicRadar` (src/shared/lib/public-data.ts).
+// Same problem as `/blog/$slug`: the inner Zod validator turns a malformed slug
+// into a 500. For the route, "not a valid slug" is just "radar not found"
+// (saas-review F2). The inner validator still runs, so nothing unsafe slips through.
+const ROUTE_RADAR_SLUG_RE = /^[a-z0-9-]{1,128}$/
+
 export const Route = createFileRoute('/r/$slug')({
   loader: async ({ params }): Promise<RadarLoaderData> => {
+    if (!ROUTE_RADAR_SLUG_RE.test(params.slug)) throw notFound()
     const radar = await resolvePublicRadar({ data: params.slug })
     if (!radar) throw notFound()
 

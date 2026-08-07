@@ -2,7 +2,8 @@
 
 > **Status**: `pending`
 > **Depends on**: nothing
-> **Blocks**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md), [`06-landing-segmentada`](../06-landing-segmentada/spec.md)
+> **Blocks**: nothing — interviews and the ICP decision moved to
+> [`phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/spec.md) on 2026-08-05.
 > **Reality check**: BuilderHunt ya sirve búsqueda, tracking, alertas, sprints, scheduling,
 > entrevistas, perfiles reclamables y equipos. El onboarding actual en `src/routes/onboarding/`
 > solo activa el workflow de búsqueda y no existe evidencia suficiente en el repositorio para
@@ -14,11 +15,12 @@ La propuesta inicial `founder | investor | user` mezcla cargo, tipo de organizac
 residual sin significado. Implementarla directamente produciría copy superficial, métricas
 imposibles de interpretar y tres experiencias basadas en supuestos.
 
-## Objetivo
+## Objetivo de esta fase
 
-Validar qué grupos tienen un problema frecuente, urgente y pagable que BuilderHunt resuelve, y
-convertir ese aprendizaje en una taxonomía pequeña y operacional para producto, onboarding,
-dashboard y adquisición.
+Preparar el paquete neutral de investigación y registrar el baseline verificable antes del
+lanzamiento. La ejecución de entrevistas, la síntesis y la decisión de ICP pertenecen a
+[`phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/spec.md); no bloquean
+la implementación de la taxonomía provisional de phase 2.
 
 ## Preguntas de investigación
 
@@ -101,6 +103,8 @@ Estos umbrales son una regla de decisión interna, no significancia estadística
 
 ## No objetivos
 
+- reclutar o entrevistar participantes antes del lanzamiento;
+- cerrar la decisión de ICP en esta fase;
 - estimar TAM con precisión;
 - fijar pricing definitivo;
 - afirmar product-market fit;
@@ -120,4 +124,3 @@ Estos umbrales son una regla de decisión interna, no significancia estadística
 La investigación termina cuando existe una decisión explícita por segmento, las conclusiones citan
 evidencia real y producto puede derivar de ellas contratos, eventos de activación y copy sin usar
 categorías ambiguas.
-

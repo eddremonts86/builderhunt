@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
+import { requirePlatformAdminPage } from '~/shared/lib/auth/auth-session'
 
 /**
  * `/admin` — the index the Admin area never had.
@@ -26,20 +26,17 @@ import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session
  * from a compile-time registry nobody updated. Metrics is a page operators already read. The
  * Command Center's attention summary belongs *on* it, where a stale number is noticed.
  *
- * ## Authorization is duplicated on purpose
+ * ## Authorization — same guard as every sibling
  *
- * The same `getIsAppAdmin` check runs here and again on `/admin/metrics`. Redirecting an
- * unauthorized caller to a page that will refuse them would answer "there is something here" before
- * refusing, and a redirect is a cheaper oracle to probe than a page. The refusal happens first.
+ * Use `requirePlatformAdminPage` first: a non-admin is sent to `/dashboard` with a flash, instead
+ * of being handed the raw "Something went wrong" error page (saas-review F5). The redirect to
+ * `/admin/metrics` only runs after the guard has confirmed the caller is a platform admin. Stays
+ * a `replace` so the URL does not become a back-button stop the admin has to click past.
  */
 export const Route = createFileRoute('/_dashboard/admin/')({
   beforeLoad: async () => {
-    const user = await getAppAuthSession()
-    if (!user.userId) throw new Error('Unauthorized')
-    if (!(await getIsAppAdmin())) {
-      throw new Error('Forbidden')
-    }
-    // `replace` so the 404-shaped URL does not become a back-button stop the administrator has to
+    await requirePlatformAdminPage()
+    // `replace` so the URL does not become a back-button stop the admin has to
     // click past on their way out of the area.
     throw redirect({ to: '/admin/metrics', replace: true })
   },

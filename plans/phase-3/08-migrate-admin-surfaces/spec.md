@@ -3,7 +3,11 @@
 > **Status**: `pending`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: Seven surfaces render rows today with no shared behaviour: `src/modules/dashboard/components/AbuseConsole.tsx` (a real `<table>`), `src/routes/_dashboard/admin/incidents.tsx`, `admin/plan-requests.tsx`, `src/modules/dashboard/components/ActiveSessionsPanel.tsx`, `src/routes/_dashboard/settings/privacy.tsx`, `me/index.tsx`, `src/modules/scheduling/components/InvitationStatus.tsx`. Their reads are already narrow, so this is mostly presentation.
+> **Reality check**: `/admin/plan-requests` was removed on 2026-08-03 and must not be rebuilt
+> (`tests/e2e/admin-journeys.spec.ts`). The current group is nine surfaces: abuse, incidents,
+> integrations, metrics, operations, active sessions, privacy, `/me`, and invitation status.
+> `IntegrationsPage`, `AdminMetricsPage`, `OperationsPage`, and `AbuseConsole` contain real
+> hand-written tables today; their reads must be classified before calling this presentation-only.
 
 ## Problem
 
@@ -13,7 +17,7 @@ selection nowhere.
 
 ## Goal
 
-All seven on the shell, so the visible payoff of plans 02–07 arrives before the harder migrations.
+All nine on the shell, so the visible payoff of plans 02–07 arrives before the harder migrations.
 
 ## Non-goals
 
@@ -35,7 +39,9 @@ and any shell assumption that only fits sprint results shows up here, while the 
 |---|---|
 | `AbuseConsole` | A real `<table>` today; becomes the ARIA grid. Signals are append-only, so created-at descending is the natural default sort. |
 | `admin/incidents` | Has create/edit actions that move into `rowActions` and the `expansion` slot. |
-| `admin/plan-requests` | An approve/deny queue; selection plus a bulk action is the first genuine use of "select loaded". |
+| `IntegrationsPage` | Platform operations table; preserve source-health semantics and actions. |
+| `AdminMetricsPage` | Metrics tables only; charts remain charts and do not become grids. |
+| `OperationsPage` | Job/schedule rows with run actions; preserve operational audit behavior. |
 | `ActiveSessionsPanel` | Account-subject data. Revoke stays a per-row action. |
 | `settings/privacy` | Small, model-bounded lists (consents, export requests). One page is always the last page. |
 | `me/index` | Several short lists on one page; each becomes its own small grid rather than one merged table. |
@@ -43,7 +49,7 @@ and any shell assumption that only fits sprint results shows up here, while the 
 
 ## Success metrics
 
-- All seven appear in `tests/e2e/data-tables.spec.ts`'s parameter list and pass every assertion.
+- All nine appear in `tests/e2e/data-tables.spec.ts`'s parameter list and pass every applicable assertion.
 - `grep -rl '<table' src/modules/dashboard src/routes/_dashboard/admin` returns nothing.
 - Each surface's existing e2e or regression coverage still passes.
 - `node scripts/check-unbounded-reads.mjs` count does not increase.

@@ -3,7 +3,12 @@
 > **Status**: `pending`
 > **Depends on**: [`02-table-query-contract`](../02-table-query-contract/spec.md)
 > **Blocks**: [`06-row-virtualization`](../06-row-virtualization/spec.md), [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
-> **Reality check**: 19 surfaces render tabular data with 5 different header treatments; 0 support keyboard navigation and 1 sorts. Design tokens, control heights, radii and both typefaces are fixed by `DESIGN.md` and `docs/visual-system.md`. `src/components/ui/` already provides `Button`, `Input`, `Select`, `Checkbox`, `Dialog` (Radix). `tests/regression/test-status-and-trust.mjs` drives existing rows by `data-testid`.
+> **Reality check**: The original audit found 19 tabular surfaces with five header treatments;
+> plan 01's fresh inventory is authoritative for implementation and plan 13 requires every current
+> surface to be classified. Design tokens, control heights, radii and both typefaces are fixed by
+> `DESIGN.md` and `docs/visual-system.md`. `src/components/ui/` already provides `Button`, `Input`,
+> `Select`, `Checkbox`, `Dialog` (Radix). `tests/regression/test-status-and-trust.mjs` drives
+> existing rows by `data-testid`.
 
 ## Problem
 
@@ -28,8 +33,9 @@ and the four renderers.
 ## Structure
 
 ARIA grid over a div tree, not `<table>`. `role="grid"` with `row`, `columnheader`, `gridcell`,
-plus `aria-rowindex`, `aria-colindex`, `aria-rowcount` (from `PageResult.total`, not the loaded
-count — a screen reader must know the list is partial) and `aria-colcount`. CSS grid template
+plus `aria-rowindex`, `aria-colindex`, `aria-rowcount` when `PageResult.total` is known (never a
+fabricated loaded count) and `aria-colcount`. Provider-backed lists with `total: null` omit
+`aria-rowcount` and announce the loaded count plus "more results available". CSS grid template
 columns does the alignment a `<table>` would have done.
 
 The reason is plan 06: virtualized rows inside a `<tbody>` need spacer rows and `translateY`, which
@@ -102,5 +108,5 @@ generates its own ids would break a green suite for reasons unrelated to tables.
   duplicated.
 - axe reports no violations on the ARIA grid (`pnpm test:a11y`).
 - Every key in the table above works, asserted in plan 07's shared e2e spec.
-- `aria-rowcount` equals `PageResult.total`, not `rows.length`.
+- `aria-rowcount` equals a known `PageResult.total`; it is absent when `total` is null.
 - All four states reachable in a fixture story or e2e assertion.

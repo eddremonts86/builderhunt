@@ -1,11 +1,23 @@
 # Plan de entrega — dashboard personalizado por segmento
 
-> **Status**: `pending`
+> **Status**: `partially-implemented`
 > **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md)
 > **Blocks**: nothing
-> **Reality check**: Bento y widgets existentes permiten una refactorización incremental.
+> **Reality check**: The compositor primitives, registry, accessible reordering, persistence API,
+> optimistic concurrency and tenant-isolation e2e coverage already exist. The remaining work is
+> segment context, presets and rollout measurement.
 
-## Fase 1 — inventario y contrato
+## Delivered foundation
+
+- `src/modules/dashboard/lib/widget-registry.ts` is the stable typed registry.
+- `src/modules/dashboard/components/DashboardCustomizeDialog.tsx` provides keyboard-accessible
+  visibility, pinning and ordering controls.
+- `src/routes/api/dashboard/preferences.ts`,
+  `src/shared/lib/dashboard/preferences-contract.ts` and
+  `src/shared/lib/repositories/dashboard-preferences.ts` persist organization-scoped preferences
+  with optimistic concurrency; migrations are `0151`–`0153`.
+
+## Fase 1 — inventario y contrato segmentado
 
 - inventariar widgets, datos, permisos y entitlements;
 - definir registro y presets puros;
@@ -24,12 +36,11 @@
 - building integrado con claim/portfolio;
 - snapshots y pruebas de orden/visibilidad.
 
-## Fase 4 — overrides
+## Fase 4 — integrar overrides existentes
 
-- persistir visibilidad/orden de widgets;
-- restaurar defaults;
-- resolver cambios de segmento;
-- evitar layouts inválidos tras retirar widgets.
+- resolver cambios de segmento sobre el contrato de preferencias existente;
+- mantener restauración, revisiones y reconciliación de widgets retirados;
+- no crear una segunda tabla, ruta o formato de preferencias.
 
 ## Fase 5 — rollout
 
@@ -49,4 +60,3 @@
 | Layout roto en mobile | Orden mobile por contrato |
 
 Rollback: forzar preset `general` mediante flag e ignorar overrides sin borrarlos.
-

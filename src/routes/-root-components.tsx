@@ -30,15 +30,19 @@ export function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 export function RootErrorBoundary({ error }: { error: Error }) {
+  // The router supplies `shellComponent: RootDocument` for every render, including
+  // the error branch. Wrapping the error UI in another `RootDocument` here would
+  // nest a second `<html><body>…` inside the outer shell's `<div id="main-content">`,
+  // which React rejects as "div cannot be a child of <html>" — and which React 19
+  // logs as a hydration warning on every page in the app (saas-review F1+F3).
+  // Render the inner error markup directly; the shell stays the router's job.
   return (
-    <RootDocument>
-      <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-app text-bh-text">
-        <h1 className="text-4xl font-bold mb-2">Something went wrong</h1>
-        <p className="text-bh-text-muted mb-6 max-w-md">
-          {error?.message ?? 'An unknown error occurred while loading this page.'}
-        </p>
-        <a href="/" className="btn-primary">Back to home</a>
-      </div>
-    </RootDocument>
+    <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-app text-bh-text">
+      <h1 className="text-4xl font-bold mb-2">Something went wrong</h1>
+      <p className="text-bh-text-muted mb-6 max-w-md">
+        {error?.message ?? 'An unknown error occurred while loading this page.'}
+      </p>
+      <a href="/" className="btn-primary">Back to home</a>
+    </div>
   )
 }
