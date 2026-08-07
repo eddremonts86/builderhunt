@@ -62,7 +62,9 @@ export function gridTemplateColumns<Row>(
   const parts: string[] = []
   if (options.selectable) parts.push('2.25rem')
   for (const column of columns) {
-    parts.push(column.align === 'end' ? 'minmax(0, max-content)' : 'minmax(0, 1fr)')
+    parts.push(column.align === 'end'
+      ? 'minmax(0, max-content)'
+      : `minmax(0, ${column.weight ?? 1}fr)`)
   }
   if (options.expandable) parts.push('2.25rem')
   return parts.join(' ')

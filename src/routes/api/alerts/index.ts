@@ -10,8 +10,10 @@ import {
   createOrganizationAlert,
   createOrganizationAlertFromQueryForPrincipal,
   deleteOrganizationAlert,
-  listOrganizationAlerts,
+  pageOrganizationAlerts,
 } from '~/shared/lib/repositories/organization-alerts'
+import { alertsCapability } from '~/shared/lib/table/capabilities/alerts'
+import { tablePageHandler } from '~/shared/lib/table/handler'
 import { SharedResourceError, stripOrganizationAuthority } from '~/shared/lib/shared-resources/contracts'
 
 const CreateBody = z.object({
@@ -45,17 +47,17 @@ export const Route = createFileRoute('/api/alerts/')({
       // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
       ANY: methodNotAllowed(['GET', 'POST', 'DELETE']),
 
-      GET: async ({ request }) => {
-        try {
-          const principal = await requireTenantPrincipal(request)
-          const rows = await withTenantContext(principal, (tx) =>
-            listOrganizationAlerts(tx, principal.organizationId),
-          )
-          return Response.json(rows)
-        } catch (error) {
-          return alertErrorResponse(error, 'Failed to fetch alerts')
-        }
-      },
+      /**
+       * One keyset page of the organization's radars.
+       *
+       * A `PageResult` now, not the bare array it was. The only consumer is the alerts page, which
+       * reads it as a grid.
+       */
+      GET: async ({ request }) => tablePageHandler({
+        capability: alertsCapability,
+        request,
+        load: ({ transaction, search }) => pageOrganizationAlerts(transaction, search.query, search.page),
+      }),
       POST: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)

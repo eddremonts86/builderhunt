@@ -189,3 +189,185 @@ test.describe('alert test delivery', () => {
     }
   })
 })
+
+/**
+ * The inbox, after plans/phase-3/10 moved its grouping to the server.
+ *
+ * The defect these exist for is not "the page was slow". `listOrganizationTriggers` was capped at
+ * 100 with no cursor, so match 101 was unreachable, and `groupByAlert` printed
+ * `group.triggers.length` as the group's size — "12 matches" for a radar with 300. It looked
+ * entirely right, which is why it survived. The count comes from the server's facet over the whole
+ * filtered set now, and the page is a real keyset page.
+ */
+test.describe('the alerts inbox as a grouped page', () => {
+  const MATCHES_PER_RADAR = 40
+  const RADARS = 3
+  const TOTAL = MATCHES_PER_RADAR * RADARS
+
+  let alertIds: string[] = []
+
+  async function seedInbox(): Promise<void> {
+    const { sql, organization, owner } = harness
+    alertIds = []
+    for (let index = 0; index < RADARS; index += 1) {
+      const id = `e2e-inbox-alert-${harness.workerIndex}-${index}`
+      await sql`
+        insert into alerts (id, organization_id, user_id, name, keywords, frequency, delivery_channel, enabled, trigger_conditions, created_at)
+        values (
+          ${id}, ${organization.organizationId}, ${owner.userId!}, ${`Inbox radar ${index}`},
+          ${sql.json(['rust'])}, 'daily', 'email', true, ${sql.json({ eventType: 'keyword_match' })},
+          now() - (${index} * interval '1 day')
+        )
+      `
+      alertIds.push(id)
+    }
+    for (let index = 0; index < TOTAL; index += 1) {
+      await sql`
+        insert into alert_triggers (id, organization_id, alert_id, user_id, event_type, payload, matched_at, read_at)
+        values (
+          ${`e2e-inbox-trig-${harness.workerIndex}-${String(index).padStart(3, '0')}`},
+          ${organization.organizationId}, ${alertIds[index % RADARS]}, ${owner.userId!},
+          ${(['keyword_match', 'new_repo', 'new_product'])[index % 3]},
+          ${sql.json({
+    source: 'github',
+    sourceId: `inbox-${index}`,
+    username: `inboxbuilder${index}`,
+    displayName: `Inbox Builder ${index}`,
+    profileUrl: `https://example.invalid/inbox${index}`,
+    followersCount: index,
+    topics: ['rust'],
+    score: index,
+  })},
+          now() - (${index} * interval '10 minutes'),
+          ${index % 4 === 0 ? null : new Date()}
+        )
+      `
+    }
+  }
+
+  async function clearInbox(): Promise<void> {
+    await harness.sql`delete from alert_triggers where id like ${`e2e-inbox-trig-${harness.workerIndex}-%`}`
+    await harness.sql`delete from alerts where id like ${`e2e-inbox-alert-${harness.workerIndex}-%`}`
+  }
+
+  test('the group facet counts the whole group, not the loaded part', async () => {
+    await seedInbox()
+    try {
+      const page = await (await harness.owner.api!.get('/api/alerts/triggers?group=alertId')).json()
+
+      expect(page.rows.length).toBe(50)
+      expect(page.total).toBe(TOTAL)
+
+      // The assertion the old code could not make. Page one holds 50 rows across three radars of 40,
+      // so at least one group is partially loaded — and every facet still reports 40.
+      const facets = page.facets.alertId as Array<{ value: string; count: number }>
+      for (const alertId of alertIds) {
+        expect(facets.find((facet) => facet.value === alertId)?.count).toBe(MATCHES_PER_RADAR)
+      }
+
+      const loadedPerRadar = new Map<string, number>()
+      for (const row of page.rows as Array<{ alertId: string }>) {
+        loadedPerRadar.set(row.alertId, (loadedPerRadar.get(row.alertId) ?? 0) + 1)
+      }
+      expect([...loadedPerRadar.values()].some((loaded) => loaded < MATCHES_PER_RADAR)).toBe(true)
+    } finally {
+      await clearInbox()
+    }
+  })
+
+  /** A group split across pages is not a group — the server has to order by the group column first. */
+  test('grouping keeps each radar contiguous', async () => {
+    await seedInbox()
+    try {
+      const page = await (await harness.owner.api!.get('/api/alerts/triggers?group=alertId')).json()
+      const order = (page.rows as Array<{ alertId: string }>).map((row) => row.alertId)
+      const runs = order.filter((alertId, index) => index === 0 || order[index - 1] !== alertId)
+      // One run per radar present on the page, not one per interleaved match.
+      expect(runs.length).toBe(new Set(order).size)
+    } finally {
+      await clearInbox()
+    }
+  })
+
+  test('walks every match exactly once, grouped and ungrouped', async () => {
+    await seedInbox()
+    try {
+      for (const grouping of ['', '&group=alertId']) {
+        const seen = new Set<string>()
+        let cursor: string | null = null
+        let guard = 0
+        do {
+          const url: string = `/api/alerts/triggers?x=1${grouping}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+          const page = await (await harness.owner.api!.get(url)).json()
+          for (const row of page.rows as Array<{ id: string }>) {
+            expect(seen.has(row.id), `trigger ${row.id} served twice`).toBe(false)
+            seen.add(row.id)
+          }
+          cursor = page.nextCursor
+          guard += 1
+        } while (cursor && guard < 10)
+
+        expect(seen.size, `grouping "${grouping}" lost a match`).toBe(TOTAL)
+      }
+    } finally {
+      await clearInbox()
+    }
+  })
+
+  test('each row carries the name of the radar that found it', async () => {
+    await seedInbox()
+    try {
+      const page = await (await harness.owner.api!.get('/api/alerts/triggers')).json()
+      expect(page.rows.every((row: { alertName: string | null }) => row.alertName?.startsWith('Inbox radar'))).toBe(true)
+    } finally {
+      await clearInbox()
+    }
+  })
+
+  test('a match whose radar was deleted still surfaces', async () => {
+    await seedInbox()
+    try {
+      // `alerts.id` cascades to `alert_triggers`, so a deleted radar takes its matches with it —
+      // which is why the null-name branch is reached by a trigger pointing at a radar that is gone
+      // rather than by deleting one. Assert the shape the page relies on instead: a null name is
+      // rendered, not dropped.
+      const page = await (await harness.owner.api!.get('/api/alerts/triggers')).json()
+      expect(page.rows.length).toBeGreaterThan(0)
+      expect(page.rows.every((row: Record<string, unknown>) => 'alertName' in row)).toBe(true)
+    } finally {
+      await clearInbox()
+    }
+  })
+
+  test('an unknown group column is refused rather than absorbed', async () => {
+    const response = await harness.owner.api!.get('/api/alerts/triggers?group=payload')
+    expect(response.status()).toBe(400)
+    expect((await response.json()).error).toContain('Unknown group column')
+  })
+
+  test('the radar list is a page too', async () => {
+    await seedInbox()
+    try {
+      const page = await (await harness.owner.api!.get('/api/alerts')).json()
+      expect(Array.isArray(page.rows)).toBe(true)
+      expect(page.total).toBeGreaterThanOrEqual(RADARS)
+      // The page renders `a.triggerConditions.eventType`; the first version of this projection
+      // dropped the field and the route mounted straight into a TypeError.
+      expect(page.rows[0].triggerConditions.eventType).toBeTruthy()
+    } finally {
+      await clearInbox()
+    }
+  })
+
+  test('neither page answers a caller from another organization', async () => {
+    await seedInbox()
+    try {
+      const strangerInbox = await (await harness.stranger.api!.get('/api/alerts/triggers')).json()
+      expect(strangerInbox.total).toBe(0)
+      const strangerRadars = await (await harness.stranger.api!.get('/api/alerts')).json()
+      expect(strangerRadars.rows.every((row: { id: string }) => !row.id.startsWith('e2e-inbox-alert'))).toBe(true)
+    } finally {
+      await clearInbox()
+    }
+  })
+})

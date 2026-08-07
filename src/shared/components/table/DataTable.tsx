@@ -112,6 +112,16 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
    * the case: names live on `auth_users`, and a capability describes one table.
    */
   searchable?: boolean
+  /**
+   * Turns a stored dimension value into something a person can read.
+   *
+   * Needed when a dimension's values are ids. They have to *stay* ids everywhere the server is
+   * involved — the facet is computed over the real column, and two radars may share a name — so the
+   * translation happens at the edge, once, and applies to the group header, the facet chips, the
+   * command sheet and the filtered-empty copy alike. Anything less would leave `p3-alert-1` on a
+   * chip beside a group header reading "Local-first devs".
+   */
+  valueLabel?: (dimension: string, value: string) => string
   /** Shown when the unfiltered set is empty. */
   emptyState?: React.ReactNode
   /** Human labels for filter ids, used by the chips, the command sheet and the filtered-empty copy. */
@@ -185,6 +195,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     expandedRowId,
     onExpandedChange,
     searchable = true,
+    valueLabel,
     emptyState,
     filterLabels,
     className,
@@ -292,6 +303,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     expandedRowId,
     onExpandedChange,
     entries,
+    valueLabel,
     window: virtual.items,
     totalSize: virtual.totalSize,
     virtualized,
@@ -331,6 +343,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         onOpenCommandSheet={() => setCommandOpen(true)}
         searchRef={searchRef}
         searchable={searchable}
+        valueLabel={valueLabel}
       />
 
       {selectable && <SelectionBar selection={selection} total={page.total} actions={bulkActions} />}
@@ -412,6 +425,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
           <FilteredEmptyState
             query={query}
             labels={filterLabels}
+            valueLabel={valueLabel}
             onClear={() => onQueryChange({ ...query, search: '', filters: {} })}
           />
         )}
@@ -427,6 +441,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         onQueryChange={onQueryChange}
         facets={page.facets}
         labels={filterLabels}
+        valueLabel={valueLabel}
       />
     </div>
   )

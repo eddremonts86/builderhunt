@@ -27,6 +27,8 @@ export interface TableToolbarProps<Row> {
    * than no box — it reads as "no such member" for a member who is right there on page two.
    */
   searchable?: boolean
+  /** Turns a stored dimension value into a readable one — a chip should not read `p3-alert-1`. */
+  valueLabel?: (dimension: string, value: string) => string
 }
 
 /**
@@ -38,7 +40,7 @@ export interface TableToolbarProps<Row> {
  * exactly one moment: when there is more than one page, which is always.
  */
 export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
-  const { columns, query, onQueryChange, facets, labels = {}, hiddenColumns, onToggleColumn, onOpenCommandSheet, searchRef, searchable = true } = props
+  const { columns, query, onQueryChange, facets, labels = {}, hiddenColumns, onToggleColumn, onOpenCommandSheet, searchRef, searchable = true, valueLabel } = props
   const [columnsOpen, setColumnsOpen] = React.useState(false)
 
   const groupable = columns.filter((column) => column.groupable)
@@ -97,7 +99,7 @@ export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
                     : 'border-bh-border bg-bh-surface text-bh-text-muted hover:border-bh-border-strong',
                 )}
               >
-                <span className="truncate">{facet.value}</span>
+                <span className="truncate">{valueLabel?.(id, facet.value) ?? facet.value}</span>
                 <span className="tabular-nums opacity-70">{facet.count.toLocaleString()}</span>
               </button>
             )

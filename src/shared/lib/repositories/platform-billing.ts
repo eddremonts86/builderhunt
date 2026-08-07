@@ -176,13 +176,6 @@ export async function pagePlatformUsersWithBilling(
   return { ...result, rows: result.rows.map((user, index) => ({ ...user, billing: billing[index] ?? null })) }
 }
 
-export async function listPlatformUsersWithBilling(): Promise<PlatformUserWithBilling[]> {
-  const users = await listPlatformUsers()
-  const now = new Date()
-  const billing = await Promise.all(users.map((u) => getPlatformUserBillingSummary(u.userId, now)))
-  return users.map((u, i) => ({ ...u, billing: billing[i] ?? null }))
-}
-
 export async function getPlatformAccountMetrics(oneDayAgo: Date, oneWeekAgo: Date) {
   // Excludes DELETED_USER_SENTINEL_ID (drizzle/0026_deleted_user_sentinel.sql)
   // — a permanent system row, not a real account, that would otherwise

@@ -73,7 +73,6 @@ export function evaluateMatch(
   return true
 }
 
-export const listTriggersForOrganization = listOrganizationTriggers
 export const markTriggerRead = markOrganizationTriggerRead
 export const unreadTriggerCount = unreadOrganizationTriggerCount
 

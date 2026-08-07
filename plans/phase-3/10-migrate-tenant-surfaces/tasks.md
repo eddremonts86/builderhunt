@@ -112,7 +112,7 @@
     it — it wrapped the response in an `asArray` helper that turns anything non-array into `[]`, so
     the shape change would otherwise have blanked the tile silently.
 
-- [ ] **Migrate alerts, moving grouping to the server**
+- [x] **Migrate alerts, moving grouping to the server**
   - Files: `src/routes/_dashboard/alerts.tsx`,
     `src/shared/lib/repositories/organization-alerts.ts`,
     `src/shared/lib/table/capabilities/alerts.ts`
@@ -121,9 +121,49 @@
     **whole** group rather than the loaded part.
   - Verify: group counts compared before and after on the same data; where they differ, confirm the
     new number is the correct whole-group count and not a bug.
+  - **Done, and the counts do differ — the new ones are right.** Measured on 120 matches across
+    three radars of 40: the header now reads "Local-first devs · 40 total · 10 loaded". `groupByAlert`
+    would have printed "10 matches", because it counted the triggers the browser held.
+    Two capabilities, not one. The task names `listOrganizationAlerts`, but `groupByAlert` grouped
+    **triggers**, and those came from `listOrganizationTriggers(tx, org, 100)` — capped, with no
+    cursor, so match 101 was unreachable. Both are pages now.
+    Grouping is by `alert_id`, because that is the dimension the server counts and because two
+    radars may share a name. The ids had to stay ids everywhere the server is involved, so the shell
+    gained `valueLabel(dimension, value)` — one translation applied to the group header, the facet
+    chips, the command sheet and the filtered-empty copy alike. A `groupLabel` that only fixed the
+    header would have left `p3-alert-1` on a chip next to a header reading "Local-first devs".
+    `ColumnDef.weight` was added for the same surface: the match column renders a whole
+    `PersonResultCard`, and at an equal share of the row width the card collapsed to an avatar and a
+    truncated username — the exact failure the old markup carried a comment about.
+    Two counts stopped lying on the way: "Matches found" now comes from `PageResult.total` rather
+    than the loaded page's length, and "Mark all as read" — which only ever marked the loaded page —
+    says "Mark these N as read".
+    The radar *list* stayed a card list. Its read is bounded, but the task asked for the inbox's
+    grouping to move, not for the test-send/frequency/enable controls to become table cells.
+    Indexes `alerts_org_*` and `alert_triggers_org_*` in `drizzle/0162`; three on `alert_triggers`,
+    because the grouped walk orders by `(alert_id, matched_at, id)` while plan 04's guard checks
+    each sortable column in isolation. That blind spot is recorded against plan 04.
 
-- [ ] **Confirm the read count actually dropped**
+- [x] **Confirm the read count actually dropped**
   - Files: none
   - Do: `node scripts/check-unbounded-reads.mjs`.
   - Verify: the count is at least six lower than before this plan, and every remaining entry is
     accounted for by plan 11 or 12.
+  - **96 → 93, not 90, and the shortfall is the metric's assumption rather than missing work.**
+    It assumed each of the six surfaces would leave its unbounded read deletable. Four did, and were
+    deleted rather than wrapped: `listOrganizationAlerts`, `listOrganizationMembers`,
+    `listPendingInvitations` and `listPlatformUsersWithBilling` (with `listPlatformUsers` and the
+    dead `listAllUsersWithBilling`/`listTriggersForOrganization` aliases). Three did not:
+    - `listBillingRefunds` — five callers (accounting export, operations roll-up, owner billing
+      summary, notifications) that sum over the whole set. A page of fifty would make each of them
+      *wrong*, not slow.
+    - `listDisputes` — same, through `listOrganizationDisputes`.
+    - `listSprints` — the dashboard action queue, whose rules filter by status; a naive limit would
+      silently drop the nudge for a stalled sprint outside the window.
+
+    All three want the same fix and it is not a cursor: replace "read every row and add them up in
+    JavaScript" with a SQL aggregate. That is plan 12's work, and bending them here to move a
+    counter would have been the wrong trade. `listOrganizationTriggers` is no longer counted at all —
+    it takes an explicit `limit` and every caller passes one.
+    Three reads are now `unbounded-read-ok`-exempted with their reason: each is a page's own
+    enrichment query, whose `inArray` holds exactly the ids the keyset page returned.

@@ -1206,30 +1206,6 @@ export async function listOwnershipTransferCandidates(
   }
 }
 
-/** Team settings' member list — same authDb rationale as `listMyOrganizations`: RLS-forced tables this read discovers the scope for. */
-export async function listOrganizationMembers(organizationId: string): Promise<OrganizationMemberRecord[]> {
-  const [{ eq }, { authDb }, schema] = await Promise.all([
-    import('drizzle-orm'),
-    import('../db/auth-db'),
-    import('../db/schema'),
-  ])
-  const { organizationMembers, authUsers } = schema
-
-  const rows = await authDb
-    .select({
-      userId: organizationMembers.userId,
-      name: authUsers.name,
-      email: authUsers.email,
-      role: organizationMembers.role,
-      joinedAt: organizationMembers.createdAt,
-    })
-    .from(organizationMembers)
-    .innerJoin(authUsers, eq(authUsers.id, organizationMembers.userId))
-    .where(eq(organizationMembers.organizationId, organizationId))
-
-  return rows.map((row) => ({ ...row, role: row.role as OrganizationRole }))
-}
-
 /**
  * Actor names for the activity feed (plans/UI/tasks.md Wave 2 "Make Team
  * Activity human and navigable") — same authDb rationale as
@@ -1313,42 +1289,6 @@ export async function pageOrganizationInvitations(
         }),
       },
     ))
-}
-
-/** Pending invitations only — accepted/rejected/canceled ones aren't actionable from Team settings. */
-export async function listPendingInvitations(organizationId: string): Promise<InvitationRecord[]> {
-  const [{ and, eq }, { authDb }, schema] = await Promise.all([
-    import('drizzle-orm'),
-    import('../db/auth-db'),
-    import('../db/schema'),
-  ])
-  const { organizationInvitations, organizations } = schema
-
-  const rows = await authDb
-    .select({
-      id: organizationInvitations.id,
-      organizationId: organizationInvitations.organizationId,
-      organizationName: organizations.name,
-      email: organizationInvitations.email,
-      role: organizationInvitations.role,
-      status: organizationInvitations.status,
-      expiresAt: organizationInvitations.expiresAt,
-      inviterId: organizationInvitations.inviterId,
-    })
-    .from(organizationInvitations)
-    .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
-    .where(and(eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending')))
-
-  return rows.map((row) => ({
-    id: row.id,
-    organizationId: row.organizationId,
-    organizationName: row.organizationName,
-    email: row.email,
-    role: (row.role ?? 'member') as InvitableRole,
-    status: row.status as InvitationRecord['status'],
-    expiresAt: row.expiresAt,
-    inviterId: row.inviterId,
-  }))
 }
 
 /**

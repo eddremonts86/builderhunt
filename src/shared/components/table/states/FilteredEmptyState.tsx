@@ -8,6 +8,8 @@ interface FilteredEmptyStateProps {
   onClear: () => void
   /** Human labels for filter ids, so the message says "Source" rather than "source". */
   labels?: Record<string, string>
+  /** And for the values themselves, when they are ids rather than words. */
+  valueLabel?: (dimension: string, value: string) => string
 }
 
 /**
@@ -17,12 +19,12 @@ interface FilteredEmptyStateProps {
  * is "you have a chip selected". The user then leaves, or worse, files a bug. So this one names the
  * filters that are active and offers the single action that fixes it.
  */
-export function FilteredEmptyState({ query, onClear, labels = {} }: FilteredEmptyStateProps) {
+export function FilteredEmptyState({ query, onClear, labels = {}, valueLabel }: FilteredEmptyStateProps) {
   const active: string[] = []
   if (query.search.trim() !== '') active.push(`search "${query.search.trim()}"`)
   for (const [id, values] of Object.entries(query.filters)) {
     if (values.length === 0) continue
-    active.push(`${labels[id] ?? id}: ${values.join(', ')}`)
+    active.push(`${labels[id] ?? id}: ${values.map((value) => valueLabel?.(id, value) ?? value).join(', ')}`)
   }
 
   return (

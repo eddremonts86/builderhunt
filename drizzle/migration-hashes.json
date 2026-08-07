@@ -648,6 +648,10 @@
     "0161_sprints_keyset_indexes": {
       "sql": "23864d21050d076c978235a30a9ad6905f4da4adccf8ca634fa9646b5b13d800",
       "snapshot": "61741164aeb855a95e8f40d094fa455f8b9af0ff7d45036c817580664e43c6a2"
+    },
+    "0162_alerts_keyset_indexes": {
+      "sql": "1c39ef303bce508bac309a3bf9af091fe439f3b74747c572a7d94b3ef28c1e96",
+      "snapshot": "4df1f605eb2bee9f84b2d2a67a1e5ffc516ec75f89b6e38dac0377f6c50b10dc"
     }
   }
 }

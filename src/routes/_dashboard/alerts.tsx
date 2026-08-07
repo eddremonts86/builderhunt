@@ -18,7 +18,7 @@
  * what turns a match from a dead-end username into something actionable.
  */
 import * as React from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Bell, BellOff, Check, Clock, Inbox, Pause, Play, Plus, Radar, Send, Trash2, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { formatDistanceToNow } from '~/shared/lib/format'
@@ -27,6 +27,15 @@ import { formatDistanceToNow } from '~/shared/lib/format'
 // and which crashes this page at runtime.
 import { readAlertMatchPayload, type AlertMatchPayload } from '~/shared/lib/alerts-shared'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
+import { DataTable } from '~/shared/components/table'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import {
+  pickTableSearchParams,
+  serializeTableSearch,
+  tableSearchSchema,
+  tableSearchToParams,
+} from '~/shared/lib/table/query-url'
+import type { PageResult, TableQuery, TableSearch } from '~/shared/lib/table/types'
 import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { Button } from '~/components/ui/button'
@@ -99,6 +108,9 @@ const EVENT_LABELS: Record<string, string> = {
 }
 
 export const Route = createFileRoute('/_dashboard/alerts')({
+  // The inbox's state is the URL: which radar, which match type, how it is grouped. Flat params,
+  // not a parsed `TableSearch` — the router re-serializes whatever this returns.
+  validateSearch: (raw: Record<string, unknown>) => pickTableSearchParams(raw),
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) throw new Error('Unauthorized')
@@ -107,39 +119,26 @@ export const Route = createFileRoute('/_dashboard/alerts')({
   component: AlertsInboxPage,
 })
 
-interface MatchGroup {
-  alertId: string
-  alertName: string
-  enabled: boolean
-  triggers: Trigger[]
-  unread: number
-}
+/** A trigger plus the name of the radar that found it — see `pageOrganizationTriggers`. */
+type TriggerRow = Trigger & { alertName: string | null } & Record<string, unknown>
 
-/** Groups matches under their radar, newest group first. Triggers whose alert
- *  was deleted still surface (under a neutral label) rather than vanishing —
- *  the match already happened and the recruiter may still want to act on it. */
-function groupByAlert(triggers: Trigger[], alerts: AlertRow[]): MatchGroup[] {
-  const byId = new Map(alerts.map((a) => [a.id, a]))
-  const groups = new Map<string, MatchGroup>()
-  for (const trigger of triggers) {
-    let group = groups.get(trigger.alertId)
-    if (!group) {
-      const alert = byId.get(trigger.alertId)
-      group = {
-        alertId: trigger.alertId,
-        alertName: alert?.name ?? 'Deleted radar',
-        enabled: alert?.enabled ?? false,
-        triggers: [],
-        unread: 0,
-      }
-      groups.set(trigger.alertId, group)
-    }
-    group.triggers.push(trigger)
-    if (!trigger.readAt) group.unread++
-  }
-  return [...groups.values()]
-}
+const EMPTY_TRIGGERS: PageResult<TriggerRow> = { rows: [], nextCursor: null, total: 0, facets: {} }
 
+const ALERT_TRIGGER_LABELS: Record<string, string> = { alertId: 'Radar', eventType: 'Match type' }
+
+/**
+ * `MatchGroup` and `groupByAlert` used to live here.
+ *
+ * They grouped whatever triggers the browser held — 100 of them, with no way to ask for the 101st —
+ * and printed `group.triggers.length` as the group's size. For a radar with 300 matches the header
+ * said "12 matches", and it looked entirely right, which is why it survived. The shell's grouping
+ * replaces it: the server orders by `(alert_id, matched_at)` so a group is contiguous, and the
+ * header's total comes from the server's facet over the whole filtered set.
+ *
+ * Grouping is by `alertId`, not by name — two radars may share one — so `groupLabel` maps the id
+ * back to the name, and a match whose radar was deleted still surfaces under a neutral label rather
+ * than vanishing.
+ */
 function toCardData(id: string, match: AlertMatchPayload): PersonCardData {
   return {
     id,
@@ -176,8 +175,20 @@ function SummaryStat({ label, value, icon: Icon }: {
 }
 
 function AlertsInboxPage() {
-  const [triggers, setTriggers] = React.useState<Trigger[]>([])
+  const params = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
+  // Grouped by radar unless the URL says otherwise — that is how the inbox has always read.
+  const search = React.useMemo(() => {
+    const parsed = tableSearchSchema(params)
+    return parsed.query.groupBy === null && params.group === undefined
+      ? { ...parsed, query: { ...parsed.query, groupBy: 'alertId' } }
+      : parsed
+  }, [params])
+
+  const [triggersPage, setTriggersPage] = React.useState<PageResult<TriggerRow>>(EMPTY_TRIGGERS)
   const [userAlerts, setUserAlerts] = React.useState<AlertRow[]>([])
+  /** The whole organization's unread count, not the loaded page's. Its own endpoint. */
+  const [unread, setUnread] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [showForm, setShowForm] = React.useState(false)
   const [formError, setFormError] = React.useState<string | null>(null)
@@ -199,37 +210,58 @@ function AlertsInboxPage() {
   const [sendingTestId, setSendingTestId] = React.useState<string | null>(null)
   const [testResults, setTestResults] = React.useState<Map<string, { kind: 'delivered' | 'degraded' | 'rate_limited'; message: string }>>(new Map())
 
-  const load = React.useCallback(async () => {
+  /**
+   * Both endpoints answer a `PageResult` now.
+   *
+   * The radar list reads `.rows` and stays the card list it was — the task asked for the inbox's
+   * grouping to move to the shell, not for the radar cards (test-send, frequency, enable, the last
+   * evaluation error) to become table cells. Its read is bounded either way.
+   */
+  const load = React.useCallback(async (next: TableSearch, append = false) => {
     try {
-      const [triggersRes, alertsRes] = await Promise.all([
-        fetch('/api/alerts/triggers', { credentials: 'include' }),
+      const [triggersRes, alertsRes, unreadRes] = await Promise.all([
+        fetch(`/api/alerts/triggers?${tableSearchToParams(next).toString()}`, { credentials: 'include' }),
         fetch('/api/alerts', { credentials: 'include' }),
+        fetch('/api/alerts/triggers/unread-count', { credentials: 'include' }),
       ])
-      // Both endpoints return a bare array on success but an `{ error }`
-      // object on failure — guard, or a failed request poisons `.filter`.
-      const triggerData = triggersRes.ok ? await triggersRes.json() : []
-      const alertData = alertsRes.ok ? await alertsRes.json() : []
-      setTriggers(Array.isArray(triggerData) ? triggerData : [])
-      setUserAlerts(Array.isArray(alertData) ? alertData : [])
+      const triggerPage = triggersRes.ok ? await triggersRes.json() as PageResult<TriggerRow> : EMPTY_TRIGGERS
+      const alertPage = alertsRes.ok ? await alertsRes.json() as PageResult<AlertRow> : null
+      const unreadBody = unreadRes.ok ? await unreadRes.json() as { count?: number } : null
+      setTriggersPage((current) => append
+        ? { ...triggerPage, rows: [...current.rows, ...triggerPage.rows] }
+        : triggerPage)
+      setUserAlerts(Array.isArray(alertPage?.rows) ? alertPage.rows : [])
+      setUnread(unreadBody?.count ?? 0)
     } catch {
-      setTriggers([])
+      setTriggersPage(EMPTY_TRIGGERS)
       setUserAlerts([])
     } finally {
       setLoading(false)
     }
   }, [])
 
+  const searchKey = tableSearchToParams(search).toString()
   React.useEffect(() => {
-    load()
-  }, [load])
+    void load(search)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKey])
+
+  const reload = React.useCallback(() => load(search), [load, search])
 
   const markRead = async (id: string) => {
     await fetch(`/api/alerts/triggers/${id}`, { method: 'PATCH', credentials: 'include' })
-    await load()
+    await reload()
   }
 
+  /**
+   * Marks the *loaded* matches read, which is what it always did.
+   *
+   * It was labelled "Mark all as read" while operating on the 100 triggers the browser held. That
+   * was already inaccurate; it becomes a visible inaccuracy now that the unread badge shows the
+   * organization's real total, so the label says what it does.
+   */
   const markAllRead = async (ids?: string[]) => {
-    const unreadIds = ids ?? triggers.filter((t) => !t.readAt).map((t) => t.id)
+    const unreadIds = ids ?? triggersPage.rows.filter((t) => !t.readAt).map((t) => t.id)
     if (unreadIds.length === 0) return
     setMarkingAll(true)
     try {
@@ -238,7 +270,7 @@ function AlertsInboxPage() {
           fetch(`/api/alerts/triggers/${id}`, { method: 'PATCH', credentials: 'include' }),
         ),
       )
-      await load()
+      await reload()
     } finally {
       setMarkingAll(false)
     }
@@ -275,7 +307,7 @@ function AlertsInboxPage() {
       setKeywords('')
       setMinStars('')
       setShowForm(false)
-      await load()
+      await reload()
     } catch (e) {
       setFormError(String(e))
     } finally {
@@ -290,7 +322,7 @@ function AlertsInboxPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     })
-    await load()
+    await reload()
   }
 
   const toggleAlertEnabled = async (id: string, enabled: boolean) => {
@@ -302,7 +334,7 @@ function AlertsInboxPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !enabled }),
       })
-      await load()
+      await reload()
     } finally {
       setTogglingId(null)
     }
@@ -315,7 +347,7 @@ function AlertsInboxPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ frequency: nextFrequency }),
     })
-    await load()
+    await reload()
   }
 
   const sendTestAlert = async (id: string) => {
@@ -347,10 +379,73 @@ function AlertsInboxPage() {
     setTrackedRowIds((prev) => new Map(prev).set(`${match.source}:${match.sourceId}`, organizationBuilderId))
   }, [])
 
-  const unread = triggers.filter((t) => !t.readAt).length
   const hasAlerts = userAlerts.length > 0
-  const groups = React.useMemo(() => groupByAlert(triggers, userAlerts), [triggers, userAlerts])
   const activeRadars = userAlerts.filter((a) => a.enabled).length
+  const alertNames = React.useMemo(
+    () => new Map(userAlerts.map((alert) => [alert.id, alert.name])),
+    [userAlerts],
+  )
+  /** A match whose radar was deleted keeps its row; the row carries the label. */
+  const radarLabel = React.useCallback(
+    (alertId: string) => alertNames.get(alertId)
+      ?? triggersPage.rows.find((row) => row.alertId === alertId)?.alertName
+      ?? 'Deleted radar',
+    [alertNames, triggersPage.rows],
+  )
+  const loadedUnread = triggersPage.rows.filter((t) => !t.readAt).length
+
+  /**
+   * One wide column carrying the person card, plus the two the grouping and the chips need.
+   *
+   * Deliberately not a cell-per-field table. A match is a *person*, and `PersonResultCard` — the
+   * same component Search and Explore use — is what makes it actionable rather than a username in a
+   * cell. The shell does not require a row to be thin; it requires the server to have decided which
+   * rows and in what order, which it now has.
+   */
+  const matchColumns = React.useMemo<ColumnDef<TriggerRow>[]>(() => [
+    {
+      id: 'match',
+      header: 'Match',
+      priority: 'primary',
+      // The row *is* this column. At an equal share of the width beside the two thin ones, the
+      // person card collapsed to an avatar and a truncated username.
+      weight: 6,
+      value: (trigger) => trigger.id,
+      cell: (trigger) => (
+        <MatchRow
+          trigger={trigger}
+          trackedRowIds={trackedRowIds}
+          onTracked={onMatchTracked}
+          onMarkRead={markRead}
+        />
+      ),
+    },
+    {
+      id: 'alertId',
+      header: 'Radar',
+      groupable: true,
+      priority: 'secondary',
+      // The grouped value must be what the server counted — the id — or `GroupRow` has no honest
+      // total. `groupLabel` turns it into the name for display.
+      value: (trigger) => trigger.alertId,
+      cell: (trigger) => (
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-bh-text-dim">
+          <Radar className="w-3 h-3 shrink-0 text-bh-accent" aria-hidden="true" />
+          <span className="truncate">{radarLabel(trigger.alertId)}</span>
+        </span>
+      ),
+    },
+    {
+      id: 'matchedAt',
+      header: 'Matched',
+      sortable: true,
+      align: 'end',
+      priority: 'secondary',
+      value: (trigger) => trigger.matchedAt,
+      cell: (trigger) => formatDistanceToNow(new Date(trigger.matchedAt)),
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [radarLabel, trackedRowIds, onMatchTracked])
 
   return (
     <div data-testid="alerts-inbox-page">
@@ -506,7 +601,9 @@ function AlertsInboxPage() {
         <>
           {hasAlerts && (
             <div className="card p-5 mb-8 grid grid-cols-2 sm:grid-cols-4 gap-4" data-testid="alerts-summary">
-              <SummaryStat label="Matches found" value={triggers.length} icon={Inbox} />
+              {/* The whole filtered set, from `PageResult.total` — not the loaded page's length,
+                  which is what this stat used to show. */}
+              <SummaryStat label="Matches found" value={triggersPage.total} icon={Inbox} />
               <SummaryStat label="Unread" value={unread} icon={Bell} />
               <SummaryStat label="Active radars" value={activeRadars} icon={Radar} />
               <SummaryStat label="Paused radars" value={userAlerts.length - activeRadars} icon={BellOff} />
@@ -524,7 +621,9 @@ function AlertsInboxPage() {
               </h2>
               <div className="space-y-2" data-testid="alerts-config-list">
                 {userAlerts.map((a) => {
-                  const matchCount = triggers.filter((t) => t.alertId === a.id).length
+                  // The server's count for this radar over the whole filtered set — the facet the
+                  // group headers use. `null` when the radar has no matches at all.
+                  const matchCount = triggersPage.facets.alertId?.find((facet) => facet.value === a.id)?.count ?? 0
                   const testResult = testResults.get(a.id)
                   return (
                     // Wraps on narrow viewports: the frequency Select (128px)
@@ -684,7 +783,7 @@ function AlertsInboxPage() {
               >
                 Matches
               </h2>
-              {unread > 0 && (
+              {loadedUnread > 0 && (
                 <Button
                   type="button"
                   onClick={() => markAllRead()}
@@ -694,65 +793,52 @@ function AlertsInboxPage() {
                   className="text-xs"
                   data-testid="alerts-mark-all-read"
                 >
-                  {markingAll ? 'Marking…' : 'Mark all as read'}
+                  {/* It marks the loaded matches, which is all it ever did. The badge above now
+                      shows the organization's real unread total, so "all" would be a visible lie. */}
+                  {markingAll ? 'Marking…' : `Mark these ${loadedUnread} as read`}
                 </Button>
               )}
             </div>
 
-            {groups.length === 0 ? (
-              <div className="card text-center py-12" data-testid="alerts-empty">
-                <Inbox className="w-8 h-8 text-bh-text-dim mx-auto mb-3" aria-hidden="true" />
-                <p className="text-bh-text-muted mb-2">
-                  {hasAlerts ? 'No matches yet — sit tight.' : 'No radars set up yet.'}
-                </p>
-                <p className="text-xs text-bh-text-dim">
-                  {hasAlerts
-                    ? "We'll list every builder your radars find right here."
-                    : 'Create a radar above and we\'ll start watching for builders that fit.'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-8" data-testid="alerts-list">
-                {groups.map((group) => (
-                  <div key={group.alertId} data-testid={`alert-group-${group.alertId}`}>
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <p className="text-sm font-semibold text-bh-text flex items-center gap-2 min-w-0">
-                        <Radar className="w-3.5 h-3.5 text-bh-accent shrink-0" aria-hidden="true" />
-                        <span className="truncate">{group.alertName}</span>
-                        <span className="text-xs font-normal text-bh-text-dim shrink-0">
-                          {group.triggers.length === 1 ? '1 match' : `${group.triggers.length} matches`}
-                          {group.unread > 0 ? ` · ${group.unread} new` : ''}
-                        </span>
-                      </p>
-                      {group.unread > 0 && (
-                        <Button
-                          type="button"
-                          onClick={() => markAllRead(group.triggers.filter((t) => !t.readAt).map((t) => t.id))}
-                          disabled={markingAll}
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs shrink-0"
-                        >
-                          Mark group read
-                        </Button>
-                      )}
-                    </div>
-
-                    <ul className="space-y-2">
-                      {group.triggers.map((t) => (
-                        <MatchRow
-                          key={t.id}
-                          trigger={t}
-                          trackedRowIds={trackedRowIds}
-                          onTracked={onMatchTracked}
-                          onMarkRead={markRead}
-                        />
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
+            <DataTable
+              label="Alert matches"
+              columns={matchColumns}
+              page={triggersPage}
+              query={search.query}
+              onQueryChange={(query: TableQuery) => void navigate({
+                search: serializeTableSearch({ ...search, query, page: { ...search.page, cursor: null } }),
+                replace: true,
+              })}
+              renderer="grouped"
+              // The stored values are alert ids, because that is what the server counted its facet
+              // over and because two radars may share a name. This is where they become readable —
+              // in the group header, the chips, the command sheet and the filtered-empty copy alike.
+              valueLabel={(dimension, value) => dimension === 'alertId' ? radarLabel(value) : value}
+              rowTestId={(trigger) => `alert-trigger-${trigger.id}`}
+              rowId={(trigger) => trigger.id}
+              filterLabels={ALERT_TRIGGER_LABELS}
+              // Nothing on `alert_triggers` is searchable: the only text worth typing is inside the
+              // `payload` jsonb. See the capability.
+              searchable={false}
+              status={loading && triggersPage.rows.length === 0 ? 'loading' : 'ready'}
+              onLoadMore={() => {
+                if (!triggersPage.nextCursor || loading) return
+                void load({ ...search, page: { ...search.page, cursor: triggersPage.nextCursor } }, true)
+              }}
+              emptyState={(
+                <div className="px-4 py-12 text-center" data-testid="alerts-empty">
+                  <Inbox className="w-8 h-8 text-bh-text-dim mx-auto mb-3" aria-hidden="true" />
+                  <p className="text-bh-text-muted mb-2">
+                    {hasAlerts ? 'No matches yet — sit tight.' : 'No radars set up yet.'}
+                  </p>
+                  <p className="text-xs text-bh-text-dim">
+                    {hasAlerts
+                      ? "We'll list every builder your radars find right here."
+                      : 'Create a radar above and we\'ll start watching for builders that fit.'}
+                  </p>
+                </div>
+              )}
+            />
           </section>
         </>
       )}
@@ -800,10 +886,7 @@ function MatchRow({ trigger, trackedRowIds, onTracked, onMarkRead }: {
   // plain summary rather than dropping the match.
   if (!match) {
     return (
-      <li
-        className={`card p-4 flex items-start gap-3 ${isUnread ? 'border-bh-accent/30 bg-bh-accent/5' : ''}`}
-        data-testid={`alert-trigger-${trigger.id}`}
-      >
+      <div className={`flex w-full items-start gap-3 ${isUnread ? 'font-medium' : ''}`}>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-bh-text">{label}</p>
           {typeof trigger.payload?.name === 'string' && (
@@ -820,7 +903,7 @@ function MatchRow({ trigger, trackedRowIds, onTracked, onMarkRead }: {
           )}
         </div>
         {meta}
-      </li>
+      </div>
     )
   }
 
@@ -837,11 +920,10 @@ function MatchRow({ trigger, trackedRowIds, onTracked, onMarkRead }: {
     // space — at ~800px the card was squeezed to ~490px and
     // PersonResultCard's `truncate`d name collapsed to nothing, rendering a
     // match as a bare "@user…" with no name at all.
-    <li
-      className={`card flatten-nested-card p-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3 ${
-        isUnread ? 'border-bh-accent/40 bg-bh-accent/5' : ''
+    <div
+      className={`flatten-nested-card flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:gap-3 ${
+        isUnread ? 'border-l-2 border-bh-accent pl-2' : ''
       }`}
-      data-testid={`alert-trigger-${trigger.id}`}
     >
       <>
         <div className="flex-1 min-w-0">
@@ -872,6 +954,6 @@ function MatchRow({ trigger, trackedRowIds, onTracked, onMarkRead }: {
           {meta}
         </div>
       </>
-    </li>
+    </div>
   )
 }

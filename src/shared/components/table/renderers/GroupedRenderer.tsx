@@ -22,6 +22,7 @@ export function GroupedRenderer<Row>({ context }: { context: RendererContext<Row
           <GroupRow
             key={entry.key}
             value={entry.value}
+            label={context.query.groupBy ? context.valueLabel?.(context.query.groupBy, entry.value) : undefined}
             total={entry.total}
             loaded={entry.loaded}
             columnCount={columnCount}

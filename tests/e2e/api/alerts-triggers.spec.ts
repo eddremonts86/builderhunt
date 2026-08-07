@@ -157,8 +157,9 @@ test.describe('GET /api/alerts/triggers', () => {
 
     const response = await harness.a.principal.api!.get('/api/alerts/triggers')
     expect(response.status(), await response.text()).toBe(200)
-    const rows = await response.json() as Array<{ id: string }>
-    const ids = rows.map((row) => row.id)
+    // A `PageResult` since plans/phase-3/10 — the inbox is a keyset page, not a capped list.
+    const page = await response.json() as { rows: Array<{ id: string }> }
+    const ids = page.rows.map((row) => row.id)
 
     // A trigger names a builder someone is watching, so a cross-tenant leak here is competitive intelligence, not
     // just a stray row. Both directions asserted: mine present makes theirs' absence meaningful.

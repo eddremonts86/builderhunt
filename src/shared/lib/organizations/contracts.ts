@@ -24,9 +24,7 @@ import {
   getSeatUsage,
   listInvitationsForEmail,
   listMyOrganizations,
-  listOrganizationMembers,
   listOwnershipTransferCandidates,
-  listPendingInvitations,
   OrganizationLifecycleError,
   pageOrganizationInvitations,
   pageOrganizationMembers,
@@ -44,8 +42,6 @@ export {
   getSeatUsage,
   listInvitationsForEmail,
   listMyOrganizations,
-  listOrganizationMembers,
-  listPendingInvitations,
   requireTenantPrincipal,
   STALE_SESSION_ERROR_MESSAGE,
 }

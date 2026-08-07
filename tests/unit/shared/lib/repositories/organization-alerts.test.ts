@@ -17,10 +17,21 @@ describe('organization alerts repository boundary', () => {
     expect(source).toContain("~/shared/lib/repositories/organization-alerts")
   })
 
+  /**
+   * The point is that the route never reads without a tenant principal and a tenant transaction —
+   * not that it spells those two calls itself.
+   *
+   * `tablePageHandler` runs `requireTenantPrincipal` before it parses anything and opens
+   * `withTenantContext` around the load (src/shared/lib/table/handler.ts), which is the whole reason
+   * it exists. A route whose only handler is that call satisfies this rule while containing neither
+   * literal, so accepting it is recognising the guard, not loosening it — the same call
+   * `scripts/check-route-coverage.mjs` makes for the same helper.
+   */
   it.each(tenantSurfaces.filter((path) => path.startsWith('src/routes/')))('%s derives tenant context', async (path) => {
     const source = await readFile(path, 'utf8')
-    expect(source).toContain('requireTenantPrincipal')
-    expect(source).toContain('withTenantContext')
+    const delegated = /\btablePageHandler\b/.test(source)
+    expect(delegated || source.includes('requireTenantPrincipal')).toBe(true)
+    expect(delegated || source.includes('withTenantContext')).toBe(true)
   })
 
   it('worker uses the dedicated worker repository', async () => {

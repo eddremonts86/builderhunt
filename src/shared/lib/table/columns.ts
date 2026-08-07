@@ -23,6 +23,15 @@ export interface ColumnDef<Row> {
    */
   value?: (row: Row) => string | number | null
   align?: 'start' | 'end'
+  /**
+   * Share of the free width, relative to the other flexible columns. Defaults to 1.
+   *
+   * Needed the moment a column *is* the row rather than a field of it. The alerts inbox renders a
+   * whole person card in one cell beside two thin ones; at an equal share the card was squeezed to
+   * about a third of the row and `PersonResultCard`'s truncated name collapsed to nothing, so a
+   * match read as a bare avatar. `align: 'end'` columns are sized to their content and ignore this.
+   */
+  weight?: number
   sortable?: boolean
   groupable?: boolean
   /**

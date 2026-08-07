@@ -1,6 +1,10 @@
-import { and, asc, desc, eq, gte, isNotNull, lt, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { alerts, alertTriggers } from '../db/schema'
+import { alertTriggersCapability } from '../table/capabilities/alert-triggers'
+import { alertsCapability } from '../table/capabilities/alerts'
+import { buildKeysetPage } from '../table/keyset'
+import type { PageRequest, PageResult, TableQuery } from '../table/types'
 import type { TenantPrincipal } from '../authorization/permissions'
 import { findVisibleSavedQueryById } from './saved-queries'
 import { SharedResourceError } from '../shared-resources/contracts'
@@ -39,10 +43,65 @@ export interface CreateOrganizationAlertInput {
   queryId?: string | null
 }
 
-export function listOrganizationAlerts(transaction: TenantTransaction, organizationId: string) {
-  return transaction.select().from(alerts)
-    .where(eq(alerts.organizationId, organizationId))
-    .orderBy(desc(alerts.createdAt))
+/**
+ * The radar-list row the alerts page renders.
+ *
+ * Narrower than the table, and every field here is one the page actually reads — including
+ * `triggerConditions`, which the first version of this projection omitted. The page renders
+ * `a.triggerConditions.eventType`, so the omission was an immediate `TypeError` on mount; a field it
+ * read only sometimes would have been a much quieter bug, which is the argument for a projection
+ * this explicit rather than `select()`.
+ */
+export interface OrganizationAlertPageRow extends Record<string, unknown> {
+  id: string
+  name: string
+  keywords: string[]
+  frequency: string | null
+  deliveryChannel: string | null
+  enabled: boolean
+  triggerConditions: typeof alerts.$inferSelect['triggerConditions']
+  lastTriggeredAt: string | null
+  nextEvaluationAt: string | null
+  lastEvaluationErrorCode: string | null
+  createdAt: string | null
+}
+
+/** One keyset page of the organization's radars. */
+export function pageOrganizationAlerts(
+  transaction: TenantTransaction,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<OrganizationAlertPageRow>> {
+  return buildKeysetPage<OrganizationAlertPageRow>(transaction, alertsCapability, query, page, {
+    select: {
+      id: alerts.id,
+      name: alerts.name,
+      keywords: alerts.keywords,
+      frequency: alerts.frequency,
+      deliveryChannel: alerts.deliveryChannel,
+      enabled: alerts.enabled,
+      triggerConditions: alerts.triggerConditions,
+      lastTriggeredAt: alerts.lastTriggeredAt,
+      nextEvaluationAt: alerts.nextEvaluationAt,
+      lastEvaluationErrorCode: alerts.lastEvaluationErrorCode,
+      createdAt: alerts.createdAt,
+    },
+    mapRow: (row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      keywords: (row.keywords as string[] | null) ?? [],
+      frequency: (row.frequency as string | null) ?? null,
+      deliveryChannel: (row.deliveryChannel as string | null) ?? null,
+      // `enabled` is nullable in the schema with a `true` default; a null row predates the column
+      // and behaves as enabled everywhere else, so it reads as enabled here too.
+      enabled: (row.enabled as boolean | null) ?? true,
+      triggerConditions: row.triggerConditions as OrganizationAlertPageRow['triggerConditions'],
+      lastTriggeredAt: (row.lastTriggeredAt as Date | null)?.toISOString() ?? null,
+      nextEvaluationAt: (row.nextEvaluationAt as Date | null)?.toISOString() ?? null,
+      lastEvaluationErrorCode: (row.lastEvaluationErrorCode as string | null) ?? null,
+      createdAt: (row.createdAt as Date | null)?.toISOString() ?? null,
+    }),
+  })
 }
 
 export async function createOrganizationAlert(
@@ -175,6 +234,53 @@ export async function recordOrganizationTrigger(
     .set({ lastTriggeredAt: new Date() })
     .where(and(eq(alerts.organizationId, input.organizationId), eq(alerts.id, input.alertId)))
   return toTriggerRecord(row)
+}
+
+/**
+ * One keyset page of the inbox, each row carrying the name of the radar that found it.
+ *
+ * The name is resolved for the page's rows rather than joined: a capability describes one table, and
+ * `alerts.name` is on the other one. The page's group headers key off `alertId` — the dimension the
+ * server counted — and the surface maps that id to this name for the label, so the number beside a
+ * radar's name describes the whole group rather than the part that happens to be loaded.
+ *
+ * A trigger whose radar was deleted keeps a null name. It is deliberately still returned: the match
+ * already happened and the recruiter may still want to act on it, which is the same reason
+ * `groupByAlert` labelled those "Deleted radar".
+ */
+// unbounded-read-ok: the name lookup below carries no LIMIT because it does not need one — its
+// `inArray` holds the distinct alert ids of this page, so it is bounded by TABLE_PAGE_SIZE.
+export async function pageOrganizationTriggers(
+  transaction: TenantTransaction,
+  query: TableQuery,
+  page: PageRequest,
+): Promise<PageResult<AlertTriggerRecord & { alertName: string | null }>> {
+  const result = await buildKeysetPage<AlertTriggerRecord>(transaction, alertTriggersCapability, query, page, {
+    select: {
+      id: alertTriggers.id,
+      alertId: alertTriggers.alertId,
+      userId: alertTriggers.userId,
+      builderId: alertTriggers.builderId,
+      eventType: alertTriggers.eventType,
+      payload: alertTriggers.payload,
+      matchedAt: alertTriggers.matchedAt,
+      readAt: alertTriggers.readAt,
+    },
+    mapRow: (row) => toTriggerRecord(row as unknown as typeof alertTriggers.$inferSelect),
+  })
+
+  if (result.rows.length === 0) return { ...result, rows: [] }
+
+  const names = await transaction
+    .select({ id: alerts.id, name: alerts.name })
+    .from(alerts)
+    .where(inArray(alerts.id, [...new Set(result.rows.map((row) => row.alertId))]))
+  const byId = new Map(names.map((row) => [row.id, row.name]))
+
+  return {
+    ...result,
+    rows: result.rows.map((row) => ({ ...row, alertName: byId.get(row.alertId) ?? null })),
+  }
 }
 
 export async function listOrganizationTriggers(

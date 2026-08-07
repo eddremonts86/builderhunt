@@ -102,6 +102,15 @@
     The fix is either to demand a second index for the descending shape or to make `nullsLast`
     direction-aware, and it belongs with the other pagination gates.
 
+    **Second blind spot, same origin.** The guard inspects each sortable column *in isolation*, and
+    grouping produces a composite ordering: `resolveSort` leads the `ORDER BY` with the group column,
+    so the alerts inbox really orders by `(alert_id, matched_at, id)` while the guard only ever asks
+    for `(org, alert_id, id)` and `(org, matched_at, id)`. All three indexes exist on
+    `alert_triggers` — the composite one because the query needs it, the two shorter ones because the
+    guard demands them and because a URL can ask for either sort alone. A capability that added only
+    the composite index would pass no check and a capability that added only the two would pass every
+    check while the grouped page sorted the whole set. Worth teaching the guard about `groupable`.
+
     Unique constraints and primary keys are read as indexes, because they are — otherwise every
     "sort by the tiebreaker" would demand a duplicate index over the primary key.
 

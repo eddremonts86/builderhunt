@@ -41,6 +41,8 @@ export interface RendererContext<Row> {
    * virtualization is off the window covers every entry, so a renderer never needs two code paths.
    */
   entries: TableEntry<Row>[]
+  /** Turns a stored dimension value into a readable one. See `DataTable`. */
+  valueLabel?: (dimension: string, value: string) => string
   window: VirtualWindowItem[]
   /** Height of the scrolling content, so the scrollbar reflects the full list. */
   totalSize: number

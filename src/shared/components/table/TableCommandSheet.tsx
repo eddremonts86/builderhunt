@@ -14,6 +14,8 @@ interface TableCommandSheetProps<Row> {
   onQueryChange: (next: TableQuery) => void
   facets: PageResult<Row>['facets']
   labels?: Record<string, string>
+  /** Turns a stored dimension value into a readable one, same as the chips. */
+  valueLabel?: (dimension: string, value: string) => string
 }
 
 interface Verb {
@@ -32,7 +34,7 @@ interface Verb {
  * carries its facet count, which is the difference between choosing a filter and guessing at one.
  */
 export function TableCommandSheet<Row>(props: TableCommandSheetProps<Row>) {
-  const { open, onClose, columns, query, onQueryChange, facets, labels = {} } = props
+  const { open, onClose, columns, query, onQueryChange, facets, labels = {}, valueLabel } = props
   const [term, setTerm] = React.useState('')
   const searchRef = React.useRef<HTMLInputElement>(null)
 
@@ -63,7 +65,7 @@ export function TableCommandSheet<Row>(props: TableCommandSheetProps<Row>) {
         const active = (query.filters[id] ?? []).includes(facet.value)
         list.push({
           id: `filter:${id}:${facet.value}`,
-          label: `${active ? 'Remove' : 'Filter'} ${labels[id] ?? id}: ${facet.value}`,
+          label: `${active ? 'Remove' : 'Filter'} ${labels[id] ?? id}: ${valueLabel?.(id, facet.value) ?? facet.value}`,
           count: facet.count,
           run: () => {
             const current = query.filters[id] ?? []

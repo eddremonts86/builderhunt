@@ -11,6 +11,8 @@
  */
 
 export { abuseSignalsCapability, ABUSE_SIGNAL_FILTER_LABELS } from './abuse-signals'
+export { alertTriggersCapability, ALERT_TRIGGER_FILTER_LABELS, ALERT_EVENT_TYPES } from './alert-triggers'
+export { alertsCapability, ALERT_FILTER_LABELS, ALERT_FREQUENCIES, ALERT_CHANNELS } from './alerts'
 export { billingDisputesCapability, BILLING_DISPUTE_FILTER_LABELS, DISPUTE_OUTCOMES } from './billing-disputes'
 export { billingRefundsCapability, BILLING_REFUND_FILTER_LABELS } from './billing-refunds'
 export { organizationInvitationsCapability, ORGANIZATION_INVITATION_FILTER_LABELS, INVITABLE_ROLES } from './organization-invitations'

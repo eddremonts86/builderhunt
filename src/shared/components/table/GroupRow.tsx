@@ -1,5 +1,14 @@
 interface GroupRowProps {
   value: string
+  /**
+   * What to show instead of the raw grouped value.
+   *
+   * The group value has to be the dimension the *server* counted, or the facet lookup misses and
+   * there is no honest total to print. That dimension is sometimes an id: the alerts inbox groups by
+   * `alert_id`, because two radars may share a name and grouping by the name would merge them. So
+   * the value stays the id and the surface supplies the name.
+   */
+  label?: string
   /** Rows in this group across the whole filtered set — the server's number. */
   total: number | null
   /** Rows in this group that are currently loaded. */
@@ -18,7 +27,7 @@ interface GroupRowProps {
  * When the server sent no facet for the grouped dimension there is no honest total to show, so it
  * shows none rather than substituting the loaded count.
  */
-export function GroupRow({ value, total, loaded, columnCount }: GroupRowProps) {
+export function GroupRow({ value, label, total, loaded, columnCount }: GroupRowProps) {
   return (
     <div
       role="row"
@@ -26,7 +35,7 @@ export function GroupRow({ value, total, loaded, columnCount }: GroupRowProps) {
       data-testid={`table-group-${value}`}
     >
       <div role="gridcell" aria-colindex={1} className="flex items-baseline gap-2" style={{ gridColumn: `span ${columnCount}` }}>
-        <span className="text-sm font-semibold text-bh-text">{value}</span>
+        <span className="text-sm font-semibold text-bh-text">{label ?? value}</span>
         {total !== null && (
           <span className="tabular-nums text-xs text-bh-text-muted" data-testid={`table-group-${value}-total`}>
             {total.toLocaleString()} total

@@ -803,6 +803,11 @@ export const alerts = pgTable('alerts', {
   }),
   // The worker's due-set scan; also the calendar feed's read path for upcoming evaluations.
   nextEvaluationIdx: index('alerts_next_evaluation_idx').on(table.enabled, table.nextEvaluationAt),
+  // Keyset sorts for the radar list (plans/phase-3/10). `_next_evaluation_idx` above is the
+  // worker's cross-tenant due-set scan and does not lead with the organization, so it cannot serve
+  // a per-organization ordered walk.
+  orgCreatedIdIdx: index('alerts_org_created_id_idx').on(table.organizationId, table.createdAt, table.id),
+  orgNameIdIdx: index('alerts_org_name_id_idx').on(table.organizationId, table.name, table.id),
   failuresCheck: check('alerts_consecutive_failures_check', sql`${table.consecutiveFailures} >= 0`),
 }))
 
@@ -828,6 +833,19 @@ export const alertTriggers = pgTable('alert_triggers', {
     foreignColumns: [builders.organizationId, builders.id],
     name: 'alert_triggers_organization_builder_fk',
   }),
+  /*
+   * Keyset sorts for the inbox (plans/phase-3/10).
+   *
+   * Three, and each is used. The composite one serves the *grouped* walk, which orders by
+   * `(alert_id, matched_at, id)` because a group has to be contiguous to be readable. The two
+   * shorter ones serve the single-column sorts a URL can ask for on their own, which is also what
+   * plan 04's guard checks — it inspects each sortable column in isolation and cannot see the
+   * composite ordering grouping produces.
+   */
+  orgMatchedIdIdx: index('alert_triggers_org_matched_id_idx').on(table.organizationId, table.matchedAt, table.id),
+  orgAlertIdIdx: index('alert_triggers_org_alert_id_idx').on(table.organizationId, table.alertId, table.id),
+  orgAlertMatchedIdIdx: index('alert_triggers_org_alert_matched_id_idx')
+    .on(table.organizationId, table.alertId, table.matchedAt, table.id),
 }))
 
 export const builderNotes = pgTable('builder_notes', {
