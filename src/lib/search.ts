@@ -559,7 +559,19 @@ export async function pageBuilderSearch(opts: KeywordSearchPageOptions): Promise
 
   const { builders, sources } = await searchBuildersWithStatus({
     keywords: opts.keywords,
-    sources: requested,
+    /*
+     * `opts.sources`, not the materialised `requested` list.
+     *
+     * `cacheKey` includes whatever it is handed, so substituting the defaults here changed the key
+     * for every caller that names no sources — from `…rust---1-12` to
+     * `…rust-devto,github,hn,lobsters,reddit---1-12`. Same search, different key: the onboarding
+     * journey's seeded cache entry stopped being found and the page fell through to a live fan-out.
+     *
+     * `requested` is still what the fingerprint and the source snapshot are built from, which is the
+     * point of naming `DEFAULT_SEARCH_SOURCES`: "no sources" and "the five defaults" are the same
+     * search to a continuation, and must not be two entries to the cache.
+     */
+    sources: opts.sources,
     language: opts.language,
     country: opts.country,
     page: state.providerPage,

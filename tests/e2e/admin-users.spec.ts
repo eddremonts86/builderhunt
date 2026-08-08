@@ -206,7 +206,16 @@ test.describe('admin users — organization-owned billing', () => {
       await dismissOverlays(page)
 
       const row = page.getByTestId(`admin-user-row-${userId}`)
-      await row.getByTestId('admin-user-edit').click()
+      /*
+       * The shell's own expansion toggle, not a per-row "Edit" button.
+       *
+       * plans/phase-3/10 moved the grant form into `DataTable`'s `expansion` slot, and with it the
+       * per-row `admin-user-edit` button went away — the sibling unit test already records that.
+       * This spec kept clicking the old testid, so it timed out on a control that no longer exists.
+       * It went unnoticed because plan 10's verification ran `admin-journeys.spec.ts` and not this
+       * file, which is the gap `pnpm ci:local` closed.
+       */
+      await page.getByTestId(`admin-user-row-${userId}-expand`).click()
       await expect(page.getByTestId('admin-user-save')).toBeDisabled()
 
       /**
