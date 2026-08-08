@@ -54,8 +54,19 @@ test('an admin invites someone and sees the invitation appear as pending', async
     await gotoHydrated(page, `${harness.baseURL}/settings/team`)
     await dismissOverlays(page)
     await expect(page.getByTestId('team-settings-page')).toBeVisible({ timeout: 20_000 })
+    // Wait for the invitations grid to settle before typing, not just for the page shell. The page
+    // reads three queries now (snapshot, members, invitations — plan 10 split one into three), and
+    // `team-settings-page` goes visible on the first of them. Typing into the invite field while a
+    // later one lands re-renders the section and returns the controlled input to '', which the
+    // browser then blocks with its own "Please fill out this field." — no request, no error, and a
+    // 20s timeout on a list that was never going to change. Its settled empty state is the signal.
+    await expect(page.getByTestId('invitations-list')).toContainText('No pending invitations.', { timeout: 20_000 })
 
     await page.getByTestId('invite-email-input').fill(email)
+    // Assert the field actually holds it. Without this the failure above surfaces 20s later as
+    // "the list never showed the invitation", which is three inferences away from "the input was
+    // empty when the form submitted".
+    await expect(page.getByTestId('invite-email-input')).toHaveValue(email)
     await page.getByTestId('invite-submit-btn').click()
 
     // The row, not a toast: a toast disappears, and the admin's question is "is it pending *now*".

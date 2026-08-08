@@ -582,18 +582,33 @@ test.describe('federated search', () => {
     )
   })
 
+  async function loadedSearchCount(page: import('playwright/test').Page): Promise<number> {
+    return Number(await page.getByTestId('search-loaded-count').innerText())
+  }
+
   /**
    * Walk exactly the seeded set: ten pages of `TABLE_PAGE_SIZE`.
    *
-   * Nine clicks, not "until the button disappears". The tenth page exhausts provider page one and
-   * mints a cursor for provider page *two*, which this fixture deliberately does not seed — a
-   * loop that kept clicking would leave the cache and fetch from the live internet, which is how
-   * the first version of this test ended up asserting against 517 rows.
+   * Driven by the count, not by a click counter. A click is not the only thing that loads a page —
+   * the shell also fetches when its scroll container reaches the end (plan 06) — so one click can
+   * land two pages. The first version asserted `(click + 2) * 50` after every click, which encoded
+   * "only the button loads"; under load it failed with 300 where it wanted 250, one page *ahead*
+   * rather than one page short, and passed on every isolated re-run.
+   *
+   * What still has to hold is the ceiling. Past the seeded set the cursor asks for provider page
+   * *two*, which this fixture deliberately does not seed, and the request would leave the cache to
+   * fetch from the live internet — which is how the very first version of this test ended up
+   * asserting against 517 rows.
    */
   async function loadSeededSearchPages(page: import('playwright/test').Page): Promise<void> {
-    for (let click = 0; click < SEEDED_SEARCH_ROWS / 50 - 1; click += 1) {
+    let loaded = await loadedSearchCount(page)
+    while (loaded < SEEDED_SEARCH_ROWS) {
       await page.getByTestId('load-more-button').click()
-      await expect(page.getByTestId('search-loaded-count')).toHaveText(String((click + 2) * 50))
+      // Progress, so a click that lands nothing fails here instead of spinning the loop forever.
+      await expect.poll(() => loadedSearchCount(page), { timeout: 10_000 }).toBeGreaterThan(loaded)
+      loaded = await loadedSearchCount(page)
+      expect(loaded, 'never past the seeded set — beyond it the fixture stops isolating')
+        .toBeLessThanOrEqual(SEEDED_SEARCH_ROWS)
     }
   }
 
