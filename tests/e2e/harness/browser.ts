@@ -212,11 +212,17 @@ export function expectStrictBrowser(page: Page): StrictBrowserGuard {
   const isHostNetworkError = (text: string): boolean =>
     HOST_NETWORK_ERRORS.some((code) => text.includes(code))
 
-  const onConsole = (msg: { type(): string; text(): string }): void => {
+  const onConsole = (msg: { type(): string; text(): string; location?(): { url?: string } }): void => {
     // The console message Chromium logs *alongside* a failed subresource carries the same net error
     // token ("Failed to load resource: net::ERR_NETWORK_CHANGED"). Exempting the request without
     // exempting its console twin leaves the test failing on the other half of one event.
-    if (msg.type() === 'error' && !isHostNetworkError(msg.text())) record(`console.error: ${msg.text()}`)
+    if (msg.type() !== 'error' || isHostNetworkError(msg.text())) return
+    // Append the location, because Chromium's own text does not carry it. "Failed to load resource:
+    // the server responded with a status of 503" names neither the resource nor the route, and a CI
+    // log is all there is when it only reproduces there — that message cost an hour of guessing at
+    // which of a page's seven endpoints had answered.
+    const url = msg.location?.()?.url
+    record(`console.error: ${msg.text()}${url ? ` [${url}]` : ''}`)
   }
   const onPageError = (error: Error): void => {
     record(`pageerror: ${error.message}`)

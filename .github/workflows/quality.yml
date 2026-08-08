@@ -92,11 +92,12 @@ jobs:
       # off and `tests/e2e/calendar.spec.ts` asserted against `503 dependency_unavailable`
       # instead of the routes it was written for — eight of its eleven failures were that.
       #
-      # Only CALENDAR_ENABLED belongs here. SCHEDULING_ENABLED is set by each spec that
-      # needs it, through `startInterviewHarness`'s `flags`, which snapshots the previous
-      # value and restores it on teardown. Setting it globally too would change what that
-      # restore puts back, and at --workers=1 every spec shares the process it puts it back
-      # into. Redundant, with a leak vector attached.
+      # This block used to say CALENDAR_ENABLED was the only flag that belonged here, on the
+      # grounds that SCHEDULING_ENABLED is set per-spec through `startInterviewHarness`'s `flags`
+      # and setting it globally would disturb that restore. Two things were wrong with it. Only
+      # four specs pass that flag, and `.env` sets it globally anyway — so the "leak vector" has
+      # been the local configuration all along, and the suite is green under it. Meanwhile CI ran
+      # every other spec with the feature off, which is the divergence that mattered.
       CALENDAR_ENABLED: 'true'
 
       # ── Test-only credentials the app refuses to run without ────────────────────────────────────
@@ -126,7 +127,36 @@ jobs:
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      # `analyze.ts` documents its precedence: unavailable (503) is answered before the plan
+      # check (429), so without a token the work-sample spec never reaches the assertion it is
+      # named for. The value is never sent anywhere — the egress fake blocks the call.
+      #
+      # Set at job level rather than on the step: Actions reserves the `GITHUB_` prefix for
+      # variables *it* defines, and `GITHUB_TOKEN` is one of them — it is already present in every
+      # job, holding the real, privileged workflow token. Naming it here shadows that token for
+      # this job with a value that cannot authenticate anything, which is both what the app needs
+      # and strictly safer than leaving the privileged one visible to a test suite that shells out.
+      GITHUB_TOKEN: ci-only-not-a-real-token
       AI_DISABLED: 'false'
+
+      # ── Flags whose local value is not the app default ──────────────────────────────────────────
+      #
+      # Mirrored from `.env` so CI runs the configuration the suite is green against. They arrive in
+      # the runner locally through `tests/e2e/harness/load-env.ts`, which loads `.env` into the test
+      # process — which is why "each spec sets what it needs" looked true and was true of two of
+      # them. `env.ts` defaults every one of these to off, so CI was exercising a different product.
+      SCHEDULING_ENABLED: 'true'
+      CANDIDATE_UPLOADS_ENABLED: 'true'
+      CANDIDATE_WEB_IMPORT_ENABLED: 'true'
+      CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'true'
+      ACCESS_ALLOWLIST_ENABLED: 'true'
+      DEVPOST_ENABLED: 'true'
+      ABUSE_ENFORCEMENT_MODE: warn
+      ENRICHMENT_ALLOWED_CONNECTORS: github
+      # The billing suite drives the fake provider, but the page still renders its unavailable state
+      # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
+      # going to exist.
+      STRIPE_BILLING_ENABLED: 'true'
 
       # Where the documents suite puts candidate uploads and what scans them. The containers are
       # started in a step below, because a service container cannot be given a command.
@@ -303,6 +333,18 @@ jobs:
         run: pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings"
       - run: pnpm security:dependencies
       - run: pnpm build
+      # Without this a strict-collector violation or a timeout is only ever a log line; the
+      # traces and screenshots that say which request failed stayed on the runner.
+      - name: Upload the Playwright report when e2e fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Migrate + seed admin for the production-preview accessibility gate
         run: |
           pnpm exec drizzle-kit migrate

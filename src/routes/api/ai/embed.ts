@@ -28,13 +28,16 @@ export const Route = createFileRoute('/api/ai/embed')({
       ANY: methodNotAllowed(['POST']),
 
       POST: async ({ request }) => {
-        if (env.AI_DISABLED === 'true') {
-          return Response.json({ error: 'ai_disabled' }, { status: 503 })
-        }
-        if (!env.AI_EMBEDDING_URL || !env.AI_EMBEDDING_MODEL) {
-          return Response.json({ error: 'ai_unconfigured' }, { status: 503 })
-        }
-
+        // Authenticate before answering anything, including "this feature is off".
+        //
+        // These two 503s used to come first, so an anonymous caller learned whether the platform
+        // had embeddings configured without ever being asked who they were — and the auth check
+        // below never ran at all. It is the same rule `pnpm security:auth-before-validate` enforces
+        // for input validation, and availability is no more public than a request body.
+        //
+        // It stayed invisible locally because a developer's `.env` configures embeddings, so the
+        // guards fell through to the auth check and the spec passed. On CI, where they are not
+        // configured, `refuses an anonymous caller` got a 503.
         let principal
         try {
           principal = await requirePlatformAdminPrincipal(request)
@@ -42,6 +45,13 @@ export const Route = createFileRoute('/api/ai/embed')({
           const response = platformAdminErrorResponse(error)
           if (response) return response
           throw error
+        }
+
+        if (env.AI_DISABLED === 'true') {
+          return Response.json({ error: 'ai_disabled' }, { status: 503 })
+        }
+        if (!env.AI_EMBEDDING_URL || !env.AI_EMBEDDING_MODEL) {
+          return Response.json({ error: 'ai_unconfigured' }, { status: 503 })
         }
 
         let body: unknown

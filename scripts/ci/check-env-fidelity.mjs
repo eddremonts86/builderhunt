@@ -36,7 +36,6 @@ const CI_RUNS_WITHOUT = {
   // ── Third-party credentials CI has no account for ───────────────────────────────────────────
   // The connectors these belong to are exercised against the egress fake, never the real host —
   // `tests/e2e/harness/fakes/egress.ts` blocks the traffic outright.
-  GITHUB_TOKEN: 'connector credential; e2e uses the egress fake, never the real API',
   GITLAB_TOKEN: 'connector credential; e2e uses the egress fake, never the real API',
   CODEBERG_TOKEN: 'connector credential; e2e uses the egress fake, never the real API',
   REDDIT_CLIENT_ID: 'connector credential; e2e uses the egress fake, never the real API',
@@ -61,16 +60,10 @@ const CI_RUNS_WITHOUT = {
   // Setting these globally would change what `startInterviewHarness`'s flag restore puts back, and
   // at --workers=1 every spec shares the process it puts it back into. The workflow's own comment
   // on SCHEDULING_ENABLED says so.
-  SCHEDULING_ENABLED: 'set per-spec through startInterviewHarness flags; global would break the restore',
-  CANDIDATE_UPLOADS_ENABLED: 'set per-spec through startInterviewHarness flags',
-  CANDIDATE_WEB_IMPORT_ENABLED: 'set per-spec through startInterviewHarness flags',
   INTERVIEW_TRANSCRIPTION_ENABLED: 'set per-spec; needs DEEPGRAM_API_KEY, which CI does not have',
   PROFILE_REMOVAL_ENABLED: 'set per-spec',
   PROFILE_REMOVAL_HMAC_KEY: 'only read when PROFILE_REMOVAL_ENABLED is true, which is per-spec',
   ENRICHMENT_ENABLED: 'set per-spec',
-  ACCESS_ALLOWLIST_ENABLED: 'left in whatever state the environment says — fixtures pre-approve each address, see harness/fixtures/principals.ts',
-  DEVPOST_ENABLED: 'source is dead upstream (pnpm sources:probe); nothing asserts against it',
-  CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'set per-spec',
 
   // ── Supplied by other means in CI ───────────────────────────────────────────────────────────
   REDIS_URL: 'playwright.config.ts defaults it to the redis service on 6379',
@@ -78,9 +71,7 @@ const CI_RUNS_WITHOUT = {
   ADMIN_USER_IDS: 'seeded per-run by pnpm db:seed:admin, not configured',
 
   // ── Tuning with defaults that CI has no reason to override ──────────────────────────────────
-  ABUSE_ENFORCEMENT_MODE: 'defaulted; the kill-switch spec sets what it needs',
   AI_DISABLED_TASKS: 'defaulted to empty',
-  ENRICHMENT_ALLOWED_CONNECTORS: 'defaulted',
   ENRICHMENT_BATCH_SIZE: 'defaulted',
   ENRICHMENT_LEASE_SECONDS: 'defaulted',
   ENRICHMENT_MAX_ATTEMPTS: 'defaulted',
@@ -93,9 +84,21 @@ const CI_RUNS_WITHOUT = {
   // The billing specs drive the fake provider (`src/shared/lib/billing/fake-provider.ts`) and sign
   // their own webhooks; the separate "Stripe sandbox certification" job is what touches real
   // test-mode Stripe, and it carries its own secrets.
-  STRIPE_BILLING_ENABLED: 'set per-spec; the suite drives the fake provider',
   STRIPE_SECRET_KEY: 'the sandbox certification job carries the real test-mode key',
   STRIPE_WEBHOOK_SECRET: 'the sandbox certification job carries the real test-mode key',
+}
+
+/**
+ * Divergences that cannot be closed, and what each costs.
+ *
+ * Distinct from CI_RUNS_WITHOUT: these keys are *on* locally and *off* on CI, and no CI-only value
+ * fixes that because the feature needs a vendor account the runner has no way to hold. The entry is
+ * an admission that one surface is exercised in one place only — so anything asserting on it has to
+ * be a unit test or a local-only run, never a spec CI is expected to police.
+ */
+const DIVERGENCE_ACCEPTED = {
+  INTERVIEW_TRANSCRIPTION_ENABLED: 'needs a real Deepgram key; nothing in the CI suite asserts a transcription',
+  SENSITIVE_AI_ENABLED: 'needs a real EU Azure/Mistral deployment, which env.ts validates by region',
 }
 
 /** The quality job's `env:` block — six-space keys between `quality:` and its `steps:`. */
@@ -140,11 +143,50 @@ if (!existsSync(join(root, '.env'))) {
   process.exit(0)
 }
 
+/**
+ * The default `env.ts` falls back to, per key.
+ *
+ * Absence is only half the question. A key can be documented as "CI runs without this" and still
+ * diverge, because running *without* it means running with the app's default — and if `.env` sets
+ * something else, the two environments are configured differently no matter how well the absence is
+ * explained. Three flags hid here: `.env` had them `true`, `env.ts` defaults them `false`, and the
+ * exemption said "each spec sets it", which turned out to be true of exactly two of the eight keys
+ * it claimed. `tests/e2e/harness/load-env.ts` is why nobody noticed — it loads `.env` into the
+ * runner, so locally the flags arrive whether or not a spec asks.
+ */
+function declaredDefaults() {
+  const source = readFileSync(join(root, 'src/shared/lib/env.ts'), 'utf8')
+  const defaults = new Map()
+  for (const m of source.matchAll(/^\s{2}([A-Z_][A-Z0-9_]*):\s*z\.[^\n]*?\.default\((['"])(.*?)\2\)/gm)) {
+    defaults.set(m[1], m[3])
+  }
+  return defaults
+}
+
+function dotenvValues() {
+  const source = readFileSync(join(root, '.env'), 'utf8')
+  const values = new Map()
+  for (const line of source.split('\n')) {
+    const match = /^([A-Z_][A-Z0-9_]*)=(.*)$/.exec(line.trim())
+    if (match) values.set(match[1], match[2].trim())
+  }
+  return values
+}
+
 const workflow = workflowEnvKeys()
 const local = dotenvKeys()
 const used = await readKeys()
+const defaults = declaredDefaults()
+const values = dotenvValues()
 
 const gaps = [...local].filter((key) => used.has(key) && !workflow.has(key) && !(key in CI_RUNS_WITHOUT)).sort()
+
+/** Exempted, but `.env` overrides the default CI would run with — so the two still differ. */
+const divergent = [...local]
+  .filter((key) => used.has(key) && !workflow.has(key) && key in CI_RUNS_WITHOUT)
+  .filter((key) => defaults.has(key) && values.get(key) !== defaults.get(key))
+  .filter((key) => !(key in DIVERGENCE_ACCEPTED))
+  .sort()
 const stale = Object.keys(CI_RUNS_WITHOUT).filter((key) => workflow.has(key)).sort()
 
 console.log(JSON.stringify({
@@ -153,6 +195,8 @@ console.log(JSON.stringify({
   readByApp: used.size,
   documentedAbsences: Object.keys(CI_RUNS_WITHOUT).length,
   gaps: gaps.length,
+  divergentDefaults: divergent.length,
+  acceptedDivergences: Object.keys(DIVERGENCE_ACCEPTED).length,
 }))
 
 if (stale.length > 0) {
@@ -175,4 +219,15 @@ if (gaps.length > 0) {
   )
 }
 
-if (gaps.length > 0 || stale.length > 0) process.exit(1)
+if (divergent.length > 0) {
+  console.error(`\n${divergent.length} exempted key${divergent.length === 1 ? '' : 's'} whose .env value is not the default CI would run with:\n`)
+  for (const key of divergent) {
+    console.error(`  - ${key}: .env says ${JSON.stringify(values.get(key))}, env.ts defaults to ${JSON.stringify(defaults.get(key))}`)
+  }
+  console.error(
+    '\n  Being absent from CI is not the same as being off. Either set the key in the workflow so'
+    + '\n  both run the same configuration, or change .env to match the default.\n',
+  )
+}
+
+if (gaps.length > 0 || stale.length > 0 || divergent.length > 0) process.exit(1)
