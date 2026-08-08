@@ -814,7 +814,7 @@ test.describe('status page', () => {
     await withPage(browser, undefined, async (page) => {
       await page.goto(unsubscribeUrl)
       await page.waitForURL(/\/status\?unsubscribed=invalid/)
-      await expect(page.getByTestId('unsubscribe-result')).toContainText('invalid')
+      await expect(page.getByTestId('unsubscribe-result')).toContainText('no longer valid')
     })
   })
 
