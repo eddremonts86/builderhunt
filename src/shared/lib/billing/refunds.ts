@@ -49,6 +49,7 @@ import {
   findFullBillingRefund,
   lockBillingRefund,
   listPendingBillingRefundsWithoutProviderRefund,
+  PENDING_REFUND_REPAIR_BATCH,
   markBillingRefundProviderRefund,
   recordOperatorRefundDecision,
   updateBillingRefundState,
@@ -233,8 +234,20 @@ export async function listPendingPackRefundIds(
   transaction: TenantTransaction,
   organizationId: string,
 ): Promise<string[]> {
-  const rows = await listPendingBillingRefundsWithoutProviderRefund(transaction, organizationId)
-  return rows.filter((row) => row.policyDecision === 'full_unused_pack' || row.policyDecision === 'partial_pack_operator').map((row) => row.id)
+  // Drained: the read is bounded (plan 12) and every row in this queue is a refund the operator
+  // approved that Stripe never received, so stopping at a batch boundary leaves money owed.
+  const ids: string[] = []
+  let after: string | null = null
+  for (;;) {
+    const rows = await listPendingBillingRefundsWithoutProviderRefund(transaction, organizationId, after)
+    if (rows.length === 0) break
+    ids.push(...rows
+      .filter((row) => row.policyDecision === 'full_unused_pack' || row.policyDecision === 'partial_pack_operator')
+      .map((row) => row.id))
+    after = rows[rows.length - 1].id
+    if (rows.length < PENDING_REFUND_REPAIR_BATCH) break
+  }
+  return ids
 }
 
 export { findFullBillingRefund }

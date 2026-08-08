@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, lt, ne, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { accountDb } from '../db/client'
 // auth_users/auth_accounts are auth-broker-only tables (see
@@ -289,13 +289,48 @@ export const cancelPendingDeletion = (userId: string) => accountDb.update(deleti
   .where(and(eq(deletionRequests.userId, userId), eq(deletionRequests.status, 'pending')))
   .returning({ id: deletionRequests.id })
 
-export const listExpiredPendingDeletionRequests = () => accountDb.select({
+/**
+ * How many rows the two bounded reads in the deletion path take at a time.
+ *
+ * Both are **batches**, not pages, and both callers drain them. A deletion that covers the first
+ * fifty of anything is worse than the unbounded read it replaced: the rows it missed are personal
+ * data the subject asked to have erased, and nothing anywhere reports the shortfall.
+ *
+ * Overridable per call **only so a test can seed past it**. Proving the loop terminates needs a
+ * batch smaller than the fixture, and the alternative — seeding fifty-one organizations to test a
+ * boundary — tests the same property much more slowly.
+ */
+export const DELETION_BATCH = 50
+
+/**
+ * Deletion requests whose grace period has expired, one batch at a time.
+ *
+ * `processPendingDeletions` drains it. The queue is ordered by `gracePeriodEndsAt` so the subject
+ * who has been waiting longest is erased first — a batch boundary should not decide who waits
+ * another day.
+ */
+export const listExpiredPendingDeletionRequests = (
+  after: { gracePeriodEndsAt: Date; id: string } | null = null,
+  limit: number = DELETION_BATCH,
+) => accountDb.select({
   id: deletionRequests.id,
   userId: deletionRequests.userId,
+  gracePeriodEndsAt: deletionRequests.gracePeriodEndsAt,
 }).from(deletionRequests)
-  .where(and(eq(deletionRequests.status, 'pending'), lt(deletionRequests.gracePeriodEndsAt, new Date())))
+  .where(and(
+    eq(deletionRequests.status, 'pending'),
+    lt(deletionRequests.gracePeriodEndsAt, new Date()),
+    // `id` trails the timestamp because two requests can share a grace-period end — the flow sets it
+    // from a fixed offset, so two accounts closed in the same minute do — and a batch boundary
+    // inside that tie would skip one of them entirely.
+    ...(after
+      ? [sql`(${deletionRequests.gracePeriodEndsAt}, ${deletionRequests.id}) > (${after.gracePeriodEndsAt}, ${after.id})`]
+      : []),
+  ))
+  .orderBy(asc(deletionRequests.gracePeriodEndsAt), asc(deletionRequests.id))
+  .limit(limit)
 
-export async function hardDeleteAccountSubject(userId: string) {
+export async function hardDeleteAccountSubject(userId: string, batchSize: number = DELETION_BATCH) {
   // `builder_notes`/`alerts`/`saved_queries`/`builders` are tenant-private
   // with RLS forced on organization_id — a plain `accountDb.transaction()`
   // with no `app.organization_id` set silently deletes ZERO rows (RLS
@@ -305,10 +340,30 @@ export async function hardDeleteAccountSubject(userId: string) {
   // organization's own tenant context — each iteration's delete only
   // touches that org's rows for this user, enforced by RLS, not by an
   // explicit organizationId filter in the query.
-  const memberships = await authDb.select({
-    organizationId: organizationMembers.organizationId,
-    role: organizationMembers.role,
-  }).from(organizationMembers).where(eq(organizationMembers.userId, userId))
+  /*
+   * Memberships in batches, drained until none remain (plan 12).
+   *
+   * The loop's exit condition is "this batch came back short", never a page count. The rows this
+   * function deletes are the subject's private data in each organization they belong to, so a
+   * membership missed here is data that survives a completed erasure request — and the compliance row
+   * would be marked `completed` regardless.
+   *
+   * `after` is the membership's own `(organization_id, user_id)` position rather than an offset,
+   * which matters because this loop deletes as it goes: an offset would shift under its own writes.
+   */
+  let afterOrganizationId: string | null = null
+  for (;;) {
+    const memberships = await authDb.select({
+      organizationId: organizationMembers.organizationId,
+      role: organizationMembers.role,
+    }).from(organizationMembers)
+      .where(and(
+        eq(organizationMembers.userId, userId),
+        ...(afterOrganizationId ? [gt(organizationMembers.organizationId, afterOrganizationId)] : []),
+      ))
+      .orderBy(asc(organizationMembers.organizationId))
+      .limit(batchSize)
+    if (memberships.length === 0) break
 
   await Promise.all(
     memberships.map((membership) =>
@@ -356,6 +411,9 @@ export async function hardDeleteAccountSubject(userId: string) {
       ),
     ),
   )
+    afterOrganizationId = memberships[memberships.length - 1].organizationId
+    if (memberships.length < batchSize) break
+  }
 
   // Two transactions, not one: auth_users/auth_sessions/auth_accounts/auth_verifications
   // are auth-broker-only tables (drizzle/0007_auth_broker.sql revokes builderhunt_app's

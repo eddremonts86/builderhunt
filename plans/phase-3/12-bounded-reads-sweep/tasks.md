@@ -86,7 +86,9 @@
     allocation walk still stops the moment it has enough units, so the common case reads one batch and
     takes locks on nothing more than it used.
 
-    `listPendingBillingRefundsWithoutProviderRefund` is **not** done.
+    `listPendingBillingRefundsWithoutProviderRefund` is done too: a batch of 200 that its caller
+    drains, because every row in that queue is a refund the operator approved and Stripe never
+    received. Stopping at a boundary leaves money owed to a customer.
 
 - [ ] **Convert the export path, preserving completeness**
   - Files: `src/shared/lib/billing/accounting-export.ts`
@@ -94,6 +96,21 @@
     merely similar — an export missing its tail is a finding an auditor makes, not a bug a user
     reports.
   - Verify: export a seeded organization before and after; the two outputs are byte-identical.
+  - **Done, and the evidence is arithmetic rather than a snapshot.** A snapshot would agree with a
+    truncated export the day someone re-recorded it, so the new test seeds **120 refunds and 120
+    disputes** with known amounts and asserts the export's totals equal the sums — and it was run
+    green against the *unbounded* implementation first, so it is a before-image in the only sense
+    that matters.
+
+    Three of the export's five reads per organization were unfiltered: every refund, every dispute
+    and every active grant the organization had ever had, with the window applied afterwards in a
+    `for` loop. They are SQL aggregates now. Two of them were `listBillingRefunds` and
+    `listActiveBillingCreditGrants` — reads plan 10 deliberately left unbounded *because this caller
+    needed all of them*. It never needed the rows; it needed the totals.
+
+    The two revenue reads stay row-shaped but `GROUP BY` first: their amounts come from the catalog in
+    code rather than from a column, so SQL can only supply the counts per key. One row per distinct
+    catalog key is bounded by the catalog.
 
 - [ ] **Convert the deletion path, proving full coverage**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
@@ -103,6 +120,23 @@
     count.
   - Verify: seed a subject with more rows than one batch, run the deletion, assert **zero** rows
     remain in every affected table.
+  - **Done, with the batch size as a parameter and a stated reason.** The unbounded read here was the
+    subject's *membership* list — the deletes themselves are `DELETE … WHERE` statements, which are
+    set-based and already covered by the FK-order test beside the new one. A membership missed is the
+    subject's private data surviving in an organization while the compliance row says `completed`.
+
+    The loop resumes from the membership's own `organization_id` rather than an offset, because it
+    deletes as it goes and an offset would shift under its own writes.
+
+    The new test proves the loop — every membership past the boundary visited exactly once, and the
+    walk terminates — and says plainly what it does not prove: unit tests connect as a superuser, so
+    `withTenantContext`'s per-organization policy is inert here and evidence for the tenant boundary
+    still has to come from e2e or `pnpm test:rls:local`. The batch size is a parameter so this stays a
+    fast unit test of the termination condition instead of a fixture with fifty-one organizations.
+
+    One thing the change broke and the suite caught: `legal.test.ts` mocks the whole repository module
+    and did not export `DELETION_BATCH`, so the loop's `due.length < DELETION_BATCH` became
+    `n < undefined` — false — and the worker asked the mock for another batch forever.
 
 - [ ] **Bound the remaining batch reads**
   - Files: `src/shared/lib/auth/organization-lifecycle.ts`,

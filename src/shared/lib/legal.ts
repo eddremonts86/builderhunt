@@ -7,6 +7,7 @@ import {
   insertAccountConsent,
   insertDeletionRequest,
   listAccountConsents,
+  DELETION_BATCH,
   listExpiredPendingDeletionRequests,
   listOwnedOrganizationsWithOtherMembers,
   loadAccountExportSource,
@@ -156,9 +157,19 @@ export interface ProcessPendingDeletionsResult {
  * period, is never selected again.
  */
 export async function processPendingDeletions(): Promise<ProcessPendingDeletionsResult> {
-  const due = await listExpiredPendingDeletionRequests()
   let processed = 0
   let errors = 0
+  /*
+   * Drained, not one batch (plan 12).
+   *
+   * The cursor advances past every request this run *looked at*, successful or not — a request whose
+   * hard delete threw keeps its `pending` status and is picked up by the next run, but must not stall
+   * this one by being re-read forever. `errors` is what reports it.
+   */
+  let after: { gracePeriodEndsAt: Date; id: string } | null = null
+  for (;;) {
+  const due = await listExpiredPendingDeletionRequests(after)
+  if (due.length === 0) break
   for (const request of due) {
     try {
       // Capture the email before the hard delete removes the auth_users row.
@@ -180,6 +191,10 @@ export async function processPendingDeletions(): Promise<ProcessPendingDeletions
       errors++
       log.error('legal.process_pending_deletions.failed', { error, deletionRequestId: request.id })
     }
+  }
+    const last = due[due.length - 1]
+    after = { gracePeriodEndsAt: last.gracePeriodEndsAt, id: last.id }
+    if (due.length < DELETION_BATCH) break
   }
   return { processed, errors }
 }

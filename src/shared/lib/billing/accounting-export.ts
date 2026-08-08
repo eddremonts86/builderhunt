@@ -36,10 +36,9 @@
  *   dashboard, pending the separate task of wiring real cost tracking into the reservation-settlement
  *   path.
  */
-import { and, eq, gte, lt } from 'drizzle-orm'
+import { and, eq, gt, gte, lt, sql } from 'drizzle-orm'
 import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey } from './catalog'
-import { billingCreditGrants, billingDisputes, billingSubscriptions } from '../db/schema'
-import { listActiveBillingCreditGrants, listBillingRefunds } from '../repositories/billing'
+import { billingCreditGrants, billingDisputes, billingRefunds, billingSubscriptions } from '../db/schema'
 import { listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
 import { collectWorkerOrganizationIds } from '../repositories/worker-organization-scan'
 
@@ -111,64 +110,96 @@ export async function getAccountingExport(deps: AccountingExportDeps = {}): Prom
 
   for (const { id: organizationId } of organizationRows) {
     await withWorkerOrganization(organizationId, async (transaction) => {
-      const [periodStarts, packGrants, refunds, disputes, activeGrants] = await Promise.all([
+      /*
+       * Counted in SQL (plan 12), and every filter that used to run in JavaScript is now a predicate.
+       *
+       * Three of these five reads used to be unfiltered — every refund, every dispute and every
+       * active grant the organization had ever had — with the window applied afterwards in a `for`
+       * loop. An export whose cost grows with an account's entire history is a report that gets
+       * slower every month it is run, and the two that fed `listBillingRefunds` and
+       * `listActiveBillingCreditGrants` were among the reads plan 10 deliberately left unbounded
+       * because *this* caller needed all of them. It does not need the rows; it needs the totals.
+       *
+       * The two revenue reads stay row-shaped but group first: their amounts come from the catalog in
+       * code, not from a column, so SQL can only give the counts per key. One row per distinct
+       * catalog key is bounded by the catalog itself.
+       */
+      const [periodStarts, packGrants, refundTotals, disputeTotals, creditTotals] = await Promise.all([
         transaction
-          .select({ catalogKey: billingSubscriptions.catalogKey })
+          .select({ catalogKey: billingSubscriptions.catalogKey, count: sql<number>`count(*)::int` })
           .from(billingSubscriptions)
           .where(and(
             eq(billingSubscriptions.organizationId, organizationId),
             gte(billingSubscriptions.currentPeriodStart, windowStart),
             lt(billingSubscriptions.currentPeriodStart, windowEnd),
-          )),
+          ))
+          .groupBy(billingSubscriptions.catalogKey),
         transaction
-          .select({ sourceReference: billingCreditGrants.sourceReference })
+          .select({ sourceReference: billingCreditGrants.sourceReference, count: sql<number>`count(*)::int` })
           .from(billingCreditGrants)
           .where(and(
             eq(billingCreditGrants.organizationId, organizationId),
             eq(billingCreditGrants.source, 'pack'),
             gte(billingCreditGrants.createdAt, windowStart),
             lt(billingCreditGrants.createdAt, windowEnd),
-          )),
-        listBillingRefunds(transaction, organizationId),
+          ))
+          .groupBy(billingCreditGrants.sourceReference),
         transaction
-          .select({ amountCents: billingDisputes.amountCents, createdAt: billingDisputes.createdAt })
+          .select({
+            amountCents: sql<number>`coalesce(sum(${billingRefunds.amountCents}), 0)::int`,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(billingRefunds)
+          .where(and(
+            eq(billingRefunds.organizationId, organizationId),
+            eq(billingRefunds.state, 'succeeded'),
+            gte(billingRefunds.createdAt, windowStart),
+            lt(billingRefunds.createdAt, windowEnd),
+          )),
+        transaction
+          .select({
+            amountCents: sql<number>`coalesce(sum(${billingDisputes.amountCents}), 0)::int`,
+            count: sql<number>`count(*)::int`,
+          })
           .from(billingDisputes)
-          .where(eq(billingDisputes.organizationId, organizationId)),
-        listActiveBillingCreditGrants(transaction, organizationId),
+          .where(and(
+            eq(billingDisputes.organizationId, organizationId),
+            gte(billingDisputes.createdAt, windowStart),
+            lt(billingDisputes.createdAt, windowEnd),
+          )),
+        transaction
+          .select({ units: sql<number>`coalesce(sum(${billingCreditGrants.remainingUnits}), 0)::int` })
+          .from(billingCreditGrants)
+          .where(and(
+            eq(billingCreditGrants.organizationId, organizationId),
+            eq(billingCreditGrants.state, 'active'),
+            // `> now`, matching the JS `grant.expiresAt > now` it replaces exactly — a grant expiring
+            // at this instant was excluded before and stays excluded.
+            gt(billingCreditGrants.expiresAt, now),
+          )),
       ])
 
       for (const row of periodStarts) {
         const entry = resolveSubscriptionCatalogEntryByKey(row.catalogKey)
         if (entry) {
-          subscriptionCents += entry.amountCents
-          subscriptionCount += 1
+          subscriptionCents += entry.amountCents * row.count
+          subscriptionCount += row.count
         }
       }
 
       for (const row of packGrants) {
         const entry = row.sourceReference ? resolvePackCatalogEntryByKey(row.sourceReference) : null
         if (entry) {
-          packCents += entry.amountCents
-          packCount += 1
+          packCents += entry.amountCents * row.count
+          packCount += row.count
         }
       }
 
-      for (const refund of refunds) {
-        if (refund.state !== 'succeeded') continue
-        if (refund.createdAt < windowStart || refund.createdAt >= windowEnd) continue
-        refundAmountCents += refund.amountCents
-        refundCount += 1
-      }
-
-      for (const dispute of disputes) {
-        if (dispute.createdAt < windowStart || dispute.createdAt >= windowEnd) continue
-        disputeAmountCents += dispute.amountCents
-        disputeCount += 1
-      }
-
-      for (const grant of activeGrants) {
-        if (grant.expiresAt > now) unexpiredCreditUnits += grant.remainingUnits
-      }
+      refundAmountCents += refundTotals[0]?.amountCents ?? 0
+      refundCount += refundTotals[0]?.count ?? 0
+      disputeAmountCents += disputeTotals[0]?.amountCents ?? 0
+      disputeCount += disputeTotals[0]?.count ?? 0
+      unexpiredCreditUnits += creditTotals[0]?.units ?? 0
     }, deps.worker)
   }
 

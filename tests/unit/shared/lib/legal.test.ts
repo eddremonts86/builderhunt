@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('~/shared/lib/repositories/account-privacy', () => ({
+  // `processPendingDeletions` drains the queue in batches (plan 12) and compares each batch's length
+  // against this. Omitting it from the mock made the comparison `n < undefined`, which is false — so
+  // the loop asked the mock for another batch forever.
+  DELETION_BATCH: 50,
   listExpiredPendingDeletionRequests: mocks.listExpiredPendingDeletionRequests,
   hardDeleteAccountSubject: mocks.hardDeleteAccountSubject,
   listOwnedOrganizationsWithOtherMembers: mocks.listOwnedOrganizationsWithOtherMembers,

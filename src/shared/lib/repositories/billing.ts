@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantTransaction } from '../db/client'
 import { authDb } from '../db/auth-db'
@@ -828,9 +828,21 @@ export async function lockBillingRefund(
   return row ?? null
 }
 
+/**
+ * How many stuck refunds the repair worker takes per pass.
+ *
+ * A **batch**, and its caller drains it: a refund the operator approved and Stripe never received is
+ * money owed to a customer, so leaving the ones past the batch boundary for "next time" is a queue
+ * that never empties if it is ever longer than one batch. In practice this queue is a handful of rows
+ * — every entry in it is a failure — so the loop almost always runs once.
+ */
+export const PENDING_REFUND_REPAIR_BATCH = 200
+
 export async function listPendingBillingRefundsWithoutProviderRefund(
   transaction: TenantTransaction,
   organizationId: string,
+  after: string | null = null,
+  limit: number = PENDING_REFUND_REPAIR_BATCH,
 ): Promise<FullBillingRefundRecord[]> {
   return transaction
     .select()
@@ -839,7 +851,11 @@ export async function listPendingBillingRefundsWithoutProviderRefund(
       eq(billingRefunds.organizationId, organizationId),
       eq(billingRefunds.state, 'pending'),
       isNull(billingRefunds.stripeRefundId),
+      ...(after ? [gt(billingRefunds.id, after)] : []),
     ))
+    // The id alone is a total order — it is the primary key — so no trailing tiebreaker is needed.
+    .orderBy(asc(billingRefunds.id))
+    .limit(limit)
 }
 
 export interface OperatorRefundDecisionInput {

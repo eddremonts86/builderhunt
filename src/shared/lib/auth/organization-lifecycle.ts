@@ -1514,10 +1514,18 @@ export interface ProcessPendingOrganizationDeletionsResult {
  * BEFORE the organization row (and its cascade) is removed, so this worker
  * never again does a bare `authDb.delete(organizations)` itself.
  */
+/**
+ * Organization deletion requests finalised per batch.
+ *
+ * Small on purpose: each row triggers a full organization hard-delete plus a provider call, so the
+ * batch is a read-ahead buffer for a queue whose real cost is per row.
+ */
+const ORGANIZATION_DELETION_BATCH = 50
+
 export async function processPendingOrganizationDeletions(
   deps: { provider?: import('../billing/provider').BillingProvider } = {},
 ): Promise<ProcessPendingOrganizationDeletionsResult> {
-  const [{ and, eq, lt }, { authDb }, schema, { finalizeOrganizationDeletion }, { getBillingProvider }] = await Promise.all([
+  const [{ and, asc, eq, gt: gtOp, lt }, { authDb }, schema, { finalizeOrganizationDeletion }, { getBillingProvider }] = await Promise.all([
     import('drizzle-orm'),
     import('../db/auth-db'),
     import('../db/schema'),
@@ -1527,25 +1535,50 @@ export async function processPendingOrganizationDeletions(
   const { organizationDeletionRequests } = schema
   const provider = deps.provider ?? getBillingProvider()
 
-  const due = await authDb
-    .select({ id: organizationDeletionRequests.id, organizationId: organizationDeletionRequests.organizationId })
-    .from(organizationDeletionRequests)
-    .where(and(eq(organizationDeletionRequests.status, 'pending'), lt(organizationDeletionRequests.gracePeriodEndsAt, new Date())))
-
   let processed = 0
   let errors = 0
-  for (const dueRequest of due) {
-    try {
-      await finalizeOrganizationDeletion(dueRequest.organizationId, 'scheduled', { provider })
-      await authDb
-        .update(organizationDeletionRequests)
-        .set({ status: 'completed', completedAt: new Date() })
-        .where(eq(organizationDeletionRequests.id, dueRequest.id))
-      processed++
-    } catch (error) {
-      errors++
-      console.error('organization-lifecycle.process_pending_organization_deletions.failed', { error, organizationDeletionRequestId: dueRequest.id })
+  /*
+   * The due queue arrives in bounded batches and this loop drains it (plan 12).
+   *
+   * A batch, not a page: each row is an organization whose owner asked for it to be deleted and whose
+   * grace period has run out. Stopping at a batch boundary leaves a tenant's data in place past the
+   * date it was promised to be gone, and the only thing that would report it is the absence of a
+   * completion nobody is watching for.
+   *
+   * The cursor is the request id, which is the primary key and therefore already a total order — and
+   * it advances past every row this run *looked at*, so a request whose finalize threw keeps its
+   * `pending` status for the next run instead of stalling this one by being re-read forever.
+   */
+  let after: string | null = null
+  for (;;) {
+    const due = await authDb
+      .select({ id: organizationDeletionRequests.id, organizationId: organizationDeletionRequests.organizationId })
+      .from(organizationDeletionRequests)
+      .where(and(
+        eq(organizationDeletionRequests.status, 'pending'),
+        lt(organizationDeletionRequests.gracePeriodEndsAt, new Date()),
+        ...(after ? [gtOp(organizationDeletionRequests.id, after)] : []),
+      ))
+      .orderBy(asc(organizationDeletionRequests.id))
+      .limit(ORGANIZATION_DELETION_BATCH)
+    if (due.length === 0) break
+
+    for (const dueRequest of due) {
+      try {
+        await finalizeOrganizationDeletion(dueRequest.organizationId, 'scheduled', { provider })
+        await authDb
+          .update(organizationDeletionRequests)
+          .set({ status: 'completed', completedAt: new Date() })
+          .where(eq(organizationDeletionRequests.id, dueRequest.id))
+        processed++
+      } catch (error) {
+        errors++
+        console.error('organization-lifecycle.process_pending_organization_deletions.failed', { error, organizationDeletionRequestId: dueRequest.id })
+      }
     }
+
+    after = due[due.length - 1].id
+    if (due.length < ORGANIZATION_DELETION_BATCH) break
   }
   return { processed, errors }
 }

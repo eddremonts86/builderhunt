@@ -188,3 +188,59 @@ async function freshUserId(): Promise<string> {
   await db.insert(authUsers).values({ id: userId, name: userId, email: `${userId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
   return userId
 }
+
+/**
+ * plans/phase-3/12-bounded-reads-sweep: "an export missing its tail is a finding an auditor makes,
+ * not a bug a user reports".
+ *
+ * The export used to read every refund, dispute and grant an organization had and reduce them in
+ * JavaScript, which is unbounded but *complete*. Bounding it is the change that can quietly make it
+ * incomplete, so this seeds far past any plausible page size and asserts the totals against
+ * arithmetic rather than against a recorded snapshot — a snapshot would agree with a truncated
+ * export the day someone re-recorded it.
+ */
+describe('getAccountingExport — completeness past one page', () => {
+  const ROWS = 120
+
+  it('covers every refund, dispute and grant in the window', async () => {
+    const orgId = await freshOrg()
+    const requesterId = await freshUserId()
+    const windowStart = new Date('2032-01-01T00:00:00Z')
+    const windowEnd = new Date('2032-02-01T00:00:00Z')
+
+    // Disputes carry a NOT NULL grant reference. One grant with zero remaining units serves all of
+    // them without touching the cross-organization credit-liability total.
+    const grantId = uniqueId('grant')
+    await db.insert(billingCreditGrants).values({
+      id: grantId, organizationId: orgId, source: 'pack', originalUnits: 0, remainingUnits: 0,
+      expiresAt: new Date('2099-01-01T00:00:00Z'),
+    })
+
+    let expectedRefundCents = 0
+    let expectedDisputeCents = 0
+    for (let index = 0; index < ROWS; index += 1) {
+      const amountCents = 100 + index
+      expectedRefundCents += amountCents
+      await db.insert(billingRefunds).values({
+        id: uniqueId('refund'), organizationId: orgId, requestedByUserId: requesterId,
+        idempotencyKey: uniqueId('idem'), policyDecision: 'full_unused_pack', amountCents, state: 'succeeded',
+        createdAt: new Date(Date.UTC(2032, 0, 1 + (index % 28), 0, index % 60)),
+      })
+
+      const disputeCents = 200 + index
+      expectedDisputeCents += disputeCents
+      await db.insert(billingDisputes).values({
+        id: uniqueId('dispute'), organizationId: orgId, grantId, stripeDisputeId: uniqueId('dp'),
+        stripePaymentIntentId: uniqueId('pi'), amountCents: disputeCents, stripeStatus: 'needs_response',
+        createdAt: new Date(Date.UTC(2032, 0, 1 + (index % 28), 1, index % 60)),
+      })
+    }
+
+    const result = await getAccountingExport(deps({ windowStart, windowEnd }))
+
+    expect(result.refunds.count).toBe(ROWS)
+    expect(result.refunds.amountCents).toBe(expectedRefundCents)
+    expect(result.disputes.count).toBe(ROWS)
+    expect(result.disputes.amountCents).toBe(expectedDisputeCents)
+  })
+})
