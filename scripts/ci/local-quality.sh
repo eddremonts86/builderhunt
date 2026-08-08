@@ -85,6 +85,32 @@ if lsof -nP -iTCP:"$PREVIEW_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   exit 1
 fi
 
+# The same check for the E2E port, and for a stronger reason than "the port is busy".
+#
+# `playwright.config.ts` sets `reuseExistingServer: !CI`, so locally Playwright *adopts* whatever
+# already answers on this port instead of starting its own. For this gate that is never right: the
+# database the suite runs against is created below, inside this run, and dropped by the EXIT trap. A
+# server that was listening before the gate started is by definition pointed at some other database
+# — an orphan from an interrupted run, pointed at one that no longer exists at all.
+#
+# It also masks a real bug rather than causing one, which is the more important reason. A stray
+# server on this port makes the port-resolution race in `playwright.config.ts` (see `localE2EPort`)
+# invisible: the suite goes green because something happens to be answering where the workers are
+# looking. Refusing to start is what keeps that race falsifiable.
+#
+# Do not try to tell an adopted server from a spawned one by counting `[WebServer]` lines. I did, and
+# it is wrong: `webServer.stdout` defaults to `'ignore'` and Vite's ready banner goes to stdout, so a
+# clean spawn prints zero of them too.
+E2E_PORT_IN_USE="$(grep -m1 '^E2E_PORT=' .env 2>/dev/null | cut -d= -f2-)"
+E2E_PORT_IN_USE="${E2E_PORT_IN_USE:-3100}"
+E2E_PORT_PIDS="$(lsof -nP -iTCP:"$E2E_PORT_IN_USE" -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ')"
+if [ -n "$E2E_PORT_PIDS" ]; then
+  echo "Port $E2E_PORT_IN_USE (E2E_PORT) is already serving: pid(s) ${E2E_PORT_PIDS% }." >&2
+  echo "Playwright would adopt it rather than start its own, and it is pointed at a database this" >&2
+  echo "run has not created. Stop it first:  kill ${E2E_PORT_PIDS% }" >&2
+  exit 1
+fi
+
 # ── The job's environment, from the workflow rather than from .env ───────────────────────────────
 
 export TZ=UTC

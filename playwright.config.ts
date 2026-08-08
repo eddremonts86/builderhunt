@@ -1,5 +1,7 @@
 import { defineConfig, devices } from 'playwright/test'
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // E2E runs against a real dev server + real local Postgres + real local
 // Redis — never mocks. The Wave 1 Task 1 isolation harness owns one
@@ -18,10 +20,40 @@ import { randomBytes } from 'node:crypto'
 // Locally, ignore process.env.APP_URL even if a shell/tooling layer injected
 // it from `.env` (that value is baked for `pnpm dev`'s port, not this
 // config's) and always use the fixed E2E dev port instead.
+
+/**
+ * The local E2E port, read from `.env` in preference to the environment.
+ *
+ * That precedence looks backwards and is not. This file is evaluated **twice per run in different
+ * environments**: once by the main process at startup, and again by every worker process. `pnpm
+ * test:e2e` is a bare `playwright test` with no dotenvx wrapper, so at the first evaluation
+ * `process.env.E2E_PORT` is unset and the fallback wins — but something in the module graph then
+ * pulls in dotenvx, which injects `.env` with `override: true`. By the time a worker re-evaluates
+ * this file, `E2E_PORT` *is* set, to `.env`'s value.
+ *
+ * The result was a main process starting `vite dev` on 3100 while every worker asked for 3120, and
+ * `override: true` means the environment cannot win that argument — so this reads `.env` first and
+ * both evaluations agree on the same number. An exported `E2E_PORT` still works when `.env` is
+ * silent, which is what CI and a one-off `E2E_PORT=… pnpm test:e2e` rely on.
+ *
+ * How it hid: nearly every spec runs against a per-worker server from tests/e2e/harness/server.ts,
+ * so ~919 tests passed and only the handful using this shared baseURL failed — `ECONNREFUSED`, ~700
+ * tests in, in specs that pass when run alone. Any stray server on the `.env` port masks it
+ * completely, which is what made it read as flake. `scripts/ci/local-quality.sh` now refuses to
+ * start when that port is occupied, so the mask is gone too.
+ */
+function localE2EPort(): string {
+  try {
+    const match = /^E2E_PORT=(\d+)/m.exec(readFileSync(join(process.cwd(), '.env'), 'utf8'))
+    if (match) return match[1]
+  } catch { /* no `.env` — CI passes the port through APP_URL instead */ }
+  return process.env.E2E_PORT ?? '3100'
+}
+
 const baseURL =
   process.env.CI && process.env.APP_URL
     ? process.env.APP_URL
-    : `http://localhost:${process.env.E2E_PORT ?? '3100'}`
+    : `http://localhost:${localE2EPort()}`
 const PORT = new URL(baseURL).port || '80'
 
 // Pre-compute a single REDIS_URL pointing at the local Redis container.
