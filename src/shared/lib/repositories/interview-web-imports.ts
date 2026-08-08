@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import type { CapabilityTransaction } from '../db/capability-db'
 import { candidateLinks, candidateWebImports, organizations } from '../db/schema'
+import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
 
 /**
  * Data access for candidate link imports (plan:
@@ -30,8 +31,23 @@ import { candidateLinks, candidateWebImports, organizations } from '../db/schema
 
 export type ImportTransaction = WorkerTransaction | CapabilityTransaction
 
-export function listWorkerOrganizationIds(db: PostgresJsDatabase | typeof workerDb = workerDb) {
+/**
+ * One batch of organization ids, ascending — bounded since plan 12.
+ *
+ * Callers must **drain** this, not take the first batch: a worker that silently skips the
+ * five-hundred-and-first organization has not failed, it has just not done the work, and nobody is
+ * waiting on that tenant to notice. `collectWorkerOrganizationIds`/`drainWorkerOrganizations` in
+ * `worker-organization-scan.ts` are the shapes that cannot get the termination condition wrong.
+ */
+export function listWorkerOrganizationIds(
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+  after: string | null = null,
+  limit: number = WORKER_ORGANIZATION_BATCH,
+) {
   return db.select({ id: organizations.id }).from(organizations)
+    .where(after ? gt(organizations.id, after) : undefined)
+    .orderBy(asc(organizations.id))
+    .limit(limit)
 }
 
 export function withWorkerOrganization<TResult>(

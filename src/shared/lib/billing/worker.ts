@@ -46,6 +46,7 @@ import { freezeIncludedGrantsForNonPayment, shouldBlockForNonPayment } from './d
 import type { BillingProvider } from './provider'
 import { listPendingPackRefundIds, processPendingPackRefund } from './refunds'
 import { processStripeWebhookEvent } from './webhook-handlers'
+import { collectWorkerOrganizationIds } from '../repositories/worker-organization-scan'
 
 export interface EventRetriever {
   /** Returns `null` if Stripe no longer has the event (past its retention window) — never throws for a merely-missing event. */
@@ -206,7 +207,7 @@ async function processOneEvent(
 }
 
 async function sweepExpiredCreditGrants(db: PostgresJsDatabase | typeof workerDb, now: Date): Promise<number> {
-  const orgIds = await listWorkerOrganizationIds(db)
+  const orgIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
   let expired = 0
   for (const { id: organizationId } of orgIds) {
     await withWorkerOrganization(organizationId, async (tx) => {
@@ -236,7 +237,7 @@ async function sweepExpiredCreditGrants(db: PostgresJsDatabase | typeof workerDb
  * lapsed subscription's future grants.
  */
 async function sweepAnnualSubscriptionGrants(db: PostgresJsDatabase | typeof workerDb, now: Date): Promise<number> {
-  const orgIds = await listWorkerOrganizationIds(db)
+  const orgIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
   let issued = 0
   for (const { id: organizationId } of orgIds) {
     await withWorkerOrganization(organizationId, async (tx) => {
@@ -266,7 +267,7 @@ async function sweepAnnualSubscriptionGrants(db: PostgresJsDatabase | typeof wor
  * the other direction.
  */
 async function sweepNonPaymentBlocks(db: PostgresJsDatabase | typeof workerDb, now: Date): Promise<number> {
-  const orgIds = await listWorkerOrganizationIds(db)
+  const orgIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
   let blocked = 0
   for (const { id: organizationId } of orgIds) {
     await withWorkerOrganization(organizationId, async (tx) => {
@@ -289,7 +290,7 @@ async function sweepNonPaymentBlocks(db: PostgresJsDatabase | typeof workerDb, n
  * this same sweep.
  */
 async function sweepAutoRecharge(db: PostgresJsDatabase | typeof workerDb, provider: BillingProvider, now: Date): Promise<number> {
-  const orgIds = await listWorkerOrganizationIds(db)
+  const orgIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
   let triggered = 0
   for (const { id: organizationId } of orgIds) {
     await withWorkerOrganization(organizationId, async (tx) => {
@@ -306,7 +307,7 @@ async function sweepAutoRecharge(db: PostgresJsDatabase | typeof workerDb, provi
  * those; see `refunds.ts`'s top-of-file comment for why that mechanism isn't built yet).
  */
 async function sweepPendingRefunds(db: PostgresJsDatabase | typeof workerDb, provider: BillingProvider): Promise<number> {
-  const orgIds = await listWorkerOrganizationIds(db)
+  const orgIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
   let processed = 0
   for (const { id: organizationId } of orgIds) {
     await withWorkerOrganization(organizationId, async (tx) => {

@@ -12,6 +12,7 @@ import {
 } from '~/shared/lib/repositories/calendar-worker'
 import { withJobRun } from '~/shared/lib/repositories/platform-operations'
 import { buildEventIcs } from './ics'
+import { collectWorkerOrganizationIds } from '~/shared/lib/repositories/worker-organization-scan'
 
 /**
  * Delivers due calendar reminders (plan: calendar-scheduling-interview-intelligence, Phase 3
@@ -128,7 +129,7 @@ export async function runReminderWorker(options: ReminderWorkerOptions = {}): Pr
       failedOrganizations: [],
     }
 
-    const organizationIds = await listWorkerOrganizationIds(db)
+    const organizationIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
 
     for (const { id: organizationId } of organizationIds) {
       try {

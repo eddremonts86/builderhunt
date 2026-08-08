@@ -12,12 +12,14 @@
  * and `repositories/sprints-worker.ts` already establish (each keeps its own copy).
  */
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
 import { platformDb } from '../db/platform-db'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { builders, organizations, profileRemovalRequests, profileSuppressions } from '../db/schema'
+import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
+import { collectWorkerOrganizationIds } from './worker-organization-scan'
 
 export type RemovalRequestStatus = 'pending' | 'verified' | 'rejected' | 'expired'
 
@@ -261,8 +263,23 @@ export async function getRemovalOperationsMetrics(now: Date = new Date(), db: Po
   }
 }
 
-export function listWorkerOrganizationIds(db: PostgresJsDatabase | typeof workerDb = workerDb) {
+/**
+ * One batch of organization ids, ascending — bounded since plan 12.
+ *
+ * Callers must **drain** this, not take the first batch: a worker that silently skips the
+ * five-hundred-and-first organization has not failed, it has just not done the work, and nobody is
+ * waiting on that tenant to notice. `collectWorkerOrganizationIds`/`drainWorkerOrganizations` in
+ * `worker-organization-scan.ts` are the shapes that cannot get the termination condition wrong.
+ */
+export function listWorkerOrganizationIds(
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+  after: string | null = null,
+  limit: number = WORKER_ORGANIZATION_BATCH,
+) {
   return db.select({ id: organizations.id }).from(organizations)
+    .where(after ? gt(organizations.id, after) : undefined)
+    .orderBy(asc(organizations.id))
+    .limit(limit)
 }
 
 export function withWorkerOrganization<TResult>(
@@ -291,7 +308,9 @@ export async function deleteBuildersAcrossOrganizations(
   sourceId: string,
   db: PostgresJsDatabase | typeof workerDb = workerDb,
 ): Promise<number> {
-  const orgIds = await listWorkerOrganizationIds(db)
+  // Drained rather than one batch: `listWorkerOrganizationIds` is bounded (plan 12), and a worker
+  // that stops at the batch size has silently skipped every organization past it.
+  const orgIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
   let deleted = 0
   for (const { id: organizationId } of orgIds) {
     const rows = await withWorkerOrganization(organizationId, (tx) =>

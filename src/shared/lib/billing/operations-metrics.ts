@@ -27,6 +27,7 @@ import { listRiskExceptions } from './risk'
 import { isLiveMode } from './stripe-client'
 import { listActiveBillingCreditGrants, listBillingRefunds } from '../repositories/billing'
 import { listGracePeriodBillingSubscriptions, listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
+import { collectWorkerOrganizationIds } from '../repositories/worker-organization-scan'
 
 export interface WebhookBacklogMetrics {
   pending: number
@@ -143,7 +144,7 @@ export async function getBillingOperationsMetrics(deps: BillingOperationsMetrics
     countWebhookBacklog(platform),
     getLastReconciliationRun(platform),
     getOldestPendingWebhookAgeMinutes(platform, now),
-    listWorkerOrganizationIds(),
+    collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(undefined, after, limit)).then((ids) => ids.map((id) => ({ id }))),
   ])
 
   let organizationsInGrace = 0

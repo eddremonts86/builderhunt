@@ -41,6 +41,7 @@ import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey } fr
 import { billingCreditGrants, billingDisputes, billingSubscriptions } from '../db/schema'
 import { listActiveBillingCreditGrants, listBillingRefunds } from '../repositories/billing'
 import { listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
+import { collectWorkerOrganizationIds } from '../repositories/worker-organization-scan'
 
 export interface AccountingExportUnavailable {
   available: false
@@ -94,7 +95,9 @@ export async function getAccountingExport(deps: AccountingExportDeps = {}): Prom
   const windowStart = deps.windowStart ?? defaults.windowStart
   const windowEnd = deps.windowEnd ?? defaults.windowEnd
 
-  const organizationRows = await listWorkerOrganizationIds(deps.worker)
+  // Drained rather than one batch: `listWorkerOrganizationIds` is bounded (plan 12), and a worker
+  // that stops at the batch size has silently skipped every organization past it.
+  const organizationRows = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(deps.worker, after, limit))).map((id) => ({ id }))
 
   let subscriptionCents = 0
   let subscriptionCount = 0

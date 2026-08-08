@@ -28,6 +28,7 @@ import {
 import { MAX_VARIANTS_PER_CELL_PAGE, SPRINT_PAGE_SIZE, type SprintCursor } from '~/shared/lib/sprints-shared'
 import { clipToQuota, toSprintProfileSnapshot } from './results'
 import { writeThroughSprintResults } from './semantic-write-through'
+import { collectWorkerOrganizationIds } from '~/shared/lib/repositories/worker-organization-scan'
 
 export interface SprintsWorkerResult {
   sprintsRun: number
@@ -53,7 +54,7 @@ export function nextSprintCursor(cursor: SprintCursor, variantCount: number): { 
 
 export async function runSprintsWorker(): Promise<SprintsWorkerResult> {
   const result: SprintsWorkerResult = { sprintsRun: 0, resultsAdded: 0, completed: [], errors: [] }
-  const organizations = await listWorkerOrganizationIds()
+  const organizations = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(after, limit))).map((id) => ({ id }))
 
   for (const { id: organizationId } of organizations) {
     try {

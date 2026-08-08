@@ -16,10 +16,12 @@
  * enough to matter, the fix is a dedicated cross-org lookup index/materialized view, not a change to
  * this file's contract.
  */
-import { and, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingDisputes, billingRefunds, billingSubscriptions, organizations } from '../db/schema'
+import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
+import { collectWorkerOrganizationIds } from './worker-organization-scan'
 
 /**
  * `db` defaults to the real `workerDb` singleton in production; tests inject a disposable database
@@ -29,8 +31,23 @@ import { billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants,
  * hardcoding `workerDb` with no override. This code moves real money — worth the extra parameter to
  * get real integration-test coverage on the cross-org lookup and the writes it protects.
  */
-export function listWorkerOrganizationIds(db: PostgresJsDatabase | typeof workerDb = workerDb) {
+/**
+ * One batch of organization ids, ascending — bounded since plan 12.
+ *
+ * Callers must **drain** this, not take the first batch: a worker that silently skips the
+ * five-hundred-and-first organization has not failed, it has just not done the work, and nobody is
+ * waiting on that tenant to notice. `collectWorkerOrganizationIds`/`drainWorkerOrganizations` in
+ * `worker-organization-scan.ts` are the shapes that cannot get the termination condition wrong.
+ */
+export function listWorkerOrganizationIds(
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+  after: string | null = null,
+  limit: number = WORKER_ORGANIZATION_BATCH,
+) {
   return db.select({ id: organizations.id }).from(organizations)
+    .where(after ? gt(organizations.id, after) : undefined)
+    .orderBy(asc(organizations.id))
+    .limit(limit)
 }
 
 export function withWorkerOrganization<TResult>(
@@ -53,7 +70,9 @@ async function findOwningOrganizationId(
   check: (transaction: WorkerTransaction, organizationId: string) => Promise<boolean>,
   db: PostgresJsDatabase | typeof workerDb = workerDb,
 ): Promise<string | null> {
-  const orgIds = await listWorkerOrganizationIds(db)
+  // Drained rather than one batch: `listWorkerOrganizationIds` is bounded (plan 12), and a worker
+  // that stops at the batch size has silently skipped every organization past it.
+  const orgIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
   for (const { id: organizationId } of orgIds) {
     const found = await withWorkerOrganization(organizationId, (tx) => check(tx, organizationId), db)
     if (found) return organizationId

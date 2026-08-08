@@ -48,6 +48,7 @@ import {
 } from '~/lib/storage/types'
 import { workerDb, type WorkerTransaction } from '~/shared/lib/db/worker-db'
 import { withJobRun, type JobRunOutcome } from '~/shared/lib/repositories/platform-operations'
+import { collectWorkerOrganizationIds } from '~/shared/lib/repositories/worker-organization-scan'
 import {
   leaseDocumentsForExtraction,
   leaseDocumentsForScan,
@@ -151,7 +152,7 @@ export async function runDocumentWorker(options: DocumentWorkerOptions = {}): Pr
       failedCount: 0,
     }
 
-    const organizationIds = await listWorkerOrganizationIds(db)
+    const organizationIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
 
     for (const { id: organizationId } of organizationIds) {
       try {

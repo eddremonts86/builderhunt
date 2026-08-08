@@ -53,6 +53,7 @@ import { getCurrentSellerProfile } from './seller-profile'
 import { isLiveMode } from './stripe-client'
 import { findFullActiveBillingSubscription, findOrganizationOwnerEmail, listActiveBillingCreditGrants, listBillingRefunds } from '../repositories/billing'
 import { listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
+import { collectWorkerOrganizationIds } from '../repositories/worker-organization-scan'
 
 export type NotificationType =
   | 'credit_expiry_30'
@@ -137,7 +138,9 @@ export async function runNotificationSweep(deps: NotificationSweepDeps = {}): Pr
   const platform = deps.platform ?? platformDb
   const worker = deps.worker ?? workerDb
   const livemode = isLiveMode()
-  const organizationRows = await listWorkerOrganizationIds(deps.worker)
+  // Drained rather than one batch: `listWorkerOrganizationIds` is bounded (plan 12), and a worker
+  // that stops at the batch size has silently skipped every organization past it.
+  const organizationRows = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(deps.worker, after, limit))).map((id) => ({ id }))
   const sent: Record<NotificationType, number> = { ...EMPTY_SENT }
 
   for (const { id: organizationId } of organizationRows) {

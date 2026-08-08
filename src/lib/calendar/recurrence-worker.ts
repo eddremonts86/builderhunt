@@ -10,6 +10,7 @@ import {
   withWorkerOrganization,
 } from '~/shared/lib/repositories/calendar-worker'
 import { withJobRun } from '~/shared/lib/repositories/platform-operations'
+import { collectWorkerOrganizationIds } from '~/shared/lib/repositories/worker-organization-scan'
 
 /**
  * Materializes recurring calendar events into concrete occurrence rows (plan:
@@ -69,7 +70,7 @@ export async function runRecurrenceWorker(options: RecurrenceWorkerOptions = {})
       failedOrganizations: [],
     }
 
-    const organizationIds = await listWorkerOrganizationIds(db)
+    const organizationIds = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))).map((id) => ({ id }))
 
     for (const { id: organizationId } of organizationIds) {
       try {

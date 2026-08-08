@@ -40,6 +40,7 @@ import type { BillingPaymentIntent, BillingProvider, BillingRefund, BillingSubsc
 import { findFullActiveBillingSubscription, syncBillingSubscriptionMirrorFromProvider } from '../repositories/billing'
 import { listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
 import { isLiveMode } from './stripe-client'
+import { collectWorkerOrganizationIds } from '../repositories/worker-organization-scan'
 
 const OBJECT_TYPES: ReconciliationObjectType[] = ['customers', 'subscriptions', 'payment_intents', 'refunds']
 
@@ -276,7 +277,9 @@ export async function runReconciliation(deps: RunReconciliationDeps): Promise<Ru
   const livemode = isLiveMode()
   const windowStart = now
 
-  const organizationRows = await listWorkerOrganizationIds(deps.worker)
+  // Drained rather than one batch: `listWorkerOrganizationIds` is bounded (plan 12), and a worker
+  // that stops at the batch size has silently skipped every organization past it.
+  const organizationRows = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(deps.worker, after, limit))).map((id) => ({ id }))
   const organizationIds = organizationRows.map((r) => r.id)
 
   const startIndex = deps.resumeFrom ? OBJECT_TYPES.indexOf(deps.resumeFrom.objectType) : 0

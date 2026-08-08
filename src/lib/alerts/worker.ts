@@ -3,6 +3,7 @@ import { randomId } from '~/lib/utils'
 import { evaluateMatch, isDueForEvaluation, type AlertMatchPayload, type TriggerConditions } from '~/shared/lib/alerts'
 import { sendAlertDigestEmail, type AlertDigestItem } from '~/shared/lib/email'
 import { log } from '~/shared/lib/log'
+import { collectWorkerOrganizationIds } from '~/shared/lib/repositories/worker-organization-scan'
 import {
   findWorkerBuilder,
   findWorkerUserEmail,
@@ -31,7 +32,7 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
     errors: [],
   }
   const digestsByUser = new Map<string, AlertDigestItem[]>()
-  const organizations = await listWorkerOrganizationIds()
+  const organizations = (await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(after, limit))).map((id) => ({ id }))
 
   for (const { id: organizationId } of organizations) {
     const activeAlerts = await withWorkerOrganization(organizationId, (tx) =>

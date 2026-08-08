@@ -69,6 +69,7 @@ import {
 import { EXTRACTION_VERSION, extractWebImportText } from './web-import-extraction'
 import { workerDb } from '~/shared/lib/db/worker-db'
 import { withJobRun, type JobRunOutcome } from '~/shared/lib/repositories/platform-operations'
+import { collectWorkerOrganizationIds } from '~/shared/lib/repositories/worker-organization-scan'
 import {
   leaseQueuedLinks,
   listWorkerOrganizationIds,
@@ -229,7 +230,7 @@ export async function runWebImportWorker(options: WebImportWorkerOptions = {}): 
       failedCount: 0,
     }
 
-    for (const { id: organizationId } of await listWorkerOrganizationIds(db)) {
+    for (const organizationId of await collectWorkerOrganizationIds((after, limit) => listWorkerOrganizationIds(db, after, limit))) {
       try {
         // Claimed and committed before any outbound request, so the network I/O below holds no
         // transaction open — the same shape as the document worker, for the same reason.

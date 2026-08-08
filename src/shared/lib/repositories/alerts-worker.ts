@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, sql } from 'drizzle-orm'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 // auth_users is an auth-broker-only table (drizzle/0007_auth_broker.sql) —
 // builderhunt_worker has no grant on it, so the digest-email lookup must go
@@ -6,9 +6,21 @@ import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { authDb } from '../db/auth-db'
 import { alerts, alertTriggers, authUsers, builders, organizations } from '../db/schema'
 import { nextAlertTimingState, type AlertEvaluationOutcome, type AlertFrequency } from '../alerts'
+import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
 
-export function listWorkerOrganizationIds() {
+/**
+ * One batch of organization ids, ascending — bounded since plan 12.
+ *
+ * Callers must **drain** this, not take the first batch: a worker that silently skips the
+ * five-hundred-and-first organization has not failed, it has just not done the work, and nobody is
+ * waiting on that tenant to notice. `collectWorkerOrganizationIds`/`drainWorkerOrganizations` in
+ * `worker-organization-scan.ts` are the shapes that cannot get the termination condition wrong.
+ */
+export function listWorkerOrganizationIds(after: string | null = null, limit: number = WORKER_ORGANIZATION_BATCH) {
   return workerDb.select({ id: organizations.id }).from(organizations)
+    .where(after ? gt(organizations.id, after) : undefined)
+    .orderBy(asc(organizations.id))
+    .limit(limit)
 }
 
 export function withWorkerOrganization<TResult>(
