@@ -98,6 +98,50 @@ jobs:
       # restore puts back, and at --workers=1 every spec shares the process it puts it back
       # into. Redundant, with a leak vector attached.
       CALENDAR_ENABLED: 'true'
+
+      # ── Test-only credentials the app refuses to run without ────────────────────────────────────
+      #
+      # None of these are secrets. They exist because the code checks that a value is *present and
+      # well-formed* before it will do the thing under test, and CI had none of them — so twenty
+      # e2e specs failed here while passing locally, where `.env` supplies them and dotenvx injects
+      # it into every process. That asymmetry is the bug: `scripts/ci/local-quality.sh` cannot
+      # certify a gate whose environment it does not reproduce, and it has now certified a red CI
+      # twice. Anything added to `.env` that the app *requires* has to be mirrored here, with a
+      # CI-only value, or the local gate is measuring a different program.
+      #
+      # Fake on purpose, and visibly so. A real key in a public workflow file would be a leak, and
+      # every one of these paths is stubbed under E2E_MODE — the AI provider by
+      # `tests/e2e/harness/fakes/ai.ts`, outbound calls by the egress fake — so nothing here ever
+      # reaches a third party.
+
+      # Drives the recurrence and retention workers (calendar, interview-privacy). Any non-empty
+      # string; the routes only compare it against the caller's header.
+      CRON_SECRET: ci-only-cron-secret-not-a-real-one
+
+      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
+      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
+      # rather than the assertion — this is 0123456789abcdef four times over.
+      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+      # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
+      # what the AI, work-sample and portfolio specs were actually asserting against.
+      MINIMAX_API_KEY: ci-only-not-a-real-key
+      AI_DISABLED: 'false'
+
+      # Where the documents suite puts candidate uploads and what scans them. The containers are
+      # started in a step below, because a service container cannot be given a command.
+      #
+      # CANDIDATE_UPLOADS_ENABLED is deliberately NOT set here — `documents.spec.ts` turns it on
+      # through `startInterviewHarness`'s `flags`, for the same reason SCHEDULING_ENABLED is left
+      # to the specs above. These endpoint vars still belong in the job env: `env.ts` validates
+      # them the moment that flag is true, and it validates in the worker process, which inherits
+      # this block. 127.0.0.1 satisfies `isPrivateStorageHost`, so no jurisdiction rule applies.
+      INTERVIEW_R2_ENDPOINT: http://127.0.0.1:9000
+      INTERVIEW_R2_BUCKET: builderhunt-interview-documents
+      INTERVIEW_R2_ACCESS_KEY_ID: builderhunt
+      INTERVIEW_R2_SECRET_ACCESS_KEY: builderhunt-local-dev
+      INTERVIEW_CLAMAV_HOST: 127.0.0.1
+      INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -185,6 +229,47 @@ jobs:
       # `pnpm test` picks up every tests/unit/**/*.test.ts file already.
       - run: pnpm test
       - run: pnpm exec playwright install --with-deps chromium
+
+      # The object store and the virus scanner that `tests/e2e/documents.spec.ts` needs. Its own
+      # comment says so — "MinIO and ClamAV come from docker-compose. Without them every assertion
+      # below would fail as a storage error, which reads as a product bug rather than a missing
+      # container" — and that is precisely how its six failures read here for months.
+      #
+      # `docker run` rather than `services:`, because a service container cannot override the
+      # image's command and MinIO needs `server /data`.
+      #
+      # ClamAV comes from the upstream image here, not from docker/clamav/Dockerfile. That
+      # Dockerfile exists because `clamav/clamav` publishes amd64 only and the deployment target is
+      # ARM; a GitHub runner is amd64, so upstream is both available and closer to what the image
+      # is meant to be. The `stable` tag ships the signature database baked in — `stable_base`
+      # downloads it at boot, which is the "takes minutes" the compose file warns about.
+      - name: Object store and virus scanner (documents suite)
+        run: |
+          set -euo pipefail
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=builderhunt \
+            -e MINIO_ROOT_PASSWORD=builderhunt-local-dev \
+            minio/minio:latest server /data
+          docker run -d --name clamav -p 3310:3310 clamav/clamav:stable
+
+          # Readiness, not a fixed sleep: an unready clamd refuses connections, which looks exactly
+          # like a scan failure, and a bucket created against a half-started MinIO 500s.
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1 && break
+            [ "$i" = 60 ] && { echo "MinIO never became ready"; docker logs minio; exit 1; }
+            sleep 2
+          done
+          docker run --rm --network host --entrypoint sh minio/mc:latest -c "
+            mc alias set local http://127.0.0.1:9000 builderhunt builderhunt-local-dev &&
+            mc mb --ignore-existing local/builderhunt-interview-documents"
+
+          for i in $(seq 1 90); do
+            (echo PING | timeout 2 nc 127.0.0.1 3310 | grep -q PONG) && break
+            [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
+            sleep 2
+          done
+          echo "minio and clamav ready"
+
       - name: End-to-end suite
         # Was `tests/e2e/team-accounts.spec.ts` — one file, ten tests, out of
         # nineteen files and 191. The other eighteen were written, passing
