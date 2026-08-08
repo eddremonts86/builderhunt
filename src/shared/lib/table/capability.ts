@@ -60,6 +60,16 @@ export function refSql(value: FilterableRef): SQL | PgColumn {
 
 export interface FilterableColumn {
   column: FilterableRef
+  /**
+   * A read of this table without this dimension is not a valid read.
+   *
+   * The refund and dispute queues are the case: `builderhunt_platform`'s SELECT policy on those
+   * tables is organization-scoped, so "the whole queue" is not a thing that exists, and the
+   * organization arrives as a filter rather than as a tenant column. Declaring it here is what turns
+   * "the caller remembers" into "the planner refuses" — and it is what let plan 13's EXPLAIN sweep
+   * derive the predicate instead of carrying a hand-written map of which tables need what.
+   */
+  required?: true
   /** When present, a value outside this list is a 400 — the filter is an enum, not free text. */
   values?: readonly string[]
   /**
@@ -100,6 +110,20 @@ export interface TableCapability {
    * Omitted for genuinely global tables (changelog, roadmap, public content).
    */
   organizationColumn?: PgColumn
+
+  /**
+   * Columns every read of this table constrains by equality, beyond the tenant.
+   *
+   * `sprint_results` is only ever read for one sprint — which is why its indexes are
+   * `(organization_id, sprint_id, …)` and why plan 04's guard had to be told about `sprint_id` by
+   * hand. The capability describing its columns but not this predicate is how plan 13's EXPLAIN sweep
+   * ended up with nineteen failures that were all its own: it explained a query the product never
+   * issues.
+   *
+   * `planKeysetPage` builds the `eq()` itself from `scopeValues`, so a missing value is an error at
+   * the call site rather than a silently wider query.
+   */
+  scopeColumns?: readonly PgColumn[]
 
   /**
    * This table is not in Postgres.

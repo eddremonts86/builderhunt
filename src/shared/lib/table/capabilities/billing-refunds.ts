@@ -44,7 +44,9 @@ export const billingRefundsCapability = registerTableCapability(defineTableCapab
     policyDecision: { column: billingRefunds.policyDecision, values: REFUND_POLICY_DECISIONS, facet: true },
     // No facet: it is a free-text id, and a chip listing the one organization already selected
     // tells the operator nothing they did not just type.
-    organizationId: { column: billingRefunds.organizationId },
+    // Required: the platform role's SELECT policy on this table is organization-scoped, so a
+    // queue without an organization is not a wider read — it is not a read at all.
+    organizationId: { column: billingRefunds.organizationId, required: true },
   },
   groupable: [],
   // The operator arrives with a refund id from a support thread far more often than with a name.

@@ -295,3 +295,53 @@ describe('a cursor that does not match the request', () => {
       .toThrow(/Cursor does not match the sort/)
   })
 })
+
+/**
+ * The two requirements a capability can now declare, and the refusals that make them worth declaring.
+ *
+ * Plan 03 left "the surface remembers to pass the sprint id" as an unwritten contract, and plan 13's
+ * EXPLAIN sweep is what made the cost visible: a read without that predicate is not a narrower query
+ * with a missing filter, it is a query over every sprint the organization ever ran. Both of these fail
+ * closed instead.
+ */
+describe('declared scope and required filters', () => {
+  const emptyQuery = { search: '', filters: {}, sort: [], groupBy: null }
+
+  it('refuses a read that omits a declared scope column', async () => {
+    const { planKeysetPage } = await import('~/shared/lib/table/keyset')
+    const { sprintResultsCapability } = await import('~/shared/lib/table/capabilities/sprint-results')
+    expect(() => planKeysetPage(sprintResultsCapability, emptyQuery, { cursor: null, limit: 50 }, {
+      organizationId: 'org-1',
+    })).toThrow(/Missing required scope for sprint_results: sprint_id/)
+  })
+
+  it('accepts it once the value is supplied', async () => {
+    const { planKeysetPage } = await import('~/shared/lib/table/keyset')
+    const { sprintResultsCapability } = await import('~/shared/lib/table/capabilities/sprint-results')
+    expect(() => planKeysetPage(sprintResultsCapability, emptyQuery, { cursor: null, limit: 50 }, {
+      organizationId: 'org-1',
+      scopeValues: { sprint_id: 'sprint-1' },
+    })).not.toThrow()
+  })
+
+  it('refuses a queue read with no organization filter', async () => {
+    const { planKeysetPage } = await import('~/shared/lib/table/keyset')
+    const { billingRefundsCapability } = await import('~/shared/lib/table/capabilities/billing-refunds')
+    // `builderhunt_platform`'s SELECT policy on this table is organization-scoped, so "the whole
+    // queue" is not a wider read — it is not a read at all.
+    expect(() => planKeysetPage(billingRefundsCapability, emptyQuery, { cursor: null, limit: 50 }, {
+      organizationId: null,
+    })).toThrow(/Missing required filter for billing_refunds: organizationId/)
+  })
+
+  it('treats an empty filter array as absent, matching the URL codec', async () => {
+    const { planKeysetPage } = await import('~/shared/lib/table/keyset')
+    const { billingRefundsCapability } = await import('~/shared/lib/table/capabilities/billing-refunds')
+    expect(() => planKeysetPage(
+      billingRefundsCapability,
+      { ...emptyQuery, filters: { organizationId: [] } },
+      { cursor: null, limit: 50 },
+      { organizationId: null },
+    )).toThrow(/Missing required filter/)
+  })
+})

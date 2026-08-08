@@ -67,6 +67,14 @@ export type KeysetTransaction = {
 
 export interface KeysetPageOptions<Row> {
   /**
+   * Values for the columns `capability.scopeColumns` says every read of this table constrains.
+   *
+   * Keyed by database column name. The `eq()` is built by the planner, not here, so a capability that
+   * declares a scope column and a caller that forgets it produce a thrown error rather than a query
+   * over everything — see `TableCapability.scopeColumns`.
+   */
+  scopeValues?: Record<string, CursorValue>
+  /**
    * Predicates the **surface** owns, rather than ones the client-facing allowlist resolves.
    *
    * `eq(sprintResults.sprintId, id)` is the obvious kind. The less obvious kind is a filter that
@@ -307,7 +315,7 @@ export function planKeysetPage(
   capability: TableCapability,
   query: TableQuery,
   page: PageRequest,
-  context: { organizationId: string | null; scope?: SQL[] },
+  context: { organizationId: string | null; scope?: SQL[]; scopeValues?: Record<string, CursorValue> },
 ): KeysetPlan {
   if (query.groupBy !== null && !capability.groupable.includes(query.groupBy)) {
     throw new TableQueryError(`Unknown group column: ${query.groupBy}`)
@@ -319,6 +327,31 @@ export function planKeysetPage(
   if (capability.organizationColumn && context.organizationId) {
     base.push(eq(capability.organizationColumn, context.organizationId) as SQL)
   }
+
+  /*
+   * The predicates the capability says every read of this table carries.
+   *
+   * Built here rather than by the caller, so "forgot the sprint id" is a thrown error and not a query
+   * over every sprint the organization ever ran. `context.scope` stays for the free-form extras a
+   * surface adds on top — a `followersCount` floor, say — which are not properties of the table.
+   */
+  for (const column of capability.scopeColumns ?? []) {
+    const value = context.scopeValues?.[column.name]
+    if (value === undefined || value === null) {
+      throw new TableQueryError(`Missing required scope for ${capability.table}: ${column.name}`)
+    }
+    base.push(eq(column, value) as SQL)
+  }
+
+  // Same argument one level up: a dimension the capability calls required is one whose absence makes
+  // the read mean something the surface never intended.
+  for (const [id, entry] of Object.entries(capability.filterable)) {
+    if (!entry.required) continue
+    if ((query.filters[id] ?? []).length === 0) {
+      throw new TableQueryError(`Missing required filter for ${capability.table}: ${id}`)
+    }
+  }
+
   base.push(...(context.scope ?? []))
   const search = searchPredicate(capability, query.search)
   if (search) base.push(search)
@@ -364,7 +397,7 @@ export async function buildKeysetPage<Row>(
 ): Promise<PageResult<Row>> {
   const table = capabilityTable(capability)
   const organizationId = capability.organizationColumn ? await requireOrganizationId(tx) : null
-  const plan = planKeysetPage(capability, query, page, { organizationId, scope: options.scope })
+  const plan = planKeysetPage(capability, query, page, { organizationId, scope: options.scope, scopeValues: options.scopeValues })
   const { sort, base, filters, filtered, rowConditions, limit } = plan
 
   // Sort columns and the tiebreaker must come back even when the caller's projection omits them,

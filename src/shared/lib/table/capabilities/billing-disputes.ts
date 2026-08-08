@@ -53,7 +53,9 @@ export const billingDisputesCapability = registerTableCapability(defineTableCapa
     // No `values`: Stripe owns this vocabulary and adds to it, so an allowlist here would 400 on a
     // status the webhook had already written into the row.
     stripeStatus: { column: billingDisputes.stripeStatus, facet: true },
-    organizationId: { column: billingDisputes.organizationId },
+    // Required: the platform role's SELECT policy on this table is organization-scoped, so a
+    // queue without an organization is not a wider read — it is not a read at all.
+    organizationId: { column: billingDisputes.organizationId, required: true },
   },
   groupable: [],
   // An operator arrives from Stripe with a dispute id, or from a support thread with a reason.

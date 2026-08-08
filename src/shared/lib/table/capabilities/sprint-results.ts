@@ -61,6 +61,8 @@ export const sprintResultsCapability = registerTableCapability(defineTableCapabi
   // Newest first, matching what the surface showed before the migration.
   defaultSort: [{ id: 'createdAt', dir: 'desc' }],
   organizationColumn: sprintResults.organizationId,
+  // Every read is for one sprint, which is why all three indexes are `(organization_id, sprint_id, …)`.
+  scopeColumns: [sprintResults.sprintId],
 }))
 
 /** Human labels for the filter ids, used by the chips and the command sheet. */

@@ -69,7 +69,7 @@
     Facet rows are capped at `FACET_VALUE_LIMIT` (50). A facet is a list read, and "nothing loads
     a whole result set" does not stop being true because the rows are counts.
 
-- [~] **Prove no access scope can be crossed**
+- [x] **Prove no access scope can be crossed**
   - Files: `tests/unit/security/table-keyset-isolation.test.ts`
   - Do: negative tenant A/B and account A/B; assert rejection across tenant/account/platform/public
     scope kinds. Assert a throw when the capability's required context is unset. Assert a filter value
@@ -94,6 +94,19 @@
     it, so the rejection is about the boundary and not about cursors being broken; and
     `app.organization_id` set to the empty string is refused as firmly as unset, which is the
     shape `set_config` leaves behind after a failed context.
+
+    **Closed after plan 13, and by the thing plan 13 needed rather than by more tests.** The scope
+    claim was unprovable because a capability described its *columns* and not the *scope* its surface
+    always applies — so there was nothing to assert against. `TableCapability.scopeColumns` and
+    `FilterableColumn.required` say it now, and `planKeysetPage` builds the predicate itself and
+    throws when a value is missing. `sprint_results` declares `sprint_id`; the refund and dispute
+    queues declare `organizationId` required, because `builderhunt_platform`'s SELECT policy on those
+    tables is organization-scoped and "the whole queue" is not a wider read — it is not a read at all.
+
+    Four refusals are asserted, and the deferred scope-adapter work this task carried is done: plan
+    13's EXPLAIN sweep read a hand-written `REQUIRED_SCOPE` map before this and derives both from the
+    descriptor now. A capability that acquires a scope is covered the day it declares one, with
+    nothing to remember in a test.
 
     The injection assertion is deliberately loud. If the filter value were interpolated,
     `github'); drop table sprint_results; --` would drop the table and every later assertion in

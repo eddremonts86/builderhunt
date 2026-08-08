@@ -30,13 +30,14 @@
  * here is whether the index can serve the ordering at all. Same reasoning, same setting, as the HNSW
  * regression test in `public-builder-embeddings.test.ts`.
  */
-import { sql, type SQL } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import { capabilityTable, TABLE_CAPABILITIES, type TableCapability } from '~/shared/lib/table/capability'
 import { planKeysetPage } from '~/shared/lib/table/keyset'
+import type { CursorValue } from '~/shared/lib/table/cursor'
 import type { TableQuery } from '~/shared/lib/table/types'
 
 // The barrel, for the same reason `capability-index.test.ts` imports it: a sweep over an
@@ -64,28 +65,31 @@ function emptyQuery(overrides: Partial<TableQuery> = {}): TableQuery {
 }
 
 /**
- * The equality predicate each surface's real query carries and the capability cannot state.
+ * The scope and required filters the capability itself declares — no hand-written map.
  *
- * **This map is the finding, not a fixture.** A capability describes its columns; it does not
- * describe the *scope* the surface always applies — `sprint_results` is only ever read for one
- * sprint, and the refund and dispute queues are only ever read for one organization, which is why
- * both of those indexes lead with a column the capability never mentions. Explaining a query without
- * that predicate explains a query the product never issues, and the plan comes back with a `Sort`
- * that says nothing about the real path.
+ * The first version of this test carried a `REQUIRED_SCOPE` ledger, because a capability described its
+ * columns but not the *scope* its surface always applies: `sprint_results` is only ever read for one
+ * sprint, and the refund and dispute queues only for one organization, which is why those indexes lead
+ * with a column the capability never mentioned. Explaining without those predicates explained a query
+ * the product never issues — nineteen failures that were all the test's own.
  *
- * The first version of this test had no map, and reported nineteen failures that were all its own.
- *
- * It is a ledger, and a ledger drifts: a new capability whose surface scopes by something is silently
- * explained without it. Plan 03 already records the fix — `capability.scope`, so the descriptor
- * carries the predicate and this map disappears — as deferred debt.
+ * The ledger is gone. `TableCapability.scopeColumns` and `FilterableColumn.required` say it now, so
+ * this reads the requirement off the descriptor and only has to invent a *value*. A capability that
+ * acquires a scope is covered the day it declares one, with nothing to remember here.
  */
-const REQUIRED_SCOPE: Record<string, { filters?: Record<string, string[]>; scope?: (table: unknown) => SQL[] }> = {
-  // Every read is `where sprint_id = :id`; the indexes are `(organization_id, sprint_id, …)`.
-  sprint_results: { scope: () => [sql`sprint_id = 'sprint-explain-probe'`] },
-  // The organization is a *filter dimension* on these two, not the tenant column — see the
-  // capability comments. `pageBillingRefunds` requires exactly one value.
-  billing_refunds: { filters: { organizationId: [ORGANIZATION_ID] } },
-  billing_disputes: { filters: { organizationId: [ORGANIZATION_ID] } },
+function scopeFor(capability: TableCapability): {
+  filters: Record<string, string[]>
+  scopeValues: Record<string, CursorValue>
+} {
+  const filters: Record<string, string[]> = {}
+  for (const [id, entry] of Object.entries(capability.filterable)) {
+    if (entry.required) filters[id] = [`${id}-explain-probe`]
+  }
+  const scopeValues: Record<string, CursorValue> = {}
+  for (const column of capability.scopeColumns ?? []) {
+    scopeValues[column.name] = `${column.name}-explain-probe`
+  }
+  return { filters, scopeValues }
 }
 
 /**
@@ -96,14 +100,12 @@ const REQUIRED_SCOPE: Record<string, { filters?: Record<string, string[]>; scope
  * regressed.
  */
 async function explainPage(capability: TableCapability, query: TableQuery): Promise<string> {
-  const required = REQUIRED_SCOPE[capability.table]
-  const scoped: TableQuery = required?.filters
-    ? { ...query, filters: { ...required.filters, ...query.filters } }
-    : query
+  const required = scopeFor(capability)
+  const scoped: TableQuery = { ...query, filters: { ...required.filters, ...query.filters } }
   const table = capabilityTable(capability)
   const plan = planKeysetPage(capability, scoped, { cursor: null, limit: 50 }, {
     organizationId: ORGANIZATION_ID,
-    scope: required?.scope?.(table),
+    scopeValues: required.scopeValues,
   })
 
   return db.transaction(async (tx) => {

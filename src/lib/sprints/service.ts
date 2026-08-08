@@ -316,7 +316,9 @@ export async function pageSprintResults(
   transaction: TenantTransaction,
   options: SprintResultPageOptions,
 ): Promise<PageResult<SprintResultRow>> {
-  const scope: SQL[] = [eq(sprintResults.sprintId, options.sprintId)]
+  // The sprint predicate is the capability's now (`scopeColumns`), so forgetting it is an error
+  // rather than a query over every sprint. What stays here is the surface's own extra.
+  const scope: SQL[] = []
   if (options.minFollowers !== undefined) {
     // `followersCount` lives in the profile document. Cast before comparing, or Postgres compares
     // text and "9" sorts above "10".
@@ -325,6 +327,7 @@ export async function pageSprintResults(
 
   return buildKeysetPage<SprintResultRow>(transaction, sprintResultsCapability, options.query, options.page, {
     scope,
+    scopeValues: { sprint_id: options.sprintId },
     select: {
       id: sprintResults.id,
       source: sprintResults.source,
