@@ -13,6 +13,7 @@ import { builderIdentities, builderListItems, builderLists, organizationBuilders
 import { SharedResourceError } from '../shared-resources/contracts'
 import { emitActivity } from './activity'
 import { randomId } from '~/lib/utils'
+import { ENTITY_DETAIL_LIMIT, USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 // ── Lists ───────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,8 @@ export async function listVisibleBuilderLists(
       ),
     ))
     .orderBy(desc(builderLists.createdAt))
+    // Lists a member created or may read, inside one organization — made by hand, one at a time.
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export async function createBuilderListForPrincipal(

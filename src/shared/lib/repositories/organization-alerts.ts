@@ -9,6 +9,7 @@ import type { TenantPrincipal } from '../authorization/permissions'
 import { findVisibleSavedQueryById } from './saved-queries'
 import { SharedResourceError } from '../shared-resources/contracts'
 import { emitActivity } from './activity'
+import { ANALYTICS_WINDOW_LIMIT, USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 export interface AlertTriggerRecord {
   id: string
@@ -367,6 +368,8 @@ export function listOwnAlertProjections(
       lt(alerts.nextEvaluationAt, range.to),
     ))
     .orderBy(asc(alerts.nextEvaluationAt))
+    // A member's own radars. Seat-priced and configured one at a time, so the ceiling is a backstop.
+    .limit(USER_SCOPED_LIMIT)
 }
 
 /**

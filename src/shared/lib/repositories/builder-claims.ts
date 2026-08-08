@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { and, desc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm'
 import { authDb } from '../db/auth-db'
 import type { TenantTransaction, publicDb } from '../db/client'
+import { SWEEP_BATCH, USER_SCOPED_LIMIT } from '../db/read-bounds'
 import {
   authUsers,
   builderClaims,
@@ -386,6 +387,9 @@ export function listVerifiedBuilderProfiles(transaction: TenantTransaction, subj
       eq(builderClaims.subjectUserId, subjectUserId),
       eq(builderClaims.status, 'verified'),
     ))
+    // Profiles one person has claimed and had verified — each one a manual proof step.
+    .orderBy(asc(builderIdentities.id))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export async function updateVerifiedBuilderProfile(
@@ -545,14 +549,34 @@ export async function unpublishPortfolioClaim(
 }
 
 /** Sitemap-only. Filters in application code (not a jsonb SQL predicate) — this table stays small enough that it isn't worth a partial index for one low-traffic query. */
-export async function listPublishedPortfolioClaimIds(transaction: ClaimsDb): Promise<string[]> {
+/**
+ * One batch of verified claims whose portfolio is published — drained by the sitemap route.
+ *
+ * The `published` flag lives inside the `metadata` jsonb, so the filter stays in JavaScript:
+ * `parsePortfolioSettings` is the one place that knows the document's shape, and duplicating its
+ * defaulting rules as a jsonb path expression would be two sources of truth for "is this published".
+ * What moved is the **bound** — a ceiling here is a portfolio missing from the sitemap, which stops
+ * being indexed silently.
+ */
+export async function listPublishedPortfolioClaimIds(
+  transaction: ClaimsDb,
+  after: string | null = null,
+  limit: number = SWEEP_BATCH,
+): Promise<Array<{ id: string; published: boolean }>> {
   const rows = await transaction.select({
     id: builderClaims.id,
     metadata: builderClaims.metadata,
-  }).from(builderClaims).where(eq(builderClaims.status, 'verified'))
-  return rows
-    .filter((row) => parsePortfolioSettings((row.metadata as Record<string, unknown>).portfolio).published)
-    .map((row) => row.id)
+  }).from(builderClaims)
+    .where(and(
+      eq(builderClaims.status, 'verified'),
+      ...(after ? [gt(builderClaims.id, after)] : []),
+    ))
+    .orderBy(asc(builderClaims.id))
+    .limit(limit)
+  return rows.map((row) => ({
+    id: row.id,
+    published: parsePortfolioSettings((row.metadata as Record<string, unknown>).portfolio).published,
+  }))
 }
 
 /** Public, anonymous read via `publicDb` — independently rechecks `status = 'verified'` on every call so a revoked claim can never keep serving a cached or stale portfolio. */

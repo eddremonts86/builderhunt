@@ -13,6 +13,7 @@
  * process-local, short-TTL cache of active `(source, sourceId)` pairs, checked on every read.
  */
 import { listActiveSuppressions } from './repositories/profile-removal'
+import { drainSweep } from './db/read-bounds'
 
 interface SuppressionCacheEntry {
   keys: Set<string>
@@ -30,7 +31,9 @@ async function loadActiveSuppressionKeys(): Promise<Set<string>> {
   if (cacheEntry && Date.now() - cacheEntry.loadedAt < SUPPRESSION_CACHE_TTL_MS) {
     return cacheEntry.keys
   }
-  const rows = await listActiveSuppressions()
+  // Drained: the read is batched (plan 12) and a suppressed profile past the boundary is one the
+  // product keeps showing after someone had it removed.
+  const rows = await drainSweep((after, limit) => listActiveSuppressions(undefined, after, limit), (row) => row.id)
   const keys = new Set(rows.map((row) => suppressionKey(row.source, row.sourceId)))
   cacheEntry = { keys, loadedAt: Date.now() }
   return keys

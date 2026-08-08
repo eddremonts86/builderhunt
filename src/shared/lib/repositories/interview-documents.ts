@@ -5,6 +5,7 @@ import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import type { CapabilityTransaction } from '../db/capability-db'
 import { candidateDocuments, documentExtractions, organizations } from '../db/schema'
 import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 
 /**
  * Data access for candidate documents (plan: calendar-scheduling-interview-intelligence, Phase 6).
@@ -618,6 +619,8 @@ export async function listSubmissionDocuments(
       eq(candidateDocuments.submissionId, params.submissionId),
     ))
     .orderBy(candidateDocuments.createdAt)
+    // Documents attached to one submission, rendered whole on the submission page.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 /**

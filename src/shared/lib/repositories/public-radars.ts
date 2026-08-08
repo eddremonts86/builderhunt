@@ -1,6 +1,7 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm'
 import { publicDb } from '../db/client'
 import { organizations, publicRadars, savedQueries } from '../db/schema'
+import { SWEEP_BATCH } from '../db/read-bounds'
 
 export interface PublicRadarQuery {
   name: string
@@ -63,6 +64,9 @@ export async function listPublicRadarSlugsForSavedQueryIds(savedQueryIds: string
   const rows = await publicDb.select({ savedQueryId: publicRadars.savedQueryId, slug: publicRadars.slug })
     .from(publicRadars)
     .where(inArray(publicRadars.savedQueryId, savedQueryIds))
+    // At most one radar per saved query, and the `inArray` above names exactly which ones — so the
+    // ceiling is the caller's own id list, which is itself a page of saved queries.
+    .limit(savedQueryIds.length)
   return new Map(rows.map((row) => [row.savedQueryId, row.slug]))
 }
 
@@ -76,9 +80,21 @@ export async function createPublicRadar(organizationId: string, savedQueryId: st
   return radar
 }
 
-/** All shared radar slugs, for sitemap.xml. */
-export async function listAllPublicRadarSlugs(): Promise<{ slug: string; createdAt: Date }[]> {
-  return publicDb.select({ slug: publicRadars.slug, createdAt: publicRadars.createdAt }).from(publicRadars)
+/**
+ * One batch of shared radar slugs, for sitemap.xml — drained by `drainSweep`.
+ *
+ * A ceiling here is a page missing from the sitemap: it stops being indexed, and nothing in the
+ * product says so. `slug` is unique, so it is a total order on its own.
+ */
+export async function listAllPublicRadarSlugs(
+  after: string | null = null,
+  limit: number = SWEEP_BATCH,
+): Promise<{ slug: string; createdAt: Date }[]> {
+  return publicDb.select({ slug: publicRadars.slug, createdAt: publicRadars.createdAt })
+    .from(publicRadars)
+    .where(after ? gt(publicRadars.slug, after) : undefined)
+    .orderBy(asc(publicRadars.slug))
+    .limit(limit)
 }
 
 export async function deletePublicRadar(organizationId: string, savedQueryId: string): Promise<boolean> {

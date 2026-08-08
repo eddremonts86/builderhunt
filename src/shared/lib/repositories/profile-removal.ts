@@ -20,6 +20,7 @@ import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { builders, organizations, profileRemovalRequests, profileSuppressions } from '../db/schema'
 import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
 import { collectWorkerOrganizationIds } from './worker-organization-scan'
+import { SWEEP_BATCH } from '../db/read-bounds'
 
 export type RemovalRequestStatus = 'pending' | 'verified' | 'rejected' | 'expired'
 
@@ -151,10 +152,20 @@ export async function insertSuppressionIfAbsent(
  * `profile-suppression.ts`'s in-process filter loads to check candidates against. */
 export async function listActiveSuppressions(
   db: PostgresJsDatabase = publicDb,
-): Promise<Array<{ source: string; sourceId: string }>> {
-  return db.select({ source: profileSuppressions.source, sourceId: profileSuppressions.sourceId })
+  after: string | null = null,
+  limit: number = SWEEP_BATCH,
+): Promise<Array<{ id: string; source: string; sourceId: string }>> {
+  // A **batch**, drained by `profile-suppression.ts`. A suppressed profile that falls past a ceiling
+  // is a profile the product keeps showing after someone exercised their right to have it removed —
+  // the one failure here that nobody reports, because the person who asked cannot see the result.
+  return db.select({ id: profileSuppressions.id, source: profileSuppressions.source, sourceId: profileSuppressions.sourceId })
     .from(profileSuppressions)
-    .where(isNull(profileSuppressions.revokedAt))
+    .where(and(
+      isNull(profileSuppressions.revokedAt),
+      ...(after ? [gt(profileSuppressions.id, after)] : []),
+    ))
+    .orderBy(asc(profileSuppressions.id))
+    .limit(limit)
 }
 
 /** Audited admin/legal action, never a hard delete (spec.md: "deleting it is an audited

@@ -68,3 +68,26 @@ export const ANALYTICS_WINDOW_LIMIT = 1000
  * changes how many round trips a complete pass costs, never whether the pass is complete.
  */
 export const SWEEP_BATCH = 1000
+
+/**
+ * Drains `read` in `SWEEP_BATCH`-sized passes, resuming from the last row's own cursor value.
+ *
+ * For the reads whose caller needs **every** row: a sitemap that omits a page, a suppression filter
+ * that misses a suppressed profile, a status email that skips a subscriber. A ceiling on any of those
+ * is silent — nobody is waiting on the row that was dropped.
+ */
+export async function drainSweep<TRow>(
+  read: (after: string | null, limit: number) => Promise<TRow[]>,
+  cursorOf: (row: TRow) => string,
+  limit: number = SWEEP_BATCH,
+): Promise<TRow[]> {
+  const all: TRow[] = []
+  let after: string | null = null
+  for (;;) {
+    const batch = await read(after, limit)
+    if (batch.length === 0) return all
+    all.push(...batch)
+    if (batch.length < limit) return all
+    after = cursorOf(batch[batch.length - 1])
+  }
+}

@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicDb, TenantTransaction } from '../db/client'
 import { builderIdentityIdFor } from './builder-identity-id'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 import {
   builderIdentities,
   builderNotes,
@@ -647,6 +648,8 @@ export function listOrganizationBuilderNotes(
   }).from(builderNotes)
     .where(and(eq(builderNotes.organizationId, organizationId), eq(builderNotes.builderId, builderId)))
     .orderBy(builderNotes.createdAt)
+    // Notes on one builder, rendered whole on that builder's panel.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 export async function createOrganizationBuilderNote(

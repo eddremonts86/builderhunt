@@ -5,6 +5,7 @@ import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAd
 import { updatePlatformIncident } from '~/shared/lib/repositories/platform-content'
 import { listConfirmedActive } from '~/shared/lib/repositories/status-subscribers'
 import { sendIncidentStatusEmail } from '~/shared/lib/email'
+import { drainSweep } from '~/shared/lib/db/read-bounds'
 
 const UpdateBody = z.object({
   status: z.enum(['investigating', 'identified', 'monitoring', 'resolved']).optional(),
@@ -41,7 +42,7 @@ export const Route = createFileRoute('/api/admin/incidents/$id')({
           // email to the public subscriber list. Best-effort.
           if (parsed.data.status === 'resolved') {
             try {
-              const subscribers = await listConfirmedActive()
+              const subscribers = await drainSweep((after, limit) => listConfirmedActive(undefined, after, limit), (row) => row.id)
               const appUrl = (process.env.APP_URL ?? 'https://builderhunt.example').replace(/\/$/, '')
               await Promise.allSettled(
                 subscribers.map((s) =>

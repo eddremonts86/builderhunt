@@ -128,7 +128,9 @@ export const Route = createFileRoute('/sitemap.xml')({
 
         try {
           const { listAllPublicRadarSlugs } = await import('~/shared/lib/repositories/public-radars')
-          const radars = await listAllPublicRadarSlugs()
+          const { drainSweep } = await import('~/shared/lib/db/read-bounds')
+          // Drained: a slug past a batch boundary is a page that silently stops being indexed.
+          const radars = await drainSweep((after, limit) => listAllPublicRadarSlugs(after, limit), (row) => row.slug)
           for (const radar of radars) {
             entries.push({
               loc: `${SITE}/r/${radar.slug}`,
@@ -146,8 +148,11 @@ export const Route = createFileRoute('/sitemap.xml')({
           // Only published, actively-verified portfolios — never a draft or a revoked claim.
           const { publicDb } = await import('~/shared/lib/db/client')
           const { listPublishedPortfolioClaimIds } = await import('~/shared/lib/repositories/builder-claims')
-          const portfolioClaimIds = await listPublishedPortfolioClaimIds(publicDb)
-          for (const claimId of portfolioClaimIds) {
+          const { drainSweep } = await import('~/shared/lib/db/read-bounds')
+          const claims = await drainSweep((after, limit) => listPublishedPortfolioClaimIds(publicDb, after, limit), (row) => row.id)
+          // The `published` flag is parsed from the claim's jsonb metadata by the repository, which is
+          // the one place that knows that document's shape — see its comment.
+          for (const claimId of claims.filter((claim) => claim.published).map((claim) => claim.id)) {
             entries.push({
               loc: `${SITE}/portfolio/${claimId}`,
               lastmod: today,

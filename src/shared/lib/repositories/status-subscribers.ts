@@ -13,9 +13,10 @@
 //     "row not found" — so a leaked DB does not leak valid tokens, and
 //     a guessed token does not leak which rows are real.
 import { createHash, randomBytes } from 'node:crypto'
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { publicDb, type PublicDb } from '../db/client'
 import { statusSubscribers } from '../db/schema'
+import { SWEEP_BATCH } from '../db/read-bounds'
 
 // The Drizzle handle type. `publicDb` is a Proxy that delegates to
 // the real `PostgresJsDatabase<Record<string, never>>`; for the
@@ -133,8 +134,16 @@ export async function findByEmail(
   return (row as { id: string; email: string; emailLower: string; unsubscribeTokenHash: string; confirmedAt: Date | null; createdAt: Date; unsubscribedAt: Date | null } | undefined) ?? null
 }
 
+/**
+ * One batch of confirmed, still-subscribed status subscribers — drained by the incident routes.
+ *
+ * A ceiling here is a subscriber who asked to be told about incidents and was not. `id` is unique,
+ * so it is a total order on its own.
+ */
 export async function listConfirmedActive(
   db: StatusSubscriberDb = publicDb,
+  after: string | null = null,
+  limit: number = SWEEP_BATCH,
 ): Promise<Array<{ id: string; email: string; emailLower: string; unsubscribeTokenHash: string; confirmedAt: Date | null; createdAt: Date; unsubscribedAt: Date | null }>> {
   return db
     .select()
@@ -142,5 +151,8 @@ export async function listConfirmedActive(
     .where(and(
       isNull(statusSubscribers.unsubscribedAt),
       sql`${statusSubscribers.confirmedAt} IS NOT NULL`,
-    )) as Promise<Array<{ id: string; email: string; emailLower: string; unsubscribeTokenHash: string; confirmedAt: Date | null; createdAt: Date; unsubscribedAt: Date | null }>>
+      ...(after ? [gt(statusSubscribers.id, after)] : []),
+    ))
+    .orderBy(asc(statusSubscribers.id))
+    .limit(limit) as Promise<Array<{ id: string; email: string; emailLower: string; unsubscribeTokenHash: string; confirmedAt: Date | null; createdAt: Date; unsubscribedAt: Date | null }>>
 }

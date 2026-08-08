@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import type { EnrichmentEvidencePayload, EnrichmentTarget } from '~/lib/enrichment/types'
 import type { TenantTransaction } from '../db/client'
 import { builderIdentities, enrichmentEvidence, enrichmentJobs, organizationBuilders } from '../db/schema'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 
 export interface EnqueueEnrichmentJobInput {
   id: string
@@ -147,6 +148,8 @@ export async function listEnrichmentEvidence(
       sql`${enrichmentEvidence.expiresAt} > now()`,
     ))
     .orderBy(desc(enrichmentEvidence.observedAt))
+    // Evidence gathered for one enrichment subject, newest first.
+    .limit(ENTITY_DETAIL_LIMIT)
   return rows.map(toEvidenceRecord)
 }
 
