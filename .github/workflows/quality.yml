@@ -227,10 +227,14 @@ jobs:
       # Includes the ABUSE_ENFORCEMENT_MODE=observe kill-switch smoke
       # (tests/unit/shared/lib/abuse/enforcement-kill-switch.test.ts) — no separate step needed,
       # `pnpm test` picks up every tests/unit/**/*.test.ts file already.
-      - run: pnpm test
-      - run: pnpm exec playwright install --with-deps chromium
-
-      # The object store and the virus scanner that `tests/e2e/documents.spec.ts` needs. Its own
+      # The object store and the virus scanner. This sits *above* `pnpm test`, not just above the
+      # e2e step, because setting INTERVIEW_R2_* is what decides whether the unit suite talks to a
+      # real store: `tests/unit/lib/storage/s3-provider.test.ts` is `describe.skipIf(!configured)`,
+      # so those vars turn a skipped block into a running one. Starting the containers afterwards
+      # gave it "configured but unreachable" and eight assertions failed on ECONNREFUSED — a state
+      # a developer never sees, because MinIO is up whenever their `.env` names it.
+      #
+      # `tests/e2e/documents.spec.ts` needs them too. Its own
       # comment says so — "MinIO and ClamAV come from docker-compose. Without them every assertion
       # below would fail as a storage error, which reads as a product bug rather than a missing
       # container" — and that is precisely how its six failures read here for months.
@@ -243,7 +247,7 @@ jobs:
       # ARM; a GitHub runner is amd64, so upstream is both available and closer to what the image
       # is meant to be. The `stable` tag ships the signature database baked in — `stable_base`
       # downloads it at boot, which is the "takes minutes" the compose file warns about.
-      - name: Object store and virus scanner (documents suite)
+      - name: Object store and virus scanner
         run: |
           set -euo pipefail
           docker run -d --name minio -p 9000:9000 \
@@ -269,6 +273,9 @@ jobs:
             sleep 2
           done
           echo "minio and clamav ready"
+
+      - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
 
       - name: End-to-end suite
         # Was `tests/e2e/team-accounts.spec.ts` — one file, ten tests, out of
