@@ -52,6 +52,9 @@ export async function getSurfaceDirectives(now = Date.now()): Promise<SurfaceDir
       })
       .from(publicSurfaceIndexing)
       .where(inArray(publicSurfaceIndexing.surface, [...SEO_SURFACES]))
+      // One row per governed surface — the `inArray` above already says which ones, so the ceiling
+      // is the list's own length and grows with it rather than with the table.
+      .limit(SEO_SURFACES.length)
     for (const row of rows) {
       // `inArray` already filters, but a row for a retired surface would still
       // key an object we then hand to callers typed as SurfaceDirectiveMap.
@@ -104,6 +107,10 @@ export async function listSurfaceIndexingForAdmin() {
       updatedBy: publicSurfaceIndexing.updatedBy,
     })
     .from(publicSurfaceIndexing)
+    // Same ceiling as `getSurfaceDirectives`, and stated rather than assumed: a row for a retired
+    // surface would be read here and then dropped by the `SEO_SURFACES.map` below, so a table with
+    // more rows than surfaces still produces exactly `SEO_SURFACES.length` results.
+    .limit(SEO_SURFACES.length)
   const bySurface = new Map(rows.map((row) => [row.surface, row]))
   return SEO_SURFACES.map((surface) => {
     const row = bySurface.get(surface)

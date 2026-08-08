@@ -32,3 +32,17 @@ export type ImplementedSearchConnector = (typeof IMPLEMENTED_SEARCH_CONNECTORS)[
  * any other, so it reads from the registry that decides it.
  */
 export const SEARCH_SOURCE_COUNT = IMPLEMENTED_SEARCH_CONNECTORS.length
+
+/**
+ * Rows the source register may hold.
+ *
+ * Not a page size and not a guess: every row in `search_sources` arrives by migration — the thirteen
+ * connectors above, the two retired ones whose rows stay behind disabled, and the four
+ * external-link-only platforms. A deployment cannot grow this table by being used, so a `.limit()`
+ * derived from it truncates nothing; adding a source means writing a migration, and this number
+ * moves in the same commit.
+ *
+ * `assertSearchConnectorRegistryMatchesDatabase` checks the register has not outgrown it, so the
+ * bound cannot start silently truncating between the migration and someone noticing.
+ */
+export const SEARCH_SOURCE_REGISTER_LIMIT = 64

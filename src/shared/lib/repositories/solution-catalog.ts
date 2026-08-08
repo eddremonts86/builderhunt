@@ -62,10 +62,40 @@ export interface SolutionSourceRow {
   updatedAt: Date
 }
 
+/**
+ * Rows the solution-source register may hold.
+ *
+ * The same fact as `SEARCH_SOURCE_REGISTER_LIMIT`, about a different register: rows arrive by
+ * migration, so the count is a property of the schema rather than of usage, and a bounded read of it
+ * truncates nothing. `assertSolutionSourceRegisterWithinBound` is the guard that it still holds.
+ */
+export const SOLUTION_SOURCE_REGISTER_LIMIT = 64
+
+/**
+ * Fails loudly if the register has outgrown the ceiling every bounded read of it relies on.
+ *
+ * Reads one row past the limit on purpose — a check that fetches exactly as many rows as it expects
+ * to exist cannot notice the row that broke the assumption.
+ */
+export async function assertSolutionSourceRegisterWithinBound(db: PostgresJsDatabase = publicDb): Promise<void> {
+  const rows = await db
+    .select({ key: solutionSources.key })
+    .from(solutionSources)
+    .limit(SOLUTION_SOURCE_REGISTER_LIMIT + 1)
+  if (rows.length > SOLUTION_SOURCE_REGISTER_LIMIT) {
+    throw new Error(
+      `solution_sources holds more than SOLUTION_SOURCE_REGISTER_LIMIT (${SOLUTION_SOURCE_REGISTER_LIMIT}) rows — `
+      + 'every bounded read of the register is now truncating. Raise the constant in the migration that added the rows.',
+    )
+  }
+}
+
 /** The full register, for the operator's source list. Ordered so scrapes — the ones that need a review
  * before they can run — sort together. */
 export async function listSolutionSources(db: PostgresJsDatabase = publicDb): Promise<SolutionSourceRow[]> {
-  const rows = await db.select().from(solutionSources).orderBy(asc(solutionSources.kind), asc(solutionSources.key))
+  const rows = await db.select().from(solutionSources)
+    .orderBy(asc(solutionSources.kind), asc(solutionSources.key))
+    .limit(SOLUTION_SOURCE_REGISTER_LIMIT)
   return rows.map(toSourceRow)
 }
 
@@ -81,6 +111,7 @@ export async function listEnabledSourceKeys(db: PostgresJsDatabase = publicDb): 
     .from(solutionSources)
     .where(eq(solutionSources.enabled, true))
     .orderBy(asc(solutionSources.key))
+    .limit(SOLUTION_SOURCE_REGISTER_LIMIT)
   return rows.map((row) => row.key)
 }
 

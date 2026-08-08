@@ -15,7 +15,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '~/shared/lib/db/client'
 import { platformDb } from '~/shared/lib/db/platform-db'
 import { searchSources } from '~/shared/lib/db/schema'
-import { IMPLEMENTED_SEARCH_CONNECTORS, type ImplementedSearchConnector } from '~/shared/lib/search-connectors'
+import { IMPLEMENTED_SEARCH_CONNECTORS, SEARCH_SOURCE_REGISTER_LIMIT, type ImplementedSearchConnector } from '~/shared/lib/search-connectors'
 
 export type SearchSourceKind =
   | 'official_api' | 'feed' | 'licensed_dataset' | 'user_submission' | 'public_scrape' | 'external_link_only'
@@ -43,10 +43,12 @@ export interface SearchSourceRow {
  * components can read `SEARCH_SOURCE_COUNT` without this module's `publicDb`/`platformDb` imports
  * pulling `postgres` into the browser bundle. Server-side importers keep the original path.
  */
-export { IMPLEMENTED_SEARCH_CONNECTORS, type ImplementedSearchConnector }
+export { IMPLEMENTED_SEARCH_CONNECTORS, SEARCH_SOURCE_REGISTER_LIMIT, type ImplementedSearchConnector }
 
 export async function listSearchSources(db: PostgresJsDatabase = publicDb): Promise<SearchSourceRow[]> {
-  const rows = await db.select().from(searchSources).orderBy(searchSources.key)
+  // The register is migration-managed, so its row count is a fact about the schema rather than
+  // about usage — see `SEARCH_SOURCE_REGISTER_LIMIT`.
+  const rows = await db.select().from(searchSources).orderBy(searchSources.key).limit(SEARCH_SOURCE_REGISTER_LIMIT)
   return rows.map(toSearchSourceRow)
 }
 
@@ -77,6 +79,7 @@ export async function loadEnabledSearchSourceKeys(db: PostgresJsDatabase = publi
     .select({ key: searchSources.key })
     .from(searchSources)
     .where(eq(searchSources.enabled, true))
+    .limit(SEARCH_SOURCE_REGISTER_LIMIT)
   const keys = new Set(rows.map((row) => row.key))
   cache = { keys, at: Date.now() }
   return keys
@@ -184,9 +187,19 @@ export async function recordSearchSourceTermsReview(
 export async function assertSearchConnectorRegistryMatchesDatabase(
   db: PostgresJsDatabase = publicDb,
 ): Promise<{ claimedButAbsent: string[]; presentButUnregistered: string[] }> {
+  // One row over the declared ceiling is fetched on purpose: this function is the guard that the
+  // ceiling still holds, and it cannot notice a register that has outgrown it by reading exactly as
+  // many rows as it expects to exist.
   const rows = await db
     .select({ key: searchSources.key, connectorImplemented: searchSources.connectorImplemented })
     .from(searchSources)
+    .limit(SEARCH_SOURCE_REGISTER_LIMIT + 1)
+  if (rows.length > SEARCH_SOURCE_REGISTER_LIMIT) {
+    throw new Error(
+      `search_sources holds more than SEARCH_SOURCE_REGISTER_LIMIT (${SEARCH_SOURCE_REGISTER_LIMIT}) rows — `
+      + 'every bounded read of the register is now truncating. Raise the constant in the migration that added the rows.',
+    )
+  }
   const inCode = new Set<string>(IMPLEMENTED_SEARCH_CONNECTORS)
   const registered = new Set(rows.map((row) => row.key))
   return {
