@@ -1,6 +1,6 @@
 # Plan — make the bound permanent
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`08-migrate-admin-surfaces`](../08-migrate-admin-surfaces/spec.md), [`09-migrate-platform-content`](../09-migrate-platform-content/spec.md), [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md), [`11-migrate-search`](../11-migrate-search/spec.md), [`12-bounded-reads-sweep`](../12-bounded-reads-sweep/spec.md)
 > **Blocks**: nothing
 > **Reality check**: One script flag, one e2e assertion, four documentation files. No `src/` behaviour changes.

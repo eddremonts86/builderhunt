@@ -63,3 +63,26 @@ marked as transition findings until that lands.
 Authorization must never depend on `metadata`, `payload`, `topics`, `keywords`, selections, or other
 JSON fields. Future tables must be added here before their migration is accepted and must document
 owner key, DTO fields, retention, indexes, constraints, RLS policy, and introducing plan.
+
+
+## Table capabilities are an authorization surface
+
+A `TableCapability` (`src/shared/lib/table/capability.ts`) is not a UI convenience. Its `sortable`,
+`filterable`, `searchable` and `groupable` entries decide **which columns a client can reach**, and
+nothing else does: there is no path from a request to an `ORDER BY` that does not go through
+`sortable`, and none to a `WHERE` that does not go through `filterable` or `searchable`. A column id
+arriving from a client is a string, and a string that reaches an `ORDER BY` unchecked is an injection
+surface — which is why an id absent from the descriptor is a 400 rather than a query.
+
+Two consequences for anyone changing one:
+
+- **Adding an entry widens what a client may ask about a table.** A `filterable` column on a table
+  whose rows carry another tenant's data still cannot cross the boundary — RLS and the emitted
+  `organization_id` predicate are both in the way — but it can make a column *queryable* that the
+  classification above may not intend to expose, one probe at a time.
+- **`searchable` reaches text.** `ILIKE` over a column puts its contents behind a free-text box, so a
+  column holding anything from the "restricted" rows of the tables above does not belong there.
+
+`ProviderCapability`, in the same file, is the non-SQL sibling: a federation of third-party APIs has
+no columns to allowlist, so it declares what it *can* serve and why no column allowlist applies.
+`scripts/check-table-surfaces.mjs` is the gate that every grid on screen names one or the other.

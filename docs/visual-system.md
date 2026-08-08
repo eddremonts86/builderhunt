@@ -114,3 +114,26 @@ light-first.
 - This document itself is the "token contract" deliverable; the mechanical `check-visual-contract.mjs`
   script the plan also names was not built (this doc + `pnpm test -- src/shared/lib/accessibility.test.ts`
   + `pnpm test:a11y` are the closest existing automated proxies for "does the contract hold").
+
+
+## Tables — what shipped (phase 3)
+
+The code wins where this section and `DataTable.tsx` disagree; this describes what is there.
+
+| Decision | Value | Where |
+| --- | --- | --- |
+| Row height, comfortable | 40px | `useTableVirtual.ts` `ROW_HEIGHT` |
+| Row height, compact | 34px | same |
+| Row height, card surfaces | declared per surface (`rowHeight`) | `DataTable.tsx`; search uses 176px |
+| Windowing threshold | above 100 loaded rows | `VIRTUALIZATION_THRESHOLD` |
+| Scroll viewport when windowed | `maxHeight` or 70vh | `DataTable.tsx` |
+| Numeric alignment | `tabular-nums` on `align: 'end'` | `grid-roles.ts` `cellAlignmentClass` |
+| Roles | `role="grid"` / `row` / `gridcell` / `columnheader` | `DataTable.tsx`, `GridRow.tsx` |
+| Header row index | `aria-rowindex={1}` | `grid-roles.ts` `HEADER_ROW_INDEX` |
+| Row count | `total + 1`, or `-1` when unknown | `grid-roles.ts` `ariaRowCount` |
+| Empty states | `table-blank` and `table-filtered-empty` | `states/` |
+| Renderers | `table`, `grouped`, `board`, `stacked` | `renderers/` |
+
+`chrome="minimal"` hides the toolbar and visually hides the header row — for a grid whose row *is* a
+card, where a column-visibility menu over one column reads as a mistake. The header row stays in the
+accessibility tree, because `aria-rowcount` counts it.

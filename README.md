@@ -260,6 +260,22 @@ APIs on a cache miss.
 
 <br />
 
+## 📋 Adding a table
+
+Two files, and no pagination code.
+
+1. **A capability** in `src/shared/lib/table/capabilities/` — which columns may be sorted, filtered,
+   searched and grouped, the tiebreaker, the default sort, and the tenant column. Register it in that
+   directory's `index.ts`. This is an authorization surface, not a config file: an id absent from it
+   cannot reach an `ORDER BY` (see `docs/architecture/data-classification.md`).
+2. **A `ColumnDef[]`** in the surface, and `<DataTable>`. The shell does the paging, the windowing, the
+   keyboard model and the ARIA indices; it never sorts or filters the rows it was handed, because the
+   server already did.
+
+Then add `// table-surface: yourCapability` to the surface — `pnpm check:table-surfaces` fails without
+it — and let `pnpm check:unbounded` tell you if the read behind it forgot its bound. Copy any existing
+capability plus its surface; between them they show every shape.
+
 ## 📁 Project structure
 
 ```

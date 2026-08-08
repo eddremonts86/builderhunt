@@ -219,3 +219,31 @@ for glass panels, `24px` for cards. Pills (`9999px`) for badges and eyebrows. Bo
 - **Don't** ship dark-navy document metadata (`theme-color`, `msapplication-TileColor`,
   `color-scheme`) against a light-first product — they must track the live surface.
 - **Don't** use `font-mono` outside literal code/keys.
+
+## Tables (phase 3)
+
+Nineteen hand-built lists became one shell: `src/shared/components/table/DataTable.tsx`. What it
+looks like is decided here so it is not re-litigated per surface.
+
+**Row height is a table concept, not the dashboard's.** `comfortable` is 40px, `compact` 34px
+(`useTableVirtual.ts`'s `ROW_HEIGHT`). Deliberately *not* bound to the dashboard's `bento`/`sections`
+preference: switching the dashboard's layout must not silently change the row height of every table.
+A surface whose row is a card rather than a line of text declares `rowHeight` instead — search
+results do, at 176px — because the virtualizer measures nothing and a mixed-height list would jump at
+the hundredth row.
+
+**Numbers are `tabular-nums`, never `font-mono`.** `font-variant-numeric: tabular-nums` on an
+`align: 'end'` column, which is what makes a column of amounts line up without changing typeface.
+`font-mono` stays for literal code and keys (see the "Don't" above).
+
+**Two empty states, never one.** An empty *table* (`table-blank`) says there is nothing here yet and
+offers the action that creates the first row. An empty *result* (`table-filtered-empty`) says the
+filter matched nothing and offers to clear it. Collapsing them tells a new user their data is missing,
+and tells a filtering user to go create something they already have.
+
+**`role="grid"` over divs, not `<table>`.** Virtualized rows inside a `<tbody>` need spacer rows and
+`translateY`, which fight sticky group headers and column alignment; CSS grid does the alignment a
+table would have done. The cost is owning the ARIA indices, and that is a real obligation — the
+arithmetic lives in `grid-roles.ts` with its own tests, and `pnpm test:a11y` runs axe over the result.
+`aria-rowcount` is the *whole filtered set*, never the loaded rows, and `-1` when the total is
+genuinely unknowable (the federated search).

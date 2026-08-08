@@ -1,6 +1,6 @@
 # Specification — make the bound permanent
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`08-migrate-admin-surfaces`](../08-migrate-admin-surfaces/spec.md), [`09-migrate-platform-content`](../09-migrate-platform-content/spec.md), [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md), [`11-migrate-search`](../11-migrate-search/spec.md), [`12-bounded-reads-sweep`](../12-bounded-reads-sweep/spec.md)
 > **Blocks**: nothing
 > **Reality check**: `scripts/check-unbounded-reads.mjs` exists in report-only mode from plan 01. `scripts/check-route-coverage.mjs` and `scripts/check-tenant-boundaries.mjs` are already wired into `pnpm ci:local` and `.github/workflows/quality.yml` — this plan follows them. `docs/visual-system.md` documents the token contract and explicitly lists its own known gaps.
