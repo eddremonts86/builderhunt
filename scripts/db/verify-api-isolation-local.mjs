@@ -626,9 +626,23 @@ async function checkOrganizationTeamAndMembers() {
   const { Route: TeamRoute } = await import('../../src/routes/api/organizations/team.ts')
   const { GET: teamGET } = TeamRoute.options.server.handlers
 
+  /*
+   * The roster moved out of the snapshot (plans/phase-3/10): `TeamSnapshotDto` no longer carries
+   * `members` or `pendingInvitations` — both are keyset grids of their own now, because a snapshot
+   * that embedded every member could not be bounded. This probe read `snapshotA.members` and
+   * silently saw `[]`, which is the failure mode a `?? []` fallback creates: no crash, no coverage.
+   *
+   * So it asks the roster endpoint the page actually calls, which is where the tenant boundary now
+   * lives. The snapshot is still checked, for the field it does carry.
+   */
   const snapshotA = await (await teamGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/organizations/team') })).json()
-  const memberIdsA = (snapshotA.members ?? []).map((m) => m.userId)
-  record('team: org A snapshot lists only A\'s member, not B\'s', memberIdsA.includes(IDS.userA) && !memberIdsA.includes(IDS.userB), JSON.stringify(memberIdsA))
+  record('team: org A snapshot names org A', snapshotA?.organization?.id === IDS.orgA, JSON.stringify(snapshotA?.organization ?? null))
+
+  const { Route: TeamMembersRoute } = await import('../../src/routes/api/organizations/team/members.ts')
+  const { GET: teamMembersGET } = TeamMembersRoute.options.server.handlers
+  const rosterA = await (await teamMembersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/organizations/team/members') })).json()
+  const memberIdsA = (rosterA.rows ?? []).map((m) => m.userId)
+  record('team: org A roster lists only A\'s member, not B\'s', memberIdsA.includes(IDS.userA) && !memberIdsA.includes(IDS.userB), JSON.stringify(memberIdsA))
 
   const { Route: MembersRoute } = await import('../../src/routes/api/organizations/members/$memberId.ts')
   const { PATCH: memberPATCH, DELETE: memberDELETE } = MembersRoute.options.server.handlers
@@ -1185,7 +1199,14 @@ async function checkAbuseConsoleAndSessionsRoutes() {
   record('admin abuse action: non-admin session (B) is rejected at runtime', nonAdminAction.status === 403, `status=${nonAdminAction.status}`)
 
   const adminFeed = await (await abuseFeedGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/abuse') })).json()
-  record('admin abuse feed: admin session (A) can read the feed', Array.isArray(adminFeed.signals) && typeof adminFeed.stageByUserId === 'object', JSON.stringify(adminFeed).slice(0, 200))
+  // `rows`, not `signals`, and the stage is a property of each row rather than a flat
+  // `stageByUserId` map — plans/phase-3/08 put this console on a keyset page, and a map keyed by user
+  // could not survive paging.
+  record(
+    'admin abuse feed: admin session (A) can read the feed',
+    Array.isArray(adminFeed.rows) && adminFeed.rows.every((row) => 'stage' in row),
+    JSON.stringify(adminFeed).slice(0, 200),
+  )
 
   const adminClusters = await (await abuseClustersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/abuse/clusters') })).json()
   record('admin abuse clusters: admin session (A) can read clusters', Array.isArray(adminClusters.clusters), JSON.stringify(adminClusters).slice(0, 200))
