@@ -1,0 +1,102 @@
+{
+  "keyword": {
+    "query": "deterministic ranking probe",
+    "sources": [
+      "github",
+      "hn"
+    ],
+    "orderedIds": [
+      "github:rank-p1-gh-builder-4",
+      "hn:rank-p1-hn-builder-2",
+      "github:rank-p1-gh-builder-9",
+      "hn:rank-p1-hn-builder-7",
+      "github:rank-p1-gh-builder-14",
+      "hn:rank-p1-hn-builder-12",
+      "github:rank-p1-gh-builder-19",
+      "hn:rank-p1-hn-builder-1",
+      "github:rank-p1-gh-builder-3",
+      "hn:rank-p1-hn-builder-17",
+      "github:rank-p1-gh-builder-13",
+      "hn:rank-p1-hn-builder-6",
+      "github:rank-p1-gh-builder-8",
+      "hn:rank-p1-hn-builder-11",
+      "github:rank-p1-gh-builder-18",
+      "hn:rank-p1-hn-builder-22",
+      "github:rank-p1-gh-builder-2",
+      "hn:rank-p1-hn-builder-0",
+      "github:rank-p1-gh-builder-24",
+      "hn:rank-p1-hn-builder-16",
+      "github:rank-p1-gh-builder-12",
+      "hn:rank-p1-hn-builder-5",
+      "github:rank-p1-gh-builder-7",
+      "hn:rank-p1-hn-builder-10",
+      "github:rank-p1-gh-builder-1",
+      "hn:rank-p1-hn-builder-15",
+      "github:rank-p1-gh-builder-17",
+      "hn:rank-p1-hn-builder-21",
+      "github:rank-p1-gh-builder-23",
+      "hn:rank-p1-hn-builder-27",
+      "github:rank-p1-gh-builder-6",
+      "hn:rank-p1-hn-builder-20",
+      "github:rank-p1-gh-builder-11",
+      "hn:rank-p1-hn-builder-26",
+      "github:rank-p1-gh-builder-22",
+      "hn:rank-p1-hn-builder-4",
+      "github:rank-p1-gh-builder-29",
+      "hn:rank-p1-hn-builder-9",
+      "github:rank-p1-gh-builder-0",
+      "hn:rank-p1-hn-builder-14",
+      "github:rank-p1-gh-builder-16",
+      "hn:rank-p1-hn-builder-19",
+      "github:rank-p1-gh-builder-28",
+      "hn:rank-p1-hn-builder-25",
+      "github:rank-p1-gh-builder-5",
+      "hn:rank-p1-hn-builder-3",
+      "github:rank-p1-gh-builder-10",
+      "hn:rank-p1-hn-builder-8",
+      "github:rank-p1-gh-builder-21",
+      "hn:rank-p1-hn-builder-13",
+      "github:rank-p1-gh-builder-27",
+      "hn:rank-p1-hn-builder-24",
+      "github:rank-p1-gh-builder-15",
+      "hn:rank-p1-hn-builder-18",
+      "github:rank-p1-gh-builder-20",
+      "hn:rank-p1-hn-builder-23",
+      "github:rank-p1-gh-builder-26",
+      "hn:rank-p1-hn-builder-29",
+      "github:rank-p1-gh-builder-25",
+      "hn:rank-p1-hn-builder-28"
+    ],
+    "sourceHealth": [
+      {
+        "source": "github",
+        "health": "ok",
+        "resultCount": 30
+      },
+      {
+        "source": "hn",
+        "health": "ok",
+        "resultCount": 30
+      }
+    ],
+    "degraded": false
+  },
+  "semantic": {
+    "query": "a deterministic semantic ranking probe for plan eleven",
+    "mode": "semantic",
+    "orderedIds": [
+      "rank-00",
+      "rank-01",
+      "rank-02",
+      "rank-03",
+      "rank-04",
+      "rank-05",
+      "rank-06",
+      "rank-07",
+      "rank-08",
+      "rank-09",
+      "rank-10",
+      "rank-11"
+    ]
+  }
+}

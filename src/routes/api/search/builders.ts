@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
-import { searchBuildersWithStatus } from '~/lib/search'
+import { pageBuilderSearch } from '~/lib/search'
+import { SearchContinuationError } from '~/lib/search-continuation'
 import { recordIngestedSourceObservations, upsertEmbeddingStubs } from '~/lib/semantic/index-writer'
 import { rateLimit, getRateLimitId, getAuthedRateLimitId } from '~/shared/lib/rate-limit'
 import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
@@ -41,25 +42,35 @@ export const Route = createFileRoute('/api/search/builders')({
           }
 
           const body = await request.json()
-          const {
-            keywords,
-            sources,
-            language,
-            country,
-            page = 1,
-            perPage = 30,
-          } = body
+          const { keywords, sources, language, country, cursor } = body
           const keywordsArray = typeof keywords === 'string'
             ? keywords.split(/[,\s]+/).filter(Boolean)
             : Array.isArray(keywords) ? keywords : []
-          const { builders: results, sources: sourceStatuses } = await searchBuildersWithStatus({
-            keywords: keywordsArray,
-            sources: Array.isArray(sources) ? sources : undefined,
-            language,
-            country,
-            page,
-            perPage,
-          })
+
+          let page: Awaited<ReturnType<typeof pageBuilderSearch>>
+          try {
+            page = await pageBuilderSearch({
+              keywords: keywordsArray,
+              sources: Array.isArray(sources) ? sources : undefined,
+              language,
+              country,
+              // Search reads no tenant-scoped rows, but the continuation is still bound to who
+              // asked — a token is a token, and scoping it only where a boundary happens to exist
+              // is how the one place it does get missed.
+              scope: principal?.organizationId ?? 'anon',
+              mode: 'keyword',
+              cursor: typeof cursor === 'string' ? cursor : null,
+            })
+          } catch (error) {
+            if (error instanceof SearchContinuationError) {
+              // 400 and no rows. The client drops the cursor and restarts at page one — which is
+              // exactly right when the query, the filters or the enabled sources have moved.
+              return Response.json({ error: error.message }, { status: error.status })
+            }
+            throw error
+          }
+          const results = page.builders
+          const sourceStatuses = page.sources
 
           let trackedIds = new Map<string, string>()
           if (principal) {
@@ -98,14 +109,20 @@ export const Route = createFileRoute('/api/search/builders')({
 
           return Response.json({
             builders: annotated,
-            page,
-            perPage,
-            hasMore: results.length >= perPage,
+            /**
+             * Opaque and signed. `page`/`perPage`/`hasMore` were here and are gone (plan 11): the
+             * response was up to `sources × perPage` rows, and `hasMore` compared that cross-source
+             * total against a per-source ask, so it was true on virtually every response.
+             */
+            nextCursor: page.nextCursor,
+            /** Never a number. Counting would mean exhausting thirteen third-party APIs. */
+            total: page.total,
+            consistency: page.consistency,
             // Per-source health (plan 43 Phase 2). Connector isolation means a broken source now
             // yields partial results instead of a 500 — which would be a silent downgrade if the
             // response did not say so. The UI can tell "nobody matched" from "GitHub was down".
             sources: sourceStatuses,
-            degraded: sourceStatuses.some((status) => status.health !== 'ok'),
+            degraded: page.degraded,
           })
         } catch (err) {
           console.error('Search error:', err)

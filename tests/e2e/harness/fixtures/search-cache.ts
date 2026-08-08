@@ -51,33 +51,68 @@ export function searchCacheKey(
   keywords: readonly string[],
   perPage: number,
   sources: readonly string[] = [],
+  /**
+   * Provider page. Part of the key because `searchBuildersWithStatus` passes it straight to each
+   * connector — page two of a federated search is a different upstream request, not a slice of a
+   * set already held. A spec that pages therefore has to seed every page it will ask for.
+   */
+  page = 1,
 ): string {
   const keywordsPart = [...keywords].sort().join(',')
   const sourcesPart = [...sources].sort().join(',')
-  return `search:${[keywordsPart, sourcesPart, '', '', '1', String(perPage)].join('-')}`
+  return `search:${[keywordsPart, sourcesPart, '', '', String(page), String(perPage)].join('-')}`
+}
+
+/**
+ * Where a seeded row's `profileUrl` has to live, per `src/shared/lib/security/url-policy.ts`.
+ *
+ * A row whose URL is off its source's allowed host is rejected by a later
+ * `POST /api/builders/track`, so getting this wrong produces a failure two steps from its cause.
+ */
+const SOURCE_PROFILE_URL: Record<string, (username: string) => string> = {
+  github: (username) => `https://github.com/${username}`,
+  hn: (username) => `https://news.ycombinator.com/user?id=${username}`,
+  devto: (username) => `https://dev.to/${username}`,
+}
+
+export interface CachedSearchBuilderOptions {
+  /** Defaults to `github`, which is what every caller before the ranking fixtures wanted. */
+  source?: keyof typeof SOURCE_PROFILE_URL
+  /** Follower count per index. Drives `scoreBuilders`' popularity term, so it drives the ranking. */
+  followers?: (index: number) => number
+  /** Topics per index. Drives the topic-match term, capped at 15 points. */
+  topics?: (index: number) => string[]
 }
 
 /**
  * Deterministic, avatar-less results. No `avatarUrl` at all — the point is that the browser has no
  * third-party image to fetch, so the card renders its initials fallback.
+ *
+ * Nothing here carries `metadata.lastSeen`. That is what makes the *score* deterministic as well as
+ * the rows: `scoreBuilders` reads `Date.now()` only inside the recency branch, so a row without it
+ * takes the neutral five points and scores the same in every run.
  */
-export function cachedSearchBuilders(label: string, count: number): CachedSearchBuilder[] {
+export function cachedSearchBuilders(
+  label: string,
+  count: number,
+  options: CachedSearchBuilderOptions = {},
+): CachedSearchBuilder[] {
+  const source = options.source ?? 'github'
+  const profileUrl = SOURCE_PROFILE_URL[source]
   const safe = label.toLowerCase().replace(/[^a-z0-9-]+/g, '-')
   return Array.from({ length: count }, (_, index) => {
     const username = `${safe}-builder-${index}`
     return {
-      id: `github:${username}`,
+      id: `${source}:${username}`,
       kind: 'person' as const,
-      source: 'github',
+      source,
       sourceId: username,
       username,
       displayName: `Seeded Builder ${index} ${safe}`,
       bio: `Deterministic E2E search result ${index} for ${safe}.`,
-      // Must satisfy src/shared/lib/security/url-policy.ts for the declared source, or a later
-      // POST /api/builders/track on this row is rejected.
-      profileUrl: `https://github.com/${username}`,
-      followersCount: 100 + index,
-      topics: [],
+      profileUrl: profileUrl(username),
+      followersCount: options.followers?.(index) ?? 100 + index,
+      topics: options.topics?.(index) ?? [],
       metadata: {},
     }
   })

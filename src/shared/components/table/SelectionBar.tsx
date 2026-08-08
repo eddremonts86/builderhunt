@@ -6,8 +6,8 @@ import type { TableSelectionResult } from './useTableSelection'
 
 interface SelectionBarProps {
   selection: TableSelectionResult
-  /** Rows matching the current query, from `PageResult.total`. */
-  total: number
+  /** Rows matching the current query, from `PageResult.total`. `null` when it is unknowable. */
+  total: number | null
   /** Bulk actions. They receive the predicate token when one exists, so they cannot silently narrow. */
   actions?: ReactNode
 }
@@ -25,7 +25,11 @@ export function SelectionBar({ selection, total, actions }: SelectionBarProps) {
 
   if (loadedSelectedCount === 0 && !matching) return null
 
-  const moreMatchThanLoaded = total > loadedSelectedCount
+  // An unknown total cannot establish that more rows match than are loaded, so the
+  // "select all matching" affordance stays hidden. Offering it would promise a count the surface
+  // has no way to produce — and `selectAllMatching` is itself a server predicate over a set the
+  // federation never materialises.
+  const moreMatchThanLoaded = total !== null && total > loadedSelectedCount
 
   return (
     <div

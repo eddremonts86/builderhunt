@@ -19,6 +19,15 @@ import { CREDENTIAL_ENV_VARS, CREDENTIAL_MANDATORY_SOURCES } from '~/shared/lib/
 import { log } from '~/shared/lib/log'
 import { metrics } from '~/shared/lib/metrics'
 import { filterSuppressed } from '~/shared/lib/profile-suppression'
+import { TABLE_PAGE_SIZE } from '~/shared/lib/table/constants'
+import {
+  createSearchContinuation,
+  searchFingerprint,
+  SearchContinuationError,
+  verifySearchContinuation,
+  type ProviderContinuation,
+  type SearchContinuationMode,
+} from './search-continuation'
 
 export interface SearchOptions {
   keywords: string[]
@@ -28,6 +37,16 @@ export interface SearchOptions {
   page?: number
   perPage?: number
 }
+
+/**
+ * The sources a caller that names none gets.
+ *
+ * Named rather than inlined because plan 11's continuation has to fingerprint the *requested* set,
+ * and a default that only existed inside a destructuring default would be invisible to it: two
+ * requests, one naming these five and one naming nothing, are the same search and must share a
+ * fingerprint.
+ */
+export const DEFAULT_SEARCH_SOURCES = ['github', 'hn', 'devto', 'reddit', 'lobsters'] as const
 
 export type ScoredBuilder = ReturnType<typeof scoreBuilders>[number]
 
@@ -214,12 +233,23 @@ export async function searchBuilders(opts: SearchOptions): Promise<FusedBuilder[
   return builders
 }
 
-export async function searchBuildersWithStatus(opts: SearchOptions): Promise<SearchOutcome> {
-  const { keywords, sources: requestedSources = ['github', 'hn', 'devto', 'reddit', 'lobsters'], language, country, page = 1, perPage = 30 } = opts
-  const cacheKeyStr = cacheKey(opts)
-  const start = Date.now()
-  metrics.increment('searches')
+/** The sources a request will actually reach, and a status for every one it will not. */
+export interface ContactableSources {
+  /** Keys that will be contacted, in the caller's requested order. */
+  contacted: string[]
+  /** One status per source that was requested and skipped, with the reason. */
+  notContacted: SourceStatus[]
+}
 
+/**
+ * Which of the requested sources may be contacted, and why the rest may not.
+ *
+ * Extracted from `searchBuildersWithStatus` so a caller can know the answer *before* the fan-out
+ * runs. Plan 11's continuation binds this set: a source switched off between two pages has to
+ * invalidate the token, and a token can only be checked against a snapshot someone computed
+ * separately from the search that used it.
+ */
+export async function resolveContactableSources(requestedSources: readonly string[]): Promise<ContactableSources> {
   // The operator register decides which of the requested sources may be contacted at all. Consulted
   // before the cache, not after: a cache entry written while a source was enabled must not keep
   // serving that source's rows after it was switched off.
@@ -228,7 +258,7 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   // that the client bundle pulls in, and the repository imports `publicDb`, which constructs a real
   // `postgres()` client at module-evaluation time.
   const { partitionRequestedSources } = await import('~/shared/lib/repositories/search-sources')
-  const { allowed: permitted, refused } = await partitionRequestedSources(requestedSources)
+  const { allowed: permitted, refused } = await partitionRequestedSources([...requestedSources])
   const disabledStatuses: SourceStatus[] = refused.map((source) => ({
     source,
     health: 'disabled' as const,
@@ -265,8 +295,19 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   }))
   if (unconfigured.length > 0) log.warn('search_sources_unconfigured', { unconfigured })
 
-  const sources = permitted.filter((source) => !unconfigured.includes(source))
-  const notContacted = [...disabledStatuses, ...unconfiguredStatuses]
+  return {
+    contacted: permitted.filter((source) => !unconfigured.includes(source)),
+    notContacted: [...disabledStatuses, ...unconfiguredStatuses],
+  }
+}
+
+export async function searchBuildersWithStatus(opts: SearchOptions): Promise<SearchOutcome> {
+  const { keywords, sources: requestedSources = DEFAULT_SEARCH_SOURCES, language, country, page = 1, perPage = 30 } = opts
+  const cacheKeyStr = cacheKey(opts)
+  const start = Date.now()
+  metrics.increment('searches')
+
+  const { contacted: sources, notContacted } = await resolveContactableSources(requestedSources)
   if (sources.length === 0) {
     return { builders: [], sources: notContacted }
   }
@@ -376,5 +417,145 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   return {
     builders: fuseByRank(scoreBuilders(visible)),
     sources: [...liveStatuses, ...notContacted],
+  }
+}
+
+/**
+ * What every connector is asked for on one provider page.
+ *
+ * Unchanged at 30, and deliberately not `TABLE_PAGE_SIZE`. This number reaches thirteen third-party
+ * APIs and decides what each of them ranks and returns; moving it would move the fused ranking,
+ * which is the one thing plan 11 must not change (`tests/e2e/fixtures/search-ranking.json`).
+ */
+export const SEARCH_PROVIDER_PAGE_SIZE = 30
+
+/**
+ * How deep the federation will page.
+ *
+ * The old `hasMore: results.length >= perPage` was true on essentially every response — a fan-out
+ * over N sources returns up to `N × perPage` rows, so it compared a cross-source total against a
+ * per-source ask — which means nothing ever stopped the client from requesting page 40. Worse, a
+ * connector that ignores its `page` parameter returns the same rows forever, and dedup only runs
+ * *within* one fan-out, so there is no natural end at all. Ten provider pages is far past what any
+ * user scrolls and is a bound rather than a hope.
+ */
+export const SEARCH_MAX_PROVIDER_PAGES = 10
+
+export interface KeywordSearchPageOptions {
+  keywords: string[]
+  /** As the caller asked. `undefined` means `DEFAULT_SEARCH_SOURCES`. */
+  sources?: string[]
+  language?: string
+  country?: string
+  /**
+   * Who is asking: an organization id, or `'anon'`. Bound into the continuation so a token minted
+   * in one organization cannot resume a page in another — even though this search reads no
+   * tenant-scoped rows, because a continuation that ignores scope is a habit, not a special case.
+   */
+  scope: string
+  /** Which mode's continuation this is. The semantic endpoint's fallback mints `keyword-fallback`. */
+  mode: Extract<SearchContinuationMode, 'keyword' | 'keyword-fallback'>
+  /** The previous page's `nextCursor`, or null/absent for page one. */
+  cursor?: string | null
+}
+
+export interface KeywordSearchPage {
+  builders: FusedBuilder[]
+  /** `null` when there is no further page to ask for. */
+  nextCursor: string | null
+  /**
+   * Always `null`. A federation cannot count without exhausting every upstream, and none of the
+   * thirteen offers a total to exhaust.
+   */
+  total: null
+  consistency: 'provider-best-effort'
+  sources: SourceStatus[]
+  degraded: boolean
+}
+
+/**
+ * One bounded page of federated keyword search.
+ *
+ * The fan-out is unchanged: every contactable connector is asked for `SEARCH_PROVIDER_PAGE_SIZE`
+ * rows of provider page *n*, and the results are deduped, scored and fused exactly as before. What
+ * changes is what leaves the server — a slice of at most `TABLE_PAGE_SIZE` of that fused ordering,
+ * plus a signed continuation naming where the next slice starts.
+ *
+ * Two numbers, not one, because `N` sources × 30 rows is up to `N × 30` fused rows for a single
+ * provider page. Serving those 50 at a time costs no extra upstream requests at all: the second and
+ * third slices come out of the same cache entry the first one populated.
+ *
+ * The ordering is preserved exactly. Concatenating every slice of provider page *n* reproduces the
+ * list the old unbounded response returned, which is what `tests/e2e/search.spec.ts` asserts against
+ * the recorded fixture.
+ */
+export async function pageBuilderSearch(opts: KeywordSearchPageOptions): Promise<KeywordSearchPage> {
+  const requested = opts.sources ?? [...DEFAULT_SEARCH_SOURCES]
+  const { contacted, notContacted } = await resolveContactableSources(requested)
+
+  const fingerprint = searchFingerprint({
+    keywords: opts.keywords,
+    requestedSources: requested,
+    language: opts.language,
+    country: opts.country,
+  })
+
+  // Verified before the fan-out, so a stale token costs a 400 rather than thirteen upstream
+  // requests whose results are then thrown away.
+  let state: ProviderContinuation = { kind: 'provider', providerPage: 1, served: 0 }
+  if (opts.cursor) {
+    const resumed = verifySearchContinuation(opts.cursor, {
+      mode: opts.mode,
+      query: fingerprint,
+      scope: opts.scope,
+      sources: contacted,
+    })
+    if (resumed.kind !== 'provider') throw new SearchContinuationError('not a federated continuation')
+    state = resumed
+  }
+
+  if (contacted.length === 0) {
+    // Nothing to ask. `degraded` rather than an empty success: every requested source was refused
+    // or unconfigured, and "no results" would read as "nobody matched".
+    return { builders: [], nextCursor: null, total: null, consistency: 'provider-best-effort', sources: notContacted, degraded: notContacted.length > 0 }
+  }
+
+  const { builders, sources } = await searchBuildersWithStatus({
+    keywords: opts.keywords,
+    sources: requested,
+    language: opts.language,
+    country: opts.country,
+    page: state.providerPage,
+    perPage: SEARCH_PROVIDER_PAGE_SIZE,
+  })
+
+  const slice = builders.slice(state.served, state.served + TABLE_PAGE_SIZE)
+  const consumed = state.served + slice.length
+
+  let nextState: ProviderContinuation | null = null
+  if (consumed < builders.length) {
+    // More of this provider page's fused set is still unserved — no upstream request needed.
+    nextState = { kind: 'provider', providerPage: state.providerPage, served: consumed }
+  } else if (builders.length > 0 && state.providerPage < SEARCH_MAX_PROVIDER_PAGES) {
+    // This provider page is spent. A page that came back empty ends the walk instead: an upstream
+    // with nothing more to say will not have more on page n+1 either.
+    nextState = { kind: 'provider', providerPage: state.providerPage + 1, served: 0 }
+  }
+
+  return {
+    builders: slice,
+    nextCursor: nextState
+      ? createSearchContinuation({
+        mode: opts.mode,
+        query: fingerprint,
+        scope: opts.scope,
+        sources: contacted,
+        state: nextState,
+      })
+      : null,
+    total: null,
+    consistency: 'provider-best-effort',
+    sources,
+    degraded: sources.some((status) => status.health !== 'ok'),
   }
 }

@@ -31,9 +31,14 @@ export function ariaRowIndex(indexInPage: number, offset = 0): number {
  *
  * The number comes from `PageResult.total`, never from `rows.length`: the entire point is that a
  * screen-reader user learns the list is partial without scrolling to find out.
+ *
+ * `-1` is what ARIA reserves for "the total is not known" (`aria-rowcount`, WAI-ARIA 1.2), and it is
+ * the honest answer for the federated search: nothing can count third-party results without
+ * exhausting every upstream. Passing `rows.length` there instead would announce "row 50 of 50" at
+ * the bottom of a list that has more, which is worse than announcing nothing.
  */
-export function ariaRowCount(total: number): number {
-  return total + 1
+export function ariaRowCount(total: number | null): number {
+  return total === null ? -1 : total + 1
 }
 
 /** `aria-colindex` is 1-based and counts every rendered column, control columns included. */

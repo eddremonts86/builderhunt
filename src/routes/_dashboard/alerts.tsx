@@ -158,7 +158,10 @@ function toCardData(id: string, match: AlertMatchPayload): PersonCardData {
 
 function SummaryStat({ label, value, icon: Icon }: {
   label: string
-  value: number | string
+  /** `null` renders an em dash. `PageResult.total` is nullable now that a federated page can hold
+   * a genuinely unknowable count; on this surface it never is, and `?? 0` would be the reflex that
+   * turns "we do not know" into a confident zero on whichever surface acquires one first. */
+  value: number | string | null
   icon: React.ComponentType<{ className?: string }>
 }) {
   return (
@@ -167,7 +170,7 @@ function SummaryStat({ label, value, icon: Icon }: {
         <Icon className="w-4 h-4 text-bh-accent" aria-hidden="true" />
       </div>
       <div className="min-w-0">
-        <p className="text-xl font-bold leading-none text-bh-text">{value}</p>
+        <p className="text-xl font-bold leading-none text-bh-text">{value ?? '—'}</p>
         <p className="text-xs text-bh-text-dim mt-1 truncate">{label}</p>
       </div>
     </div>
