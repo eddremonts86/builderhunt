@@ -1,3 +1,4 @@
+// table-surface-ok: the plan comparison is semantic prose with a fixed number of columns, written in the component.
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Check, X, Mail, Sparkles, Zap, Rocket, Users } from 'lucide-react'

@@ -1,3 +1,4 @@
+// table-surface: abuseSignalsCapability
 import * as React from 'react'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui'
 import { ErrorState } from '~/shared/components/ErrorState'

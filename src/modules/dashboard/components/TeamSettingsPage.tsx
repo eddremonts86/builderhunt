@@ -1,3 +1,4 @@
+// table-surface: organizationMembersCapability
 import * as React from 'react'
 import { Users, UserPlus, Mail, Crown, Shield, X, RefreshCw, Link2, Check } from 'lucide-react'
 import {

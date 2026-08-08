@@ -1,3 +1,4 @@
+// table-surface: sprintResultsCapability
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Compass, Loader2, Sparkles } from 'lucide-react'
 import * as React from 'react'

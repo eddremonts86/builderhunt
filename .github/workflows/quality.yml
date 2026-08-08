@@ -167,6 +167,9 @@ jobs:
           pnpm db:restore-test
       - run: pnpm security:boundaries
       - run: pnpm security:route-coverage
+      # Phase 3: every list read declares a bound, every data grid names a capability.
+      - run: pnpm check:unbounded
+      - run: pnpm check:table-surfaces
       - run: pnpm security:ui-route-graph
       - run: pnpm security:route-client-boundary
       - run: pnpm security:route-methods

@@ -1,3 +1,4 @@
+// table-surface-ok: a fixed summary of one profile's hygiene checks, not a queried collection.
 import * as React from 'react'
 import { Check, X, Activity, GitPullRequest, FileText, Zap } from 'lucide-react'
 import {

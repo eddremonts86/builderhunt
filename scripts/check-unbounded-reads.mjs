@@ -3,8 +3,9 @@
 // model fixes, or a chunked **batch** loop for reads that must cover every row. This script finds
 // the ones that declare none.
 //
-// It is report-only here (plan 01) and exits 0 no matter what it finds. Plan 13 turns it into a
-// gate once the classification in plans/phase-3/01-read-path-audit/tasks.md has caught up with it.
+// It is a **gate** since plan 13: a non-zero exit for any read that declares no bound. The escape
+// hatch is `// unbounded-read-ok: <reason>` on the read, so an exception is visible in the diff
+// rather than folded into a baseline number.
 //
 // The heuristic is deliberately textual rather than AST-based, for the same reason
 // check-route-coverage.mjs is: the failure mode worth catching is a new repository function that
@@ -465,5 +466,27 @@ console.log(
   }),
 )
 
-// Report-only. Plan 13 replaces this with a non-zero exit above a committed baseline.
+/*
+ * A gate since plan 13, and deliberately not "above a committed baseline".
+ *
+ * A baseline is a number someone raises. Phase 3 took this from 93 to 0, and the whole point of
+ * arriving at zero is that the next unbounded read is a build failure rather than a slightly larger
+ * number in a file nobody reads. The escape hatch is per-read and visible in review:
+ *
+ *   // unbounded-read-ok: <why this read cannot be bounded>
+ *
+ * — which forces the reason into the diff instead of into a total.
+ */
+if (unbounded.length > 0) {
+  console.error(
+    `\n${unbounded.length} unbounded read${unbounded.length === 1 ? '' : 's'}. Every list read must declare a bound:\n`
+    + '  - a keyset page (shared/lib/table/keyset.ts) for anything a person looks at,\n'
+    + '  - a model-bounded .limit(n) whose ceiling comes from a source of truth, with a comment saying which,\n'
+    + '  - a named ceiling from shared/lib/db/read-bounds.ts, if the surface renders the set whole,\n'
+    + '  - a chunked batch loop (drainSweep, drainWorkerOrganizations) if the caller needs every row.\n\n'
+    + 'Run with --list to see them. A read that genuinely cannot be bounded takes\n'
+    + '`// unbounded-read-ok: <reason>` on the line above it.\n',
+  )
+  process.exit(1)
+}
 process.exit(0)

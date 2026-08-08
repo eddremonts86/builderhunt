@@ -1,3 +1,4 @@
+// table-surface-ok: the shell itself. Its <table> is the sr-only header the grid needs; every surface that renders it carries its own marker.
 import {
   columnVisibilityFeature,
   createColumnHelper,

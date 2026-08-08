@@ -9,6 +9,7 @@
  * what exists, when was it published, which file holds it, and does it look
  * right in public.
  */
+// table-surface-bounded: the library is the filesystem — one row per post file, read whole. A capability would exist only to satisfy this gate.
 import * as React from 'react'
 import { Calendar, Clock, ExternalLink, FileText, Rss, Search, Tag as TagIcon } from 'lucide-react'
 import { DataTable } from '~/shared/components/table'

@@ -1,3 +1,4 @@
+// table-surface: searchBuildersCapability
 import * as React from 'react'
 import {
   Search, X, Bookmark, ExternalLink, Code, Filter, Clock, Hash,

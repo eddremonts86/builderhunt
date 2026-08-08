@@ -1,3 +1,4 @@
+// table-surface-bounded: source register and AI task registry — both one row per code-side entry, read whole. Still <table> markup rather than the shell: plans/phase-3/08 tracks that migration, which is a UI-consistency task and not a pagination one.
 import * as React from 'react'
 import { AlertTriangle, BookOpen, CheckCircle2, ExternalLink, MinusCircle, XCircle } from 'lucide-react'
 import { Button } from '~/components/ui'

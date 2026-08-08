@@ -4,6 +4,7 @@
  * instead of two copies that drift. Every `data-testid` is preserved verbatim —
  * `tests/regression/test-status-and-trust.mjs` drives this UI by those ids.
  */
+// table-surface-bounded: one row per shipped release, read whole; the operator writes them by hand.
 import * as React from 'react'
 import { BookOpen, ExternalLink, Plus, Save, Trash2, X } from 'lucide-react'
 import { Button, Input, Textarea } from '~/components/ui'

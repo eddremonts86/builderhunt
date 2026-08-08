@@ -1,3 +1,4 @@
+// table-surface-bounded: this person's live sessions, read whole — one row per device they signed in from.
 import * as React from 'react'
 import { Laptop, LogOut, ShieldAlert, Sparkles } from 'lucide-react'
 import { authClient } from '~/shared/lib/auth/client'

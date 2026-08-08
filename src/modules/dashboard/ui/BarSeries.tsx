@@ -1,3 +1,4 @@
+// table-surface-ok: the sr-only accessible equivalent of a chart — the same series the bars draw, never a queried collection.
 import * as React from 'react'
 
 /**

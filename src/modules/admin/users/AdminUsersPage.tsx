@@ -1,3 +1,4 @@
+// table-surface: platformUsersCapability
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { Users, Edit3, X, Save, ExternalLink, ShieldCheck, AlertTriangle } from 'lucide-react'

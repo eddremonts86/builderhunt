@@ -1,3 +1,4 @@
+// table-surface-bounded: funnel steps and removal metrics, computed as aggregates over a window — one row per step, never a row collection that grows. See plans/phase-3/08 for the shell migration.
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { Activity, AlertTriangle, CalendarClock, Database, Cpu, ExternalLink, Filter, RefreshCw, Compass, ShieldCheck } from 'lucide-react'

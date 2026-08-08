@@ -1,3 +1,4 @@
+// table-surface-ok: the cookie disclosure table is legal prose, written in the component.
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Cookie } from 'lucide-react'

@@ -1,3 +1,4 @@
+// table-surface-bounded: the incident log, read whole and bounded by OPERATOR_LIST_LIMIT.
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, Plus, Save, X } from 'lucide-react'

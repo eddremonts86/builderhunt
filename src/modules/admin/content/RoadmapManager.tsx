@@ -7,6 +7,7 @@
  * undifferentiated list of 30 is not reviewable) and a marker on rows that are
  * defined by a file in `content/roadmap/`.
  */
+// table-surface-bounded: one row per roadmap item, read whole and bounded by OPERATOR_LIST_LIMIT.
 import * as React from 'react'
 // `Map` is aliased: the lucide icon shadows the global `Map` constructor, and
 // `new Map<string, number>()` below silently resolved to the React component.

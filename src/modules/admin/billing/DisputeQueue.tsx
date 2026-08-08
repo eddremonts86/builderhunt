@@ -1,3 +1,4 @@
+// table-surface: billingDisputesCapability
 import * as React from 'react'
 import { Input, Label } from '~/components/ui'
 import { ErrorState } from '~/shared/components/ErrorState'

@@ -1,3 +1,4 @@
+// table-surface: sprintsCapability
 import * as React from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Compass, Plus, Trash2, Pause, Play, PlayCircle, Loader2 } from 'lucide-react'

@@ -17,6 +17,7 @@
  * no built-in action; see the sibling pattern in sprints/$sprintId). That is
  * what turns a match from a dead-end username into something actionable.
  */
+// table-surface: alertTriggersCapability
 import * as React from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Bell, BellOff, Check, Clock, Inbox, Pause, Play, Plus, Radar, Send, Trash2, X } from 'lucide-react'

@@ -1,3 +1,4 @@
+// table-surface-bounded: this person's own consents and export requests, both bounded by USER_SCOPED_LIMIT.
 import * as React from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Download, Trash2, Shield, AlertTriangle, FileJson, CheckCircle2, Clock, X, Users } from 'lucide-react'

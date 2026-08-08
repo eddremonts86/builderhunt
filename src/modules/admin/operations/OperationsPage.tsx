@@ -1,3 +1,4 @@
+// table-surface-bounded: one row per entry in OPERATIONAL_SCHEDULES, the code-side registry this page reconciles against. See plans/phase-3/08 for the shell migration.
 import * as React from 'react'
 import { AlertTriangle, BookOpen, CheckCircle2, Clock, Pause, Play, RefreshCw, XCircle } from 'lucide-react'
 import { Button } from '~/components/ui'
