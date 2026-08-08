@@ -48,6 +48,15 @@ const AGGREGATE_VALUE =
 // A reviewed exception, on any of the lines above the function.
 const EXEMPTION = /\/\/\s*unbounded-read-ok:\s*(\S.*)$/
 
+/**
+ * Whether a file can reach the database at all.
+ *
+ * Deliberately broad — a Drizzle import, a schema import, any `*Db`/`*db` handle, or a
+ * transaction parameter. A file matching none of these has no query to bound, and the check runs
+ * before anything else so a DOM `.select()` in a component never becomes a finding.
+ */
+const REACHES_DATABASE = /from ['"]drizzle-orm|\/db\/schema|\bworkerDb\b|\bpublicDb\b|\bplatformDb\b|\bauthDb\b|\baccountDb\b|\bcapabilityDb\b|\btenantDb\b|\bTenantTransaction\b|\bWorkerTransaction\b|\bPostgresJsDatabase\b/
+
 // Naive `.from(` matching inflated the first survey from 50 to 113 entries. Nothing below matches
 // `.from(` any more, but these are stripped anyway so a future widening of LIST_READ cannot
 // silently reintroduce the same false positives.
@@ -357,6 +366,15 @@ const mixed = []
 for (const absolutePath of files) {
   const path = relative(root, absolutePath).split(sep).join('/')
   const raw = await readFile(absolutePath, 'utf8')
+
+  // A file that reaches no database cannot contain a database read, whatever `.select()` it calls.
+  //
+  // `SearchPage.tsx` was counted for `inputRef.current?.select()` — the DOM method for selecting an
+  // input's text, matched by the same `\.select\(\)` that catches Drizzle's select-all. Harmless
+  // while this script only reported; a false positive in plan 13's gate is a component that cannot
+  // focus a text field without an exemption comment explaining it is not a query.
+  if (!REACHES_DATABASE.test(raw)) continue
+
   const source = raw.replace(NON_DRIZZLE_FROM, '')
   const lines = source.split('\n')
 

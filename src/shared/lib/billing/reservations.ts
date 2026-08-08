@@ -13,7 +13,7 @@ import {
   insertLedgerEntry,
   insertReservation,
   listAllocationsForReservation,
-  lockActiveCreditGrantsByEarliestExpiry,
+  drainActiveCreditGrants,
   lockReservation,
   updateAllocationAllocated,
   updateAllocationConsumed,
@@ -72,12 +72,19 @@ async function allocateFromEarliestExpiryGrants(
   ledgerIdempotencyKeyPrefix: string,
   now: Date,
 ): Promise<AllocationWalkResult> {
-  const grants = (await lockActiveCreditGrantsByEarliestExpiry(transaction, organizationId))
-    .filter((grant) => grant.expiresAt.getTime() > now.getTime())
-
   const allocations: BillingCreditAllocationRecord[] = []
   let remaining = unitsNeeded
 
+  /*
+   * Grants arrive one locked batch at a time (plan 12), and the expiry cut is a SQL predicate
+   * rather than a JS filter over every active grant.
+   *
+   * The walk still stops the moment it has enough units — `drainActiveCreditGrants` asks for the
+   * next batch only while `remaining > 0` — so the common case reads exactly one batch and takes
+   * locks on nothing more than it needed. An organization with more grants than one batch is now
+   * served correctly instead of being served from however many rows happened to fit in memory.
+   */
+  await drainActiveCreditGrants(transaction, organizationId, { locked: true, notExpiredAt: now }, async (grants) => {
   for (const grant of grants) {
     if (remaining <= 0) break
     const take = Math.min(grant.remainingUnits, remaining)
@@ -112,6 +119,9 @@ async function allocateFromEarliestExpiryGrants(
     allocations.push(allocation)
     remaining -= take
   }
+    // Ask for another batch only while units are still owed.
+    return remaining > 0
+  })
 
   if (remaining > 0) {
     throw new ReservationError(`Insufficient credits: ${unitsNeeded - remaining} of ${unitsNeeded} available`, 'insufficient_credits')

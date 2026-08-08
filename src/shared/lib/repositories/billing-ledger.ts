@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { billingCreditAllocations, billingCreditGrants, billingCreditReservations, billingLedgerEntries } from '../db/schema'
 
@@ -77,16 +77,76 @@ export async function findCreditGrantByStripePaymentIntentId(
   return row ?? null
 }
 
-/** Every eligible-to-consume grant, earliest expiry first — the order every consumption/reservation path must follow (spec.md: earliest-expiring grants are used first). */
+/**
+ * How many rows the bounded grant reads return.
+ *
+ * `CREDIT_GRANT_BATCH` is a *batch* size, not a page: every caller that uses it drains its query in
+ * a loop, because a grant left unexpired or unallocated is money the ledger is wrong about. It is
+ * large enough that the loop almost always runs once and small enough that one iteration is a
+ * bounded amount of memory.
+ *
+ * `GRANT_VELOCITY_WINDOW_LIMIT` is different, and smaller on purpose: its caller counts grants
+ * inside a short abuse window to decide whether an organization is buying too fast. Any window with
+ * more than this many purchases is already far past every threshold that read exists to compare
+ * against, so the exact number stops mattering before the bound bites.
+ */
+const CREDIT_GRANT_BATCH = 500
+const GRANT_VELOCITY_WINDOW_LIMIT = 100
+
+/** Where a grant batch resumes: the last row's place in the total order `(expires_at, id)`. */
+export interface CreditGrantCursor {
+  expiresAt: Date
+  id: string
+}
+
+export interface ActiveCreditGrantBatch {
+  /** Drop grants whose expiry has already passed. Applied in SQL, not by the caller. */
+  notExpiredAt?: Date
+  /** Resume after this grant. Absent means the first batch. */
+  after?: CreditGrantCursor | null
+  /** Defaults to `CREDIT_GRANT_BATCH`. */
+  limit?: number
+}
+
+/**
+ * The predicate and the order shared by the locked and unlocked grant walks.
+ *
+ * `id` trails `expires_at` because two grants can expire in the same instant — a pack and a
+ * subscription window bought together do — and a batch boundary inside that tie would hand the same
+ * grant out twice or skip it. That is money, not a display glitch.
+ */
+function activeGrantConditions(organizationId: string, options: ActiveCreditGrantBatch) {
+  const conditions = [
+    eq(billingCreditGrants.organizationId, organizationId),
+    eq(billingCreditGrants.state, 'active'),
+  ]
+  if (options.notExpiredAt) conditions.push(gt(billingCreditGrants.expiresAt, options.notExpiredAt))
+  if (options.after) {
+    conditions.push(sql`(${billingCreditGrants.expiresAt}, ${billingCreditGrants.id}) > (${options.after.expiresAt}, ${options.after.id})`)
+  }
+  return conditions
+}
+
+/**
+ * One batch of eligible-to-consume grants, earliest expiry first — the order every
+ * consumption/reservation path must follow (spec.md: earliest-expiring grants are used first).
+ *
+ * Bounded since plan 12, and a **batch** rather than a page: a caller that stops early because it
+ * has enough units is done, and a caller that needs every grant drains the loop. What neither may
+ * do is take the first batch and treat it as the whole set — `drainActiveCreditGrants` below is the
+ * shape that cannot get that wrong.
+ */
 export async function listActiveCreditGrantsByEarliestExpiry(
   transaction: TenantTransaction,
   organizationId: string,
+  options: ActiveCreditGrantBatch = {},
 ): Promise<BillingCreditGrantRecord[]> {
   return transaction
     .select()
     .from(billingCreditGrants)
-    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, 'active')))
-    .orderBy(asc(billingCreditGrants.expiresAt))
+    .where(and(...activeGrantConditions(organizationId, options)))
+    .orderBy(asc(billingCreditGrants.expiresAt), asc(billingCreditGrants.id))
+    .limit(options.limit ?? CREDIT_GRANT_BATCH)
 }
 
 /**
@@ -94,17 +154,77 @@ export async function listActiveCreditGrantsByEarliestExpiry(
  * every reservation/extension allocation walk must use this, never the unlocked list, so two
  * concurrent reservations against the same organization can't both read the same pre-allocation
  * `remainingUnits` and overspend it.
+ *
+ * The lock is per batch and the transaction outlives every batch, so a walk that fetches three
+ * batches holds all three batches' locks until it commits — which is the behaviour the unbounded
+ * version had, minus reading every grant into memory first.
  */
 export async function lockActiveCreditGrantsByEarliestExpiry(
   transaction: TenantTransaction,
   organizationId: string,
+  options: ActiveCreditGrantBatch = {},
 ): Promise<BillingCreditGrantRecord[]> {
   return transaction
     .select()
     .from(billingCreditGrants)
-    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, 'active')))
-    .orderBy(asc(billingCreditGrants.expiresAt))
+    .where(and(...activeGrantConditions(organizationId, options)))
+    .orderBy(asc(billingCreditGrants.expiresAt), asc(billingCreditGrants.id))
+    .limit(options.limit ?? CREDIT_GRANT_BATCH)
     .for('update')
+}
+
+/**
+ * Spendable units, added up in Postgres.
+ *
+ * The balance is read on every metered call. Computing it by fetching each unexpired grant and
+ * reducing in JavaScript meant the busiest read in billing grew with the number of grants an
+ * account had ever been given — and the number it produced was one integer.
+ */
+export async function sumAvailableCreditUnits(
+  transaction: TenantTransaction,
+  organizationId: string,
+  now: Date,
+): Promise<number> {
+  const [row] = await transaction
+    .select({ value: sql<number>`coalesce(sum(${billingCreditGrants.remainingUnits}), 0)::int` })
+    .from(billingCreditGrants)
+    .where(and(...activeGrantConditions(organizationId, { notExpiredAt: now })))
+  return row?.value ?? 0
+}
+
+/** The cursor for a batch's last row, or null when the batch was short and the walk is over. */
+export function nextCreditGrantCursor(
+  batch: readonly BillingCreditGrantRecord[],
+  limit = CREDIT_GRANT_BATCH,
+): CreditGrantCursor | null {
+  if (batch.length < limit) return null
+  const last = batch[batch.length - 1]
+  return { expiresAt: last.expiresAt, id: last.id }
+}
+
+/**
+ * Every eligible grant, one batch at a time, stopping when `consume` says it has enough.
+ *
+ * The loop lives here rather than at each call site because "take the first batch and call it the
+ * set" is the one way this change does damage, and there are two callers. `consume` returning
+ * `false` ends the walk; returning `true` asks for the next batch.
+ */
+export async function drainActiveCreditGrants(
+  transaction: TenantTransaction,
+  organizationId: string,
+  options: Omit<ActiveCreditGrantBatch, 'after'> & { locked?: boolean },
+  consume: (batch: BillingCreditGrantRecord[]) => Promise<boolean> | boolean,
+): Promise<void> {
+  const limit = options.limit ?? CREDIT_GRANT_BATCH
+  const read = options.locked ? lockActiveCreditGrantsByEarliestExpiry : listActiveCreditGrantsByEarliestExpiry
+  let after: CreditGrantCursor | null = null
+  for (;;) {
+    const batch = await read(transaction, organizationId, { ...options, after, limit })
+    if (batch.length === 0) return
+    if (!(await consume(batch))) return
+    after = nextCreditGrantCursor(batch, limit)
+    if (!after) return
+  }
 }
 
 /** The only mutation path onto a grant row — state and remainingUnits are always changed together, from `credits.ts`, never independently. */
@@ -194,11 +314,17 @@ export async function listRecentGrantsBySource(
   source: string,
   since: Date,
 ): Promise<BillingCreditGrantRecord[]> {
-  const rows = await transaction
+  return transaction
     .select()
     .from(billingCreditGrants)
-    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.source, source)))
-  return rows.filter((row) => row.createdAt.getTime() >= since.getTime())
+    .where(and(
+      eq(billingCreditGrants.organizationId, organizationId),
+      eq(billingCreditGrants.source, source),
+      // Was a JS filter over every grant this organization ever received from this source.
+      gte(billingCreditGrants.createdAt, since),
+    ))
+    .orderBy(desc(billingCreditGrants.createdAt))
+    .limit(GRANT_VELOCITY_WINDOW_LIMIT)
 }
 
 /** Grant `source` values that represent an actual payment, distinct from promotional/manual/trial grants — used by `abuse/credit-abuse.ts`'s first-payer spend-velocity cap (G6) to define "when did this organization first pay us". */
@@ -209,12 +335,17 @@ export async function findEarliestPaidGrantCreatedAt(
   transaction: TenantTransaction,
   organizationId: string,
 ): Promise<Date | null> {
-  const rows = await transaction
-    .select({ source: billingCreditGrants.source, createdAt: billingCreditGrants.createdAt })
+  // `min()` in SQL over the paid sources, rather than every grant the organization has ever
+  // received followed by `Math.min` over the survivors. `PAID_GRANT_SOURCES` is a set in code, so
+  // it reaches the query as an `inArray` — the source of truth stays where it is documented.
+  const [row] = await transaction
+    .select({ earliest: sql<Date | null>`min(${billingCreditGrants.createdAt})` })
     .from(billingCreditGrants)
-    .where(eq(billingCreditGrants.organizationId, organizationId))
-  const paidTimestamps = rows.filter((row) => PAID_GRANT_SOURCES.has(row.source)).map((row) => row.createdAt.getTime())
-  return paidTimestamps.length > 0 ? new Date(Math.min(...paidTimestamps)) : null
+    .where(and(
+      eq(billingCreditGrants.organizationId, organizationId),
+      inArray(billingCreditGrants.source, [...PAID_GRANT_SOURCES]),
+    ))
+  return row?.earliest ? new Date(row.earliest) : null
 }
 
 /** Units actually reserved (removed from a grant's balance) since `since` — the `reserve` ledger entry carries `unitsDelta: -take` at the moment credits leave the pool (see `billing/reservations.ts`), unlike `consume`/`release` markers which record `0`. Counts every reservation attempt in the window regardless of whether it was later settled or released, since the point is capping how much a possibly-fraudulent new payment method can spend before it's caught, not netting out refunds. */
@@ -223,13 +354,23 @@ export async function sumReservedUnitsSince(
   organizationId: string,
   since: Date,
 ): Promise<number> {
-  const rows = await transaction
-    .select({ unitsDelta: billingLedgerEntries.unitsDelta, createdAt: billingLedgerEntries.createdAt })
+  // Summed in SQL, and the window is a predicate rather than a JS filter (plan 12).
+  //
+  // This read used to fetch **every** `reserve` entry the organization has ever written and then
+  // drop the ones outside the window in JavaScript. The number it returns caps how much a possibly
+  // fraudulent new payment method can spend, so it runs on the reservation path — the busiest one
+  // in billing — and the row count it moved grew with the account's whole history while the
+  // predicate that bounds it sat one step too late.
+  const [row] = await transaction
+    .select({ value: sql<number>`coalesce(sum(-${billingLedgerEntries.unitsDelta}), 0)::int` })
     .from(billingLedgerEntries)
-    .where(and(eq(billingLedgerEntries.organizationId, organizationId), eq(billingLedgerEntries.entryType, 'reserve')))
-  return rows
-    .filter((row) => row.unitsDelta < 0 && row.createdAt.getTime() >= since.getTime())
-    .reduce((sum, row) => sum - row.unitsDelta, 0)
+    .where(and(
+      eq(billingLedgerEntries.organizationId, organizationId),
+      eq(billingLedgerEntries.entryType, 'reserve'),
+      lt(billingLedgerEntries.unitsDelta, 0),
+      gte(billingLedgerEntries.createdAt, since),
+    ))
+  return row?.value ?? 0
 }
 
 /** Grants still marked `active` whose `expiresAt` has already passed — the daily worker's expiry sweep target (a later task builds the actual worker; this is the read it will use). */
@@ -238,11 +379,17 @@ export async function listExpiredButStillActiveGrants(
   organizationId: string,
   now: Date,
 ): Promise<BillingCreditGrantRecord[]> {
-  const rows = await transaction
+  return transaction
     .select()
     .from(billingCreditGrants)
-    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, 'active')))
-  return rows.filter((row) => row.expiresAt.getTime() <= now.getTime())
+    .where(and(
+      eq(billingCreditGrants.organizationId, organizationId),
+      eq(billingCreditGrants.state, 'active'),
+      // Was a JS filter applied after reading every active grant.
+      lte(billingCreditGrants.expiresAt, now),
+    ))
+    .orderBy(asc(billingCreditGrants.expiresAt), asc(billingCreditGrants.id))
+    .limit(CREDIT_GRANT_BATCH)
 }
 
 // ---------------------------------------------------------------------------
@@ -444,13 +591,19 @@ export async function sumRefundedUnitsSince(
   organizationId: string,
   since: Date,
 ): Promise<number> {
-  const rows = await transaction
-    .select({ unitsDelta: billingLedgerEntries.unitsDelta, reservationId: billingLedgerEntries.reservationId, createdAt: billingLedgerEntries.createdAt })
+  // Every predicate the JS filter applied, in the WHERE clause. Same reasoning as
+  // `sumReservedUnitsSince`: the old form read every `adjust` entry in the account's history.
+  const [row] = await transaction
+    .select({ value: sql<number>`coalesce(sum(${billingLedgerEntries.unitsDelta}), 0)::int` })
     .from(billingLedgerEntries)
-    .where(and(eq(billingLedgerEntries.organizationId, organizationId), eq(billingLedgerEntries.entryType, 'adjust')))
-  return rows
-    .filter((row) => row.reservationId !== null && row.unitsDelta > 0 && row.createdAt.getTime() >= since.getTime())
-    .reduce((sum, row) => sum + row.unitsDelta, 0)
+    .where(and(
+      eq(billingLedgerEntries.organizationId, organizationId),
+      eq(billingLedgerEntries.entryType, 'adjust'),
+      isNotNull(billingLedgerEntries.reservationId),
+      gt(billingLedgerEntries.unitsDelta, 0),
+      gte(billingLedgerEntries.createdAt, since),
+    ))
+  return row?.value ?? 0
 }
 
 /** Units actually settled (permanently consumed) since `since` — the denominator for the G4 refund-to-settle ratio. Only a `settled` reservation can ever be refunded, so this is the correct base to compare refunded units against. */
@@ -459,11 +612,16 @@ export async function sumSettledUnitsSince(
   organizationId: string,
   since: Date,
 ): Promise<number> {
-  const rows = await transaction
-    .select({ settledUnits: billingCreditReservations.settledUnits, state: billingCreditReservations.state, updatedAt: billingCreditReservations.updatedAt })
+  // `coalesce` covers both "no matching rows" and a matching row with a null `settledUnits`, which
+  // is what the JS `?? 0` did. Read every reservation the organization ever made, before plan 12.
+  const [row] = await transaction
+    .select({ value: sql<number>`coalesce(sum(${billingCreditReservations.settledUnits}), 0)::int` })
     .from(billingCreditReservations)
-    .where(eq(billingCreditReservations.organizationId, organizationId))
-  return rows
-    .filter((row) => row.state === 'settled' && row.settledUnits !== null && row.updatedAt.getTime() >= since.getTime())
-    .reduce((sum, row) => sum + (row.settledUnits ?? 0), 0)
+    .where(and(
+      eq(billingCreditReservations.organizationId, organizationId),
+      eq(billingCreditReservations.state, 'settled'),
+      isNotNull(billingCreditReservations.settledUnits),
+      gte(billingCreditReservations.updatedAt, since),
+    ))
+  return row?.value ?? 0
 }

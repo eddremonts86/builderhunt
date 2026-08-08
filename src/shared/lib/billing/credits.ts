@@ -6,7 +6,8 @@ import {
   findLedgerEntryByIdempotencyKey,
   insertCreditGrant,
   insertLedgerEntry,
-  listActiveCreditGrantsByEarliestExpiry,
+  drainActiveCreditGrants,
+  sumAvailableCreditUnits,
   updateCreditGrantState,
 } from '../repositories/billing-ledger'
 
@@ -285,8 +286,15 @@ export async function getAvailableCreditGrantsByEarliestExpiry(
   organizationId: string,
   now: Date = new Date(),
 ): Promise<BillingCreditGrantRecord[]> {
-  const grants = await listActiveCreditGrantsByEarliestExpiry(transaction, organizationId)
-  return grants.filter((grant) => grant.expiresAt.getTime() > now.getTime())
+  // Drained, not "the first batch". Its one caller renders the list, and a balance page that shows
+  // the earliest 500 grants without saying so would be a quieter lie than an unbounded read.
+  // The expiry cut is a SQL predicate now, not a JS filter over every active grant.
+  const grants: BillingCreditGrantRecord[] = []
+  await drainActiveCreditGrants(transaction, organizationId, { notExpiredAt: now }, (batch) => {
+    grants.push(...batch)
+    return true
+  })
+  return grants
 }
 
 export async function getAvailableCreditBalance(
@@ -294,8 +302,9 @@ export async function getAvailableCreditBalance(
   organizationId: string,
   now: Date = new Date(),
 ): Promise<number> {
-  const grants = await getAvailableCreditGrantsByEarliestExpiry(transaction, organizationId, now)
-  return grants.reduce((total, grant) => total + grant.remainingUnits, 0)
+  // Summed in SQL. This is on the reservation path — every metered AI call reads it — and it used to
+  // materialise every unexpired grant to add up one integer.
+  return sumAvailableCreditUnits(transaction, organizationId, now)
 }
 
 /** spec.md §Packs and auto-recharge: "Pack Checkout uses payment mode and active-paid-entitlement validation before creation and grant" — a pack purchase requires an active or trialing paid subscription on this NEW catalog, never the legacy manual-billing tier. */
