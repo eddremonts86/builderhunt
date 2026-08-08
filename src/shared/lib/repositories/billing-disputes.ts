@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { billingDisputes } from '../db/schema'
 import { billingDisputesCapability } from '../table/capabilities/billing-disputes'
 import { buildKeysetPage } from '../table/keyset'
 import type { PageRequest, PageResult, TableQuery } from '../table/types'
+import { OPERATOR_LIST_LIMIT } from '../db/read-bounds'
 
 /**
  * Data access for chargeback tracking (plans/phase-1/30-stripe-billing-platform/tasks.md §8 "Implement dispute
@@ -80,6 +81,10 @@ export async function listDisputes(
     .select()
     .from(billingDisputes)
     .where(eq(billingDisputes.organizationId, organizationId))
+    // `pageBillingDisputes` (plan 10) is the queue's read; this one is the operations roll-up over a
+    // single organization, and the accounting export that needed every row counts in SQL now.
+    .orderBy(desc(billingDisputes.createdAt), desc(billingDisputes.id))
+    .limit(OPERATOR_LIST_LIMIT)
 }
 
 /** The chargeback view's wire shape — the reviewed subset of the row, timestamps serialized. */

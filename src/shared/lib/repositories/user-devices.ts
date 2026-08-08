@@ -1,8 +1,9 @@
-import { and, eq, gte } from 'drizzle-orm'
+import { and, desc, eq, gte } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantTransaction } from '../db/client'
 import { userDevices } from '../db/schema'
 import { workerDb } from '../db/worker-db'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * Account-subject (`user_id`) — `builderhunt_app` has SELECT + INSERT + UPDATE
@@ -42,7 +43,11 @@ export async function listUserDevicesForUser(
   transaction: TenantTransaction,
   userId: string,
 ): Promise<UserDeviceRecord[]> {
+  // One row per device this person has signed in from — `USER_SCOPED_LIMIT` grows by deliberate
+  // human action, and an account past it is the abuse system's problem, not the pager's.
   return transaction.select().from(userDevices).where(eq(userDevices.userId, userId))
+    .orderBy(desc(userDevices.lastSeenAt))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 /**

@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { OPERATOR_LIST_LIMIT, USER_SCOPED_LIMIT } from '../db/read-bounds'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantTransaction } from '../db/client'
 import { authDb } from '../db/auth-db'
@@ -520,6 +521,8 @@ export async function listBillingTermsAcceptances(
     .from(billingTermsAcceptances)
     .where(eq(billingTermsAcceptances.organizationId, organizationId))
     .orderBy(desc(billingTermsAcceptances.acceptedAt))
+    // One row per version of the billing terms this organization accepted — a deliberate human act.
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export interface BillingCreditGrantRecord {
@@ -549,6 +552,9 @@ export async function listActiveBillingCreditGrants(
     .from(billingCreditGrants)
     .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, 'active')))
     .orderBy(billingCreditGrants.expiresAt)
+    // The owner's billing page renders these whole. A balance made of more than five hundred separate
+    // grants is an auto-recharge loop, which is the abuse system's signal rather than a paging problem.
+    .limit(OPERATOR_LIST_LIMIT)
 }
 
 /** Same shape as `listActiveBillingCreditGrants` but for an arbitrary state — `dunning.ts` uses this to find `'frozen'` grants on payment recovery, without a second bespoke query for every future state that needs listing. */
@@ -570,6 +576,8 @@ export async function listBillingCreditGrantsByState(
     .from(billingCreditGrants)
     .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, state)))
     .orderBy(billingCreditGrants.expiresAt)
+    // Same ceiling and same argument as `listActiveBillingCreditGrants`.
+    .limit(OPERATOR_LIST_LIMIT)
 }
 
 export interface CreateBillingCreditGrantInput {
@@ -698,6 +706,9 @@ export async function listBillingRefunds(
     .from(billingRefunds)
     .where(eq(billingRefunds.organizationId, organizationId))
     .orderBy(desc(billingRefunds.createdAt))
+    // Every remaining caller is an operator roll-up over one organization's refund history. The
+    // accounting export -- the one that genuinely needed all of them -- counts in SQL now.
+    .limit(OPERATOR_LIST_LIMIT)
 }
 
 /** The review queue's wire shape — `BillingRefundRecord` with the timestamp already serialized. */

@@ -29,6 +29,7 @@ import {
   userConsents,
 } from '../db/schema'
 import { loadInterviewExportSection, shortenInterviewRetentionForOwner } from './interview-privacy'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 // A permanent system row (drizzle/0026_deleted_user_sentinel.sql) that
 // organization-owned resources' `creator_user_id` gets reassigned to on
@@ -36,13 +37,17 @@ import { loadInterviewExportSection, shortenInterviewRetentionForOwner } from '.
 // hardDeleteAccountSubject below for why.
 export const DELETED_USER_SENTINEL_ID = 'system-deleted-user'
 
+// One row per version of each legal document this person accepted — `USER_SCOPED_LIMIT`'s
+// deliberate-action argument, and the document set itself is a handful.
 export const listAccountConsents = (userId: string) => accountDb.select().from(userConsents)
-  .where(eq(userConsents.userId, userId)).orderBy(desc(userConsents.acceptedAt))
+  .where(eq(userConsents.userId, userId)).orderBy(desc(userConsents.acceptedAt)).limit(USER_SCOPED_LIMIT)
 
 export const insertAccountConsent = (input: typeof userConsents.$inferInsert) => accountDb.insert(userConsents).values(input)
 
+// One row per export the person asked for, newest first. Rate-limited at the route, so the ceiling
+// is a backstop rather than the real bound.
 export const listAccountExportRequests = (userId: string) => accountDb.select().from(dataExportRequests)
-  .where(eq(dataExportRequests.userId, userId)).orderBy(desc(dataExportRequests.createdAt))
+  .where(eq(dataExportRequests.userId, userId)).orderBy(desc(dataExportRequests.createdAt)).limit(USER_SCOPED_LIMIT)
 
 export async function findAccountExportRequest(userId: string, id: string) {
   const [row] = await accountDb.select().from(dataExportRequests)

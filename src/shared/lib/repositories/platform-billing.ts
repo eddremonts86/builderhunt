@@ -5,6 +5,7 @@ import { platformUsersCapability } from '../table/capabilities/platform-users'
 import { buildKeysetPage } from '../table/keyset'
 import type { PageRequest, PageResult, TableQuery } from '../table/types'
 import { DELETED_USER_SENTINEL_ID } from './account-privacy'
+import { OPERATOR_LIST_LIMIT } from '../db/read-bounds'
 
 /*
  * `LegacyPlanMutationDisabledError` / `shouldBlockLegacyPlanMutations` / `assertLegacyPlanMutationsEnabled`
@@ -39,7 +40,12 @@ export async function listPlatformUsers() {
     name: authUsers.name,
     email: authUsers.email,
     createdAt: authUsers.createdAt,
-  }).from(authUsers).orderBy(desc(authUsers.createdAt))
+  })
+    .from(authUsers)
+    .orderBy(desc(authUsers.createdAt))
+    // `pagePlatformUsersWithBilling` (plan 10) is the admin grid's read. This one survives for the
+    // operator exports that want a wide slice in one request, and says how wide.
+    .limit(OPERATOR_LIST_LIMIT)
   return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
 }
 

@@ -30,6 +30,7 @@ import { and, eq, isNull, lt, ne, sql } from 'drizzle-orm'
 
 import { accessRequests } from './db/schema'
 import { env } from './env'
+import { OPERATOR_LIST_LIMIT } from './db/read-bounds'
 
 /** Invite links are short-lived: long enough to act on an email, short enough that a leaked link in a
  *  forwarded thread is usually already dead. */
@@ -335,10 +336,11 @@ export async function expireStaleInvites(db: any, now: Date = new Date()): Promi
 
 /** Admin queue, newest request first. */
 export async function listAccessRequests(db: any, status?: AccessRequestStatus): Promise<AccessRequestRow[]> {
+  // The operator's allowlist queue, newest first.
   const query = db.select().from(accessRequests)
   const rows = status
-    ? await query.where(eq(accessRequests.status, status)).orderBy(sql`${accessRequests.requestedAt} desc`)
-    : await query.orderBy(sql`${accessRequests.requestedAt} desc`)
+    ? await query.where(eq(accessRequests.status, status)).orderBy(sql`${accessRequests.requestedAt} desc`).limit(OPERATOR_LIST_LIMIT)
+    : await query.orderBy(sql`${accessRequests.requestedAt} desc`).limit(OPERATOR_LIST_LIMIT)
   return rows as AccessRequestRow[]
 }
 

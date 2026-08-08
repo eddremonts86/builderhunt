@@ -3,6 +3,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { platformDb } from '../db/platform-db'
 import { workerDb } from '../db/worker-db'
 import { jobRuns, operationalSchedules } from '../db/schema'
+import { ANALYTICS_WINDOW_LIMIT, OPERATOR_LIST_LIMIT } from '../db/read-bounds'
 import {
   calculateNextRun,
   findScheduleDefinition,
@@ -51,6 +52,9 @@ export async function syncScheduleRegistry(
       nextRunAt: operationalSchedules.nextRunAt,
     })
     .from(operationalSchedules)
+    // One row per entry in `OPERATIONAL_SCHEDULES`, which is the code-side source of truth this
+    // function is reconciling the table against — so the ceiling is that list's own length.
+    .limit(schedules.length)
   const byKey = new Map(existing.map((row) => [row.jobKey, row]))
 
   let created = 0
@@ -172,6 +176,8 @@ export async function listScheduleRegistry(db: Db = workerDb) {
     })
     .from(operationalSchedules)
     .orderBy(asc(operationalSchedules.jobKey))
+    // Same ceiling as `syncScheduleRegistry`, from the same source of truth.
+    .limit(OPERATIONAL_SCHEDULES.length)
 }
 
 /** Advances a schedule past the run that just happened. A disabled schedule loses its next run entirely. */
@@ -372,4 +378,7 @@ export async function listJobRuns(
       lt(jobRuns.scheduledFor, range.to),
     ))
     .orderBy(desc(jobRuns.scheduledFor))
+    // Runs inside a requested window for a named set of job keys — the window is the bound and this
+    // is the backstop. A window this dense means the scheduler is looping, which the console shows.
+    .limit(ANALYTICS_WINDOW_LIMIT)
 }

@@ -3,6 +3,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { z } from 'zod'
 import { platformDb } from '../db/client'
 import { billingSellerProfiles } from '../db/schema'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * Platform-admin-only seller/country/tax configuration (spec.md §Seller,
@@ -78,7 +79,9 @@ export async function getCurrentSellerProfile(db: PostgresJsDatabase = platformD
 
 /** Every recorded version, most recent first — "historical invoices keep the seller snapshot effective when they were issued" (spec.md) depends on every prior version staying readable forever, never deleted or overwritten. */
 export async function listSellerProfileHistory(db: PostgresJsDatabase = platformDb): Promise<SellerProfileRecord[]> {
+  // Versions of the one seller profile — a monotonic counter bumped by an operator, never in bulk.
   return db.select().from(billingSellerProfiles).orderBy(desc(billingSellerProfiles.version))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 /** Inserts the next version (current max + 1, or 1 if none exists yet) — never updates a prior row. */

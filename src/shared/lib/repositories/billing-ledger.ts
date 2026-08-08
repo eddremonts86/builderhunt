@@ -561,6 +561,11 @@ export async function listAllocationsForReservation(
       eq(billingCreditAllocations.organizationId, organizationId),
       eq(billingCreditAllocations.reservationId, reservationId),
     ))
+    // One allocation per grant this reservation drew on, and the walk that creates them stops as soon
+    // as it has enough units — so the real ceiling is how many grants it took to cover one
+    // reservation. `CREDIT_GRANT_BATCH` is that walk's own batch size, which is the same bound.
+    .orderBy(asc(billingCreditAllocations.id))
+    .limit(CREDIT_GRANT_BATCH)
 }
 
 export async function updateAllocationConsumed(

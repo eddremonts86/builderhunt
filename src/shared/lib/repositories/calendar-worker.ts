@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, gt, gte, inArray, isNotNull, lt, lte, notInArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, lte, notInArray, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import {
@@ -15,6 +15,7 @@ import {
   schedulingInvitations,
 } from '../db/schema'
 import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
+import { ANALYTICS_WINDOW_LIMIT } from '../db/read-bounds'
 
 /**
  * Worker-role data access for calendar materialization and reminder delivery (plan:
@@ -207,6 +208,10 @@ export async function listRecentJobRuns(
       gte(jobRuns.scheduledFor, range.from),
       lt(jobRuns.scheduledFor, range.to),
     ))
+    .orderBy(desc(jobRuns.scheduledFor))
+    // Runs inside a requested window for a named set of job keys — the window is the bound and this
+    // is the backstop. A window this dense means the scheduler is looping, which the console shows.
+    .limit(ANALYTICS_WINDOW_LIMIT)
 }
 
 // ── Reminder delivery (plan Phase 3, "Implement reminder and participant-notification delivery") ──

@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { and, desc, eq, isNull, gt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, isNull, sql } from 'drizzle-orm'
 import { platformDb, type TenantTransaction } from '../db/client'
 import { billingRiskEvents, billingRiskExceptions } from '../db/schema'
+import { ANALYTICS_WINDOW_LIMIT, USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * Data access for fraud/high-volume exception controls (plans/phase-1/30-stripe-billing-platform/tasks.md §8
@@ -51,8 +52,16 @@ export async function listRecentRiskEvents(
   const rows = await transaction
     .select()
     .from(billingRiskEvents)
-    .where(and(eq(billingRiskEvents.organizationId, organizationId), eq(billingRiskEvents.eventType, eventType)))
-  return rows.filter((row) => row.createdAt.getTime() >= since.getTime())
+    .where(and(
+      eq(billingRiskEvents.organizationId, organizationId),
+      eq(billingRiskEvents.eventType, eventType),
+      // Was a JS filter over every risk event of this type the organization ever produced. The
+      // window is the real bound; the ceiling below is the backstop for a denser one than expected.
+      gte(billingRiskEvents.createdAt, since),
+    ))
+    .orderBy(desc(billingRiskEvents.createdAt))
+    .limit(ANALYTICS_WINDOW_LIMIT)
+  return rows
 }
 
 export interface BillingRiskExceptionRecord {
@@ -93,6 +102,8 @@ export async function listRiskExceptions(
     .from(billingRiskExceptions)
     .where(eq(billingRiskExceptions.organizationId, organizationId))
     .orderBy(desc(billingRiskExceptions.issuedAt))
+    // One row per exception an operator granted this organization, by hand.
+    .limit(USER_SCOPED_LIMIT)
 }
 
 /**

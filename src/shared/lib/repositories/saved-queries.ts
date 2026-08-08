@@ -6,6 +6,7 @@ import { savedQueries } from '../db/schema'
 import { SharedResourceError } from '../shared-resources/contracts'
 import { emitActivity } from './activity'
 import { randomId } from '~/lib/utils'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 export interface CreateSavedQueryInput {
   id: string
@@ -26,9 +27,11 @@ export async function findSavedQueryById(transaction: TenantTransaction, organiz
 }
 
 export function listSavedQueries(transaction: TenantTransaction, organizationId: string) {
+  // Saved searches are created by hand, one per deliberate action — see `USER_SCOPED_LIMIT`.
   return transaction.select().from(savedQueries)
     .where(eq(savedQueries.organizationId, organizationId))
     .orderBy(savedQueries.createdAt)
+    .limit(USER_SCOPED_LIMIT)
 }
 
 /**
@@ -58,6 +61,7 @@ export async function listVisibleSavedQueriesForPrincipal(
       ),
     )
     .orderBy(desc(savedQueries.createdAt))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export function listRecentSavedQueries(

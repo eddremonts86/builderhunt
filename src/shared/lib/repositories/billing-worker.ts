@@ -22,6 +22,7 @@ import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingDisputes, billingRefunds, billingSubscriptions, organizations } from '../db/schema'
 import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
 import { collectWorkerOrganizationIds } from './worker-organization-scan'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * `db` defaults to the real `workerDb` singleton in production; tests inject a disposable database
@@ -247,6 +248,10 @@ export async function listActiveAnnualBillingSubscriptions(
       eq(billingSubscriptions.interval, 'annual'),
       sql`${billingSubscriptions.stripeStatus} in ('active', 'trialing')`,
     ))
+    // Subscriptions belonging to **one** organization. An organization with more than a handful is
+    // already a billing incident; the ceiling is the backstop, the tenant predicate is the bound.
+    .orderBy(asc(billingSubscriptions.stripeSubscriptionId))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export interface GracePeriodBillingSubscriptionRecord {
@@ -272,6 +277,9 @@ export async function listGracePeriodBillingSubscriptions(
       sql`${billingSubscriptions.gracePeriodEndsAt} is not null`,
       sql`${billingSubscriptions.paymentBlockedAt} is null`,
     ))
+    // Same argument as `listActiveAnnualBillingSubscriptions`: scoped to one organization.
+    .orderBy(asc(billingSubscriptions.stripeSubscriptionId))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export interface UpdateBillingSubscriptionFromStripeInput {

@@ -1,6 +1,7 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import type { WorkerTransaction } from '../db/worker-db'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 import {
   interviewBriefs,
   interviewReports,
@@ -279,6 +280,9 @@ export async function listBriefVersions(
       eq(interviewBriefs.eventId, params.eventId),
     ))
     .orderBy(desc(interviewBriefs.version))
+    // Versions of one brief. The version counter is monotonic per event, so a brief past this is an
+    // event being regenerated in a loop rather than a document with history.
+    .limit(ENTITY_DETAIL_LIMIT)
   return rows.map((row) => toRow(row as unknown as Record<string, unknown>))
 }
 
@@ -636,6 +640,8 @@ export async function listSessionSegments(
       eq(transcriptSegments.sessionId, params.sessionId),
     ))
     .orderBy(transcriptSegments.sequence)
+    // Segments of one interview transcript, rendered whole on the session page.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 // ── Interview suggestions (plan: calendar-scheduling-interview-intelligence, Phase 10) ───────────
@@ -721,6 +727,8 @@ export async function listSuggestions(
       eq(interviewSuggestions.sessionId, params.sessionId),
     ))
     .orderBy(interviewSuggestions.sequence)
+    // Suggestions for one session, rendered whole beside the transcript.
+    .limit(ENTITY_DETAIL_LIMIT)
   return rows.map((row) => toSuggestionRow(row as unknown as Record<string, unknown>))
 }
 
@@ -956,6 +964,8 @@ export async function listReportVersions(
       eq(interviewReports.eventId, params.eventId),
     ))
     .orderBy(desc(interviewReports.version))
+    // Versions of one report — same monotonic-counter argument as the brief list above.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 // ── The interview list (plan: calendar-scheduling-interview-intelligence, Phase 10 follow-up) ─────
