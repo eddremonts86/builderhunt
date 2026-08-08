@@ -198,6 +198,12 @@ skip() { SKIPPED+=("$1 ($2)"); printf '\n\033[2m── %s — skipped: %s\033[0m
 
 psql "$MIGRATION_URL" -q -c "CREATE DATABASE ${DB}" || exit 1
 
+# First, and cheap: everything after this is only worth what the environment it ran in is worth.
+# This script's whole claim is that a green run here means a green run on GitHub, and a value that
+# only `.env` carries quietly voids that — see scripts/ci/check-env-fidelity.mjs for the twenty
+# specs it cost. Local-only by nature: there is no `.env` on CI to diverge from.
+step env-fidelity node scripts/ci/check-env-fidelity.mjs
+
 step migration-integrity pnpm test:migration-integrity
 step drizzle-check pnpm exec drizzle-kit check
 step migrations-local pnpm test:migrations:local
