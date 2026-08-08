@@ -113,7 +113,7 @@ function workflowEnvKeys() {
 function conditionalRequirements() {
   const source = readFileSync(join(root, 'src/shared/lib/env.ts'), 'utf8')
   const required = new Map()
-  for (const m of source.matchAll(/if \(data\.([A-Z_][A-Z0-9_]*) === 'true'\) \{([\s\S]*?)\n  \}/g)) {
+  for (const m of source.matchAll(/if \(data\.([A-Z_][A-Z0-9_]*) === 'true'\) \{([\s\S]*?)\n {2}\}/g)) {
     const keys = [...m[2].matchAll(/path: \['([A-Z_][A-Z0-9_]*)'\]/g)].map((p) => p[1])
     if (keys.length > 0) required.set(m[1], new Set(keys))
   }
