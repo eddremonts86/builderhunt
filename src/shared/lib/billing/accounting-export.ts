@@ -37,7 +37,7 @@
  *   path.
  */
 import { and, eq, gt, gte, lt, sql } from 'drizzle-orm'
-import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey } from './catalog'
+import { PACK_CATALOG, resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, SUBSCRIPTION_CATALOG } from './catalog'
 import { billingCreditGrants, billingDisputes, billingRefunds, billingSubscriptions } from '../db/schema'
 import { listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
 import { collectWorkerOrganizationIds } from '../repositories/worker-organization-scan'
@@ -88,6 +88,15 @@ function previousMonthWindow(now: Date): { windowStart: Date; windowEnd: Date } 
   return { windowStart, windowEnd }
 }
 
+/**
+ * Distinct catalog keys one organization can have bought inside one month.
+ *
+ * The two revenue reads group by a catalog key and multiply the count by the price the catalog holds
+ * in code, so their row count is the catalog's cardinality — not the number of purchases. Named from
+ * the register rather than as a literal so it moves when the catalog does.
+ */
+const SUBSCRIPTION_CATALOG_KEY_CEILING = Object.keys(SUBSCRIPTION_CATALOG).length + Object.keys(PACK_CATALOG).length
+
 export async function getAccountingExport(deps: AccountingExportDeps = {}): Promise<AccountingExportResult> {
   const now = (deps.now ?? (() => new Date()))()
   const defaults = previousMonthWindow(now)
@@ -133,7 +142,9 @@ export async function getAccountingExport(deps: AccountingExportDeps = {}): Prom
             gte(billingSubscriptions.currentPeriodStart, windowStart),
             lt(billingSubscriptions.currentPeriodStart, windowEnd),
           ))
-          .groupBy(billingSubscriptions.catalogKey),
+          .groupBy(billingSubscriptions.catalogKey)
+          // One row per distinct subscription catalog key in the window — bounded by the catalog.
+          .limit(SUBSCRIPTION_CATALOG_KEY_CEILING),
         transaction
           .select({ sourceReference: billingCreditGrants.sourceReference, count: sql<number>`count(*)::int` })
           .from(billingCreditGrants)
@@ -143,7 +154,9 @@ export async function getAccountingExport(deps: AccountingExportDeps = {}): Prom
             gte(billingCreditGrants.createdAt, windowStart),
             lt(billingCreditGrants.createdAt, windowEnd),
           ))
-          .groupBy(billingCreditGrants.sourceReference),
+          .groupBy(billingCreditGrants.sourceReference)
+          // One row per distinct pack catalog key in the window — bounded by the same catalog.
+          .limit(SUBSCRIPTION_CATALOG_KEY_CEILING),
         transaction
           .select({
             amountCents: sql<number>`coalesce(sum(${billingRefunds.amountCents}), 0)::int`,

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { publicDb } from '../db/client'
 import { changelog, incidents, roadmapItems, roadmapVotes } from '../db/schema'
+import { OPERATOR_LIST_LIMIT } from '../db/read-bounds'
 
 const incidentPublicFields = {
   id: incidents.id,
@@ -68,16 +69,22 @@ export async function listPublicRoadmap(userId?: string) {
     publicDb
       .select(roadmapPublicFields)
       .from(roadmapItems)
-      .orderBy(asc(roadmapItems.sortOrder), asc(roadmapItems.createdAt)),
+      .orderBy(asc(roadmapItems.sortOrder), asc(roadmapItems.createdAt))
+      // The public roadmap board, rendered whole and curated by hand.
+      .limit(OPERATOR_LIST_LIMIT),
     publicDb
       .select({ itemId: roadmapVotes.itemId, count: sql<number>`count(*)::int` })
       .from(roadmapVotes)
-      .groupBy(roadmapVotes.itemId),
+      .groupBy(roadmapVotes.itemId)
+      // One row per roadmap item that has any votes — bounded by the item list above.
+      .limit(OPERATOR_LIST_LIMIT),
     userId
       ? publicDb
           .select({ itemId: roadmapVotes.itemId })
           .from(roadmapVotes)
           .where(eq(roadmapVotes.userId, userId))
+          // This viewer's own votes, at most one per roadmap item.
+          .limit(OPERATOR_LIST_LIMIT)
       : Promise.resolve([]),
   ])
   const countByItem = new Map(counts.map((row) => [row.itemId, row.count]))

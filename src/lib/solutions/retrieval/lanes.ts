@@ -200,6 +200,9 @@ export async function loadCandidates(
     })
     .from(solutionComponentProjections)
     .where(inArray(solutionComponentProjections.componentId, componentIds))
+    // The `inArray` names exactly which components; a component can have several projection versions,
+    // and the filter below keeps only the ones the lanes ranked. `× 4` is headroom over that.
+    .limit(componentIds.length * 4)
 
   // Only the (componentId, version) pairs the lanes actually returned. A component whose version moved
   // between the lane query and this one would otherwise contribute a row nothing ranked.

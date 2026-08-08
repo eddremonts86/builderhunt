@@ -10,6 +10,7 @@
 import { and, count, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { builderClaims, builderProfileViews, publishedBuilderProfiles } from '../db/schema'
+import { ANALYTICS_WINDOW_LIMIT } from '../db/read-bounds'
 
 /**
  * Whether the (viewer, builder, day) tuple already has a row. Used by the
@@ -86,6 +87,8 @@ export async function listBuilderProfileViewCounts(
     )
     .groupBy(sql`date_trunc('day', ${builderProfileViews.viewedAt})`)
     .orderBy(desc(sql`date_trunc('day', ${builderProfileViews.viewedAt})`))
+    // One row per day in the requested window.
+    .limit(ANALYTICS_WINDOW_LIMIT)
   return rows.map((r) => ({ day: r.day, count: Number(r.count) }))
 }
 

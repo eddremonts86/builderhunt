@@ -1,6 +1,7 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { seatUsageDaily } from '../db/schema'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * Tenant-private (`organization_id`) — `builderhunt_app` has SELECT + INSERT +
@@ -55,6 +56,10 @@ export async function listSeatUsageForOrgDay(
       eq(seatUsageDaily.day, day),
       eq(seatUsageDaily.action, action),
     ))
+    // One row per seat for one (organization, day, action). Seats are priced, so the ceiling is the
+    // largest plan's seat count with room to spare — an organization cannot exceed it by being used.
+    .orderBy(asc(seatUsageDaily.userId))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export interface IncrementSeatUsageInput {

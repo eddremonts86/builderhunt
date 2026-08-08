@@ -8,6 +8,7 @@ import {
   documentExtractions,
 } from '~/shared/lib/db/schema'
 import type { SourceManifestEntry } from '~/shared/lib/interviews'
+import { ENTITY_DETAIL_LIMIT } from '~/shared/lib/db/read-bounds'
 
 /**
  * Assembles the evidence manifest a brief may cite (plan:
@@ -80,6 +81,9 @@ export async function assembleBriefEvidence(
       eq(candidateDocuments.submissionId, params.submissionId),
     ))
     .orderBy(candidateDocuments.createdAt)
+    // Documents and links attached to one submission — the brief is assembled from all of them, and a
+    // submission with more than this is not an interview brief.
+    .limit(ENTITY_DETAIL_LIMIT)
 
   const linkRows = await transaction
     .select({
@@ -105,6 +109,7 @@ export async function assembleBriefEvidence(
       eq(candidateLinks.submissionId, params.submissionId),
     ))
     .orderBy(candidateLinks.createdAt)
+    .limit(ENTITY_DETAIL_LIMIT)
 
   const manifest: SourceManifestEntry[] = []
   let pendingDocuments = 0

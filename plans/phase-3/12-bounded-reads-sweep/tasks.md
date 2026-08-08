@@ -1,6 +1,6 @@
 # Tasks — bound or batch the reads with no table UI
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`01-read-path-audit`](../01-read-path-audit/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: Work from a fresh detector run — plans 07–11 have already removed entries from the audit's snapshot.
@@ -32,7 +32,7 @@
       property of the migrations rather than of usage — a third outcome the spec's three do not
       name, and the one where a `.limit()` provably truncates nothing.
 
-- [ ] **Bound the model-bounded reads with a stated reason**
+- [x] **Bound the model-bounded reads with a stated reason**
   - Files: `src/shared/lib/repositories/public-surface-indexing.ts`,
     `src/shared/lib/auth/organization-lifecycle.ts`,
     `src/shared/lib/repositories/account-privacy.ts`,
@@ -59,10 +59,24 @@
     on purpose: a check that fetches exactly as many rows as it expects to exist cannot notice the row
     that broke the assumption.
 
-    Still open on this task: `organization-lifecycle.ts`, `account-privacy.ts`, `calendar.ts`,
-    `platform-operations.ts`, `public-radars.ts`, `seat-usage.ts`.
+    **Done — `{"unbounded":0}`.** Every file the task names is bounded, plus the thirty others the
+    fresh detector run turned up.
 
-- [ ] **Convert the credit-grant and refund reads to batch loops**
+    The bulk needed a **fourth** category the spec's three do not describe: a read with no derivable
+    model ceiling, feeding a surface that renders it whole. `db/read-bounds.ts` names five of those —
+    `ENTITY_DETAIL_LIMIT`, `USER_SCOPED_LIMIT`, `OPERATOR_LIST_LIMIT`, `ANALYTICS_WINDOW_LIMIT`,
+    `SWEEP_BATCH` — and each carries the argument for why it is a bound rather than a truncation. The
+    spec's warning is about `.limit(3)` with nothing said; the answer is not to avoid policy ceilings
+    but to state what each one claims. `USER_SCOPED_LIMIT`, for instance, claims the set grows one row
+    per deliberate human act, so an account past it is the abuse system's problem and not the pager's.
+
+    Where a real source of truth existed it was used, and several were hiding in plain sight:
+    `SEO_SURFACES.length`, `OPERATIONAL_SCHEDULES.length`, `INVITATION_STATUSES.length`,
+    `Object.keys(SUBSCRIPTION_CATALOG).length + Object.keys(PACK_CATALOG).length`, `schedules.length`
+    for the registry it is reconciling, and — for four reads — the caller's own `inArray` list, which
+    is the tightest bound available and needs no constant at all.
+
+- [x] **Convert the credit-grant and refund reads to batch loops**
   - Files: `src/shared/lib/repositories/billing-ledger.ts`, `src/shared/lib/repositories/billing.ts`
   - Do: `listActiveCreditGrantsByEarliestExpiry`, `lockActiveCreditGrantsByEarliestExpiry`,
     `listExpiredButStillActiveGrants` and `listPendingBillingRefundsWithoutProviderRefund` become
@@ -90,7 +104,7 @@
     drains, because every row in that queue is a refund the operator approved and Stripe never
     received. Stopping at a boundary leaves money owed to a customer.
 
-- [ ] **Convert the export path, preserving completeness**
+- [x] **Convert the export path, preserving completeness**
   - Files: `src/shared/lib/billing/accounting-export.ts`
   - Do: stream or chunk rather than materialising the whole export. Output must be **identical**, not
     merely similar — an export missing its tail is a finding an auditor makes, not a bug a user
@@ -112,7 +126,7 @@
     code rather than from a column, so SQL can only supply the counts per key. One row per distinct
     catalog key is bounded by the catalog.
 
-- [ ] **Convert the deletion path, proving full coverage**
+- [x] **Convert the deletion path, proving full coverage**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
     `tests/unit/shared/lib/repositories/account-privacy.test.ts`
   - Do: `hardDeleteAccountSubject` becomes a chunked loop that keeps going until nothing remains.
@@ -138,7 +152,7 @@
     and did not export `DELETION_BATCH`, so the loop's `due.length < DELETION_BATCH` became
     `n < undefined` — false — and the worker asked the mock for another batch forever.
 
-- [ ] **Bound the remaining batch reads**
+- [x] **Bound the remaining batch reads**
   - Files: `src/shared/lib/auth/organization-lifecycle.ts`,
     `src/shared/lib/repositories/builder-claims.ts`,
     `src/shared/lib/repositories/profile-removal.ts`,
@@ -148,6 +162,20 @@
     suppression consumers need every row, so the loop must complete, not stop at a page.
   - Verify: `/sitemap.xml` lists the same slug set as before; a suppressed profile is still
     suppressed.
+  - **Done.** `drainSweep` in `db/read-bounds.ts` holds the loop for the four reads whose caller needs
+    every row, and the four call sites use it: the sitemap's radar slugs and portfolio claims, the
+    suppression filter, and the incident routes' subscriber list. Each of those is silent when it is
+    wrong — a page that stops being indexed, a profile still shown after someone had it removed, a
+    subscriber who asked to be told about incidents and was not.
+
+    `listPublishedPortfolioClaimIds` kept its JavaScript filter deliberately. The `published` flag
+    lives inside a jsonb document and `parsePortfolioSettings` is the one place that knows its shape,
+    including its defaults; duplicating that as a jsonb path expression would be two sources of truth
+    for "is this published". What moved is the bound, not the predicate.
+
+    `listWorkerSeenSourceIds` is the fifth, and the most important one to get right: it is a radar's
+    dedup memory, so a row missing from it is a match the user is shown **again**. It drains, even
+    though the set grows for the lifetime of the radar.
   - **Partly done: `processPendingOrganizationDeletions` is still open; the every-organization scan
     it shares with six other workers is not.** Seven worker repositories each kept their own
     `listWorkerOrganizationIds`, and every one read the whole organizations table. The duplication is
@@ -161,10 +189,22 @@
     nobody is waiting on the five-hundred-and-first to notice. The cursor is the organization id
     ascending — data rather than a counter — so a run that dies halfway resumes where it stopped.
 
-- [ ] **Give the worker scans an explicit limit**
+- [x] **Give the worker scans an explicit limit**
   - Files: the 13 worker reads named by the detector (`*-worker.ts`, `discovery`, `enrichment`,
     `reconciliation` paths)
   - Do: add `.limit(BATCH)` and a comment. These already lease-batch via columns like
     `enrichment_jobs_worker_scan_idx`; this makes the bound explicit rather than implied. Do not
     redesign the HTTP-triggered worker pattern (`plans/_meta/conventions.md` rule 7).
   - Verify: `node scripts/check-unbounded-reads.mjs` reports `{"unbounded":0}`; worker tests green.
+  - **Done, and the last one standing was the one plan 10 had deliberately kept.**
+    `listSprints` fed the dashboard's action queue, whose rules filter by status — which is exactly why
+    plan 10 refused to put a naive `.limit()` on it: the nudge for a stalled sprint could be sitting
+    past the boundary. The fix is not a bigger limit. `listActionQueueSprints` moves **both** rules'
+    predicates into SQL, so what comes back is only rows that will produce an item: `completed` with a
+    `having count(...) > 0`, or `paused`, or `active` with a last run before the stall cutoff. The
+    `resultCount > 0` test was a JavaScript filter over every sprint the organization had ever run, and
+    it is the whole reason the read could not be bounded.
+
+    `sprintStalledBefore` is exported from `action-rules.ts` so the SQL predicate and the rule cannot
+    drift: one of them calling a sprint stalled while the other does not would either show a nudge for
+    a row the read excluded, or hide one it returned.

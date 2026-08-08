@@ -75,6 +75,9 @@ export async function projectComponents(options: ProjectComponentsOptions = {}):
     })
     .from(solutionComponentProjections)
     .where(inArray(solutionComponentProjections.componentId, candidates.map((c) => c.componentId)))
+    // `candidates` is already the run's own bounded slice — see `ProjectComponentsOptions.limit` — so
+    // the ceiling is that slice, with headroom for a component's several projection versions.
+    .limit(candidates.length * 4)
   const existingByKey = new Map(existing.map((row) => [`${row.componentId}:${row.version}`, row]))
 
   for (const candidate of candidates) {

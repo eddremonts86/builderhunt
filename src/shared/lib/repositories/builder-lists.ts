@@ -244,6 +244,8 @@ export async function listItemsForList(
     .innerJoin(builderIdentities, eq(builderIdentities.id, builderListItems.builderIdentityId))
     .where(and(eq(builderListItems.listId, listId), eq(builderListItems.organizationId, principal.organizationId)))
     .orderBy(desc(builderListItems.createdAt))
+    // Members of one shortlist, rendered whole — see `ENTITY_DETAIL_LIMIT`.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 /**

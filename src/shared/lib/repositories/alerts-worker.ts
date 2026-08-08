@@ -7,6 +7,7 @@ import { authDb } from '../db/auth-db'
 import { alerts, alertTriggers, authUsers, builders, organizations } from '../db/schema'
 import { nextAlertTimingState, type AlertEvaluationOutcome, type AlertFrequency } from '../alerts'
 import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
+import { SWEEP_BATCH, USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * One batch of organization ids, ascending — bounded since plan 12.
@@ -41,6 +42,9 @@ export function withWorkerOrganization<TResult>(
 export function listEnabledWorkerAlerts(transaction: WorkerTransaction, organizationId: string) {
   return transaction.select().from(alerts)
     .where(and(eq(alerts.organizationId, organizationId), eq(alerts.enabled, true)))
+    // Enabled radars for one organization — configured by hand, and seat-priced.
+    .orderBy(asc(alerts.id))
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export async function findWorkerBuilder(
@@ -59,11 +63,33 @@ export async function listWorkerSeenSourceIds(
   organizationId: string,
   alertId: string,
 ) {
-  const rows = await transaction.select({ payload: alertTriggers.payload }).from(alertTriggers)
-    .where(and(eq(alertTriggers.organizationId, organizationId), eq(alertTriggers.alertId, alertId)))
-  return new Set(rows
-    .map((row) => row.payload.sourceId)
-    .filter((value): value is string => typeof value === 'string'))
+  /*
+   * The dedup memory for one radar, drained in batches.
+   *
+   * This is the set the evaluator checks candidates against, so a row missing from it is a match the
+   * user is shown **again** — the one thing an alert must not do. So a ceiling is wrong here and the
+   * loop is the answer, even though the set grows for the lifetime of the radar.
+   */
+  const seen = new Set<string>()
+  let after: string | null = null
+  for (;;) {
+    const rows = await transaction.select({ id: alertTriggers.id, payload: alertTriggers.payload }).from(alertTriggers)
+      .where(and(
+        eq(alertTriggers.organizationId, organizationId),
+        eq(alertTriggers.alertId, alertId),
+        ...(after ? [gt(alertTriggers.id, after)] : []),
+      ))
+      .orderBy(asc(alertTriggers.id))
+      .limit(SWEEP_BATCH)
+    if (rows.length === 0) break
+    for (const row of rows) {
+      const sourceId = row.payload.sourceId
+      if (typeof sourceId === 'string') seen.add(sourceId)
+    }
+    after = rows[rows.length - 1].id
+    if (rows.length < SWEEP_BATCH) break
+  }
+  return seen
 }
 
 /**

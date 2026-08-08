@@ -406,4 +406,6 @@ export function listOwnAlertResultBuckets(
     ))
     .groupBy(alertTriggers.alertId, alerts.name, sql`date_trunc('day', ${alertTriggers.matchedAt})`)
     .orderBy(sql`bucket_start asc`)
+    // One row per (radar, UTC day) inside the requested window — the window is the bound.
+    .limit(ANALYTICS_WINDOW_LIMIT)
 }

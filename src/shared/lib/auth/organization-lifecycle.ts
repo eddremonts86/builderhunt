@@ -6,6 +6,7 @@ import type { PlanStatus } from '../billing-shared'
 import type { EntitlementTier } from '../repositories/entitlements'
 import type { KeysetTransaction } from '../table/keyset'
 import type { PageRequest, PageResult, TableQuery } from '../table/types'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * Wraps the better-auth organization plugin's operations with the
@@ -1029,7 +1030,7 @@ export interface MyOrganizationRecord {
  * switchable orgs) — no chicken-and-egg tenant-context problem.
  */
 export async function listMyOrganizations(userId: string): Promise<MyOrganizationRecord[]> {
-  const [{ eq }, { authDb }, schema] = await Promise.all([
+  const [{ asc, eq }, { authDb }, schema] = await Promise.all([
     import('drizzle-orm'),
     import('../db/auth-db'),
     import('../db/schema'),
@@ -1047,6 +1048,10 @@ export async function listMyOrganizations(userId: string): Promise<MyOrganizatio
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
     .where(eq(organizationMembers.userId, userId))
+    // Organizations this person belongs to — the workspace switcher renders them whole, and each one
+    // is an invitation they accepted by hand.
+    .orderBy(asc(organizationMembers.organizationId))
+    .limit(USER_SCOPED_LIMIT)
 
   return rows.map((row) => ({
     organization: { id: row.id, name: row.name, slug: row.slug },
@@ -1237,6 +1242,8 @@ export async function resolveActorDisplayNames(
     .from(organizationMembers)
     .innerJoin(authUsers, eq(authUsers.id, organizationMembers.userId))
     .where(and(eq(organizationMembers.organizationId, organizationId), inArray(organizationMembers.userId, uniqueIds)))
+    // The `inArray` above names exactly which rows, so the caller's own id list is the ceiling.
+    .limit(uniqueIds.length)
 
   return new Map(rows.map((row) => [row.userId, row.name]))
 }
@@ -1301,7 +1308,7 @@ export async function pageOrganizationInvitations(
  * has been invited where.
  */
 export async function listInvitationsForEmail(email: string): Promise<InvitationRecord[]> {
-  const [{ and, eq }, { authDb }, schema] = await Promise.all([
+  const [{ and, asc, eq }, { authDb }, schema] = await Promise.all([
     import('drizzle-orm'),
     import('../db/auth-db'),
     import('../db/schema'),
@@ -1323,6 +1330,10 @@ export async function listInvitationsForEmail(email: string): Promise<Invitation
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
     .where(and(eq(organizationInvitations.email, normalized), eq(organizationInvitations.status, 'pending')))
+    // Pending invitations addressed to one email. Each is a deliberate act by some organization's
+    // owner, and the sign-in screen renders them whole.
+    .orderBy(asc(organizationInvitations.id))
+    .limit(USER_SCOPED_LIMIT)
 
   const now = Date.now()
   return rows

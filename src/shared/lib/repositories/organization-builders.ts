@@ -668,6 +668,9 @@ export async function createOrganizationBuilderNote(
   return note
 }
 
+/** The dashboard's activity strip is seven UTC days wide — the same seven the loop below builds. */
+const DASHBOARD_STAT_DAYS = 7
+
 export async function getOrganizationDashboardStats(
   transaction: TenantTransaction,
   organizationId: string,
@@ -703,12 +706,15 @@ export async function getOrganizationDashboardStats(
     }).from(organizationBuilders)
       .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
       .where(and(eq(organizationBuilders.organizationId, organizationId), gte(builderIdentities.lastSeenAt, activeSince)))
-      .groupBy(sql`date_trunc('day', ${builderIdentities.lastSeenAt} at time zone 'UTC')`),
+      .groupBy(sql`date_trunc('day', ${builderIdentities.lastSeenAt} at time zone 'UTC')`)
+      // One row per UTC day since `activeSince`, and the loop below builds exactly seven keys — so
+      // seven is both the ceiling and the number of buckets the caller will read.
+      .limit(DASHBOARD_STAT_DAYS),
   ])
 
   const dailyCounts = new Map(dailyRows.map((row) => [row.day, row.value]))
   const generatedAt = new Date()
-  const lastSeenByDay = Array.from({ length: 7 }, (_, index) => {
+  const lastSeenByDay = Array.from({ length: DASHBOARD_STAT_DAYS }, (_, index) => {
     // UTC arithmetic throughout. `setDate` mutates in local time, so a server west of UTC building
     // keys with `toISOString` could produce the same ISO day twice and drop another entirely.
     const date = new Date(Date.UTC(

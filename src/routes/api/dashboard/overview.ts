@@ -26,10 +26,11 @@ import {
   type DashboardOverview,
   type DashboardUsage,
 } from '~/shared/lib/dashboard/contracts'
+import { sprintStalledBefore } from '~/shared/lib/dashboard/action-rules'
 import { buildActionQueue } from '~/shared/lib/dashboard/action-rules'
 import { getOnboardingStatus } from '~/shared/lib/onboarding'
 import { listOrganizationTriggers } from '~/shared/lib/repositories/organization-alerts'
-import { listSprints } from '~/lib/sprints/service'
+import { listActionQueueSprints } from '~/lib/sprints/service'
 import { listUpcomingAppointments } from '~/shared/lib/repositories/dashboard-upcoming'
 import { listReviewCandidates, listShortlistSummaries } from '~/shared/lib/repositories/dashboard-review'
 import { getInvitationDistribution } from '~/shared/lib/repositories/dashboard-invitations'
@@ -354,7 +355,8 @@ export const Route = createFileRoute('/api/dashboard/overview')({
               const [onboarding, triggers, sprints] = await Promise.all([
                 getOnboardingStatus(transaction, principal.organizationId, principal.userId),
                 listOrganizationTriggers(transaction, principal.organizationId, DASHBOARD_ROW_LIMITS.alerts),
-                listSprints(transaction, principal.organizationId),
+                // Only the sprints a queue rule can fire on, filtered in SQL — see the function's comment.
+                listActionQueueSprints(transaction, principal.organizationId, sprintStalledBefore(now)),
               ])
               return { onboarding, triggers, sprints }
             })

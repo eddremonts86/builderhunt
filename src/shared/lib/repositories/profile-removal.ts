@@ -20,7 +20,7 @@ import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { builders, organizations, profileRemovalRequests, profileSuppressions } from '../db/schema'
 import { WORKER_ORGANIZATION_BATCH } from './worker-organization-scan'
 import { collectWorkerOrganizationIds } from './worker-organization-scan'
-import { SWEEP_BATCH } from '../db/read-bounds'
+import { OPERATOR_LIST_LIMIT, SWEEP_BATCH } from '../db/read-bounds'
 
 export type RemovalRequestStatus = 'pending' | 'verified' | 'rejected' | 'expired'
 
@@ -226,6 +226,11 @@ export async function getRemovalOperationsMetrics(now: Date = new Date(), db: Po
     createdAt: profileRemovalRequests.createdAt,
     expiresAt: profileRemovalRequests.expiresAt,
   }).from(profileRemovalRequests)
+    // Counted in JavaScript across four different groupings — status, source, pending-age bucket and
+    // an overdue flag — so a single `GROUP BY` cannot serve it. The ceiling is the operator console's:
+    // a redacted metrics panel computed from more than this many rows is a report, not a panel.
+    .orderBy(desc(profileRemovalRequests.createdAt))
+    .limit(OPERATOR_LIST_LIMIT)
 
   const byStatus: Record<RemovalRequestStatus, number> = { pending: 0, verified: 0, rejected: 0, expired: 0 }
   const bySourceCounts = new Map<string, number>()

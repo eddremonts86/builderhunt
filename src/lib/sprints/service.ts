@@ -3,7 +3,7 @@
 // an explicit `organizationId` and scopes every query by it (defense in
 // depth alongside the composite FK), matching the `organization-alerts.ts`
 // convention. No cross-organization access is possible through this module.
-import { and, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, lt, ne, or, sql, type SQL } from 'drizzle-orm'
 import type { TenantTransaction } from '~/shared/lib/db/client'
 import { randomId } from '~/lib/utils'
 import type { SprintResultRow } from '~/lib/sprints/results'
@@ -12,6 +12,7 @@ import { sprintResultsCapability } from '~/shared/lib/table/capabilities/sprint-
 import { sprintsCapability } from '~/shared/lib/table/capabilities/sprints'
 import { buildKeysetPage } from '~/shared/lib/table/keyset'
 import type { PageRequest, PageResult, TableQuery } from '~/shared/lib/table/types'
+import { DASHBOARD_ROW_LIMITS } from '~/shared/lib/dashboard/contracts'
 import {
   DEFAULT_SPRINT_QUOTA,
   type CreateSprintInput,
@@ -119,14 +120,49 @@ export async function pageSprints(
   }
 }
 
-export async function listSprints(transaction: TenantTransaction, organizationId: string): Promise<SprintListItem[]> {
+/**
+ * The sprints the dashboard's action queue can actually raise a nudge about.
+ *
+ * `listSprints` was here, unbounded, and plan 10 kept it for exactly this caller: the queue's rules
+ * filter by status, so a naive `.limit()` would have dropped the nudge for a stalled sprint sitting
+ * past it. Plan 12's answer is not a bigger limit — it is to move both rules' predicates into SQL, so
+ * what comes back is only rows that *will* produce an item.
+ *
+ * Two shapes, one union, matching `action-rules.ts` one to one:
+ *   - `completed` with at least one result — "a finished sprint has results to review"
+ *   - `paused`, or `active` and last run before `stalledBefore` — "this sprint is stalled"
+ *
+ * The `having` clause is what makes the first honest: `resultCount > 0` was a JavaScript filter over
+ * every sprint the organization ever ran, and it is the reason this read had to be unbounded.
+ */
+export async function listActionQueueSprints(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stalledBefore: Date,
+  limit: number = DASHBOARD_ROW_LIMITS.actionQueue,
+): Promise<SprintListItem[]> {
   const rows = await transaction
     .select({ sprint: sourcingSprints, resultCount: sql<number>`count(${sprintResults.id})::int` })
     .from(sourcingSprints)
     .leftJoin(sprintResults, eq(sprintResults.sprintId, sourcingSprints.id))
-    .where(eq(sourcingSprints.organizationId, organizationId))
+    .where(and(
+      eq(sourcingSprints.organizationId, organizationId),
+      or(
+        eq(sourcingSprints.status, 'completed'),
+        eq(sourcingSprints.status, 'paused'),
+        and(eq(sourcingSprints.status, 'active'), lt(sourcingSprints.lastRunAt, stalledBefore)),
+      ),
+    ))
     .groupBy(sourcingSprints.id)
+    // A completed sprint with no results raises nothing, so it is not worth returning. The other two
+    // states qualify on status alone, which is why this is `or` and not a flat `> 0`.
+    .having(or(
+      ne(sourcingSprints.status, 'completed'),
+      sql`count(${sprintResults.id}) > 0`,
+    ))
     .orderBy(desc(sourcingSprints.createdAt))
+    // The queue renders at most `actionQueue` items in total, across every rule.
+    .limit(limit)
   return rows.map((row) => ({ ...toRecord(row.sprint), resultCount: row.resultCount }))
 }
 

@@ -23,6 +23,7 @@ import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
 import { solutionBriefs, solutionRunFeedback, solutionRunRoutes, solutionRuns } from '../db/schema'
 import { solutionBriefSchema, solutionRouteSchema, type RouteType, type SolutionBrief, type SolutionRoute } from '../solutions/contracts'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 
 export class SolutionsRepositoryError extends Error {
   constructor(message: string, readonly code: 'not_found' | 'invalid_brief' | 'invalid_route') {
@@ -273,6 +274,8 @@ export async function listFeedback(
   return transaction.select().from(solutionRunFeedback)
     .where(and(eq(solutionRunFeedback.organizationId, principal.organizationId), eq(solutionRunFeedback.runId, runId)))
     .orderBy(desc(solutionRunFeedback.createdAt))
+    // Feedback left on one run, by hand, one entry at a time.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 // ── DTOs ────────────────────────────────────────────────────────────────────

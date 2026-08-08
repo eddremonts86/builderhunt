@@ -112,6 +112,9 @@ export async function getDashboardRecency(
       gte(builderIdentities.lastSeenAt, since),
     ))
     .groupBy(sql`date_trunc('day', ${builderIdentities.lastSeenAt} at time zone 'UTC')`)
+    // One row per UTC day in the window, and `days` is that window's own length — the same number
+    // `fillDays` pads the result to, so the ceiling cannot cut a bucket the chart then draws as zero.
+    .limit(days)
 
   return { buckets: fillDays(rows, now, days), timezone: 'UTC' }
 }
@@ -173,6 +176,9 @@ export async function getDashboardDiscoveryTrend(
       gte(organizationBuilders.createdAt, since),
     ))
     .groupBy(sql`date_trunc('day', ${organizationBuilders.createdAt} at time zone 'UTC')`)
+    // One row per UTC day in the window, and `days` is that window's own length — the same number
+    // `fillDays` pads the result to, so the ceiling cannot cut a bucket the chart then draws as zero.
+    .limit(days)
 
   return { buckets: fillDays(rows, now, days), timezone: 'UTC' }
 }
@@ -203,6 +209,9 @@ export async function getDashboardAlertVolume(
       gte(alertTriggers.matchedAt, since),
     ))
     .groupBy(sql`date_trunc('day', ${alertTriggers.matchedAt} at time zone 'UTC')`)
+    // One row per UTC day in the window, and `days` is that window's own length — the same number
+    // `fillDays` pads the result to, so the ceiling cannot cut a bucket the chart then draws as zero.
+    .limit(days)
 
   return { buckets: fillDays(rows, now, days), timezone: 'UTC' }
 }

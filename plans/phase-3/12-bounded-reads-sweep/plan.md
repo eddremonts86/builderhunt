@@ -1,6 +1,6 @@
 # Plan — bound or batch the reads with no table UI
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`01-read-path-audit`](../01-read-path-audit/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: ~21 reads across `src/shared/lib/repositories/`, `shared/lib/billing/`, `shared/lib/auth/organization-lifecycle.ts`. No UI changes.

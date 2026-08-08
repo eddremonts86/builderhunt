@@ -32,6 +32,7 @@ import {
 } from '../db/schema'
 import type { CapabilityEvidenceLevel, ComponentKind, CompatibilityEdgeType } from '~/shared/lib/solutions/contracts'
 import { randomId } from '~/lib/utils'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 
 // ── Source register ────────────────────────────────────────────────────────────────────────────
 
@@ -544,6 +545,9 @@ export async function listTraversableEdges(
     .from(solutionCompatibilityEdges)
     .where(and(...conditions))
     .orderBy(desc(solutionCompatibilityEdges.confidenceBps))
+    // Edges out of one component, strongest confidence first — the graph walk that consumes them
+    // takes the top of this list, so a ceiling cuts the tail it would have discarded anyway.
+    .limit(ENTITY_DETAIL_LIMIT)
   return rows.map((row) => ({ ...row, constraints: (row.constraints ?? {}) as Record<string, unknown> }))
 }
 
@@ -668,6 +672,9 @@ export async function listComponentClaimSnippets(
     .innerJoin(solutionComponents, eq(solutionComponents.id, solutionComponentCapabilities.componentId))
     .where(inArray(solutionComponentCapabilities.componentId, parsed.map((entry) => entry.componentId)))
     .orderBy(asc(solutionComponentCapabilities.componentId), asc(solutionComponentCapabilities.capabilityKey))
+    // Capabilities for the components the caller named — the `inArray` above is the bound, and this
+    // multiplies it by the per-component capability ceiling.
+    .limit(parsed.length * ENTITY_DETAIL_LIMIT)
 
   const wanted = new Set(parsed.map((entry) => `${entry.componentId}@${entry.version}`))
   const byEvidenceId = new Map<string, ComponentClaimSnippet>()
@@ -738,6 +745,9 @@ export async function listAttributionsForEvidence(
     .innerJoin(solutionSources, eq(solutionSources.key, solutionComponents.sourceKey))
     .where(inArray(solutionComponents.id, componentIds))
     .groupBy(solutionSources.key, solutionSources.attributionRequired, solutionSources.attributionText, solutionSources.attributionUrl)
+    // One row per distinct source behind the named components, so the ceiling is the register's own
+    // — the same `SOLUTION_SOURCE_REGISTER_LIMIT` declared at the top of this file.
+    .limit(SOLUTION_SOURCE_REGISTER_LIMIT)
 
   return rows
     .filter((row) => row.attributionRequired && row.attributionText && row.attributionUrl)

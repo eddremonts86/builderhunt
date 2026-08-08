@@ -141,6 +141,17 @@ interface RuleOutput {
 const SPRINT_STALL_MS = 3 * 24 * 60 * 60 * 1000
 
 /**
+ * The same threshold as a cutoff timestamp, for the SQL predicate that pre-filters the read.
+ *
+ * Exported so `listActionQueueSprints` and the `sprint-stalled` rule below cannot drift: one of them
+ * deciding a sprint is stalled while the other does not would show a nudge for a sprint the read had
+ * already excluded, or hide one it returned.
+ */
+export function sprintStalledBefore(now: Date): Date {
+  return new Date(now.getTime() - SPRINT_STALL_MS)
+}
+
+/**
  * How close an interview has to be before "no brief yet" becomes something to act on *now*.
  *
  * 24 hours. An interview next week with no brief is normal — briefs are written the day before, and

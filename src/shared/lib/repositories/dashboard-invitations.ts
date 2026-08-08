@@ -62,6 +62,10 @@ export async function getInvitationDistribution(
       eq(schedulingInvitations.ownerUserId, ownerUserId),
     ))
     .groupBy(schedulingInvitations.status)
+    // One row per status, and `INVITATION_STATUSES` right above is that enum — the same list the
+    // result is padded back out to below, so the ceiling cannot drop a category the caller then
+    // reports as zero.
+    .limit(INVITATION_STATUSES.length)
 
   const byStatus = new Map(rows.map((row) => [row.status, Number(row.value)]))
   // Every status, always, including the zeros. A distribution that omits its empty categories is a

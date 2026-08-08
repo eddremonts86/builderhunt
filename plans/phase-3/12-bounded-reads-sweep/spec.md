@@ -1,6 +1,6 @@
 # Specification — bound or batch the reads with no table UI
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`01-read-path-audit`](../01-read-path-audit/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: The original audit snapshot included non-table reads, but plan 01's fresh,

@@ -21,6 +21,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
 import { feedCapabilities, savedQueries, type feedCapabilities as feedCapabilitiesTable } from '../db/schema'
 import { emitActivity } from './activity'
+import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * The DB handle the repository operates on. Defaults to the
@@ -305,4 +306,6 @@ export function listActiveFeedCapabilities(
     .from(feedCapabilities)
     .where(eq(feedCapabilities.organizationId, organizationId))
     .orderBy(feedCapabilities.createdAt)
+    // Feed tokens an organization minted, each a deliberate act in settings.
+    .limit(USER_SCOPED_LIMIT)
 }

@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, lt, lte, or, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
+import { ANALYTICS_WINDOW_LIMIT, ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 import {
   calendarEventExceptions,
   calendarEventOccurrences,
@@ -233,6 +234,9 @@ export async function listEventsInRange(
       gte(calendarEvents.endsAt, range.from),
     ))
     .orderBy(asc(calendarEvents.startsAt))
+    // Events overlapping the requested window. The window is the bound; this is the backstop for a
+    // calendar denser than the availability picker can draw.
+    .limit(ANALYTICS_WINDOW_LIMIT)
 }
 
 /** Title/participant/type/date-range search (spec.md "Search filters title, participant, event type, and date range"). */
@@ -495,10 +499,13 @@ export async function listEventExceptions(
   return transaction
     .select({ recurrenceId: calendarEventExceptions.recurrenceId })
     .from(calendarEventExceptions)
+    // Exceptions to one recurring event's series — see `ENTITY_DETAIL_LIMIT`.
     .where(and(
       eq(calendarEventExceptions.organizationId, organizationId),
       eq(calendarEventExceptions.eventId, eventId),
     ))
+    .orderBy(asc(calendarEventExceptions.recurrenceId))
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 // ── Participants ─────────────────────────────────────────────────────────────────────────────
@@ -899,4 +906,7 @@ export async function listBusyRanges(
       gte(calendarEvents.endsAt, range.from),
     ))
     .orderBy(asc(calendarEvents.startsAt))
+    // Events overlapping the requested window. The window is the bound; this is the backstop for a
+    // calendar denser than the availability picker can draw.
+    .limit(ANALYTICS_WINDOW_LIMIT)
 }
