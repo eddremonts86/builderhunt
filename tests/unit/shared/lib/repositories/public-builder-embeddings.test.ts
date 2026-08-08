@@ -88,9 +88,35 @@ describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
     expect(plan).toContain('Index Scan using builder_embeddings_hnsw_idx')
     expect(plan).toContain('Order By: (embedding <=>')
     expect(plan).not.toContain('Seq Scan on builder_embeddings')
-    // A Sort node means the ordering was computed after retrieval rather than
-    // supplied by the index — exactly the regression this test guards.
-    expect(plan).not.toContain('Sort Key:')
+    /*
+     * A plain `Sort` means the ordering was computed after retrieval rather than supplied by the
+     * index — the regression this test guards.
+     *
+     * `Incremental Sort` is a different node and is expected since plan 11: the ORDER BY gained
+     * `source, source_id` to make it a total order, and Postgres supplies the leading distance term
+     * from the index and sorts only *within* each distance group.
+     *
+     * The match is on the node line — a name followed by its cost — and not on `Sort Key:`, which
+     * both nodes emit. The first version of this assertion did match `Sort Key:` and failed on a
+     * plan that was in fact correct, which is a good argument for asserting on what a plan *is*
+     * rather than on a substring that appears in it.
+     */
+    expect(plan.split('\n').some((line) => /^\s*(->\s+)?Sort\s+\(cost=/.test(line))).toBe(false)
+    // The positive form of the same claim: the index supplied the leading key, so the sort only
+    // ever runs inside one distance group.
+    expect(plan).toContain('Presorted Key: ((embedding <=>')
+  })
+
+  it('keeps the index scan when resuming from a keyset cursor', async () => {
+    // The predicate compares against the distance *expression*, so it is a Filter above the index
+    // scan rather than something that costs the ordering.
+    const plan = await explain(
+      similarBuilderEmbeddingsQuery(db, vectorFor(0), 5, undefined, { distance: 0.1, source: 'github', sourceId: 'user-3' }),
+    )
+
+    expect(plan).toContain('Index Scan using builder_embeddings_hnsw_idx')
+    expect(plan).toContain('Order By: (embedding <=>')
+    expect(plan).not.toContain('Seq Scan on builder_embeddings')
   })
 
   it('negative control: ordering by the derived similarity expression cannot use the index', async () => {
@@ -211,12 +237,22 @@ describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
       expect(hasMore).toBe(false)
     })
 
+    /** The cursor a caller mints from the last row of a page. */
+    function cursorOf(match: { distance: number; source: string; sourceId: string }) {
+      return { distance: match.distance, source: match.source, sourceId: match.sourceId }
+    }
+
     it('reports hasMore true while rows remain, and pages without repeating a row', async () => {
-      const first = await searchBuilderEmbeddings(vectorFor(0), { limit: 4, offset: 0 }, undefined, db)
+      const first = await searchBuilderEmbeddings(vectorFor(0), { limit: 4 }, undefined, db)
       expect(first.matches).toHaveLength(4)
       expect(first.hasMore).toBe(true)
 
-      const second = await searchBuilderEmbeddings(vectorFor(0), { limit: 4, offset: 4 }, undefined, db)
+      const second = await searchBuilderEmbeddings(
+        vectorFor(0),
+        { limit: 4, after: cursorOf(first.matches[3]) },
+        undefined,
+        db,
+      )
       expect(second.matches).toHaveLength(4)
 
       const firstIds = first.matches.map((m) => `${m.entityKind}:${m.source}:${m.sourceId}`)
@@ -224,10 +260,58 @@ describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
       expect(firstIds.filter((id) => secondIds.includes(id))).toEqual([])
     })
 
+    it('walks the whole corpus exactly once', async () => {
+      const seen: string[] = []
+      let after: { distance: number; source: string; sourceId: string } | null = null
+      for (let page = 0; page < 10; page++) {
+        const result: Awaited<ReturnType<typeof searchBuilderEmbeddings>> =
+          await searchBuilderEmbeddings(vectorFor(0), { limit: 3, after }, undefined, db)
+        seen.push(...result.matches.map((m) => `${m.entityKind}:${m.source}:${m.sourceId}`))
+        if (!result.hasMore) break
+        after = cursorOf(result.matches[result.matches.length - 1])
+      }
+      // 8 github + 1 hn + 1 model, each once. An offset pager over a table the write-through
+      // indexer inserts into would have repeated or dropped instead.
+      expect(seen).toHaveLength(10)
+      expect(new Set(seen).size).toBe(10)
+    })
+
+    /**
+     * The property an offset could not give: a row inserted between two pages does not shift the
+     * boundary. It appears if it sorts after the cursor and is skipped if it sorts before — which
+     * is correct, because a row that belongs on page one is not page two's to serve.
+     */
+    it('does not repeat or skip the boundary when a row is inserted between pages', async () => {
+      const probe = vectorFor(0)
+      const first = await searchBuilderEmbeddings(probe, { limit: 4 }, undefined, db)
+      const boundary = cursorOf(first.matches[3])
+
+      await db.insert(builderEmbeddings).values({
+        id: 'embedding-interloper',
+        source: 'github',
+        sourceId: 'interloper',
+        contentHash: 'hash-interloper',
+        document: 'document interloper',
+        profile: { username: 'interloper', profileUrl: 'https://github.com/interloper', topics: [] },
+        // Identical to the probe, so it sorts to the very front — ahead of the boundary.
+        embedding: probe,
+        embeddedAt: new Date(),
+      })
+      try {
+        const second = await searchBuilderEmbeddings(probe, { limit: 4, after: boundary }, undefined, db)
+        const secondIds = second.matches.map((m) => m.sourceId)
+        expect(secondIds).not.toContain('interloper')
+        expect(first.matches.map((m) => m.sourceId).filter((id) => secondIds.includes(id))).toEqual([])
+      } finally {
+        await db.delete(builderEmbeddings).where(sql`${builderEmbeddings.id} = 'embedding-interloper'`)
+      }
+    })
+
     it('honors the filter while paging, so a filtered page 2 cannot leak an excluded source', async () => {
+      const first = await searchBuilderEmbeddings(vectorFor(0), { limit: 4 }, { sources: ['github'] }, db)
       const { matches, hasMore } = await searchBuilderEmbeddings(
         vectorFor(0),
-        { limit: 4, offset: 4 },
+        { limit: 4, after: cursorOf(first.matches[3]) },
         { sources: ['github'] },
         db,
       )
@@ -235,6 +319,42 @@ describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
       // 8 github rows, 4 consumed by page 1, 4 on this page, nothing beyond.
       expect(matches).toHaveLength(4)
       expect(hasMore).toBe(false)
+    })
+
+    /**
+     * Two rows at an identical distance are ordinary here: a re-indexed profile keeps its vector,
+     * and the seeded corpus below shares one deliberately. Without the trailing `source, source_id`
+     * terms the page boundary inside that tie has no defined side, so one of the two is served
+     * twice or not at all.
+     */
+    it('pages through a distance tie without repeating or dropping a row', async () => {
+      const probe = vectorFor(0)
+      const tied = ['tie-a', 'tie-b', 'tie-c'].map((sourceId) => ({
+        id: `embedding-${sourceId}`,
+        source: 'github',
+        sourceId,
+        contentHash: `hash-${sourceId}`,
+        document: `document ${sourceId}`,
+        profile: { username: sourceId, profileUrl: `https://github.com/${sourceId}`, topics: [] },
+        embedding: probe,
+        embeddedAt: new Date(),
+      }))
+      await db.insert(builderEmbeddings).values(tied)
+      try {
+        const first = await searchBuilderEmbeddings(probe, { limit: 2 }, { sources: ['github'] }, db)
+        const second = await searchBuilderEmbeddings(
+          probe,
+          { limit: 2, after: cursorOf(first.matches[1]) },
+          { sources: ['github'] },
+          db,
+        )
+        const ids = [...first.matches, ...second.matches].map((m) => m.sourceId)
+        expect(new Set(ids).size).toBe(4)
+        // All three tied rows plus `user-0`, whose vector is the probe's own, sit at distance 0.
+        expect(first.matches.every((m) => m.distance === first.matches[0].distance)).toBe(true)
+      } finally {
+        await db.delete(builderEmbeddings).where(sql`${builderEmbeddings.sourceId} like 'tie-%'`)
+      }
     })
   })
 })

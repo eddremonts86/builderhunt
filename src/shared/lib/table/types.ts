@@ -45,8 +45,15 @@ export interface PageRequest {
  * third-party APIs, and an upstream that reorders or renumbers between two requests shifts the set
  * underneath. Saying so is the point — the alternative was to keep the same field names and let a
  * caller assume the guarantee the SQL surfaces give.
+ *
+ * `approximate` is the local semantic leg, and it is a third thing rather than a synonym for the
+ * second. Its pages *are* a keyset over a total order, so no row is ever served twice or stepped
+ * over — but the candidate set comes from an HNSW index, which explores `ef_search` neighbours and
+ * returns the best it found. A row can therefore be missed entirely. Folding that into
+ * `provider-best-effort` would blame a third party for the index's own approximation, and folding
+ * it into `exact` would promise recall nothing here can promise.
  */
-export type PageConsistency = 'exact' | 'provider-best-effort'
+export type PageConsistency = 'exact' | 'provider-best-effort' | 'approximate'
 
 /** What came back. */
 export interface PageResult<Row> {

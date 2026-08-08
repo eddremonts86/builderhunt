@@ -118,6 +118,15 @@ export interface BuilderEmbeddingMatch {
   sourceId: string
   profile: EmbeddedProfile
   similarity: number
+  /**
+   * Cosine distance — the sort key itself, not `1 - similarity`.
+   *
+   * A cursor built from the similarity would be a value derived from the distance and then compared
+   * back against the distance, and float arithmetic does not survive that round trip exactly. The
+   * keyset predicate compares this against the same `embedding <=> $vec` expression the ORDER BY
+   * uses, so the boundary row's own value is what decides where the next page starts.
+   */
+  distance: number
 }
 
 /**
@@ -136,11 +145,30 @@ export interface BuilderEmbeddingSearchFilters {
   sources?: readonly string[]
 }
 
+/** The last row of the previous page, in the total order `(distance, source, source_id)`. */
+export interface BuilderEmbeddingCursor {
+  distance: number
+  source: string
+  sourceId: string
+}
+
 export interface BuilderEmbeddingSearchPage {
   limit: number
-  /** Rows to skip. Offset paging over an approximate index is stable only while the corpus is
-   * unchanged, which is the same caveat every HNSW pager carries — see `findSimilarBuilderEmbeddings`. */
-  offset?: number
+  /**
+   * Resume after this row. Absent means page one.
+   *
+   * This replaced an `offset` (plan 11). An offset over a relevance ordering repeats and drops rows
+   * whenever the corpus changes between two requests — the write-through indexer inserts rows on
+   * every federated search, so that was not a rare case here but the normal one. A keyset over
+   * `(distance, source, source_id)` cannot repeat a row at all: the predicate is strictly greater
+   * than the boundary.
+   *
+   * What it still cannot promise is that the same rows would have been *found*. HNSW explores a
+   * candidate set and returns the best it saw, and a filtered re-probe explores it afresh. That is
+   * the index's approximation, not the cursor's — no cursor design removes it, which is why the
+   * response calls itself `approximate` rather than `exact`.
+   */
+  after?: BuilderEmbeddingCursor | null
 }
 
 export interface BuilderEmbeddingSearchResult {
@@ -183,22 +211,44 @@ export function similarBuilderEmbeddingsQuery(
   queryVector: number[],
   limit: number,
   filters?: BuilderEmbeddingSearchFilters,
-  offset = 0,
+  after?: BuilderEmbeddingCursor | null,
 ) {
   const distance = cosineDistance(builderEmbeddings.embedding, queryVector)
-  const query = db
+  const conditions = buildFilterConditions(filters)
+  if (after) {
+    /*
+     * The keyset predicate, as a row-value comparison.
+     *
+     * Written against the distance *expression*, not against a stored column, because that is what
+     * the ORDER BY sorts by — comparing anything else would resume from a position in a different
+     * ordering. `source` and `source_id` follow so the order is total: two rows at an identical
+     * distance are common here (a re-indexed profile keeps its vector), and a page boundary landing
+     * inside such a tie is exactly what repeats or drops a row.
+     *
+     * A row constructor rather than the expanded `d > $1 or (d = $1 and ...)` form: none of the
+     * three is nullable — `embedding is not null` is already a condition, and `source`/`source_id`
+     * are NOT NULL — so the null-aware expansion would buy nothing and read worse.
+     */
+    conditions.push(
+      sql`(${distance}, ${builderEmbeddings.source}, ${builderEmbeddings.sourceId}) > (${after.distance}, ${after.source}, ${after.sourceId})`,
+    )
+  }
+  return db
     .select({
       entityKind: builderEmbeddings.entityKind,
       source: builderEmbeddings.source,
       sourceId: builderEmbeddings.sourceId,
       profile: builderEmbeddings.profile,
       similarity: sql<number>`1 - (${distance})`,
+      distance: sql<number>`${distance}`,
     })
     .from(builderEmbeddings)
-    .where(and(...buildFilterConditions(filters)))
-    .orderBy(asc(distance))
+    .where(and(...conditions))
+    // The trailing terms are what make this a total order. The HNSW index still serves the leading
+    // one, and Postgres finishes the job with an incremental sort inside each distance group —
+    // which is only ever a handful of rows.
+    .orderBy(asc(distance), asc(builderEmbeddings.source), asc(builderEmbeddings.sourceId))
     .limit(limit)
-  return offset > 0 ? query.offset(offset) : query
 }
 
 /**
@@ -247,10 +297,9 @@ export async function searchBuilderEmbeddings(
   /** Override for disposable-database tests, same seam as `similarBuilderEmbeddingsQuery`. */
   db: PostgresJsDatabase = publicDb,
 ): Promise<BuilderEmbeddingSearchResult> {
-  const offset = page.offset ?? 0
   // Over-fetch by one *before* the payload filter below, then again after: dropping catalog rows can
   // shrink the page, so `hasMore` is decided from what survives rather than from what the index returned.
-  const rows = await similarBuilderEmbeddingsQuery(db, queryVector, page.limit + 1, filters, offset)
+  const rows = await similarBuilderEmbeddingsQuery(db, queryVector, page.limit + 1, filters, page.after)
 
   /**
    * Catalog components share this table with people — that is what `entity_kind` is for — so a row here

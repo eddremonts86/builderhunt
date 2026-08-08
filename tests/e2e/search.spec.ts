@@ -289,40 +289,57 @@ function finishRecording(): void {
   writeFileSync(FIXTURE_PATH, `${JSON.stringify(recorded, null, 2)}\n`, 'utf8')
 }
 
-test('keyword search returns a stable fused ranking across two sources', async () => {
+interface KeywordResponse {
+  builders: Array<{ id: string; source: string }>
+  nextCursor: string | null
+  total: number | null
+  consistency: string
+  sources: Array<{ source: string; health: string; resultCount: number; durationMs: number }>
+  degraded: boolean
+}
+
+async function keywordPage(cursor: string | null): Promise<KeywordResponse> {
   const response = await harness.owner.api!.post('/api/search/builders', {
-    data: {
-      keywords: KEYWORD_QUERY,
-      sources: [...KEYWORD_SOURCES],
-      page: 1,
-      perPage: PROVIDER_PER_PAGE,
-    },
+    data: { keywords: KEYWORD_QUERY, sources: [...KEYWORD_SOURCES], cursor },
   })
   expect(response.ok(), `status ${response.status()}: ${await response.text()}`).toBe(true)
-  const body = await response.json() as {
-    builders: Array<{ id: string; source: string }>
-    sources: Array<{ source: string; health: string; resultCount: number; durationMs: number }>
-    degraded: boolean
-  }
+  return await response.json() as KeywordResponse
+}
 
+test('keyword search returns a stable fused ranking across two sources', async () => {
+  /*
+   * Exactly two pages: 60 fused rows from one provider fan-out, sliced at `TABLE_PAGE_SIZE`.
+   *
+   * The second page's cursor points at provider page *two* and is deliberately not followed —
+   * beyond it lie provider pages this spec has not seeded, which would leave the cache and reach
+   * the live internet.
+   */
+  const first = await keywordPage(null)
+  expect(first.builders).toHaveLength(50)
+  expect(first.nextCursor).not.toBeNull()
+  expect(first.total, 'a federation cannot count without exhausting every upstream').toBeNull()
+  expect(first.consistency).toBe('provider-best-effort')
+
+  const second = await keywordPage(first.nextCursor)
+  expect(second.builders).toHaveLength(10)
+
+  const builders = [...first.builders, ...second.builders]
   const observed: RankingFixture['keyword'] = {
     query: KEYWORD_QUERY,
     sources: [...KEYWORD_SOURCES],
-    orderedIds: body.builders.map((builder) => builder.id),
+    orderedIds: builders.map((builder) => builder.id),
     // `durationMs` is dropped rather than zeroed — see the file header.
-    sourceHealth: body.sources
+    sourceHealth: first.sources
       .map(({ source, health, resultCount }) => ({ source, health, resultCount }))
       .sort((a, b) => a.source.localeCompare(b.source)),
-    degraded: body.degraded,
+    degraded: first.degraded,
   }
 
-  // The seed is two sources of 30. A response holding all 60 is the point of the record: it is the
-  // shape plan 11 has to bound, and a fixture taken from a response that was already small would
-  // prove nothing about the bounding.
+  // The seed is two sources of 30, and the two slices are that fan-out in its original order.
   expect(observed.orderedIds).toHaveLength(2 * PROVIDER_PER_PAGE)
   expect(new Set(observed.orderedIds).size, 'ids must be unique').toBe(observed.orderedIds.length)
   expect(
-    new Set(body.builders.slice(0, 10).map((builder) => builder.source)).size,
+    new Set(builders.slice(0, 10).map((builder) => builder.source)).size,
     'the top of the ranking must interleave both sources, or the fixture proves nothing about fusion',
   ).toBe(2)
 
@@ -331,18 +348,39 @@ test('keyword search returns a stable fused ranking across two sources', async (
     finishRecording()
     return
   }
+  // The whole point of the fixture: the ordering recorded from the unbounded endpoint, reproduced
+  // by the bounded one.
   expect(observed).toEqual(readFixture().keyword)
+})
+
+test('a keyword cursor is refused once the query changes', async () => {
+  const first = await keywordPage(null)
+  const response = await harness.owner.api!.post('/api/search/builders', {
+    data: { keywords: 'a different query entirely', sources: [...KEYWORD_SOURCES], cursor: first.nextCursor },
+  })
+  expect(response.status()).toBe(400)
+  expect((await response.json()).error).toMatch(/query or filter mismatch/)
 })
 
 test('semantic search returns a stable distance ranking @requires-embeddings', async () => {
   const response = await harness.owner.api!.post('/api/search/semantic', {
-    data: { query: SEMANTIC_QUERY, perPage: PROVIDER_PER_PAGE },
+    data: { query: SEMANTIC_QUERY },
   })
   expect(response.ok(), `status ${response.status()}: ${await response.text()}`).toBe(true)
   const body = await response.json() as {
     mode: string
     builders: Array<{ source: string; sourceId: string }>
+    nextCursor: string | null
+    total: number | null
+    consistency: string
   }
+
+  // Twelve above-threshold rows fit inside one `TABLE_PAGE_SIZE` page, so the walk ends here.
+  expect(body.nextCursor).toBeNull()
+  expect(body.total).toBeNull()
+  // A keyset over a total order, but an approximate candidate set — neither `exact` nor a third
+  // party's best effort. See `PageConsistency`.
+  expect(body.consistency).toBe('approximate')
 
   const observed: RankingFixture['semantic'] = {
     query: SEMANTIC_QUERY,

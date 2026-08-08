@@ -76,7 +76,7 @@ function payloadOf(token: string): Record<string, unknown> {
 
 describe('search continuations', () => {
   it('round-trips the provider state it minted', () => {
-    expect(verify(mint())).toEqual({ kind: 'provider', providerPage: 1, served: 50 })
+    expect(verify(mint())).toEqual({ mode: 'keyword', state: { kind: 'provider', providerPage: 1, served: 50 } })
   })
 
   it('round-trips the semantic state it minted', () => {
@@ -85,10 +85,8 @@ describe('search continuations', () => {
       state: { kind: 'semantic', distance: 0.1834, source: 'github', sourceId: 'octocat' },
     })
     expect(verify(token, { mode: 'semantic' })).toEqual({
-      kind: 'semantic',
-      distance: 0.1834,
-      source: 'github',
-      sourceId: 'octocat',
+      mode: 'semantic',
+      state: { kind: 'semantic', distance: 0.1834, source: 'github', sourceId: 'octocat' },
     })
   })
 
@@ -102,7 +100,7 @@ describe('search continuations', () => {
   it('round-trips a snapshot holding every implemented connector', () => {
     const sources = [...IMPLEMENTED_SEARCH_CONNECTORS]
     const token = mint({ sources })
-    expect(verify(token, { sources })).toEqual({ kind: 'provider', providerPage: 1, served: 50 })
+    expect(verify(token, { sources }).state).toEqual({ kind: 'provider', providerPage: 1, served: 50 })
   })
 
   it('accepts a source snapshot in any order', () => {
@@ -179,6 +177,18 @@ describe('search continuations', () => {
 
   it('refuses a mode it was not minted for', () => {
     expect(() => verify(mint({ mode: 'keyword' }), { mode: 'semantic' })).toThrow(/mode mismatch/)
+  })
+
+  /**
+   * The semantic endpoint mints two modes and has to resume either. It says so by naming both, and
+   * the answer tells it which one it got — so the *token* decides which leg runs, not the client.
+   */
+  it('accepts either mode an endpoint declares, and reports which one it was', () => {
+    const accepted = ['semantic', 'hybrid'] as const
+    expect(verify(mint({ mode: 'hybrid' }), { mode: accepted }).mode).toBe('hybrid')
+    expect(verify(mint({ mode: 'semantic' }), { mode: accepted }).mode).toBe('semantic')
+    // Still a real check — the keyword endpoint's tokens are in neither list.
+    expect(() => verify(mint({ mode: 'keyword' }), { mode: accepted })).toThrow(/mode mismatch/)
   })
 
   /**

@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
-import { searchBuilders } from '~/lib/search'
+import { pageBuilderSearch } from '~/lib/search'
+import { SearchContinuationError, SEARCH_CONTINUATION_MAX_LENGTH } from '~/lib/search-continuation'
 import { semanticSearch } from '~/lib/semantic/semantic-search'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { getTask } from '~/shared/lib/ai/tasks'
@@ -17,8 +18,15 @@ const SemanticSearchBody = z.object({
   sources: z.array(z.string()).optional(),
   language: z.string().optional(),
   country: z.string().optional(),
-  page: z.number().int().positive().optional(),
-  perPage: z.number().int().positive().max(50).optional(),
+  /**
+   * The previous page's `nextCursor`. `page`/`perPage` were here and are gone (plan 11): a page
+   * number over an approximate vector index repeats and drops rows whenever the corpus changes,
+   * and the write-through indexer changes it on every federated search.
+   *
+   * Length-capped here as well as inside `verifySearchContinuation`, so an oversized token is a
+   * schema error rather than work the server does before refusing.
+   */
+  cursor: z.string().max(SEARCH_CONTINUATION_MAX_LENGTH).nullish(),
 })
 
 /**
@@ -66,44 +74,60 @@ export const Route = createFileRoute('/api/search/semantic')({
             : null
           const translatedInput = translated?.success ? translated.data : undefined
 
-          const perPage = parsed.data.perPage ?? 30
-          const page = parsed.data.page ?? 1
+          const cursor = parsed.data.cursor ?? null
           let builders: Array<{ source: string; sourceId: string }>
           let mode: 'semantic' | 'hybrid' | 'keyword-fallback'
           let translatedOut = translatedInput
-          let hasMore: boolean
+          let nextCursor: string | null
+          let consistency: 'approximate' | 'provider-best-effort'
 
           try {
-            // `sources` and `page` were accepted by this schema and then dropped on the floor until
-            // plan 43 Phase 2 — the endpoint advertised a filter and a pager it did not honor.
+            // `sources` and the pager were accepted by this schema and then dropped on the floor
+            // until plan 43 Phase 2 — the endpoint advertised a filter and a pager it did not honor.
             const outcome = await semanticSearch({
               query: parsed.data.query,
               translated: translatedInput,
               sources: parsed.data.sources,
               language: parsed.data.language,
               country: parsed.data.country,
-              page,
-              perPage,
+              cursor,
               principal,
               entitlement,
             })
             builders = outcome.results
             mode = outcome.mode
             translatedOut = outcome.translated ?? translatedInput
-            hasMore = outcome.hasMore
+            nextCursor = outcome.nextCursor
+            consistency = outcome.consistency === 'approximate' ? 'approximate' : 'provider-best-effort'
           } catch (error) {
+            /*
+             * A refused continuation is the client's problem, not a reason to degrade.
+             *
+             * Without this branch the catch-all below would swallow it and answer 200 with
+             * `keyword-fallback` results — telling the user the AI had failed when in fact their
+             * cursor was stale, and giving them no signal to drop it. Checked before the log, so a
+             * stale cursor does not read as a semantic-search outage in the logs either.
+             */
+            if (error instanceof SearchContinuationError) {
+              return Response.json({ error: error.message }, { status: error.status })
+            }
             log.error('semantic_search_route_error', { error: error instanceof Error ? error.message : String(error) })
-            const fallback = await searchBuilders({
+            const fallback = await pageBuilderSearch({
               keywords: parsed.data.query.split(/\s+/).filter(Boolean),
               sources: parsed.data.sources,
               language: parsed.data.language,
               country: parsed.data.country,
-              page,
-              perPage,
+              scope: principal.organizationId,
+              mode: 'keyword-fallback',
+              // Not `cursor`: the cursor that reached this branch belongs to a mode that is no
+              // longer running. Restarting at page one is the honest answer to "the AI just broke",
+              // and `keyword-fallback` in the response is what tells the client to drop what it holds.
+              cursor: null,
             })
-            builders = fallback
+            builders = fallback.builders
             mode = 'keyword-fallback'
-            hasMore = fallback.length >= perPage
+            nextCursor = fallback.nextCursor
+            consistency = 'provider-best-effort'
           }
 
           let trackedIds = new Map<string, string>()
@@ -127,9 +151,10 @@ export const Route = createFileRoute('/api/search/semantic')({
             builders: annotated,
             mode,
             translated: translatedOut,
-            page,
-            perPage,
-            hasMore,
+            nextCursor,
+            /** Never a number — see `SemanticSearchOutcome.total`. */
+            total: null,
+            consistency,
           })
         } catch (error) {
           if (error instanceof TenantAuthorizationError) {

@@ -6,7 +6,15 @@
 // (src/routes/api/search/semantic.ts), which falls back to plain keyword
 // search with `mode: 'keyword-fallback'`.
 import { createHash } from 'node:crypto'
-import { searchBuilders, type ScoredBuilder } from '~/lib/search'
+import { DEFAULT_SEARCH_SOURCES, pageBuilderSearch, resolveContactableSources, type ScoredBuilder } from '~/lib/search'
+import {
+  createSearchContinuation,
+  queryVectorHash,
+  searchFingerprint,
+  verifySearchContinuation,
+} from '~/lib/search-continuation'
+import { TABLE_PAGE_SIZE } from '~/shared/lib/table/constants'
+import type { PageConsistency } from '~/shared/lib/table/types'
 import type { PlanTier } from '~/shared/lib/billing-shared'
 import { checkAndConsumeBudget } from '~/shared/lib/ai/budget'
 import { embedTexts } from '~/shared/lib/ai/embeddings'
@@ -75,9 +83,8 @@ export interface SemanticSearchOptions {
   entityKinds?: readonly ComponentKind[]
   language?: string
   country?: string
-  /** 1-based, matching `searchBuilders`. */
-  page?: number
-  perPage?: number
+  /** The previous page's `nextCursor`, or null/absent for page one. */
+  cursor?: string | null
   principal: Pick<TenantPrincipal, 'organizationId' | 'userId'>
   entitlement: Pick<EntitlementPolicy, 'tier'>
 }
@@ -86,14 +93,18 @@ export interface SemanticSearchOutcome {
   results: (SemanticBuilderResult | ScoredBuilder)[]
   mode: 'semantic' | 'hybrid'
   translated?: QueryTranslation
-  page: number
+  /** Opaque, signed, and `null` when there is no further page. */
+  nextCursor: string | null
   /**
-   * Whether a further page exists. On the `semantic` path this is measured by the repository's
-   * over-fetch. On the `hybrid` path it reflects the federated leg, which cannot know its own total
-   * — so it reports "the page came back full", the strongest honest claim available from a
-   * federation of paged third-party APIs.
+   * Always `null`.
+   *
+   * The local leg *could* be counted, but not cheaply: the threshold is a cut on a value derived
+   * from the query vector, so counting means computing a distance for every embedded row. The
+   * hybrid leg cannot be counted at any price. One honest answer for both beats a number that means
+   * something different depending on which leg produced it.
    */
-  hasMore: boolean
+  total: null
+  consistency: PageConsistency
 }
 
 /** Redis-cached query embedding — 1 embed call per unique query per 24h. Throws (caught by the route, which degrades to keyword search) when the daily embed budget is exhausted. */
@@ -175,8 +186,7 @@ function matchesFilter(value: string | undefined, filter: string | undefined): b
 }
 
 export async function semanticSearch(opts: SemanticSearchOptions): Promise<SemanticSearchOutcome> {
-  const perPage = opts.perPage ?? 30
-  const page = opts.page ?? 1
+  const limit = TABLE_PAGE_SIZE
 
   // Cheap once per process, and it turns "vector search silently matches nothing" into a loud
   // error. Awaited before the first vector round trip on purpose.
@@ -188,14 +198,67 @@ export async function semanticSearch(opts: SemanticSearchOptions): Promise<Seman
   // already has — an explicit `sources`, or a translation the client did. A translation computed
   // later (in the degradation branch below) can only constrain the federated leg.
   const localSources = opts.sources ?? opts.translated?.sources
+  const entityKinds = opts.entityKinds ?? DEFAULT_SEMANTIC_ENTITY_KINDS
+
+  /*
+   * One fingerprint for both legs of this endpoint, bound to the raw query and to the query vector
+   * rather than to the translated keywords. See `KeywordSearchPageOptions.queryFingerprint`: the
+   * translation is derived from these inputs, so binding it would make a token fragile against its
+   * own cache while proving nothing extra.
+   */
+  const fingerprint = searchFingerprint({
+    keywords: [opts.query],
+    requestedSources: localSources,
+    language: opts.language,
+    country: opts.country,
+    entityKinds,
+    vectorHash: queryVectorHash(queryVector),
+  })
+  const scope = opts.principal.organizationId
+
+  /*
+   * The register snapshot is resolved even for a purely local page.
+   *
+   * The local index is filtered by the *requested* sources and does not consult the register at all
+   * — a gap this plan does not close (`plans/phase-3/11-migrate-search` non-goals: same behaviour,
+   * same permissions). Binding the snapshot anyway means a source switched off mid-session restarts
+   * the walk on both legs rather than only the federated one, which is the cheaper end of being
+   * wrong.
+   */
+  const { contacted } = await resolveContactableSources(localSources ?? [...DEFAULT_SEARCH_SOURCES])
+  const expectation = {
+    mode: ['semantic', 'hybrid'] as const,
+    query: fingerprint,
+    scope,
+    sources: contacted,
+  }
+
+  const resumed = opts.cursor ? verifySearchContinuation(opts.cursor, expectation) : null
+
+  /*
+   * A provider continuation means the previous page had already degraded, so the local leg is
+   * skipped entirely rather than re-run.
+   *
+   * Re-running it would re-prepend the same handful of local matches to every subsequent page —
+   * they were all served on page one, since there were fewer than `SEMANTIC_MIN_LOCAL_MATCHES` of
+   * them by definition. That is the duplicate this branch exists to prevent.
+   */
+  if (resumed?.state.kind === 'provider') {
+    return federatedPage(opts, { fingerprint, scope, cursor: opts.cursor!, translated: opts.translated })
+  }
+
+  const after = resumed?.state.kind === 'semantic'
+    ? { distance: resumed.state.distance, source: resumed.state.source, sourceId: resumed.state.sourceId }
+    : null
+
   // Over-fetch: `SEMANTIC_SIMILARITY_THRESHOLD` is a relevance cut on a value derived from the
   // vector, so it cannot be pushed into SQL alongside the hard filters. Asking for a wider window
   // means the threshold has room to reject without starving the page.
-  const window = Math.max(perPage, SEMANTIC_MIN_LOCAL_MATCHES) * 2
+  const window = Math.max(limit, SEMANTIC_MIN_LOCAL_MATCHES) * 2
   const { matches, hasMore: moreRowsExist } = await searchBuilderEmbeddings(
     queryVector,
-    { limit: window, offset: (page - 1) * perPage },
-    { sources: localSources, entityKinds: opts.entityKinds ?? DEFAULT_SEMANTIC_ENTITY_KINDS },
+    { limit: window, after },
+    { sources: localSources, entityKinds },
   )
 
   const kept = matches
@@ -212,48 +275,106 @@ export async function semanticSearch(opts: SemanticSearchOptions): Promise<Seman
     ...m.profile,
   }))
 
-  if (localResults.length >= SEMANTIC_MIN_LOCAL_MATCHES) {
+  /*
+   * Enough local matches, *or* this is not page one.
+   *
+   * The second half matters: `SEMANTIC_MIN_LOCAL_MATCHES` asks "did the vector index have enough to
+   * say", which is a question about the query, not about page four. Without it, walking to the tail
+   * of a genuinely good semantic result set would degrade to the federation the moment the last
+   * page came back short — and then merge federated rows in behind a `hybrid` label the user never
+   * saw a reason for.
+   */
+  if (localResults.length >= SEMANTIC_MIN_LOCAL_MATCHES || after !== null) {
+    const page = localResults.slice(0, limit)
+    const last = kept[page.length - 1]
+    /*
+     * `matches` is ordered by ascending distance, so similarity descends: once one row falls under
+     * the threshold, every row after it does too. A window that produced a rejected row has
+     * therefore reached the end of the above-threshold set, whatever the repository's over-fetch
+     * says about rows beyond it.
+     */
+    const thresholdReached = matches.length > kept.length
+    const hasMore = localResults.length > limit || (moreRowsExist && !thresholdReached)
     return {
-      results: localResults.slice(0, perPage),
+      results: page,
       mode: 'semantic',
-      page,
-      // Either the window itself held more than one page, or the repository saw a row beyond it.
-      hasMore: localResults.length > perPage || moreRowsExist,
+      nextCursor: hasMore && last
+        ? createSearchContinuation({
+          mode: 'semantic',
+          query: fingerprint,
+          scope,
+          sources: contacted,
+          state: { kind: 'semantic', distance: last.distance, source: last.source, sourceId: last.sourceId },
+        })
+        : null,
+      total: null,
+      consistency: 'approximate',
     }
   }
 
-  // Degradation: not enough local matches — translate + run the existing
-  // federated search, then merge (local-first, deduped by source:sourceId).
-  const translated = opts.translated ?? (await translateQueryServerSide(opts.query, opts.principal, opts.entitlement) ?? undefined)
+  // Degradation: not enough local matches — translate + run the existing federated search, then
+  // merge (local-first, deduped by source:sourceId). Only ever page one, by the branch above.
+  return federatedPage(opts, { fingerprint, scope, cursor: null, translated: opts.translated, localResults })
+}
+
+interface FederatedLegContext {
+  fingerprint: string
+  scope: string
+  cursor: string | null
+  translated?: QueryTranslation
+  /** Local matches to place ahead of the federated ones. Page one only. */
+  localResults?: SemanticBuilderResult[]
+}
+
+/**
+ * The hybrid leg: local matches first, then a bounded federated page filling the rest.
+ *
+ * Split out because it is reached two ways — page one degrading, and every page after it resuming a
+ * provider continuation — and the two must agree on the fingerprint, the scope and the mode or the
+ * second would reject the first's token.
+ */
+async function federatedPage(
+  opts: SemanticSearchOptions,
+  context: FederatedLegContext,
+): Promise<SemanticSearchOutcome> {
+  const localResults = context.localResults ?? []
+  const translated = context.translated
+    ?? (await translateQueryServerSide(opts.query, opts.principal, opts.entitlement) ?? undefined)
   const keywords = translated?.keywords ?? opts.query.split(/\s+/).filter(Boolean)
 
   // An explicit caller filter outranks the model's guess: the model may widen `sources` to
   // something the caller deliberately excluded, and honoring that would make the federated leg
   // return exactly the sources the local leg just filtered out.
   const federatedSources = opts.sources ? [...opts.sources] : translated?.sources
-  const federated = await searchBuilders({
+
+  const page = await pageBuilderSearch({
     keywords,
     sources: federatedSources,
     language: translated?.language ?? opts.language,
     country: translated?.country ?? opts.country,
-    page,
-    perPage,
+    scope: context.scope,
+    mode: 'hybrid',
+    cursor: context.cursor,
+    // Whatever the local leg already spent of this page. On a resumed page that is nothing.
+    limit: Math.max(1, TABLE_PAGE_SIZE - localResults.length),
+    queryFingerprint: context.fingerprint,
   })
 
-  const seen = new Set(localResults.map((r) => `${r.source}:${r.sourceId}`))
-  const merged = [...localResults, ...federated.filter((f) => !seen.has(`${f.source}:${f.sourceId}`))]
+  const seen = new Set(localResults.map((result) => `${result.source}:${result.sourceId}`))
+  const federated = page.builders.filter((builder) => !seen.has(`${builder.source}:${builder.sourceId}`))
 
   // Write-through the newly discovered federated results — fire-and-forget,
   // same as the search/track routes (index-writer.ts).
-  upsertEmbeddingStubs(federated).catch((error) =>
+  upsertEmbeddingStubs(page.builders).catch((error) =>
     log.error('embedding_writethrough_error', { error: error instanceof Error ? error.message : String(error) }),
   )
 
   return {
-    results: merged.slice(0, perPage),
+    results: [...localResults, ...federated],
     mode: 'hybrid',
     translated,
-    page,
-    hasMore: merged.length > perPage || federated.length >= perPage,
+    nextCursor: page.nextCursor,
+    total: null,
+    consistency: 'provider-best-effort',
   }
 }

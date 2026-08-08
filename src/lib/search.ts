@@ -453,10 +453,33 @@ export interface KeywordSearchPageOptions {
    * tenant-scoped rows, because a continuation that ignores scope is a habit, not a special case.
    */
   scope: string
-  /** Which mode's continuation this is. The semantic endpoint's fallback mints `keyword-fallback`. */
-  mode: Extract<SearchContinuationMode, 'keyword' | 'keyword-fallback'>
+  /**
+   * Which mode's continuation this is. The semantic endpoint reaches the same federation two ways:
+   * `hybrid` when the local vector leg found some matches but too few, `keyword-fallback` when it
+   * could not run at all.
+   */
+  mode: Extract<SearchContinuationMode, 'keyword' | 'keyword-fallback' | 'hybrid'>
   /** The previous page's `nextCursor`, or null/absent for page one. */
   cursor?: string | null
+  /**
+   * How many rows this page may hold, clamped to `TABLE_PAGE_SIZE`.
+   *
+   * Below the clamp only for the hybrid leg, which has already spent part of the page on local
+   * vector matches and asks the federation for the remainder. The continuation's `served` counter
+   * then advances by what the federation actually contributed, so the next page resumes where this
+   * one stopped rather than where a full-size page would have.
+   */
+  limit?: number
+  /**
+   * Use this fingerprint instead of computing one from `keywords` and the filters.
+   *
+   * Only the hybrid leg passes it. Its keywords are *translated* ones — the output of an AI task —
+   * so a fingerprint over them would bind the token to a derived value that a cache miss can
+   * change, invalidating a perfectly good continuation for a query the user never touched. The
+   * semantic endpoint binds the raw query and the query vector instead, which is both stabler and
+   * strictly stronger: the translation is a function of them.
+   */
+  queryFingerprint?: string
 }
 
 export interface KeywordSearchPage {
@@ -493,7 +516,7 @@ export async function pageBuilderSearch(opts: KeywordSearchPageOptions): Promise
   const requested = opts.sources ?? [...DEFAULT_SEARCH_SOURCES]
   const { contacted, notContacted } = await resolveContactableSources(requested)
 
-  const fingerprint = searchFingerprint({
+  const fingerprint = opts.queryFingerprint ?? searchFingerprint({
     keywords: opts.keywords,
     requestedSources: requested,
     language: opts.language,
@@ -510,8 +533,8 @@ export async function pageBuilderSearch(opts: KeywordSearchPageOptions): Promise
       scope: opts.scope,
       sources: contacted,
     })
-    if (resumed.kind !== 'provider') throw new SearchContinuationError('not a federated continuation')
-    state = resumed
+    if (resumed.state.kind !== 'provider') throw new SearchContinuationError('not a federated continuation')
+    state = resumed.state
   }
 
   if (contacted.length === 0) {
@@ -529,7 +552,9 @@ export async function pageBuilderSearch(opts: KeywordSearchPageOptions): Promise
     perPage: SEARCH_PROVIDER_PAGE_SIZE,
   })
 
-  const slice = builders.slice(state.served, state.served + TABLE_PAGE_SIZE)
+  // Clamped, not honoured: page size is a property of what the server is willing to serve.
+  const limit = Math.min(Math.max(1, opts.limit ?? TABLE_PAGE_SIZE), TABLE_PAGE_SIZE)
+  const slice = builders.slice(state.served, state.served + limit)
   const consumed = state.served + slice.length
 
   let nextState: ProviderContinuation | null = null

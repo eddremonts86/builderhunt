@@ -129,12 +129,28 @@ interface SearchContinuationPayload {
 
 /** What the request being served right now is asking for. */
 export interface SearchContinuationExpectation {
-  mode: SearchContinuationMode
+  /**
+   * The mode, or the modes this endpoint is willing to resume.
+   *
+   * A list, because `/api/search/semantic` mints two: a `semantic` token when the local vector leg
+   * answered, and a `hybrid` one when it degraded and the federation filled the page. Which of the
+   * two a request is resuming is decided by the token's own signed state kind, not by anything the
+   * client says — so the endpoint names both and dispatches on what comes back. It is still a real
+   * check: a `keyword` or `keyword-fallback` token is in neither endpoint's list.
+   */
+  mode: SearchContinuationMode | readonly SearchContinuationMode[]
   /** `searchFingerprint` computed from the current request. */
   query: string
   scope: string
   /** The enabled-source snapshot resolved for the current request, in any order. */
   sources: readonly string[]
+}
+
+/** What a verified continuation says. */
+export interface VerifiedSearchContinuation {
+  /** The mode it was minted for — one of the modes the caller said it would accept. */
+  mode: SearchContinuationMode
+  state: SearchContinuationState
 }
 
 /**
@@ -286,7 +302,7 @@ export function verifySearchContinuation(
   token: string,
   expected: SearchContinuationExpectation,
   options: { secret?: string; now?: number } = {},
-): SearchContinuationState {
+): VerifiedSearchContinuation {
   if (token.length > SEARCH_CONTINUATION_MAX_LENGTH) throw new SearchContinuationError('token too large')
 
   const [encoded, signature, extra] = token.split('.')
@@ -318,7 +334,10 @@ export function verifySearchContinuation(
   if (typeof payload.x !== 'number' || !Number.isFinite(payload.x)) throw new SearchContinuationError('missing expiry')
 
   if ((options.now ?? Date.now()) > payload.x) throw new SearchContinuationError('expired')
-  if (payload.m !== expected.mode) throw new SearchContinuationError('mode mismatch')
+  const acceptedModes = Array.isArray(expected.mode) ? expected.mode : [expected.mode]
+  if (!acceptedModes.includes(payload.m as SearchContinuationMode)) {
+    throw new SearchContinuationError('mode mismatch')
+  }
   if (payload.q !== expected.query) throw new SearchContinuationError('query or filter mismatch')
   if (payload.a !== expected.scope) throw new SearchContinuationError('access scope mismatch')
 
@@ -328,5 +347,5 @@ export function verifySearchContinuation(
     throw new SearchContinuationError('source snapshot mismatch')
   }
 
-  return parseState(payload.c)
+  return { mode: payload.m as SearchContinuationMode, state: parseState(payload.c) }
 }
