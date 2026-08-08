@@ -214,3 +214,50 @@ export function registerTableCapability(capability: TableCapability): TableCapab
   TABLE_CAPABILITIES[capability.table] = capability
   return capability
 }
+
+/**
+ * A collection that reaches a table surface without reaching SQL.
+ *
+ * Search is the case, and it is a different shape rather than a `TableCapability` with fields left
+ * blank. Everything a `TableCapability` says is about columns: which of *this table's* columns may
+ * reach an `ORDER BY`, a `WHERE`, a `GROUP BY`. A federation of thirteen third-party APIs has no
+ * columns, no index for plan 04's guard to check, and no injection surface for the allowlist to
+ * close — the query never becomes SQL. `tiebreaker: PgColumn` is required for a reason and there is
+ * no honest value for it here.
+ *
+ * So this registry answers the question plan 13's surface gate actually asks — "is this grid's
+ * backend declared somewhere, and does it say what it can serve?" — without pretending the two
+ * kinds of backend are one kind.
+ *
+ * (`TableCapability.nonSql` stays for what it was added for: a file-backed collection that still
+ * has stable row identity and could carry a real tiebreaker. A federation has neither.)
+ */
+export interface ProviderCapability {
+  /** Stable id, in the same namespace as `TableCapability.table` — the two may not collide. */
+  table: string
+  /** Sort ids the backend can actually serve. Empty means "relevance, and nothing a client picks". */
+  sorts: readonly string[]
+  /** Filter dimensions the backend honours. Search's live in its own panel, not the table toolbar. */
+  filters: readonly string[]
+  /** Whether the backend can report a total. */
+  countable: boolean
+  /** Why no column allowlist applies. Non-empty — an exemption without a reason is a gap. */
+  reason: string
+}
+
+export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {}
+
+export function registerProviderCapability(capability: ProviderCapability): ProviderCapability {
+  if (capability.reason.trim().length === 0) {
+    throw new TableCapabilityError(capability.table, 'a provider capability must say why no column allowlist applies')
+  }
+  if (TABLE_CAPABILITIES[capability.table]) {
+    throw new TableCapabilityError(capability.table, 'already registered as a SQL table capability')
+  }
+  const existing = PROVIDER_CAPABILITIES[capability.table]
+  if (existing && existing !== capability) {
+    throw new TableCapabilityError(capability.table, 'already registered by another module')
+  }
+  PROVIDER_CAPABILITIES[capability.table] = capability
+  return Object.freeze(capability)
+}

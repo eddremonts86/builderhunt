@@ -11,8 +11,11 @@ import { ai } from '~/shared/lib/ai/client'
 import { AIUnavailableError } from '~/shared/lib/ai/errors'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
 import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
+import { DataTable, VIRTUALIZATION_THRESHOLD } from '~/shared/components/table/DataTable'
 import { resolveSafeBuilderFrom } from '~/shared/lib/safe-next'
 import { SOURCE_PRESENTATION } from '~/shared/lib/source-presentation'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import type { PageResult, TableQuery } from '~/shared/lib/table/types'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -62,8 +65,21 @@ function formatRelativeDate(ms: number): string {
 }
 
 type Source = Builder['source']
-type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
+
+/**
+ * One source's outcome, as `SourceStatus` in `src/lib/search.ts` reports it.
+ *
+ * `disabled` and `unconfigured` are operator states rather than failures, and they are named
+ * separately here for the same reason they are named separately there: folding them into "failed"
+ * would tell a user something is broken when an operator switched a source off on purpose.
+ */
+interface SourceStatusView {
+  source: string
+  health: 'ok' | 'failed' | 'timeout' | 'disabled' | 'unconfigured'
+  resultCount: number
+  detail?: string
+}
 
 /** All supported sources. Visible in the source-pills UI. */
 // `sourcehut` (drizzle/0143) and `hashnode` (drizzle/0144) are deliberately absent: both retired, so
@@ -121,6 +137,51 @@ const QUERY_STOPWORDS = new Set([
 ])
 
 /* -------------------------------------------------------------------------- */
+/*  Shell adapter                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One result, as the shell wants it: a `Record<string, unknown>` with a stable id.
+ *
+ * The builder is nested rather than spread so `id` cannot be shadowed by whatever a connector
+ * happens to call a field, and so the card keeps taking exactly the object it always took.
+ */
+interface SearchRow extends Record<string, unknown> {
+  id: string
+  builder: Builder
+}
+
+/**
+ * Height of one result row, in pixels.
+ *
+ * The shell's virtualizer measures nothing (see `DataTableProps.rowHeight`), so a card row has to
+ * declare a height, and the card is clamped to it: the bio is already `line-clamp-2` and the meta
+ * row is capped below. Fixed rather than measured is the trade plan 06 made deliberately —
+ * variable heights are its own plan — and a uniform card list is a defensible thing to look at,
+ * where a list that jumps at the hundredth row would not be.
+ */
+const SEARCH_ROW_HEIGHT = 176
+
+/**
+ * The query the shell's toolbar is handed.
+ *
+ * Frozen, because every control that would change it lives elsewhere on this page and re-runs the
+ * federation rather than re-viewing a set. Passing the page's real filter state here would put two
+ * controls on screen for one input.
+ */
+const EMPTY_TABLE_QUERY: TableQuery = Object.freeze({ search: '', filters: {}, sort: [], groupBy: null })
+const NO_TABLE_QUERY_CHANGE = () => {}
+
+/** What a source that did not answer gets said about it, when the server sent no `detail`. */
+const UNANSWERED_LABEL: Record<SourceStatusView['health'], string> = {
+  ok: 'answered',
+  failed: 'unavailable',
+  timeout: 'took too long to answer',
+  disabled: 'switched off by an operator',
+  unconfigured: 'not configured on this deployment',
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Page                                                                       */
 /* -------------------------------------------------------------------------- */
 export function SearchPage() {
@@ -131,8 +192,22 @@ export function SearchPage() {
   const [results, setResults] = React.useState<Builder[]>([])
   const [loading, setLoading] = React.useState(false)
   const [loadingMore, setLoadingMore] = React.useState(false)
-  const [page, setPage] = React.useState(1)
-  const [hasMore, setHasMore] = React.useState(true)
+  /**
+   * The server's opaque continuation, or `null` when there is no further page.
+   *
+   * `page`/`hasMore` were here and are gone (plan 11). A page number meant the client decided how
+   * deep to walk a federation, and `hasMore` came from a server flag that compared a cross-source
+   * total against a per-source ask and was therefore true almost always.
+   */
+  const [cursor, setCursor] = React.useState<string | null>(null)
+  /**
+   * Per-source health from the last response.
+   *
+   * `/api/search/builders` has reported this since connector isolation landed and this page has
+   * never read it, so a search where GitHub timed out looked exactly like a search where nobody
+   * matched. That is the one thing the status exists to distinguish.
+   */
+  const [sourceStatuses, setSourceStatuses] = React.useState<SourceStatusView[]>([])
   const sentinelRef = React.useRef<HTMLDivElement>(null)
   const [searched, setSearched] = React.useState(false)
   // Read ?q= from URL on mount and auto-run the search
@@ -168,7 +243,6 @@ export function SearchPage() {
     const valid = requested.filter((entry): entry is Source => (ALL_SOURCES as string[]).includes(entry))
     return new Set(valid.length > 0 ? valid : DEFAULT_ACTIVE_SOURCES)
   })
-  const [sortBy, setSortBy] = React.useState<SortBy>('score')
   const [activeTab, setActiveTab] = React.useState<ResultTab>('people')
   const [recent, setRecent] = React.useState<string[]>([])
   const [showSave, setShowSave] = React.useState(false)
@@ -382,9 +456,9 @@ export function SearchPage() {
     setShowSave(false)
     setSaveMsg(null)
     setError(null)
-    setPage(1)
-    setHasMore(true)
+    setCursor(null)
     setResultMode(null)
+    setSourceStatuses([])
     rememberSearch(q)
     try {
       const endpoint = semanticMode ? '/api/search/semantic' : '/api/search/builders'
@@ -399,8 +473,6 @@ export function SearchPage() {
           sources: Array.from(activeSources),
           country: location.trim() || undefined,
           language: language.trim() || undefined,
-          page: 1,
-          perPage: 30,
         }),
       })
       if (!res.ok) {
@@ -409,7 +481,9 @@ export function SearchPage() {
       }
       const data = await res.json()
       setResults(data.builders ?? [])
-      setHasMore(Boolean(data.hasMore) && (data.builders?.length ?? 0) > 0)
+      setCursor(data.nextCursor ?? null)
+      // Absent on the semantic endpoint, which contacts no connector on its local leg.
+      setSourceStatuses(Array.isArray(data.sources) ? data.sources : [])
       if (semanticMode && (data.mode === 'semantic' || data.mode === 'hybrid' || data.mode === 'keyword-fallback')) {
         setResultMode(data.mode)
       }
@@ -421,18 +495,25 @@ export function SearchPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed. Please try again.')
       setResults([])
-      setHasMore(false)
+      setCursor(null)
+      setSourceStatuses([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Infinite scroll: load next page when sentinel intersects viewport.
+  /**
+   * Load the next page, resuming from the server's continuation.
+   *
+   * The request repeats the query and the filters because the server re-derives the fingerprint
+   * from them and refuses the cursor if they no longer agree — which is what makes "changed the
+   * filters, kept scrolling" a clean 400 and a restart rather than a page silently spliced out of
+   * a different result set.
+   */
   const loadMore = React.useCallback(async () => {
-    if (loadingMore || !hasMore || loading || !searched) return
+    if (loadingMore || !cursor || loading || !searched) return
     setLoadingMore(true)
     try {
-      const next = page + 1
       const endpoint = semanticMode ? '/api/search/semantic' : '/api/search/builders'
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -443,41 +524,28 @@ export function SearchPage() {
           sources: Array.from(activeSources),
           country: location.trim() || undefined,
           language: language.trim() || undefined,
-          page: next,
-          perPage: 30,
+          cursor,
         }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       const newOnes: Builder[] = data.builders ?? []
-      // Dedupe by id (server should already dedup, but safety)
+      // Dedupe by id. The keyset legs cannot repeat a row; the federated one is
+      // `provider-best-effort` and an upstream that renumbers its pages between two requests can.
       setResults((prev) => {
         const seen = new Set(prev.map((b) => b.id))
         return [...prev, ...newOnes.filter((b) => !seen.has(b.id))]
       })
-      setPage(next)
-      setHasMore(Boolean(data.hasMore) && newOnes.length > 0)
+      setCursor(data.nextCursor ?? null)
     } catch {
-      setHasMore(false)
+      // Stop walking rather than retrying into the same failure. The rows already loaded stay on
+      // screen — losing them would punish the user for the last page's problem.
+      setCursor(null)
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, hasMore, loading, searched, page, query, activeSources, location, language, semanticMode])
+  }, [loadingMore, cursor, loading, searched, query, activeSources, location, language, semanticMode])
 
-  React.useEffect(() => {
-    const el = sentinelRef.current
-    if (!el) return
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) loadMore()
-        }
-      },
-      { rootMargin: '200px' },
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [loadMore])
 
   /* Split results by kind */
   const people = React.useMemo(() => results.filter((b) => b.kind === 'person'), [results])
@@ -520,19 +588,55 @@ export function SearchPage() {
     runSearch(nextQuery)
   }
 
-  /* Sort the active tab's results */
-  const sorted = React.useMemo(() => {
-    const list = activeTab === 'people' ? people : resources
-    const copy = [...list]
-    if (sortBy === 'recency') {
-      copy.sort((a, b) => (getLastSeenMs(b) ?? 0) - (getLastSeenMs(a) ?? 0))
-    } else if (sortBy === 'followers') {
-      copy.sort((a, b) => (b.followersCount ?? 0) - (a.followersCount ?? 0))
-    } else {
-      copy.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    }
-    return copy
-  }, [people, resources, sortBy, activeTab])
+  /**
+   * The active tab's results, in the order the server returned them.
+   *
+   * There was a `.sort()` here, driven by a "Best match / Most recent / Most followers" menu, and
+   * all three re-ordered the rows this browser happened to hold. That was never a sort of the
+   * result set: with up to `sources × 30` rows arriving per request and infinite scroll appending
+   * more, "most followers" meant "the most-followed of what has loaded so far" and changed meaning
+   * every time the user scrolled. Neither backend can sort globally — the federation would have to
+   * exhaust thirteen upstreams, and the vector leg's order *is* the relevance — so the menu is gone
+   * rather than reimplemented (`searchBuildersCapability.sorts` is empty and says why).
+   *
+   * The tab split stays: it partitions the loaded rows by kind, which is a different claim from
+   * ordering them, and the counts beside it say `loaded` for exactly that reason.
+   */
+  const visible = React.useMemo(
+    () => (activeTab === 'people' ? people : resources),
+    [people, resources, activeTab],
+  )
+
+  /** Sources that were requested and did not contribute — for whatever reason, each named. */
+  const unansweredSources = React.useMemo(
+    () => sourceStatuses.filter((status) => status.health !== 'ok'),
+    [sourceStatuses],
+  )
+
+  /**
+   * Infinite scroll, for as long as the grid scrolls with the page.
+   *
+   * Once the shell windows the rows it becomes its own `overflow-y: auto` box, the page stops
+   * scrolling, and this sentinel — which sits *below* that box — is permanently in view. Left
+   * observing, it would ask for every remaining page in a row. Above the threshold the shell's own
+   * container scroll takes over through `onLoadMore`, so the two never both drive it.
+   */
+  const gridIsWindowed = visible.length > VIRTUALIZATION_THRESHOLD
+  React.useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || gridIsWindowed) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) loadMore()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [loadMore, gridIsWindowed])
+
 
   /* Source toggle — individual clicks can't reduce to zero (that would
      silently break Search); "Clear all" below is the deliberate way to
@@ -605,6 +709,65 @@ export function SearchPage() {
     setResults((prev) => prev.map(patch))
     setFeatured((prev) => prev.map(patch))
   }, [])
+
+  /**
+   * Changing what is being searched discards what was found.
+   *
+   * Sources, country, language and the semantic toggle are all bound into the continuation's
+   * fingerprint or its source snapshot, so keeping the cursor across a change would earn a 400 on
+   * the next scroll. Worse than the 400 is the alternative: rows from the old query sitting above
+   * rows from the new one under a single heading, with nothing to say they answer different
+   * questions.
+   *
+   * The query *text* is not here on purpose — it changes on every keystroke, and clearing results
+   * as someone types would empty the page they are reading. `runSearch` resets on submit instead.
+   */
+  const searchInputsSignature = `${Array.from(activeSources).sort().join(',')}|${location.trim()}|${language.trim()}|${semanticMode}`
+  const lastSignature = React.useRef(searchInputsSignature)
+  React.useEffect(() => {
+    if (lastSignature.current === searchInputsSignature) return
+    lastSignature.current = searchInputsSignature
+    setResults([])
+    setCursor(null)
+    setResultMode(null)
+    setSourceStatuses([])
+    setSearched(false)
+  }, [searchInputsSignature])
+
+  /**
+   * The loaded rows as a `PageResult`.
+   *
+   * `total` is `null` and `nextCursor` is the server's own, so `aria-rowcount` announces -1 rather
+   * than the loaded count. That is the honest answer here and the reason `PageResult.total` became
+   * nullable: neither backend can count without exhausting itself.
+   */
+  const resultPage = React.useMemo<PageResult<SearchRow>>(() => ({
+    rows: visible.map((builder) => ({ id: `${builder.source}-${builder.id}`, builder })),
+    nextCursor: cursor,
+    total: null,
+    facets: {},
+    consistency: semanticMode && resultMode === 'semantic' ? 'approximate' : 'provider-best-effort',
+  }), [visible, cursor, semanticMode, resultMode])
+
+  /**
+   * One column, because the row *is* the card.
+   *
+   * `priority: 'primary'` so the stacked renderer keeps it below `md` rather than dropping it, and
+   * nothing else competes for the width.
+   */
+  const resultColumns = React.useMemo<ColumnDef<SearchRow>[]>(() => [{
+    id: 'result',
+    header: 'Result',
+    priority: 'primary',
+    cell: (row) => (
+      // `w-full`: the grid cell is a flex row, so a block child sizes to its content rather than
+      // stretching, and the card came out ragged and half-width.
+      <div className="w-full overflow-hidden" style={{ height: SEARCH_ROW_HEIGHT - 12 }}>
+        <BuilderResultCard builder={row.builder} query={query} onTracked={handleTracked} />
+      </div>
+    ),
+    value: (row) => row.builder.username,
+  }], [query, handleTracked])
 
   /* ---------------------------------------------------------------------- */
 
@@ -804,6 +967,7 @@ export function SearchPage() {
                   key={s}
                   type="button"
                   onClick={() => toggleSource(s)}
+                  data-testid={`search-source-${s}`}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 ${
                     active
                       ? 'bg-bh-accent-soft text-bh-accent border-bh-accent shadow-sm'
@@ -935,9 +1099,12 @@ export function SearchPage() {
         <div className="mb-4 pb-3 border-b border-bh-border">
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              {/* "N results" was here, and N was the loaded count. Neither backend can report a
+                  total — the federation would have to exhaust thirteen upstreams — so the number
+                  says what it actually is, and "so far" is dropped once the walk ends. */}
               <p className="text-sm text-bh-text-muted whitespace-nowrap">
                 <span className="font-semibold text-bh-text">{results.length}</span> result
-                {results.length === 1 ? '' : 's'}
+                {results.length === 1 ? '' : 's'}{cursor ? ' so far' : ''}
                 {displayKeywords.length === 0 && (
                   <>
                     {' '}matching <span className="font-medium text-bh-text">"{query}"</span>
@@ -966,7 +1133,9 @@ export function SearchPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <SortMenu value={sortBy} onChange={setSortBy} />
+              {/* The sort menu was here. It re-ordered the loaded prefix and called it a sort of
+                  the results; see the `visible` memo. Relevance is the only ordering either
+                  backend can serve, and it is not a choice. */}
               {searched && !showSave && (
                 <Button onClick={() => setShowSave(true)} variant="secondary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent">
                   <Bookmark className="w-4 h-4" /> Save search
@@ -1015,13 +1184,49 @@ export function SearchPage() {
         </div>
       )}
 
+      {/* Degraded source notice — shown whenever a source did not answer, with or without results.
+          Above the empty state on purpose: zero results from a search where GitHub timed out is not
+          evidence that nobody matched, and `NoResults`' "try a different query" advice is actively
+          misleading there. */}
+      {searched && !loading && !error && unansweredSources.length > 0 && (
+        <div
+          className="mb-4 rounded-xl border border-bh-warning/30 bg-bh-warning/10 px-4 py-3 text-sm text-bh-text"
+          role="status"
+          data-testid="search-degraded-notice"
+        >
+          <p className="font-medium">
+            {results.length === 0
+              ? 'No results — but not every source answered.'
+              : 'Some sources did not answer, so these results are partial.'}
+          </p>
+          <ul className="mt-1.5 space-y-0.5 text-xs text-bh-text-muted">
+            {unansweredSources.map((status) => (
+              <li key={status.source} data-testid={`search-source-status-${status.source}`}>
+                <span className="font-medium text-bh-text">{SOURCE_META[status.source as Source]?.label ?? status.source}</span>
+                {' — '}
+                {status.detail ?? UNANSWERED_LABEL[status.health]}
+              </li>
+            ))}
+          </ul>
+          <Button
+            onClick={() => runSearch(query)}
+            variant="secondary"
+            size="sm"
+            className="mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+            data-testid="search-degraded-retry"
+          >
+            Search again
+          </Button>
+        </div>
+      )}
+
       {/* No results */}
-      {searched && !loading && !error && results.length === 0 && (
+      {searched && !loading && !error && results.length === 0 && unansweredSources.length === 0 && (
         <NoResults query={query} onTryPopular={(q) => { setQuery(q); runSearch(q) }} />
       )}
 
       {/* Empty active tab (results exist but none in this kind) */}
-      {searched && !loading && !error && results.length > 0 && sorted.length === 0 && (
+      {searched && !loading && !error && results.length > 0 && visible.length === 0 && (
         <div className="card text-center py-12">
           <div className="inline-flex w-12 h-12 rounded-xl bg-bh-surface-2 border border-bh-border items-center justify-center mb-3">
             {activeTab === 'people' ? <Users className="w-6 h-6 text-bh-text-muted" /> : <BookMarked className="w-6 h-6 text-bh-text-muted" />}
@@ -1061,19 +1266,29 @@ export function SearchPage() {
       )}
 
       {/* Results list */}
-      {searched && !loading && !error && sorted.length > 0 && (
+      {searched && !loading && !error && visible.length > 0 && (
         <>
-          <ul className="space-y-3" role="list">
-            {sorted.map((builder) => (
-              <li key={`${builder.source}-${builder.id}`}>
-                <BuilderResultCard
-                  builder={builder}
-                  query={query}
-                  onTracked={handleTracked}
-                />
-              </li>
-            ))}
-          </ul>
+          <DataTable<SearchRow>
+            label={activeTab === 'people' ? 'Search results — people' : 'Search results — resources'}
+            columns={resultColumns}
+            page={resultPage}
+            query={EMPTY_TABLE_QUERY}
+            // The shell's toolbar controls nothing here: the query, the sources, the language and
+            // the country are this page's own inputs, and each of them re-runs the federation from
+            // page one rather than re-viewing a set already fetched. So the toolbar is fed a frozen
+            // query and a no-op, and the real controls stay where the user found them.
+            onQueryChange={NO_TABLE_QUERY_CHANGE}
+            searchable={false}
+            rowTestId={(row) => `search-result-${row.builder.id}`}
+            rowId={(row) => row.id}
+            rowHeight={SEARCH_ROW_HEIGHT}
+            maxHeight="70vh"
+            onLoadMore={cursor ? loadMore : undefined}
+            // One column called "Result": a column-visibility menu over it is meaningless and a
+            // header reading "RESULT" above a list of people reads as a mistake.
+            chrome="minimal"
+            className="border-0 bg-transparent"
+          />
 
           {/* Infinite scroll sentinel + status */}
           <div
@@ -1096,7 +1311,7 @@ export function SearchPage() {
           )}
 
           {/* Explicit Load more fallback (for users w/o IO) */}
-          {!loadingMore && hasMore && sorted.length >= 30 && (
+          {!loadingMore && cursor && (
             <div className="flex justify-center py-6">
               <Button
                 variant="secondary"
@@ -1111,14 +1326,17 @@ export function SearchPage() {
           )}
 
           {/* End of results */}
-          {!hasMore && (
+          {!cursor && (
             <div
               className="flex items-center justify-center gap-2 py-8 text-xs text-bh-text-dim"
               role="status"
               data-testid="end-of-results"
             >
               <span className="h-px w-8 bg-bh-border" aria-hidden="true" />
-              End of results · {results.length} total
+              {/* "N total" was here, over `results.length`, and it was only ever the loaded count —
+                  the endpoints cannot report a total at all. At the end of the walk the two do
+                  coincide, which is the one moment the old wording was accidentally right. */}
+              End of results · {results.length} loaded
               <span className="h-px w-8 bg-bh-border" aria-hidden="true" />
             </div>
           )}
@@ -1666,64 +1884,3 @@ function ResultTabButton({
   )
 }
 
-function SortMenu({ value, onChange }: { value: SortBy; onChange: (v: SortBy) => void }) {
-  const [open, setOpen] = React.useState(false)
-  const ref = React.useRef<HTMLDivElement>(null)
-
-  React.useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [])
-
-  const options: { value: SortBy; label: string; icon: typeof TrendingUp }[] = [
-    { value: 'score', label: 'Best match', icon: Sparkles },
-    { value: 'recency', label: 'Most recent', icon: Clock },
-    { value: 'followers', label: 'Most followers', icon: TrendingUp },
-  ]
-  const current = options.find((o) => o.value === value)!
-
-  return (
-    <div ref={ref} className="relative">
-      <Button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        variant="secondary"
-        size="sm"
-        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <current.icon className="w-3.5 h-3.5" aria-hidden="true" />
-        {current.label}
-        <ChevronDown className="w-3 h-3" aria-hidden="true" />
-      </Button>
-      {open && (
-        <ul
-          role="menu"
-          className="absolute right-0 mt-1 w-48 card p-1 z-10 animate-fade-in"
-        >
-          {options.map((opt) => (
-            <li key={opt.value} role="none">
-              <button
-                role="menuitemradio"
-                aria-checked={value === opt.value}
-                onClick={() => { onChange(opt.value); setOpen(false) }}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 ${
-                  value === opt.value
-                    ? 'bg-bh-accent-soft text-bh-accent font-semibold'
-                    : 'text-bh-text hover:bg-bh-surface-2'
-                }`}
-              >
-                <opt.icon className="w-3.5 h-3.5" aria-hidden="true" />
-                {opt.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}

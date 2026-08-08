@@ -18,5 +18,9 @@ export { billingRefundsCapability, BILLING_REFUND_FILTER_LABELS } from './billin
 export { organizationInvitationsCapability, ORGANIZATION_INVITATION_FILTER_LABELS, INVITABLE_ROLES } from './organization-invitations'
 export { organizationMembersCapability, ORGANIZATION_MEMBER_FILTER_LABELS, ORGANIZATION_ROLES } from './organization-members'
 export { platformUsersCapability } from './platform-users'
+// Provider-backed, not SQL — they land in `PROVIDER_CAPABILITIES`, which the index guard skips and
+// plan 13's surface gate reads. Exported here for the same reason as the rest: so the registry is
+// complete without depending on which surface happened to be imported.
+export { searchBuildersCapability, searchSemanticCapability } from './search-builders'
 export { sprintResultsCapability, SPRINT_RESULT_FILTER_LABELS } from './sprint-results'
 export { sprintsCapability, SPRINT_FILTER_LABELS, SPRINT_STATUSES } from './sprints'

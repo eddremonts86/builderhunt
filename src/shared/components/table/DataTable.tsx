@@ -131,6 +131,18 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
   /** Row height. The table's own concept, not the dashboard's bento/sections preference. */
   density?: TableDensity
   /**
+   * Row height in pixels, overriding `density`.
+   *
+   * The virtualizer measures nothing — `useTableVirtual` says so, and variable heights are
+   * deliberately outside plan 06 — so a surface whose row is a card rather than a line of text has
+   * to declare how tall that row is. Search is the case: its row *is* a result card.
+   *
+   * A surface that sets this owes its cell a matching fixed height. Otherwise rows render at their
+   * natural height below `VIRTUALIZATION_THRESHOLD` and snap to this one above it, which reads as
+   * the list jumping at the hundredth row.
+   */
+  rowHeight?: number
+  /**
    * Render only the visible window.
    *
    * On by default above `VIRTUALIZATION_THRESHOLD` loaded rows. A surface can force it off — the
@@ -139,6 +151,19 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
   virtualize?: boolean
   /** Height of the scroll viewport. Virtualization needs a bounded container to window against. */
   maxHeight?: number | string
+  /**
+   * How much of the shell's own furniture to show.
+   *
+   * `full` is every table in the app: a toolbar with search, facet chips, grouping and column
+   * visibility, above a visible header row.
+   *
+   * `minimal` is for a grid whose row *is* a card — search results. There, one column called
+   * "Result" makes a column-visibility menu meaningless and a header reading "RESULT" above a list
+   * of people reads as a mistake. The header row is hidden visually and **kept in the accessibility
+   * tree**: a `role="grid"` with no `role="row"` at `aria-rowindex=1` would make `aria-rowcount`
+   * describe a sequence that does not exist.
+   */
+  chrome?: 'full' | 'minimal'
 }
 
 /**
@@ -200,8 +225,10 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     filterLabels,
     className,
     density = 'comfortable',
+    rowHeight = ROW_HEIGHT[density],
     virtualize,
     maxHeight,
+    chrome = 'full',
   } = props
 
   const [commandOpen, setCommandOpen] = React.useState(false)
@@ -282,10 +309,32 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
   const virtual = useTableVirtual({
     count: entries.length,
     scrollRef,
-    rowHeight: ROW_HEIGHT[density],
+    rowHeight,
     focusedIndex: focusedEntryIndex,
     enabled: virtualized,
   })
+
+  /**
+   * Ask for the next page when the *container's* scroll nears its end.
+   *
+   * Only meaningful once virtualization is on, and that is exactly when it is needed: below the
+   * threshold the grid sits in page flow and a surface's own bottom-of-page sentinel sees the
+   * viewport scroll, but a windowed grid becomes its own `overflow-y: auto` box and the page barely
+   * moves — so that sentinel is either permanently visible (asking for every remaining page at
+   * once) or never visible (infinite scroll silently stopping at the hundredth row). Neither is
+   * something a surface can fix from outside the container.
+   *
+   * Firing repeatedly is the caller's to absorb: every `onLoadMore` here already refuses to run
+   * while a page is in flight or when there is no cursor left.
+   */
+  const handleScroll = React.useCallback(() => {
+    if (!onLoadMore) return
+    const element = scrollRef.current
+    if (!element) return
+    const remaining = element.scrollHeight - element.scrollTop - element.clientHeight
+    // One viewport of slack, so the next page is requested before the user hits the floor.
+    if (remaining <= element.clientHeight) onLoadMore()
+  }, [onLoadMore])
 
   const context: RendererContext<Row> = {
     columns: visibleColumns,
@@ -332,7 +381,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
 
   return (
     <div className={cn('card overflow-hidden p-0', className)}>
-      <TableToolbar
+      {chrome === 'full' && <TableToolbar
         columns={columns}
         query={query}
         onQueryChange={onQueryChange}
@@ -344,7 +393,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         searchRef={searchRef}
         searchable={searchable}
         valueLabel={valueLabel}
-      />
+      />}
 
       {selectable && <SelectionBar selection={selection} total={page.total} actions={bulkActions} />}
 
@@ -359,6 +408,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         aria-busy={isLoading || undefined}
         onKeyDown={keyboard.onKeyDown}
         ref={scrollRef}
+        onScroll={virtualized ? handleScroll : undefined}
         className="table-scroll"
         // Virtualization needs a bounded viewport to window against; an unbounded container is
         // always "fully visible" and every row stays mounted.
@@ -372,6 +422,8 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
           className={cn(
             'sticky top-0 z-20 border-b border-bh-border bg-bh-surface px-4 py-2.5',
             usesGridTemplate ? 'grid items-center gap-3' : 'flex items-center gap-3',
+            // Hidden from sight, not from a screen reader: `aria-rowcount` counts this row.
+            chrome === 'minimal' && 'sr-only',
           )}
           style={usesGridTemplate
             ? { gridTemplateColumns: gridTemplateColumns(visibleColumns, { selectable, expandable: Boolean(expansion) }) }
