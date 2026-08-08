@@ -78,14 +78,7 @@ const CI_RUNS_WITHOUT = {
   ENRICHMENT_USER_AGENT: 'defaulted',
   ENRICHMENT_RAW_RETENTION_DAYS: 'defaulted',
   ENRICHMENT_ACCEPTED_RETENTION_DAYS: 'defaulted',
-  STRIPE_API_VERSION: 'defaulted in env.ts',
 
-  // ── Billing ─────────────────────────────────────────────────────────────────────────────────
-  // The billing specs drive the fake provider (`src/shared/lib/billing/fake-provider.ts`) and sign
-  // their own webhooks; the separate "Stripe sandbox certification" job is what touches real
-  // test-mode Stripe, and it carries its own secrets.
-  STRIPE_SECRET_KEY: 'the sandbox certification job carries the real test-mode key',
-  STRIPE_WEBHOOK_SECRET: 'the sandbox certification job carries the real test-mode key',
 }
 
 /**
@@ -107,6 +100,24 @@ function workflowEnvKeys() {
   const job = /^ {2}quality:$([\s\S]*?)^ {4}steps:$/m.exec(source)
   if (!job) throw new Error('Could not find the quality job\'s env block in .github/workflows/quality.yml')
   return new Set([...job[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((m) => m[1]))
+}
+
+/**
+ * `env.ts`'s conditional requirements: flag → keys it makes mandatory.
+ *
+ * Its `superRefine` blocks read `if (data.X === 'true') { ... path: ['Y'] ... }`, so enabling a flag
+ * in the workflow silently enlarges the set of variables the app refuses to boot without. Turning
+ * STRIPE_BILLING_ENABLED on cost a run for exactly that: three more keys became required, one of
+ * them exempted here as "defaulted in env.ts", which it is only while billing is off.
+ */
+function conditionalRequirements() {
+  const source = readFileSync(join(root, 'src/shared/lib/env.ts'), 'utf8')
+  const required = new Map()
+  for (const m of source.matchAll(/if \(data\.([A-Z_][A-Z0-9_]*) === 'true'\) \{([\s\S]*?)\n  \}/g)) {
+    const keys = [...m[2].matchAll(/path: \['([A-Z_][A-Z0-9_]*)'\]/g)].map((p) => p[1])
+    if (keys.length > 0) required.set(m[1], new Set(keys))
+  }
+  return required
 }
 
 /** Keys `.env` sets to something non-empty. An empty value is not a divergence. */
@@ -178,6 +189,22 @@ const local = dotenvKeys()
 const used = await readKeys()
 const defaults = declaredDefaults()
 const values = dotenvValues()
+const conditional = conditionalRequirements()
+
+/** Flags the workflow switches on without the keys env.ts then demands. */
+const workflowValues = (() => {
+  const source = readFileSync(join(root, '.github/workflows/quality.yml'), 'utf8')
+  const job = /^ {2}quality:$([\s\S]*?)^ {4}steps:$/m.exec(source)
+  const map = new Map()
+  for (const m of job[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):\s*'?([^'\n#]*)'?/gm)) map.set(m[1], m[2].trim())
+  return map
+})()
+
+const unmetConditions = []
+for (const [flag, keys] of conditional) {
+  if (workflowValues.get(flag) !== 'true') continue
+  for (const key of keys) if (!workflow.has(key)) unmetConditions.push(`${flag}=true requires ${key}`)
+}
 
 const gaps = [...local].filter((key) => used.has(key) && !workflow.has(key) && !(key in CI_RUNS_WITHOUT)).sort()
 
@@ -197,6 +224,7 @@ console.log(JSON.stringify({
   gaps: gaps.length,
   divergentDefaults: divergent.length,
   acceptedDivergences: Object.keys(DIVERGENCE_ACCEPTED).length,
+  unmetConditions: unmetConditions.length,
 }))
 
 if (stale.length > 0) {
@@ -230,4 +258,10 @@ if (divergent.length > 0) {
   )
 }
 
-if (gaps.length > 0 || stale.length > 0 || divergent.length > 0) process.exit(1)
+if (unmetConditions.length > 0) {
+  console.error(`\n${unmetConditions.length} flag/requirement pair${unmetConditions.length === 1 ? '' : 's'} the workflow leaves unmet:\n`)
+  for (const line of unmetConditions) console.error(`  - ${line}`)
+  console.error('\n  env.ts refuses to parse without them, so the job dies at import rather than at an assertion.\n')
+}
+
+if (gaps.length > 0 || stale.length > 0 || divergent.length > 0 || unmetConditions.length > 0) process.exit(1)
