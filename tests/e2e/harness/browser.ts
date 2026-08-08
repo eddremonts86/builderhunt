@@ -43,9 +43,14 @@ export async function gotoHydrated(page: Page, url: string): Promise<void> {
  * modal that is not visible *yet* may still be coming. Resource Timing
  * records that fetch, so wait for it semantically (never a fixed delay),
  * let React commit whatever the response triggered, then act on the
- * final overlay state. The cookie banner decides synchronously from
- * localStorage in a mount effect, which has already flushed by the time
- * the hydration marker is set — its current visibility is already final.
+ * final overlay state.
+ *
+ * This used to claim the cookie banner's visibility was already final by
+ * the time the hydration marker was set, on the grounds that it decides
+ * from localStorage in a mount effect. That was wrong: `HydrationSignal`
+ * sets the attribute from its own effect, and nothing orders the banner's
+ * effect ahead of that one. Both overlays are now waited for before being
+ * dismissed, and waited on until they are actually gone.
  */
 export async function dismissOverlays(page: Page): Promise<void> {
   // Ask the same endpoint the modal itself consults. If this session
@@ -62,10 +67,48 @@ export async function dismissOverlays(page: Page): Promise<void> {
     })
     .catch((): ConsentStatus | null => null)
   if (status?.userId && status.needsAcceptance.includes('tos')) {
-    await page.getByTestId('tos-modal-accept').click()
+    const accept = page.getByTestId('tos-modal-accept')
+    await accept.click()
+    // Gone, not merely clicked — see the cookie banner below for what returning early costs.
+    await expect(accept).toBeHidden()
   }
+
+  /**
+   * The cookie banner starts `visible = false` and turns itself on from a mount effect that reads
+   * `bh_cookie_consent` (`src/shared/components/CookieBanner.tsx`). A single `isVisible()` probe
+   * answers "not yet" exactly as it answers "never" — and this returned before the banner arrived.
+   *
+   * What that cost: the banner mounted after the spec had already typed, and that commit returned
+   * the page's controlled inputs to their empty state. Two specs then failed as product bugs. The
+   * invite journey submitted an empty field and the browser's own `required` tooltip blocked it —
+   * no request, no error, and a twenty-second timeout on a list that was never going to change. The
+   * onboarding journey watched its submit button stay `disabled` through thirty-three polls. Both
+   * passed on every isolated re-run, and the screenshots of both failures show this banner still up.
+   *
+   * So read the same key the component reads: no stored decision means the banner is coming, which
+   * makes waiting for it correct rather than hopeful. The wait is bounded because a surface without
+   * the root layout never renders one, and that must not hang.
+   */
+  const decided = await page
+    .evaluate(() => {
+      try {
+        const raw = window.localStorage.getItem('bh_cookie_consent')
+        if (!raw) return false
+        return typeof (JSON.parse(raw) as { decidedAt?: unknown })?.decidedAt === 'string'
+      } catch {
+        return false
+      }
+    })
+    .catch(() => false)
+  if (decided) return
   const cookies = page.getByTestId('cookie-banner-essential')
-  if (await cookies.isVisible().catch(() => false)) await cookies.click()
+  const appeared = await cookies
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false)
+  if (!appeared) return
+  await cookies.click()
+  await expect(cookies).toBeHidden()
 }
 
 export interface StrictBrowserGuard {
