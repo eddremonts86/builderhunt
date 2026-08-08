@@ -180,6 +180,13 @@ export interface SearchFingerprintInput {
   /** Entity kinds, on the semantic leg. */
   entityKinds?: readonly string[]
   /**
+   * Rows asked of each connector, when the caller wanted fewer than the default.
+   *
+   * Part of the fingerprint because it changes *which rows exist*: a six-row preview and a thirty-row
+   * search are different result sets, and a continuation minted from one must not resume the other.
+   */
+  providerPageSize?: number
+  /**
    * Hex digest of the query vector, on the semantic leg.
    *
    * Binding the vector rather than only the text is strictly stronger: it catches an embedding
@@ -204,6 +211,7 @@ export function searchFingerprint(input: SearchFingerprintInput): string {
     l: input.language ?? '',
     c: input.country ?? '',
     e: [...(input.entityKinds ?? [])].sort(),
+    p: input.providerPageSize ?? 0,
     v: input.vectorHash ?? '',
   })
   return createHash('sha256').update(canonical).digest('base64url').slice(0, 16)

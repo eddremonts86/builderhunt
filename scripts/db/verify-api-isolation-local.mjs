@@ -257,7 +257,10 @@ async function checkAlerts() {
   const { Route } = await import('../../src/routes/api/alerts/index.ts')
   const { GET, DELETE } = Route.options.server.handlers
 
-  const listA = await (await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/alerts') })).json()
+  // `PageResult`, not an array, since plans/phase-3/10 put the radar list on a keyset page. This probe
+  // read `listA.map` and crashed the whole script — a guard that only knew the old spelling.
+  const pageA = await (await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/alerts') })).json()
+  const listA = pageA.rows ?? []
   record('alerts: A sees only A\'s alert', Array.isArray(listA) && listA.length === 1 && listA[0].id === IDS.alertA, JSON.stringify(listA.map((a) => a.id)))
 
   const deleteOther = await DELETE({
@@ -419,7 +422,9 @@ async function checkSprints() {
   const { Route: ListRoute } = await import('../../src/routes/api/sprints/index.ts')
   const { GET: listGET } = ListRoute.options.server.handlers
 
-  const listA = await (await listGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints') })).json()
+  // Also a `PageResult` since plans/phase-3/10.
+  const sprintPageA = await (await listGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints') })).json()
+  const listA = sprintPageA.rows ?? []
   record('sprints: A sees only A\'s sprint', Array.isArray(listA) && listA.length === 1 && listA[0].id === IDS.sprintA, JSON.stringify(listA.map((s) => s.id)))
 
   const { Route: DetailRoute } = await import('../../src/routes/api/sprints/$sprintId.ts')
@@ -453,7 +458,8 @@ async function checkSprints() {
   record('sprints: A cannot read B\'s sprint results (other id)', resultsOther.status === 404, `status=${resultsOther.status}`)
 
   const resultsOwn = await (await resultsGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x/results'), params: { sprintId: IDS.sprintA } })).json()
-  record('sprints: A sees A\'s own sprint result', Array.isArray(resultsOwn.items) && resultsOwn.items.length === 1, JSON.stringify(resultsOwn))
+  // `rows`, not `items`: plans/phase-3/07 replaced the hand-rolled envelope with `PageResult`.
+  record('sprints: A sees A\'s own sprint result', Array.isArray(resultsOwn.rows) && resultsOwn.rows.length === 1, JSON.stringify(resultsOwn))
 }
 
 async function checkEnrichmentAndEvidence() {
@@ -758,8 +764,9 @@ async function checkAdminContentManagement() {
   )
 
   const usersAfter = await (await usersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users') })).json()
-  const billingA = usersAfter.users.find((u) => u.userId === IDS.userA)?.billing
-  const billingB = usersAfter.users.find((u) => u.userId === IDS.userB)?.billing
+  // `rows`, not `users`: the admin grid is a platform-scoped keyset page since plans/phase-3/10.
+  const billingA = (usersAfter.rows ?? []).find((u) => u.userId === IDS.userA)?.billing
+  const billingB = (usersAfter.rows ?? []).find((u) => u.userId === IDS.userB)?.billing
   record(
     'admin users: the grant lands on A\'s organization only, never B\'s',
     billingA?.entitlementTier === 'pro' && billingB?.entitlementTier !== 'pro',

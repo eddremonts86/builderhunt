@@ -42,7 +42,7 @@ export const Route = createFileRoute('/api/search/builders')({
           }
 
           const body = await request.json()
-          const { keywords, sources, language, country, cursor } = body
+          const { keywords, sources, language, country, cursor, perPage } = body
           const keywordsArray = typeof keywords === 'string'
             ? keywords.split(/[,\s]+/).filter(Boolean)
             : Array.isArray(keywords) ? keywords : []
@@ -60,6 +60,10 @@ export const Route = createFileRoute('/api/search/builders')({
               scope: principal?.organizationId ?? 'anon',
               mode: 'keyword',
               cursor: typeof cursor === 'string' ? cursor : null,
+              // A *size*, clamped down only — see `KeywordSearchPageOptions.providerPageSize`. The
+              // previews that pass it draw six rows; asking each connector for thirty to render six
+              // is the waste, and it also missed their seeded cache key.
+              providerPageSize: typeof perPage === 'number' ? perPage : undefined,
             })
           } catch (error) {
             if (error instanceof SearchContinuationError) {

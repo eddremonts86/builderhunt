@@ -797,7 +797,11 @@ test.describe('status page', () => {
     await withPage(browser, undefined, async (page) => {
       await page.goto(unsubscribeUrl)
       await page.waitForURL(/\/status\?unsubscribed=ok/)
-      await expect(page.getByTestId('unsubscribe-result')).toContainText('unsubscribed')
+      // The page's own words, not the word in the URL parameter. This asserted `'unsubscribed'` and
+      // the success copy has never contained it — the confirmation says what happens next ("you
+      // won't get any more"), which is the more useful sentence and the one on screen. The `?ok`
+      // branch is already pinned by the `waitForURL` above and by the database check below.
+      await expect(page.getByTestId('unsubscribe-result')).toContainText("won't get any more status emails")
     })
 
     const [subscriberRow] = await harness.sql<{ unsubscribed_at: Date | null }[]>`

@@ -176,6 +176,27 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
  */
 export const VIRTUALIZATION_THRESHOLD = 100
 
+/**
+ * A `role="grid"` may only contain rows, and a state panel is not a row until it says so.
+ *
+ * `aria-required-children` is a **critical** axe rule, and the sprints index is what tripped it: its
+ * `emptyState` offers a "Start a sprint" link, so an `<a>` sat directly inside the grid container.
+ * `pnpm test:a11y` caught it at all three viewports — a bare `<div>` there had been invalid all along
+ * and only became visible once an empty state contained an interactive element.
+ *
+ * One `row`/`gridcell` pair around every state panel, rather than each panel growing its own roles:
+ * a blank state, a filtered-empty state and an inline error are three components and one obligation.
+ * `aria-colindex` is 1 and there is no `aria-rowindex` on purpose — this is not row *n* of the set, it
+ * is what the grid shows instead of rows.
+ */
+function GridStateRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div role="row">
+      <div role="gridcell" aria-colindex={ariaColIndex(0)}>{children}</div>
+    </div>
+  )
+}
+
 const RENDERERS = {
   table: TableRenderer,
   grouped: GroupedRenderer,
@@ -473,17 +494,21 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         </div>
 
         {isLoading && rows.length === 0 && <SkeletonRows columns={visibleColumns} selectable={selectable} />}
-        {showBlank && (emptyState ?? <BlankState />)}
+        {showBlank && <GridStateRow>{emptyState ?? <BlankState />}</GridStateRow>}
         {showFilteredEmpty && (
-          <FilteredEmptyState
-            query={query}
-            labels={filterLabels}
-            valueLabel={valueLabel}
-            onClear={() => onQueryChange({ ...query, search: '', filters: {} })}
-          />
+          <GridStateRow>
+            <FilteredEmptyState
+              query={query}
+              labels={filterLabels}
+              valueLabel={valueLabel}
+              onClear={() => onQueryChange({ ...query, search: '', filters: {} })}
+            />
+          </GridStateRow>
         )}
         {rows.length > 0 && <Renderer context={context} />}
-        {status === 'error' && error && <ErrorRow message={error.message} onRetry={error.onRetry} />}
+        {status === 'error' && error && (
+          <GridStateRow><ErrorRow message={error.message} onRetry={error.onRetry} /></GridStateRow>
+        )}
       </div>
 
       <TableCommandSheet

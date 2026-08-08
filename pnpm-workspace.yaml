@@ -18,6 +18,13 @@ overrides:
   # vulnerable js-yaml, and gray-matter's separate js-yaml@3 must not be dragged across two majors by
   # a broad pin.
   'xmlbuilder2>js-yaml': '>=5.2.2'
+  # Same shape, different advisory: nanoid < 3.3.17 loops indefinitely on a custom generator, and the
+  # only paths to it are `@tanstack/react-start > … > vite > postcss > nanoid`. Nothing in this repo
+  # depends on nanoid directly, upstream has not bumped postcss's range, and `pnpm audit --prod
+  # --audit-level high` fails on it — so the pin is the only route. Patch-level.
+  # Range-capped at the major postcss asks for: an override ignores the parent's range, and a bare
+  # '>=3.3.17' resolved nanoid to 6.0.1 — three majors past what postcss declares.
+  'nanoid@<3.3.17': '>=3.3.17 <4'
 onlyBuiltDependencies:
   - '@clerk/shared'
   - '@parcel/watcher'

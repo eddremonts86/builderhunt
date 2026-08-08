@@ -45,13 +45,20 @@ const RENDERS_GRID = /<DataTable\b/
 const RENDERS_TABLE = /<table[\s>]/
 
 /**
- * Page-number paging, as it appears in a route.
+ * **Position**, as it appears in a route — never size.
  *
- * Matched against the *request* side only — a `page` field the route reads from the query string or
- * the JSON body. A `page` variable used internally is not the problem; handing the client the offset
- * is.
+ * `page` and `offset` say *where* in a set to resume, and that is the shape plan 03 replaced with
+ * keyset cursors: an offset repeats and drops rows when the set changes between two requests.
+ *
+ * `perPage` and `limit` say *how many*, and the phase's own rule is that a client may ask for fewer
+ * and a larger value is clamped rather than honoured (`TABLE_PAGE_SIZE`). The first version of this
+ * pattern rejected `perPage` too, which forbade one spelling of "how many" while `PageRequest.limit`
+ * — the contract's own — sailed through, and it broke the onboarding journey's six-row search preview.
+ *
+ * Matched against the *request* side only. A `page` variable used internally is not the problem;
+ * handing the client the offset is.
  */
-const PAGE_PARAM = /(?:searchParams\.get\(['"](?:page|perPage|per_page|offset)['"]\)|['"](?:page|perPage|per_page|offset)['"]\s*:\s*z\.|\bbody\.(?:page|perPage|offset)\b|\{[^}]*\b(?:page|perPage|offset)\b[^}]*\}\s*=\s*body)/
+const PAGE_PARAM = /(?:searchParams\.get\(['"](?:page|offset)['"]\)|['"](?:page|offset)['"]\s*:\s*z\.|\bbody\.(?:page|offset)\b|\{[^}]*\b(?:page|offset)\b[^}]*\}\s*=\s*body)/
 
 /**
  * Where numeric provider paging is legitimate.

@@ -480,6 +480,15 @@ export interface KeywordSearchPageOptions {
    * strictly stronger: the translation is a function of them.
    */
   queryFingerprint?: string
+  /**
+   * Rows to ask each connector for, when the caller wants fewer than `SEARCH_PROVIDER_PAGE_SIZE`.
+   *
+   * Clamped, never honoured upward — the phase's rule for every page size. A *size* is not the
+   * offset paging plan 03 removed: the previews that use it (the onboarding starter query, the
+   * pre-search featured strip) ask for six rows because six is what they draw, and dropping the
+   * parameter made them fetch thirty per source and miss their seeded cache key.
+   */
+  providerPageSize?: number
 }
 
 export interface KeywordSearchPage {
@@ -516,11 +525,16 @@ export async function pageBuilderSearch(opts: KeywordSearchPageOptions): Promise
   const requested = opts.sources ?? [...DEFAULT_SEARCH_SOURCES]
   const { contacted, notContacted } = await resolveContactableSources(requested)
 
+  const providerPageSize = Math.min(
+    Math.max(1, opts.providerPageSize ?? SEARCH_PROVIDER_PAGE_SIZE),
+    SEARCH_PROVIDER_PAGE_SIZE,
+  )
   const fingerprint = opts.queryFingerprint ?? searchFingerprint({
     keywords: opts.keywords,
     requestedSources: requested,
     language: opts.language,
     country: opts.country,
+    providerPageSize,
   })
 
   // Verified before the fan-out, so a stale token costs a 400 rather than thirteen upstream
@@ -549,7 +563,7 @@ export async function pageBuilderSearch(opts: KeywordSearchPageOptions): Promise
     language: opts.language,
     country: opts.country,
     page: state.providerPage,
-    perPage: SEARCH_PROVIDER_PAGE_SIZE,
+    perPage: providerPageSize,
   })
 
   // Clamped, not honoured: page size is a property of what the server is willing to serve.

@@ -154,8 +154,9 @@ test.describe('admin users — organization-owned billing', () => {
     try {
       const response = await harness.admin.api!.get('/api/admin/users')
       expect(response.status()).toBe(200)
-      const body = await response.json() as { users: Array<{ userId: string; billing: { provenance: string } | null }> }
-      const byId = new Map(body.users.map((u) => [u.userId, u]))
+      // `rows`, not `users`: the admin grid is a platform-scoped keyset page since plans/phase-3/10.
+      const body = await response.json() as { rows: Array<{ userId: string; billing: { provenance: string } | null }> }
+      const byId = new Map(body.rows.map((u) => [u.userId, u]))
 
       expect(byId.get(canonical.userId)?.billing?.provenance).toBe('canonical')
       expect(byId.get(manual.userId)?.billing?.provenance).toBe('manual_exception')
