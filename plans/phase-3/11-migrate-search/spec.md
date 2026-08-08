@@ -1,6 +1,6 @@
 # Specification — migrate search onto the table shell
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: `SearchPage.tsx` is 1,666 lines and appends pages without virtualization.

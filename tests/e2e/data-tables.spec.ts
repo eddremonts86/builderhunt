@@ -25,6 +25,7 @@ import { e2eEnv } from './harness/env'
 import type { OrganizationFixture } from './harness/fixtures/organizations'
 import { createOwnerPrincipal, type FixtureContext, type Principal } from './harness/fixtures/principals'
 import { seedConsent } from './harness/fixtures/privacy'
+import { cachedSearchBuilders, searchCacheKey, seedSearchCache } from './harness/fixtures/search-cache'
 import { startWorkerServer, stopWorkerServer } from './harness/server'
 import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
 
@@ -528,6 +529,174 @@ test.describe('sprints index', () => {
     } finally {
       await context.close()
       await clearSprints()
+    }
+  })
+})
+
+/**
+ * Federated search, after plans/phase-3/11 moved it onto the shell.
+ *
+ * It is **not** in `SURFACES`, and that is a statement rather than an omission. Every assertion in
+ * that loop is about a SQL table: a sort control whose id reaches an `ORDER BY`, a facet computed
+ * over a column, a `total` counting the filtered set, query state in the URL. Search has none of
+ * them — its backend is thirteen third-party APIs, its filters re-run the federation rather than
+ * re-viewing a set, and it cannot count without exhausting every upstream. Asserting those here
+ * would mean asserting things that are false about this surface.
+ *
+ * What *does* apply is everything the shell itself promises, and that is what this block covers:
+ * a DOM that stays bounded as rows accumulate, absolute row indices, focus that survives the
+ * virtualizer, and an announced row count that admits it does not know.
+ */
+test.describe('federated search', () => {
+  /** Deliberately larger than one page, one provider fan-out, and the virtualization threshold. */
+  const SEEDED_SEARCH_ROWS = 500
+  const SEARCH_QUERY = 'shell bounded search probe'
+  const SEARCH_TERMS = SEARCH_QUERY.split(/[,\s]+/).filter(Boolean)
+  /**
+   * The page's own default selection, not a narrower one.
+   *
+   * The cache key is built from the sources the *request* names, and `SearchPage` sends
+   * `DEFAULT_ACTIVE_SOURCES` unless a user has changed them. Seeding a two-source key produced a
+   * cache miss and forty-five rows off the live internet — a green-looking test measuring nothing,
+   * which is exactly the failure a seeded fixture exists to prevent.
+   */
+  const SEARCH_SOURCES = ['github', 'reddit', 'hn', 'devto', 'lobsters'] as const
+
+  test.beforeAll(async () => {
+    /*
+     * One cache entry, 500 rows.
+     *
+     * A cache hit is restricted to the permitted sources and otherwise served whole —
+     * `perPage` reaches connectors, not the cache — so a single seeded entry gives the fused set
+     * 500 rows for provider page one. That is the path under test: `pageBuilderSearch` slicing a
+     * large fused set at `TABLE_PAGE_SIZE` without another upstream request, rather than the
+     * federation being asked for ten more pages.
+     */
+    await seedSearchCache(
+      harness.redisPrefix,
+      searchCacheKey(SEARCH_TERMS, 30, SEARCH_SOURCES),
+      [
+        ...cachedSearchBuilders('shell-gh', SEEDED_SEARCH_ROWS / 2, { source: 'github', followers: (i) => 20_000 - i }),
+        ...cachedSearchBuilders('shell-hn', SEEDED_SEARCH_ROWS / 2, { source: 'hn', followers: (i) => 19_000 - i }),
+      ],
+    )
+  })
+
+  /**
+   * Walk exactly the seeded set: ten pages of `TABLE_PAGE_SIZE`.
+   *
+   * Nine clicks, not "until the button disappears". The tenth page exhausts provider page one and
+   * mints a cursor for provider page *two*, which this fixture deliberately does not seed — a
+   * loop that kept clicking would leave the cache and fetch from the live internet, which is how
+   * the first version of this test ended up asserting against 517 rows.
+   */
+  async function loadSeededSearchPages(page: import('playwright/test').Page): Promise<void> {
+    for (let click = 0; click < SEEDED_SEARCH_ROWS / 50 - 1; click += 1) {
+      await page.getByTestId('load-more-button').click()
+      await expect(page.getByTestId('search-loaded-count')).toHaveText(String((click + 2) * 50))
+    }
+  }
+
+  test('the DOM stays bounded while 500 rows accumulate, and the count admits it is unknown', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/search?q=${encodeURIComponent(SEARCH_QUERY)}`)
+      await dismissOverlays(page)
+
+      const grid = page.locator('[role="grid"]')
+      await expect(grid).toBeVisible()
+      // -1, not 501. A federation cannot count without exhausting every upstream, and the number a
+      // screen reader is given has to be one nothing is pretending about.
+      await expect(grid).toHaveAttribute('aria-rowcount', '-1')
+
+      await loadSeededSearchPages(page)
+      // Every seeded row was fetched — ten pages of fifty — and the browser holds a window of them.
+      await expect(page.getByTestId('search-loaded-count')).toHaveText(String(SEEDED_SEARCH_ROWS))
+      const rendered = await page.locator('[role="row"][data-testid^="search-result-"]').count()
+      expect(rendered, 'the window is bounded, not the loaded set').toBeGreaterThan(0)
+      expect(rendered).toBeLessThanOrEqual(60)
+    } finally {
+      await context.close()
+    }
+  })
+
+  /** Announcing "row 3 of unknown" for the third row *of the window* is the failure axe cannot see. */
+  test('rendered rows carry their absolute index once windowed', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/search?q=${encodeURIComponent(SEARCH_QUERY)}`)
+      await dismissOverlays(page)
+      await page.getByTestId('load-more-button').click()
+      await page.getByTestId('load-more-button').click()
+      await page.waitForTimeout(300)
+
+      const rows = page.locator('[role="row"][data-testid^="search-result-"]')
+      const count = await rows.count()
+      const indices = await rows.evaluateAll((nodes) =>
+        nodes.map((node) => Number(node.getAttribute('aria-rowindex'))))
+      expect(count).toBeGreaterThan(0)
+      // Ascending and contiguous through the DOM, which is the order a screen reader reads them in.
+      expect(indices).toEqual([...indices].sort((a, b) => a - b))
+      expect(indices[indices.length - 1] - indices[0]).toBe(count - 1)
+    } finally {
+      await context.close()
+    }
+  })
+
+  test('focus survives a PageDown/PageUp round trip through the window', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/search?q=${encodeURIComponent(SEARCH_QUERY)}`)
+      await dismissOverlays(page)
+      await page.getByTestId('load-more-button').click()
+      await page.getByTestId('load-more-button').click()
+      await page.waitForTimeout(300)
+
+      const cell = page.locator('[role="gridcell"][tabindex="0"]').first()
+      await cell.focus()
+      const before = await page.evaluate(() =>
+        document.activeElement?.closest('[role="row"]')?.getAttribute('aria-rowindex') ?? null)
+
+      await page.keyboard.press('PageDown')
+      await page.keyboard.press('PageDown')
+      await page.keyboard.press('PageUp')
+      await page.keyboard.press('PageUp')
+
+      const after = await page.evaluate(() =>
+        document.activeElement?.closest('[role="row"]')?.getAttribute('aria-rowindex') ?? null)
+      expect(after).toBe(before)
+      expect(await page.locator('[role="gridcell"][tabindex="0"]').count()).toBe(1)
+    } finally {
+      await context.close()
+    }
+  })
+
+  /**
+   * The reset the continuation makes mandatory: the token is bound to the source snapshot, so rows
+   * loaded under one selection cannot sit above rows loaded under another.
+   */
+  test('changing a source discards the loaded rows and the cursor', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/search?q=${encodeURIComponent(SEARCH_QUERY)}`)
+      await dismissOverlays(page)
+      const rows = page.locator('[role="row"][data-testid^="search-result-"]')
+      // `expect(...).toBeVisible()`, not a bare `count()`: the page searches on mount from `?q=`,
+      // and a synchronous count right after `dismissOverlays` reads the DOM before the fetch
+      // resolves. It passed alone and failed in a full run, which is the shape of every race.
+      await expect(rows.first()).toBeVisible()
+
+      await page.locator('button[aria-label="Sources & filters"]').click()
+      await page.getByTestId('search-source-hn').click()
+
+      await expect(rows).toHaveCount(0)
+      await expect(page.getByTestId('load-more-button')).toHaveCount(0)
+    } finally {
+      await context.close()
     }
   })
 })

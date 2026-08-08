@@ -1103,7 +1103,7 @@ export function SearchPage() {
                   total — the federation would have to exhaust thirteen upstreams — so the number
                   says what it actually is, and "so far" is dropped once the walk ends. */}
               <p className="text-sm text-bh-text-muted whitespace-nowrap">
-                <span className="font-semibold text-bh-text">{results.length}</span> result
+                <span className="font-semibold text-bh-text" data-testid="search-loaded-count">{results.length}</span> result
                 {results.length === 1 ? '' : 's'}{cursor ? ' so far' : ''}
                 {displayKeywords.length === 0 && (
                   <>

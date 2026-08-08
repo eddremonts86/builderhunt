@@ -353,6 +353,31 @@ test('keyword search returns a stable fused ranking across two sources', async (
   expect(observed).toEqual(readFixture().keyword)
 })
 
+/**
+ * The spec's own resolved edge case: an operator switches a source off between two pages.
+ *
+ * The request still *asks* for both sources — nothing changed in the UI — so the query fingerprint
+ * still matches and only the enabled-source snapshot catches it. Restarting at page one is what
+ * stops a cache entry written while the source was enabled from serving its rows afterwards.
+ */
+test('a keyword cursor is refused after a source is switched off in the register', async () => {
+  const first = await keywordPage(null)
+  await harness.sql`update search_sources set enabled = false where key = 'hn'`
+  try {
+    // `loadEnabledSearchSourceKeys` caches for five seconds in the app process, and a direct SQL
+    // update does not reach `invalidateSearchSourceCache` the way the operator route does.
+    await new Promise((resolve) => setTimeout(resolve, 6_000))
+    const response = await harness.owner.api!.post('/api/search/builders', {
+      data: { keywords: KEYWORD_QUERY, sources: [...KEYWORD_SOURCES], cursor: first.nextCursor },
+    })
+    expect(response.status()).toBe(400)
+    expect((await response.json()).error).toMatch(/source snapshot mismatch/)
+  } finally {
+    await harness.sql`update search_sources set enabled = true where key = 'hn'`
+    await new Promise((resolve) => setTimeout(resolve, 6_000))
+  }
+})
+
 test('a keyword cursor is refused once the query changes', async () => {
   const first = await keywordPage(null)
   const response = await harness.owner.api!.post('/api/search/builders', {
@@ -400,4 +425,28 @@ test('semantic search returns a stable distance ranking @requires-embeddings', a
     return
   }
   expect(observed).toEqual(readFixture().semantic)
+})
+
+/**
+ * A semantic cursor is bound to the query *vector*, not only to the query text.
+ *
+ * Twelve rows fit in one page, so this one is minted by hand rather than taken from a response —
+ * the point under test is the refusal, and a surface that never pages would never exercise it.
+ */
+test('a semantic cursor is refused once the query changes @requires-embeddings', async () => {
+  const { createSearchContinuation } = await import('../../src/lib/search-continuation')
+  const forged = createSearchContinuation({
+    mode: 'semantic',
+    // A fingerprint this request will not reproduce, however the server computes it.
+    query: 'not-this-query',
+    scope: harness.owner.organizationId!,
+    sources: [],
+    state: { kind: 'semantic', distance: 0.1, source: 'e2e', sourceId: 'rank-00' },
+  })
+
+  const response = await harness.owner.api!.post('/api/search/semantic', {
+    data: { query: SEMANTIC_QUERY, cursor: forged },
+  })
+  expect(response.status()).toBe(400)
+  expect((await response.json()).error).toMatch(/query or filter mismatch|source snapshot mismatch/)
 })

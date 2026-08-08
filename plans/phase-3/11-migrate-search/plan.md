@@ -1,6 +1,6 @@
 # Plan — migrate search onto the table shell
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
 > **Reality check**: One UI component, two routes, the federation, and the pgvector repository.
