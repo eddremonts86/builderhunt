@@ -1,9 +1,18 @@
 name: Quality
 
+# Only master, and only on push.
+#
+# A private repo bills every runner minute, and this job is ~55 of them. Running it on
+# `pull_request` and on feature branches meant the same commit was measured two or three times on
+# its way to master while the branch it measured was still moving.
+#
+# What replaces it is `pnpm ci:local`, which every push runs through the pre-push hook
+# (`.githooks/pre-push`) on *any* branch. That trade only holds while the local gate is a faithful
+# copy of this file — `scripts/ci/check-env-fidelity.mjs` and `scripts/ci/check-step-parity.mjs` are
+# what keep it one, and both run first, locally, before anything expensive.
 on:
-  pull_request:
   push:
-    branches: [master, codex/security-multitenancy]
+    branches: [master]
 
 permissions:
   contents: read

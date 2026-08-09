@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# The full quality gate, on every push, on every branch.
+#
+# `.github/workflows/quality.yml` fires only on a push to master now — a private repo bills every
+# runner minute and that job is ~55 of them. So this is where a feature branch gets checked, and it
+# is the only place. The two parity gates it starts with (`check-env-fidelity`, `check-step-parity`)
+# are what keep "it passed locally" worth saying: one compares this machine's environment to the
+# workflow's, the other compares the list of checks.
+#
+# Skip it with `--no-verify` when you know why. Pushing master is the one case where that is a bad
+# idea, since going green there deploys to production and applies migrations.
+
+set -uo pipefail
+
+branch="$(git rev-parse --abbrev-ref HEAD)"
+
+if [ "${SKIP_CI_LOCAL:-}" = "1" ]; then
+  echo "pre-push: SKIP_CI_LOCAL=1 — skipping the quality gate for $branch." >&2
+  exit 0
+fi
+
+# Nothing to check when the push deletes a ref or has no new commits.
+has_commits=0
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+  [ "$local_sha" = "$remote_sha" ] && continue
+  has_commits=1
+done
+if [ "$has_commits" -eq 0 ]; then
+  exit 0
+fi
+
+echo "pre-push: running the full quality gate for '$branch' before pushing."
+echo "          ~55 minutes. SKIP_CI_LOCAL=1 git push  bypasses it."
+echo
+
+if pnpm ci:local; then
+  echo
+  echo "pre-push: gate green — pushing $branch."
+  exit 0
+fi
+
+echo >&2
+echo "pre-push: the quality gate failed, so the push is refused." >&2
+echo "          GitHub only runs this on master, which means nothing downstream would have caught it." >&2
+exit 1

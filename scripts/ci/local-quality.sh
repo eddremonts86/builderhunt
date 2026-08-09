@@ -80,6 +80,17 @@ if [ "$REDIS_OK" -eq 0 ]; then
   echo "WARNING: no Redis on 127.0.0.1:6379 — the e2e step will be skipped, not silently passed." >&2
 fi
 
+# MinIO and ClamAV, which `tests/e2e/documents.spec.ts` needs and the workflow starts as containers.
+# They sit behind docker-compose's `interviews` profile locally, so they are off unless asked for —
+# and their absence reads as a storage error inside six specs rather than as a missing container.
+for svc in "object store:9000" "virus scanner:3310"; do
+  if ! (exec 3<>/dev/tcp/127.0.0.1/"${svc##*:}") 2>/dev/null; then
+    echo "No ${svc%%:*} on 127.0.0.1:${svc##*:} — documents specs will fail as storage errors." >&2
+    echo "Start them with: docker compose --profile interviews up -d storage antivirus" >&2
+    exit 1
+  fi
+done
+
 if lsof -nP -iTCP:"$PREVIEW_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "Port $PREVIEW_PORT is in use; set CI_LOCAL_PREVIEW_PORT to something free." >&2
   exit 1
@@ -203,6 +214,8 @@ psql "$MIGRATION_URL" -q -c "CREATE DATABASE ${DB}" || exit 1
 # only `.env` carries quietly voids that — see scripts/ci/check-env-fidelity.mjs for the twenty
 # specs it cost. Local-only by nature: there is no `.env` on CI to diverge from.
 step env-fidelity node scripts/ci/check-env-fidelity.mjs
+# And the other half of the same claim: same environment, same list of checks.
+step step-parity node scripts/ci/check-step-parity.mjs
 
 step migration-integrity pnpm test:migration-integrity
 step drizzle-check pnpm exec drizzle-kit check
@@ -313,6 +326,16 @@ else
   fi
 
   step dependency-audit pnpm security:dependencies
+
+  # Before the preview, for the same reason the workflow puts it there: these projects start their
+  # own dev server and `reuseExistingServer` is false under CI, so a held port fails the step with
+  # "already used" and never takes a screenshot.
+  #
+  # One caveat this gate cannot close: baselines are per-OS. Here it compares against the *darwin*
+  # files; GitHub compares against the linux ones. So a green run here proves the pages still render
+  # as expected, not that the images CI will diff are current. Refreshing those means taking them
+  # from a CI artifact — see the commit that last did it.
+  step visual pnpm test:visual
   step build pnpm build
 
   # Only meaningful after `build`, and it is the only step that runs the entrypoint that actually ships.
@@ -358,6 +381,8 @@ else
   # and the first time it did, it found `/admin/incidents` redirecting because ADMIN_USER_IDS was
   # never set. Two gates that had both been quiet for months, agreeing about nothing.
   step status-trust pnpm test:status-trust
+  step conversion pnpm test:conversion
+  step lighthouse pnpm test:lighthouse
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────────────────────────
