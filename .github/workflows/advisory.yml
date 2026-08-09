@@ -588,6 +588,10 @@ jobs:
             echo "⚠️ STRIPE_SANDBOX_SECRET_KEY exists but is empty — certification skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # The one job that must NOT mint a placeholder: it authenticates against real test-mode Stripe with
+  # the repository secret, and `$GITHUB_ENV` takes precedence over a job's `env:` — so inserting the
+  # mint step here silently replaced a working key with sixteen random bytes and failed the
+  # certification that had just started passing.
   stripe-sandbox-certification:
     name: Stripe sandbox certification (optional, real test-mode API)
     runs-on: ubuntu-latest
@@ -617,20 +621,6 @@ jobs:
       # skipped, and a green tick is not a place anyone looks for a missing secret.
       - run: echo "✅ Certifying against real test-mode Stripe." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v7
-      # Minted per run, never written down.
-      #
-      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
-      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
-      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
-      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
-      # string's word for it. Generating them removes the question instead of arguing it.
-      - name: Mint CI-only credential placeholders
-        run: |
-          {
-            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
-            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
-            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
-          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
