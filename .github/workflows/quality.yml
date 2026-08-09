@@ -497,8 +497,26 @@ jobs:
     outputs:
       configured: ${{ steps.probe.outputs.configured }}
     steps:
+      # Read through `env:` and test the runtime value, rather than comparing the secret inside an
+      # expression. The expression form answered `false` against a secret that `gh secret list`
+      # showed as present — which is the one case worth separating: a secret can exist with an empty
+      # or whitespace value, and the listing shows only names and dates, never values or lengths.
+      #
+      # The length is safe to print. GitHub masks the value itself in logs, and a character count is
+      # what tells "never set" apart from "set to nothing" — the two states that look identical from
+      # outside and have completely different fixes.
       - id: probe
-        run: echo "configured=${{ secrets.STRIPE_SANDBOX_SECRET_KEY != '' }}" >> "$GITHUB_OUTPUT"
+        env:
+          KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+        run: |
+          TRIMMED="$(printf '%s' "$KEY" | tr -d '[:space:]')"
+          echo "secret length: ${#KEY} characters (${#TRIMMED} after trimming whitespace)"
+          if [ -n "$TRIMMED" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ STRIPE_SANDBOX_SECRET_KEY exists but is empty — certification skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   stripe-sandbox-certification:
     name: Stripe sandbox certification (optional, real test-mode API)
