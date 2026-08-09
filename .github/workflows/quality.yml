@@ -146,6 +146,12 @@ jobs:
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      # Required the moment a spec turns INTERVIEW_TRANSCRIPTION_ENABLED on, which several do through
+      # `startInterviewHarness`'s flags — and then env.ts refuses to parse and the worker server never
+      # boots. One missing key took down 26 specs across two shards: the first interview spec set the
+      # flag, its harness threw before teardown could restore it, and every spec after it inherited a
+      # flag whose dependency was absent.
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
       # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
       # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
       # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a
@@ -800,6 +806,7 @@ jobs:
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
       # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
       # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
       # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a

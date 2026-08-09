@@ -19,7 +19,7 @@
 //
 // It does nothing on CI, where there is no `.env` to diverge from.
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -41,7 +41,6 @@ const CI_RUNS_WITHOUT = {
   REDDIT_CLIENT_ID: 'connector credential; e2e uses the egress fake, never the real API',
   REDDIT_CLIENT_SECRET: 'connector credential; e2e uses the egress fake, never the real API',
   STACKOVERFLOW_API_KEY: 'connector credential; e2e uses the egress fake, never the real API',
-  DEEPGRAM_API_KEY: 'transcription vendor; no spec asserts a real transcription',
   RESEND_API_KEY: 'email vendor; delivery is asserted through tests/e2e/harness/fakes/email.ts',
   MISTRAL_API_KEY: 'sensitive-AI vendor; SENSITIVE_AI_ENABLED is off in CI',
   MISTRAL_BASE_URL: 'sensitive-AI vendor; SENSITIVE_AI_ENABLED is off in CI',
@@ -107,6 +106,33 @@ function workflowEnvKeys() {
  * STRIPE_BILLING_ENABLED on cost a run for exactly that: three more keys became required, one of
  * them exempted here as "defaulted in env.ts", which it is only while billing is off.
  */
+/**
+ * Flags the *specs* switch on, which the workflow never mentions.
+ *
+ * `startInterviewHarness` writes its `flags` into the runner's `process.env`, so a spec can enable a
+ * feature the job env says nothing about — and `env.ts` then demands that feature's dependencies at
+ * the moment the worker server boots. Reading only the workflow's own flags misses this entirely,
+ * which is how one absent DEEPGRAM_API_KEY took down 26 specs across two shards: the first
+ * interview spec set INTERVIEW_TRANSCRIPTION_ENABLED, its harness threw before teardown could put
+ * the value back, and every spec after it inherited a flag whose dependency was missing.
+ */
+function flagsSpecsEnable() {
+  const enabled = new Set()
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name.endsWith('.ts')) {
+        for (const m of readFileSync(full, 'utf8').matchAll(/flags:\s*\{([^}]*)\}/g)) {
+          for (const f of m[1].matchAll(/([A-Z_][A-Z0-9_]*)\s*:\s*'true'/g)) enabled.add(f[1])
+        }
+      }
+    }
+  }
+  walk(join(root, 'tests/e2e'))
+  return enabled
+}
+
 function conditionalRequirements() {
   const source = readFileSync(join(root, 'src/shared/lib/env.ts'), 'utf8')
   const required = new Map()
@@ -198,9 +224,16 @@ const workflowValues = (() => {
 })()
 
 const unmetConditions = []
+const specFlags = flagsSpecsEnable()
 for (const [flag, keys] of conditional) {
-  if (workflowValues.get(flag) !== 'true') continue
-  for (const key of keys) if (!workflow.has(key)) unmetConditions.push(`${flag}=true requires ${key}`)
+  if (workflowValues.get(flag) !== 'true' && !specFlags.has(flag)) continue
+  for (const key of keys) {
+    // A key with a declared default cannot make the app fail to *parse* for being absent — only for
+    // holding a wrong value, and the default is the app's own answer to that. DEEPGRAM_BASE_URL is
+    // named in one of these branches and defaults to the endpoint the branch demands.
+    if (defaults.has(key)) continue
+    if (!workflow.has(key)) unmetConditions.push(`${flag}=true requires ${key}`)
+  }
 }
 
 const gaps = [...local].filter((key) => used.has(key) && !workflow.has(key) && !(key in CI_RUNS_WITHOUT)).sort()

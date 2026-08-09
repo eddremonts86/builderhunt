@@ -74,6 +74,12 @@ jobs:
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
       WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      # Required the moment a spec turns INTERVIEW_TRANSCRIPTION_ENABLED on, which several do through
+      # `startInterviewHarness`'s flags — and then env.ts refuses to parse and the worker server never
+      # boots. One missing key took down 26 specs across two shards: the first interview spec set the
+      # flag, its harness threw before teardown could restore it, and every spec after it inherited a
+      # flag whose dependency was absent.
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
       GITHUB_TOKEN: ci-only-not-a-real-token
       AI_EMBEDDING_URL: http://localhost:11434/v1/embeddings
       AI_EMBEDDING_MODEL: nomic-embed-text
