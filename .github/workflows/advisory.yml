@@ -36,6 +36,181 @@ jobs:
     name: Visual regression
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # The empty-state baselines are of a signed-in dashboard, so this job stands up the app and needs
+    # the same database and env as any other that does. Built without them, its dev server died on a
+    # ZodError before taking a single screenshot — a failure that reads like a visual regression and
+    # is a missing env block.
+    services:
+      postgres:
+        # Production moved to PostgreSQL 18 on 2026-08-05 (postgres-18-upgrade
+        # Phase 4), so this is once again "the version that is actually
+        # deployed". The transitional second DB-only job that ran the
+        # version-sensitive steps against the newer major is deleted with it —
+        # one DB-bearing job again, pinned to the same major and the same
+        # pgvector build as the production resource `ekq4rkiqtyl5nzzb3cc32kkg`.
+        #
+        # Keep this pin and the production resource's image in lockstep: a plain
+        # `postgres:18` makes `CREATE EXTENSION vector` fail inside migration
+        # 0013, which rolls back every migration in the same transaction.
+        image: pgvector/pgvector:0.8.5-pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: builderhunt_security_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # Required by the E2E harness, not optional. `playwright.config.ts` defaults REDIS_URL to
+      # redis://localhost:6379 and `tests/e2e/harness/cache.ts` refuses to run without it — E2E deliberately
+      # exercises the real cache path, because the in-memory rate-limit fallback is forbidden under
+      # E2E_MODE. Without this service every spec failed with "Connection is closed" against a port
+      # nothing was listening on. Same image and port as the `redis` service in docker-compose.yml, so
+      # local and CI agree.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+      # Not optional here, despite being optional in the app.
+      #
+      # `capability-db.ts` falls back to the worker URL when this is unset, and
+      # `workerDatabaseUrls` only applies its `forceRole` when the source URL names a user
+      # that is *not* already a base role. The worker URL names one, so the fallback kept
+      # `builderhunt_worker` and the public candidate flow connected as the worker.
+      # drizzle/0078 revokes EXECUTE on `scheduling_resolve_capability` from that role and
+      # grants it to `builderhunt_capability`, so every capability exchange raised
+      # `permission denied for function`, which the route catches and reports as a coded
+      # `invalid_input` — about 45 failures across scheduling, interviews, documents and
+      # billing-credits, all reading as one unexplained 400.
+      #
+      # Reproduced locally by removing this variable alone: scheduling.spec.ts goes from 5
+      # failures to 10, with the `permission denied` visible in the server log.
+      DATABASE_CAPABILITY_URL: postgresql://builderhunt_capability:test-capability-password@127.0.0.1:5432/builderhunt_security_test_ci
+      APP_URL: http://localhost:3000
+      VITE_APP_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      # Defaults to 'false' in env.ts; `.env.example` turns it on, which is how it is on
+      # every developer machine. CI has no `.env`, so it ran the calendar surface switched
+      # off and `tests/e2e/calendar.spec.ts` asserted against `503 dependency_unavailable`
+      # instead of the routes it was written for — eight of its eleven failures were that.
+      #
+      # This block used to say CALENDAR_ENABLED was the only flag that belonged here, on the
+      # grounds that SCHEDULING_ENABLED is set per-spec through `startInterviewHarness`'s `flags`
+      # and setting it globally would disturb that restore. Two things were wrong with it. Only
+      # four specs pass that flag, and `.env` sets it globally anyway — so the "leak vector" has
+      # been the local configuration all along, and the suite is green under it. Meanwhile CI ran
+      # every other spec with the feature off, which is the divergence that mattered.
+      CALENDAR_ENABLED: 'true'
+
+      # ── Test-only credentials the app refuses to run without ────────────────────────────────────
+      #
+      # None of these are secrets. They exist because the code checks that a value is *present and
+      # well-formed* before it will do the thing under test, and CI had none of them — so twenty
+      # e2e specs failed here while passing locally, where `.env` supplies them and dotenvx injects
+      # it into every process. That asymmetry is the bug: `scripts/ci/local-quality.sh` cannot
+      # certify a gate whose environment it does not reproduce, and it has now certified a red CI
+      # twice. Anything added to `.env` that the app *requires* has to be mirrored here, with a
+      # CI-only value, or the local gate is measuring a different program.
+      #
+      # Fake on purpose, and visibly so. A real key in a public workflow file would be a leak, and
+      # every one of these paths is stubbed under E2E_MODE — the AI provider by
+      # `tests/e2e/harness/fakes/ai.ts`, outbound calls by the egress fake — so nothing here ever
+      # reaches a third party.
+
+      # Drives the recurrence and retention workers (calendar, interview-privacy). Any non-empty
+      # string; the routes only compare it against the caller's header.
+      CRON_SECRET: ci-only-cron-secret-not-a-real-one
+
+      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
+      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
+      # rather than the assertion — this is 0123456789abcdef four times over.
+      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+      # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
+      # what the AI, work-sample and portfolio specs were actually asserting against.
+      MINIMAX_API_KEY: ci-only-not-a-real-key
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
+      # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
+      # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
+      # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a
+      # local embedding server being up". It still 503'd here, because the guard fires first.
+      # The specs that genuinely need a provider carry @requires-embeddings and the step below
+      # greps them out; this one does not, and should not.
+      AI_EMBEDDING_URL: http://localhost:11434/v1/embeddings
+      AI_EMBEDDING_MODEL: nomic-embed-text
+      AI_EMBEDDING_DIM: '768'
+      # `analyze.ts` documents its precedence: unavailable (503) is answered before the plan
+      # check (429), so without a token the work-sample spec never reaches the assertion it is
+      # named for. The value is never sent anywhere — the egress fake blocks the call.
+      #
+      # Set at job level rather than on the step: Actions reserves the `GITHUB_` prefix for
+      # variables *it* defines, and `GITHUB_TOKEN` is one of them — it is already present in every
+      # job, holding the real, privileged workflow token. Naming it here shadows that token for
+      # this job with a value that cannot authenticate anything, which is both what the app needs
+      # and strictly safer than leaving the privileged one visible to a test suite that shells out.
+      GITHUB_TOKEN: ci-only-not-a-real-token
+      AI_DISABLED: 'false'
+
+      # ── Flags whose local value is not the app default ──────────────────────────────────────────
+      #
+      # Mirrored from `.env` so CI runs the configuration the suite is green against. They arrive in
+      # the runner locally through `tests/e2e/harness/load-env.ts`, which loads `.env` into the test
+      # process — which is why "each spec sets what it needs" looked true and was true of two of
+      # them. `env.ts` defaults every one of these to off, so CI was exercising a different product.
+      SCHEDULING_ENABLED: 'true'
+      CANDIDATE_UPLOADS_ENABLED: 'true'
+      CANDIDATE_WEB_IMPORT_ENABLED: 'true'
+      CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'true'
+      ACCESS_ALLOWLIST_ENABLED: 'true'
+      DEVPOST_ENABLED: 'true'
+      ABUSE_ENFORCEMENT_MODE: warn
+      ENRICHMENT_ALLOWED_CONNECTORS: github
+      # The billing suite drives the fake provider, but the page still renders its unavailable state
+      # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
+      # going to exist.
+      STRIPE_BILLING_ENABLED: 'true'
+      # Turning billing on makes env.ts require these three. Prefix-validated, so a bare
+      # placeholder fails validation rather than a test. The suite drives the fake provider and
+      # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
+      # well-formed and consistent — the real test-mode keys live in the sandbox job.
+      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
+      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
+      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
+      # or three suites will point a key that authenticates nothing at the real Stripe API.
+      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
+      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
+      STRIPE_API_VERSION: 2026-06-24.dahlia
+
+      # Where the documents suite puts candidate uploads and what scans them. The containers are
+      # started in a step below, because a service container cannot be given a command.
+      #
+      # CANDIDATE_UPLOADS_ENABLED is deliberately NOT set here — `documents.spec.ts` turns it on
+      # through `startInterviewHarness`'s `flags`, for the same reason SCHEDULING_ENABLED is left
+      # to the specs above. These endpoint vars still belong in the job env: `env.ts` validates
+      # them the moment that flag is true, and it validates in the worker process, which inherits
+      # this block. 127.0.0.1 satisfies `isPrivateStorageHost`, so no jurisdiction rule applies.
+      INTERVIEW_R2_ACCOUNT_ID: minio
+      INTERVIEW_R2_ENDPOINT: http://127.0.0.1:9000
+      INTERVIEW_R2_BUCKET: builderhunt-interview-documents
+      INTERVIEW_R2_ACCESS_KEY_ID: builderhunt
+      INTERVIEW_R2_SECRET_ACCESS_KEY: builderhunt-local-dev
+      INTERVIEW_CLAMAV_HOST: 127.0.0.1
+      INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -190,6 +365,7 @@ jobs:
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
       # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
       # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
       # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a
@@ -267,6 +443,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # The base roles first. `quality.yml` runs these long before its preview block, so the block
+      # copied from it assumed they existed — here nothing had created them, so the migrations had no
+      # roles to grant to, the seed wrote nothing, and the admin read-back below came up empty.
+      - run: pnpm test:migrations:local
+      - run: node scripts/db/prepare-rls-fixture.mjs
+
       - name: Migrate + seed admin for the production-preview accessibility gate
         run: |
           pnpm exec drizzle-kit migrate

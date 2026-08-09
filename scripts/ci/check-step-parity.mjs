@@ -73,18 +73,28 @@ function envBlocksAgree() {
   // Only the two jobs that boot the app. The Stripe certification job carries a deliberately
   // different env — comparing every block in the file reported 38 differences, all of them correct
   // and none of them a problem, which is the shape of a check nobody will keep.
-  const envOf = (job) => {
-    const block = new RegExp(`^ {2}${job}:$([\\s\\S]*?)^ {4}steps:$`, 'm').exec(source)
+  const sources = {
+    quality: source,
+    advisory: readFileSync(join(root, '.github/workflows/advisory.yml'), 'utf8'),
+  }
+  const envOf = (job, file) => {
+    const block = new RegExp(`^ {2}${job}:$([\\s\\S]*?)^ {4}steps:$`, 'm').exec(sources[file])
     if (!block) return null
     const env = /^ {4}env:$([\s\S]*)$/m.exec(block[1])
     return env ? new Set([...env[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((k) => k[1])) : null
   }
-  const quality = envOf('quality')
-  const e2e = envOf('e2e')
-  if (!quality || !e2e) return []
+  const quality = envOf('quality', 'quality')
+  if (!quality) return []
   const problems = []
-  for (const key of quality) if (!e2e.has(key)) problems.push(`the e2e job is missing ${key}`)
-  for (const key of e2e) if (!quality.has(key)) problems.push(`the e2e job has an extra ${key}`)
+  // Every job that boots the app needs the same environment. `advisory.yml`'s visual job was built
+  // without one at all, and its dev server died on a ZodError before taking a screenshot — a failure
+  // that reads like a visual regression and is a missing env block.
+  for (const [file, job] of [['quality', 'e2e'], ['advisory', 'visual'], ['advisory', 'lighthouse']]) {
+    const other = envOf(job, file)
+    if (!other) continue
+    for (const key of quality) if (!other.has(key)) problems.push(`${file}.yml's ${job} job is missing ${key}`)
+    for (const key of other) if (!quality.has(key)) problems.push(`${file}.yml's ${job} job has an extra ${key}`)
+  }
   return problems
 }
 
