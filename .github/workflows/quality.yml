@@ -127,6 +127,15 @@ jobs:
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
+      # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
+      # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a
+      # local embedding server being up". It still 503'd here, because the guard fires first.
+      # The specs that genuinely need a provider carry @requires-embeddings and the step below
+      # greps them out; this one does not, and should not.
+      AI_EMBEDDING_URL: http://localhost:11434/v1/embeddings
+      AI_EMBEDDING_MODEL: nomic-embed-text
+      AI_EMBEDDING_DIM: '768'
       # `analyze.ts` documents its precedence: unavailable (503) is answered before the plan
       # check (429), so without a token the work-sample spec never reaches the assertion it is
       # named for. The value is never sent anywhere — the egress fake blocks the call.

@@ -48,11 +48,8 @@ const CI_RUNS_WITHOUT = {
   MISTRAL_MODEL: 'sensitive-AI vendor; SENSITIVE_AI_ENABLED is off in CI',
   SENSITIVE_AI_ENABLED: 'off in CI — the EU-region vendor rules need a real Azure/Mistral deployment',
   SENSITIVE_AI_PROVIDER: 'only read when SENSITIVE_AI_ENABLED is true',
-  AI_EMBEDDING_URL: 'the embeddings service is a local Ollama container; specs needing it are tagged @requires-embeddings and CI greps them out',
-  AI_EMBEDDING_API_KEY: 'see AI_EMBEDDING_URL',
-  AI_EMBEDDING_MODEL: 'see AI_EMBEDDING_URL',
-  AI_EMBEDDING_DIM: 'see AI_EMBEDDING_URL',
-  AI_EMBEDDING_TIMEOUT_MS: 'see AI_EMBEDDING_URL',
+  AI_EMBEDDING_API_KEY: 'the local Ollama container needs no key, and the E2E stub never calls out',
+  AI_EMBEDDING_TIMEOUT_MS: 'defaulted; the E2E stub answers synchronously',
   MINIMAX_BASE_URL: 'defaulted in env.ts; the AI path is stubbed by fakes/ai.ts under E2E_MODE',
   MINIMAX_MODEL: 'defaulted in env.ts; the AI path is stubbed by fakes/ai.ts under E2E_MODE',
 

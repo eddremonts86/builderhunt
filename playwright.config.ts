@@ -89,7 +89,18 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: defaultWorkers,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
-  timeout: 30_000,
+  // 30s locally, 90s on CI.
+  //
+  // Not a concession to flake. The e2e harness runs `vite dev`, which compiles a route tree the
+  // first time something asks for it, and a cold GitHub runner is several times slower at that than
+  // a developer laptop with a warm cache. Specs that cross two route trees — `/admin/claims`
+  // redirecting a non-admin to the dashboard, the calendar page — spent the whole 30s budget on
+  // compilation and failed with a screenshot showing skeletons, which reads as a broken page and is
+  // a build step. Individual specs already carry `test.setTimeout(120_000)` for exactly this, with
+  // the same explanation; this stops the next one having to rediscover it.
+  //
+  // Production never pays it: it serves a build, not a dev server.
+  timeout: process.env.CI ? 90_000 : 30_000,
   use: {
     baseURL,
     trace: 'retain-on-failure',
