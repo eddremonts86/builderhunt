@@ -72,7 +72,6 @@ jobs:
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
       CALENDAR_ENABLED: 'true'
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
-      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       MINIMAX_API_KEY: ci-only-not-a-real-key
       # Required the moment a spec turns INTERVIEW_TRANSCRIPTION_ENABLED on, which several do through
       # `startInterviewHarness`'s flags — and then env.ts refuses to parse and the worker server never
@@ -94,8 +93,6 @@ jobs:
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       STRIPE_BILLING_ENABLED: 'true'
-      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
-      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
       INTERVIEW_R2_ACCOUNT_ID: minio
       INTERVIEW_R2_ENDPOINT: http://127.0.0.1:9000
@@ -106,6 +103,20 @@ jobs:
       INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10

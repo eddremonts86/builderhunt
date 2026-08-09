@@ -64,7 +64,6 @@ const CI_RUNS_WITHOUT = {
   // ── Supplied by other means in CI ───────────────────────────────────────────────────────────
   REDIS_URL: 'playwright.config.ts defaults it to the redis service on 6379',
   NODE_ENV: 'set by the tooling that runs each step, not by the job',
-  ADMIN_USER_IDS: 'exported into $GITHUB_ENV after seeding, from the row seed-admin.ts just wrote — the id is random per run so it cannot be a literal',
 
   // ── Tuning with defaults that CI has no reason to override ──────────────────────────────────
   AI_DISABLED_TASKS: 'defaulted to empty',
@@ -90,12 +89,25 @@ const DIVERGENCE_ACCEPTED = {
   SENSITIVE_AI_ENABLED: 'needs a real EU Azure/Mistral deployment, which env.ts validates by region',
 }
 
+/**
+ * Keys a workflow step writes into `$GITHUB_ENV`, which are as present as any `env:` entry.
+ *
+ * Three of them are minted per run rather than written down — the Stripe pair and the webhook
+ * encryption key — because `env.ts` validates their shape and a placeholder carrying that shape is
+ * indistinguishable from a leak to a secret scanner. Reading only the `env:` block would report them
+ * missing and be wrong.
+ */
+function keysSetAtRuntime(source) {
+  return new Set([...source.matchAll(/^\s*echo "([A-Z_][A-Z0-9_]*)=/gm)].map((m) => m[1]))
+}
+
 /** The quality job's `env:` block — six-space keys between `quality:` and its `steps:`. */
 function workflowEnvKeys() {
   const source = readFileSync(join(root, '.github/workflows/quality.yml'), 'utf8')
   const job = /^ {2}quality:$([\s\S]*?)^ {4}steps:$/m.exec(source)
   if (!job) throw new Error('Could not find the quality job\'s env block in .github/workflows/quality.yml')
-  return new Set([...job[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((m) => m[1]))
+  const declared = [...job[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((m) => m[1])
+  return new Set([...declared, ...keysSetAtRuntime(source)])
 }
 
 /**

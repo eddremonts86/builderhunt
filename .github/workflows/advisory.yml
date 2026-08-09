@@ -137,10 +137,6 @@ jobs:
       # string; the routes only compare it against the caller's header.
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
 
-      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
-      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
-      # rather than the assertion — this is 0123456789abcdef four times over.
-      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
@@ -185,16 +181,6 @@ jobs:
       # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
       # going to exist.
       STRIPE_BILLING_ENABLED: 'true'
-      # Turning billing on makes env.ts require these three. Prefix-validated, so a bare
-      # placeholder fails validation rather than a test. The suite drives the fake provider and
-      # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
-      # well-formed and consistent — the real test-mode keys live in the sandbox job.
-      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
-      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
-      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
-      # or three suites will point a key that authenticates nothing at the real Stripe API.
-      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
-      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
 
       # Where the documents suite puts candidate uploads and what scans them. The containers are
@@ -214,6 +200,20 @@ jobs:
       INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
@@ -361,10 +361,6 @@ jobs:
       # string; the routes only compare it against the caller's header.
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
 
-      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
-      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
-      # rather than the assertion — this is 0123456789abcdef four times over.
-      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
@@ -409,16 +405,6 @@ jobs:
       # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
       # going to exist.
       STRIPE_BILLING_ENABLED: 'true'
-      # Turning billing on makes env.ts require these three. Prefix-validated, so a bare
-      # placeholder fails validation rather than a test. The suite drives the fake provider and
-      # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
-      # well-formed and consistent — the real test-mode keys live in the sandbox job.
-      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
-      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
-      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
-      # or three suites will point a key that authenticates nothing at the real Stripe API.
-      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
-      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
 
       # Where the documents suite puts candidate uploads and what scans them. The containers are
@@ -438,6 +424,20 @@ jobs:
       INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
@@ -617,6 +617,20 @@ jobs:
       # skipped, and a green tick is not a place anyone looks for a missing secret.
       - run: echo "✅ Certifying against real test-mode Stripe." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
