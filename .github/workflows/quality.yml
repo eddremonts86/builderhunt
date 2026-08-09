@@ -161,6 +161,10 @@ jobs:
       # placeholder fails validation rather than a test. The suite drives the fake provider and
       # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
       # well-formed and consistent — the real test-mode keys live in the sandbox job.
+      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
+      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
+      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
+      # or three suites will point a key that authenticates nothing at the real Stripe API.
       STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
       STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
@@ -496,13 +500,26 @@ jobs:
       STRIPE_API_VERSION: '2026-06-24.dahlia'
       RUN_STRIPE_INTEGRATION_TESTS: '1'
     steps:
+      # Two things this step has to get right, because the job is `continue-on-error: true` and
+      # every step below is conditional — so it reports success whether it certified anything or
+      # did nothing at all, and "Stripe sandbox certification: success" reads like the former.
+      #
+      #   1. Test the variable the steps are actually gated on, and name that one. It used to test
+      #      STRIPE_SECRET_KEY and report about STRIPE_SANDBOX_SECRET_KEY. Harmless while both come
+      #      from one secret, which is today — but the comment above exists precisely because the
+      #      two names are meant to be able to differ, and then the guard would announce a
+      #      certification it was skipping.
+      #   2. Put the outcome in the run summary, not only in a step log. A skip nobody sees is a
+      #      suite that has quietly not run since the secret was last configured.
       - name: Report whether a Stripe test-mode key is configured
-        # Named so the reason for a no-op job is visible in the run without opening a step.
         run: |
           if [ -n "$STRIPE_SECRET_KEY" ]; then
-            echo "Stripe test-mode key configured — running certification."
+            echo "STRIPE_SANDBOX_SECRET_KEY is configured — running the three certification suites."
+            echo "✅ Stripe sandbox certification ran against real test-mode Stripe." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No STRIPE_SANDBOX_SECRET_KEY configured — skipping certification (not a failure)."
+            echo "STRIPE_SANDBOX_SECRET_KEY is not configured — skipping (deliberate, not a failure)."
+            echo "⏭️ Stripe sandbox certification **skipped**: no STRIPE_SANDBOX_SECRET_KEY repository secret." >> "$GITHUB_STEP_SUMMARY"
+            echo "This job is advisory (\`continue-on-error\`), so its green never means the certification ran." >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/checkout@v7
         if: env.STRIPE_SECRET_KEY != ''
