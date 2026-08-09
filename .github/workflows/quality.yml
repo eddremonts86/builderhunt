@@ -920,8 +920,9 @@ jobs:
 
           # Embeddings. Same image and model as docker-compose's `embeddings` service, started the
           # same way — `ollama serve` in the background, then pull the model it will be asked for.
-          # Without it the semantic-search specs are excluded from CI with `--grep-invert`, which is
-          # a whole retrieval path that only ever runs on a developer's laptop.
+          # Without it the semantic-search specs had to be excluded with `--grep-invert`, which left a
+          # whole retrieval path — semantic ranking, cursor invalidation — running only on a
+          # developer's laptop.
           docker run -d --name ollama -p 11434:11434 --entrypoint /bin/sh ollama/ollama:latest \
             -c 'ollama serve & pid=$!; sleep 3; ollama pull nomic-embed-text; wait $pid'
           for i in $(seq 1 90); do
