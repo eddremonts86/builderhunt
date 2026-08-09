@@ -1,0 +1,179 @@
+name: Refresh Linux visual baselines
+
+# The button that did not exist.
+#
+# Baselines are named per project *and* per platform, so the gate compares against `*-linux.png`
+# while a developer can only produce `*-darwin.png`. `tests/README.md` and plan 50 both say to run
+# `pnpm test:visual --update-snapshots` and commit the result — which regenerates the darwin half and
+# leaves the linux half at whatever it was on 2026-08-03. Nobody here has a Linux machine, so the
+# linux baselines have had no way to follow a deliberate UI change since the day they were committed.
+#
+# What that cost: the table-shell migration changed the alerts empty state, and
+# `empty-alerts-visual-mobile-linux.png` still showed the pre-migration layout. It failed at ratio
+# 0.02 against a 0.01 threshold. Its desktop twin was stale in exactly the same way and *passed*, at
+# roughly 0.0098 — the same defect, one coin-flip away from being invisible. A gate whose baselines
+# cannot be updated does not stay honest; it drifts until the diffs are large enough to notice.
+#
+# So: dispatch this after any intentional visual change, download the artifact, and commit the
+# `-linux.png` files it contains. Nothing here writes to the repository — see below for why.
+
+on:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'Optional -g filter, to refresh one group instead of all 22 baselines'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-baselines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baselines:
+    name: Regenerate and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Same services and env as `advisory.yml`'s visual job, because this runs the same specs against
+    # the same signed-in dashboard. The reasoning behind each entry lives there and is not repeated
+    # here — but `scripts/ci/check-step-parity.mjs` compares this block against the quality job's, so
+    # a key added there and not here is a failed gate rather than a mystery at 03:00.
+    services:
+      postgres:
+        # Keep in lockstep with the production resource's image: a plain `postgres:18` makes
+        # `CREATE EXTENSION vector` fail inside migration 0013, rolling back every migration with it.
+        image: pgvector/pgvector:0.8.5-pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: builderhunt_security_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_CAPABILITY_URL: postgresql://builderhunt_capability:test-capability-password@127.0.0.1:5432/builderhunt_security_test_ci
+      APP_URL: http://localhost:3000
+      VITE_APP_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      CALENDAR_ENABLED: 'true'
+      CRON_SECRET: ci-only-cron-secret-not-a-real-one
+      MINIMAX_API_KEY: ci-only-not-a-real-key
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
+      AI_EMBEDDING_URL: http://localhost:11434/v1/embeddings
+      AI_EMBEDDING_MODEL: nomic-embed-text
+      AI_EMBEDDING_DIM: '768'
+      GITHUB_TOKEN: ci-only-not-a-real-token
+      AI_DISABLED: 'false'
+      SCHEDULING_ENABLED: 'true'
+      CANDIDATE_UPLOADS_ENABLED: 'true'
+      CANDIDATE_WEB_IMPORT_ENABLED: 'true'
+      CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'true'
+      ACCESS_ALLOWLIST_ENABLED: 'true'
+      DEVPOST_ENABLED: 'true'
+      ABUSE_ENFORCEMENT_MODE: warn
+      ENRICHMENT_ALLOWED_CONNECTORS: github
+      STRIPE_BILLING_ENABLED: 'true'
+      STRIPE_API_VERSION: 2026-06-24.dahlia
+      INTERVIEW_R2_ACCOUNT_ID: minio
+      INTERVIEW_R2_ENDPOINT: http://127.0.0.1:9000
+      INTERVIEW_R2_BUCKET: builderhunt-interview-documents
+      INTERVIEW_R2_ACCESS_KEY_ID: builderhunt
+      INTERVIEW_R2_SECRET_ACCESS_KEY: builderhunt-local-dev
+      INTERVIEW_CLAMAV_HOST: 127.0.0.1
+      INTERVIEW_CLAMAV_PORT: '3310'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # `empty-states.spec.ts` drives the worker harness, which serves `dist/`.
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # `--update-snapshots` reports a test whose baseline it had to write as failed, so its exit
+      # code says "snapshots changed", not "something is wrong". The verification run below is what
+      # decides that — and it is the half that matters: a baseline captured from a page that had not
+      # settled will be rewritten happily here and then fail on the very next push.
+      - name: Rewrite the Linux baselines
+        run: pnpm test:visual --update-snapshots ${{ inputs.grep && format('-g "{0}"', inputs.grep) || '' }} || true
+
+      - name: Show what moved
+        run: |
+          git -c core.fileMode=false status --porcelain -- 'tests/e2e/visual/**' | tee /tmp/moved.txt
+          if [ ! -s /tmp/moved.txt ]; then
+            echo "No baseline changed — the committed ones already match this runner." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### Baselines rewritten"
+              echo
+              echo '```'
+              cat /tmp/moved.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # The precondition for committing any of this. A baseline is only worth having if a bare run
+      # against it passes twice in a row — the first `--update-snapshots` pass proves nothing, since
+      # it accepts whatever it saw, including a half-rendered page.
+      - name: Verify the new baselines are stable
+        run: pnpm test:visual ${{ inputs.grep && format('-g "{0}"', inputs.grep) || '' }}
+
+      # Uploaded, not committed. This workflow holds `contents: read` and there is no bot identity
+      # here worth minting one for: a push from CI to a protected branch needs a token that can
+      # bypass its own gate, which is a larger hole than the manual step it saves. Download, unzip
+      # over `tests/e2e/visual/`, look at the diff, commit what you meant to change.
+      - name: Upload the regenerated baselines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-visual-baselines
+          path: tests/e2e/visual/**/*-linux.png
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload diffs from the verification run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-diffs
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: ignore

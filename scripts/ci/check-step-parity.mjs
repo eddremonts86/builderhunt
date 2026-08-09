@@ -55,6 +55,21 @@ function pnpmScripts(source) {
  */
 const CHECKING_WORKFLOWS = ['.github/workflows/quality.yml', '.github/workflows/advisory.yml']
 
+/**
+ * Every workflow that stands the app up and drives a Playwright suite.
+ *
+ * Wider than CHECKING_WORKFLOWS on purpose. The two above are the ones whose *checks* must exist
+ * locally; these two also exist, run the same harness, and have the same two ways of being broken —
+ * a missing `pnpm build` and an env block copied by hand. `nightly-serial.yml` is not in
+ * CHECKING_WORKFLOWS because it re-runs the e2e suite unsharded and would only duplicate entries;
+ * `visual-baselines.yml` is not, because it is dispatch-only and refreshes baselines rather than
+ * checking anything. Neither exemption applies to the build and env checks below.
+ */
+const SUITE_RUNNING_WORKFLOWS = CHECKING_WORKFLOWS.concat(
+  '.github/workflows/nightly-serial.yml',
+  '.github/workflows/visual-baselines.yml',
+)
+
 function workflowScripts() {
   const found = new Set()
   for (const file of CHECKING_WORKFLOWS) {
@@ -76,6 +91,7 @@ function envBlocksAgree() {
   const sources = {
     quality: source,
     advisory: readFileSync(join(root, '.github/workflows/advisory.yml'), 'utf8'),
+    'visual-baselines': readFileSync(join(root, '.github/workflows/visual-baselines.yml'), 'utf8'),
   }
   const envOf = (job, file) => {
     const block = new RegExp(`^ {2}${job}:$([\\s\\S]*?)^ {4}steps:$`, 'm').exec(sources[file])
@@ -89,7 +105,15 @@ function envBlocksAgree() {
   // Every job that boots the app needs the same environment. `advisory.yml`'s visual job was built
   // without one at all, and its dev server died on a ZodError before taking a screenshot — a failure
   // that reads like a visual regression and is a missing env block.
-  for (const [file, job] of [['quality', 'e2e'], ['advisory', 'visual'], ['advisory', 'lighthouse']]) {
+  for (const [file, job] of [
+    ['quality', 'e2e'],
+    ['advisory', 'visual'],
+    ['advisory', 'lighthouse'],
+    // Dispatch-only, and the one place a hand-copied env block is *least* likely to be noticed: it
+    // runs when someone changes the UI, months apart, and a missing key there produces a rewritten
+    // baseline of an error page rather than a failure.
+    ['visual-baselines', 'baselines'],
+  ]) {
     const other = envOf(job, file)
     if (!other) continue
     for (const key of quality) if (!other.has(key)) problems.push(`${file}.yml's ${job} job is missing ${key}`)
@@ -114,7 +138,7 @@ const exempt = (script) =>
  */
 function jobsMissingABuild() {
   const problems = []
-  for (const file of CHECKING_WORKFLOWS.concat('.github/workflows/nightly-serial.yml')) {
+  for (const file of SUITE_RUNNING_WORKFLOWS) {
     const source = readFileSync(join(root, file), 'utf8')
     // Only inside `jobs:` — an earlier version matched two-space keys anywhere and counted `push:`
     // from the trigger block as a job.
