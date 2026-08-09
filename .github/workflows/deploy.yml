@@ -58,6 +58,23 @@ jobs:
       # `/api/health` is deliberately static: it proves the process is serving. The second probe asks
       # for a real page, because a process that answers a constant and nothing else is exactly the
       # failure above.
+      # `builderhunt.dev` — the canonical host since 2026-08-09, and it serves the app.
+      #
+      # For twelve days before that it did not. The domain's DNS sat on Porkbun's URL-forwarding
+      # service, which answered 302 on *every* path and sent all of them to the root of
+      # `builderhunt.eduardoinerarte.dk` without preserving the path, so `builderhunt.dev/api/health`
+      # landed on the homepage. `plans/phase-1/54-waitlist-launch/tasks.md` recorded that a checklist
+      # run against `.dev` "literally produces sixteen 302s". This step was written against `.dev`
+      # anyway and would have failed the first green deploy on a perfectly healthy production — it
+      # never executed to prove it, because no deploy had run since 2026-07-28.
+      #
+      # It is correct now for a reason, not by luck: the apex and `www` A records point at the Coolify
+      # host, `builderhunt.dev` is the application's primary FQDN with its own certificate, and
+      # `APP_URL`/`VITE_APP_URL` name it in all four Coolify env rows.
+      #
+      # Deliberately no `-L`. If this domain ever goes back to redirecting, following the redirect
+      # would reach a 200 homepage and call it health — the failure this step exists to prevent, one
+      # level more subtle. The body assertion below is the second lock on that door.
       - name: Verify production actually answers
         run: |
           set -uo pipefail
@@ -69,7 +86,15 @@ jobs:
             [ "$i" = 30 ] && { echo "::error::$BASE/api/health never returned 200 after the deploy"; exit 1; }
             sleep 5
           done
-          echo "health ok"
+
+          # The status code alone cannot tell "the app is healthy" from "a proxy answered for it".
+          # `/api/health` returns `{"ok":true,...}` and nothing else does, so this is the assertion that
+          # a redirect, a maintenance page or a CDN error page cannot satisfy.
+          body=$(curl -sS --max-time 10 "$BASE/api/health" || echo '')
+          case "$body" in
+            *'"ok":true'*) echo "health ok" ;;
+            *) echo "::error::$BASE/api/health answered 200 but the body was not the health payload: $body"; exit 1 ;;
+          esac
 
           page=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/" || echo 000)
           if [ "$page" != "200" ]; then

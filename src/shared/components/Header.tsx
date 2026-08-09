@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from '@tanstack/react-router'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { Button, LinkButton } from '~/components/ui'
 import { ChevronDown, LayoutDashboard, LogOut, Menu } from 'lucide-react'
-import { useSession, signOut } from '~/shared/lib/auth/client'
+import { signOut } from '~/shared/lib/auth/client'
 import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
 import { PublicNavDrawer, type PublicNavGroup } from '~/shared/components/PublicNavDrawer'
 import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
@@ -64,8 +64,22 @@ function NavGroupMenu({ group }: { group: PublicNavGroup }) {
   )
 }
 
-export function Header() {
-  const session = useSession()
+export interface HeaderProps {
+  /**
+   * Passed in rather than read from `useSession()` here.
+   *
+   * A client hook gives the server no answer, so this header rendered signed-out during SSR and
+   * possibly signed-in on the client's first pass — a hydration mismatch, and a flash of the wrong
+   * CTA. The caller resolves the session in `beforeLoad`, where the server can answer.
+   *
+   * A prop rather than route context because this component lives in `shared/`: `_landing/route.tsx`
+   * is its only call site today, and reading `useRouteContext({ from: '/_landing' })` from here would
+   * pin a shared component to one route id.
+   */
+  isAuthed: boolean
+}
+
+export function Header({ isAuthed }: HeaderProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [signingOut, setSigningOut] = React.useState(false)
@@ -85,8 +99,6 @@ export function Header() {
       navigate({ to: '/' })
     }
   }
-
-  const isAuthed = !!session.data?.user
 
   return (
     <header

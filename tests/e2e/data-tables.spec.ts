@@ -322,9 +322,16 @@ for (const surface of SURFACES) {
         await chip.click()
         await expect(chip).toHaveAttribute('aria-pressed', 'true')
 
+        // `expect.poll`, not a one-shot `getAttribute`. `aria-pressed` above is the chip's own
+        // optimistic state and flips on click, so it says nothing about the filtered query having
+        // resolved — and a bare `getAttribute` has no retry, unlike every `expect(locator)` in this
+        // file. It read the pre-filter count of exactly SEEDED_ROWS + 1 on CI and failed there while
+        // passing everywhere else, which is what that window looks like from outside.
         const grid = page.locator('[role="grid"]')
-        const narrowed = Number(await grid.getAttribute('aria-rowcount'))
-        expect(narrowed).toBeLessThan(SEEDED_ROWS + 1)
+        await expect.poll(
+          async () => Number(await grid.getAttribute('aria-rowcount')),
+          { timeout: 10_000 },
+        ).toBeLessThan(SEEDED_ROWS + 1)
         // Its own count did not collapse to the filtered set.
         await expect(chip).toHaveText(before!.trim())
       } finally {

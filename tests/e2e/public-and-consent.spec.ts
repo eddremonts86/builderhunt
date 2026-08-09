@@ -33,6 +33,7 @@ import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
 import {
   expectStrictBrowser,
   gotoHydrated,
+  waitForHydration,
   dismissOverlays,
   type StrictBrowserGuard,
 } from './harness/browser'
@@ -358,17 +359,13 @@ test.describe('consent API', () => {
 test.describe('ToS acceptance lifecycle', () => {
   test('signed-in user without current ToS consent is blocked by the modal; accepting persists and unblocks', async ({ browser }) => {
     const { tosUser, sql, baseURL } = harness
-    await withPage(browser, tosUser.storageState!, async (page, guard) => {
-      // KNOWN PRODUCT ISSUE (do not copy this pattern casually): when a
-      // signed-in user loads a _landing page, the server renders the
-      // signed-out header (Sign in / Get started) while the client can
-      // already have the session by hydration time, so React logs a
-      // recoverable "Hydration failed" error for the session-dependent
-      // header CTA. It is racy — it may or may not fire — and is unrelated
-      // to the consent lifecycle under test. Tracked as a plan issue; these
-      // one-shot allowances keep the strict guard armed for everything else.
-      // (one console + one pageerror per full page load; two loads here)
-      for (let i = 0; i < 4; i++) guard.allowExpectedFailure(/Hydration failed|error while hydrating/)
+    await withPage(browser, tosUser.storageState!, async (page) => {
+      // This used to carry four one-shot `allowExpectedFailure(/Hydration failed/)` allowances for a
+      // documented product issue: `_landing` resolved the session with `useSession()`, a client hook,
+      // so the server rendered the signed-out header for a signed-in visitor and the client's first
+      // render could disagree. The allowances are gone because the cause is: `_landing/route.tsx`
+      // resolves the session in `beforeLoad`, on the server. The strict guard is now armed here with
+      // no exemptions at all, which is the only version of it worth having.
       await gotoHydrated(page, `${baseURL}/`)
 
       const modal = page.getByTestId('tos-modal')
@@ -393,8 +390,15 @@ test.describe('ToS acceptance lifecycle', () => {
       expect(rows.map((r) => r.version)).toContain(CURRENT_CONSENT_VERSIONS.tos)
 
       // …and a full reload no longer shows the modal.
+      //
+      // `reload()` then `waitForHydration`, not `reload()` then `gotoHydrated` — the latter was a
+      // *third* full page load doing nothing the reload had not already done. It mattered while the
+      // hydration allowances above existed, because it put three racy loads against a budget of
+      // four messages; it is kept this way now because the redundant navigation was never the point.
+      // `reload()` only resolves once the new document is committed, and `waitForHydration`'s own
+      // docblock says it is safe to call after one.
       await page.reload()
-      await gotoHydrated(page, `${baseURL}/`)
+      await waitForHydration(page)
       await expect(page.getByTestId('tos-modal')).toHaveCount(0)
     })
 
@@ -410,6 +414,59 @@ test.describe('ToS acceptance lifecycle', () => {
       await expect(page.getByTestId('tos-modal')).toHaveCount(0)
       await expect(page.getByTestId('legal-terms')).toBeVisible()
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Landing SSR — the session has to be resolved before the HTML is sent
+// ---------------------------------------------------------------------------
+
+/**
+ * The regression test for the hydration mismatch, asserted where it is deterministic.
+ *
+ * `_landing` used to resolve the session with `useSession()`, a client hook with no answer during
+ * SSR. So the server sent the signed-out header to a signed-in visitor, the client rendered the
+ * signed-in one, and React reported a hydration mismatch (#418) — racy, because it depended on
+ * whether the session had arrived by hydration time. Two CI runs went red on it, and only on Linux
+ * serving the production build; ten repeat-each runs on macOS could not reproduce it either way.
+ *
+ * So this does not test the race. It tests the property the race was a symptom of: what the server
+ * puts in the HTML. That is a single request with a cookie jar, identical on every platform, and it
+ * fails loudly if anyone puts a client-only session read back into this tree.
+ *
+ * Markers are the header's own, and each is unique on `/`: `Sign out` exists only in Header's authed
+ * branch, `Get started` only in its anonymous one (the footer's equivalent link reads "Create
+ * account", and the mobile drawer renders nothing while closed). `Go to dashboard` covers HomePage's
+ * hero CTA, which had the same bug.
+ */
+test.describe('landing SSR session resolution', () => {
+  test('the served HTML shows a signed-in visitor the signed-in header, not the signed-out one', async () => {
+    const { voter, baseURL } = harness
+    const authed = await newApiContext(baseURL, voter.storageState!)
+    try {
+      const response = await authed.get('/')
+      expect(response.ok()).toBe(true)
+      const html = await response.text()
+      expect(html).toContain('Sign out')
+      expect(html).toContain('Go to dashboard')
+      expect(html).not.toContain('Get started')
+    } finally {
+      await authed.dispose()
+    }
+  })
+
+  test('and shows an anonymous visitor the signed-out header', async () => {
+    const anonymous = await newApiContext(harness.baseURL)
+    try {
+      const response = await anonymous.get('/')
+      expect(response.ok()).toBe(true)
+      const html = await response.text()
+      expect(html).toContain('Get started')
+      expect(html).not.toContain('Sign out')
+      expect(html).not.toContain('Go to dashboard')
+    } finally {
+      await anonymous.dispose()
+    }
   })
 })
 
@@ -575,9 +632,6 @@ test.describe('public roadmap', () => {
   test('a signed-in user can vote and un-vote from the browser; the toggle is reflected in count and style', async ({ browser }) => {
     const { voter, baseURL } = harness
     await withPage(browser, voter.storageState!, async (page, guard) => {
-      // Same racy signed-in header hydration mismatch as documented in the
-      // ToS lifecycle test — one page load here.
-      for (let i = 0; i < 2; i++) guard.allowExpectedFailure(/Hydration failed|error while hydrating/)
       await gotoHydrated(page, `${baseURL}/roadmap`)
       await dismissOverlays(page)
 

@@ -55,6 +55,17 @@ const zodEnv = z.object({
   BETTER_AUTH_SECRET: z.string().optional(),
   APP_URL: z.string().min(1, 'APP_URL is required').transform(ensureProtocol),
   VITE_APP_URL: z.string().min(1, 'VITE_APP_URL is required').transform(ensureProtocol),
+  /**
+   * Hostnames the app no longer answers for, comma separated — each 301s to APP_URL.
+   *
+   * Production only, and only because production is the only place with a second hostname:
+   * `builderhunt.eduardoinerarte.dk` was the address until 2026-08-09 and still resolves. Left unset
+   * — as it is on every developer machine and in CI — `canonicalHostMiddleware` is a no-op.
+   *
+   * A host equal to APP_URL's own is discarded rather than honoured, so this cannot be pointed at
+   * itself to make a redirect loop.
+   */
+  CANONICAL_HOST_REDIRECT_FROM: z.string().optional(),
   GITHUB_TOKEN: z.string().optional(),
   REDDIT_CLIENT_ID: z.string().optional(),
   REDDIT_CLIENT_SECRET: z.string().optional(),

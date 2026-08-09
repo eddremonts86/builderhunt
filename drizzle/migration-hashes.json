@@ -652,6 +652,10 @@
     "0162_alerts_keyset_indexes": {
       "sql": "1c39ef303bce508bac309a3bf9af091fe439f3b74747c572a7d94b3ef28c1e96",
       "snapshot": "4df1f605eb2bee9f84b2d2a67a1e5ffc516ec75f89b6e38dac0377f6c50b10dc"
+    },
+    "0163_reseed_search_source_register": {
+      "sql": "cc69394260f743643c8d44b3d3cd3114743a133094a68efbdcb2f02d93bacc52",
+      "snapshot": "c0263b428d20aa6ed06486eba1dca5d8bf1186edc9117a389ef4acbaf04623ff"
     }
   }
 }
