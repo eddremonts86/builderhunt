@@ -256,6 +256,9 @@ jobs:
           name: visual-diffs
           path: test-results/
           retention-days: 14
+          # A job that dies before taking a screenshot leaves nothing here, and the default is to warn
+          # about it — an annotation that reads like a second failure and is the absence of one.
+          if-no-files-found: ignore
 
   lighthouse:
     name: Lighthouse budgets
