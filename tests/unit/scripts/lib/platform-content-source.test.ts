@@ -12,7 +12,7 @@ import {
   roadmapItemId,
   serializeChangelogEntry,
   serializeRoadmapItem,
-} from '~/shared/lib/platform-content-source'
+} from '../../../../scripts/lib/platform-content-source'
 
 const CHANGELOG = `---
 title: A thing shipped

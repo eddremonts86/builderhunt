@@ -262,6 +262,7 @@ jobs:
         run: pg_dump --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:migration-integrity
+      - run: pnpm test:deploy-imports
       - run: pnpm exec drizzle-kit check
       - run: pnpm test:migrations:local
       - run: node scripts/db/prepare-rls-fixture.mjs

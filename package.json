@@ -79,6 +79,7 @@
     "test:enrichment-matrix:local": "bash scripts/ops/run-enrichment-matrix-local.sh",
     "test:lighthouse": "lhci autorun",
     "test:migration-integrity": "node scripts/db/verify-migration-integrity.mjs",
+    "test:deploy-imports": "node scripts/ci/check-deploy-script-imports.mjs",
     "test:migrations:local": "node scripts/db/verify-migrations-local.mjs",
     "test:rls": "pnpm test:rls:local",
     "test:rls:local": "node scripts/db/verify-rls-local.mjs",

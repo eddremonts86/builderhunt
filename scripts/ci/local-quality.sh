@@ -218,6 +218,7 @@ step env-fidelity node scripts/ci/check-env-fidelity.mjs
 step step-parity node scripts/ci/check-step-parity.mjs
 
 step migration-integrity pnpm test:migration-integrity
+step deploy-imports pnpm test:deploy-imports
 step drizzle-check pnpm exec drizzle-kit check
 step migrations-local pnpm test:migrations:local
 
