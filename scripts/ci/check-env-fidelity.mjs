@@ -65,7 +65,7 @@ const CI_RUNS_WITHOUT = {
   // ── Supplied by other means in CI ───────────────────────────────────────────────────────────
   REDIS_URL: 'playwright.config.ts defaults it to the redis service on 6379',
   NODE_ENV: 'set by the tooling that runs each step, not by the job',
-  ADMIN_USER_IDS: 'seeded per-run by pnpm db:seed:admin, not configured',
+  ADMIN_USER_IDS: 'exported into $GITHUB_ENV after seeding, from the row seed-admin.ts just wrote — the id is random per run so it cannot be a literal',
 
   // ── Tuning with defaults that CI has no reason to override ──────────────────────────────────
   AI_DISABLED_TASKS: 'defaulted to empty',

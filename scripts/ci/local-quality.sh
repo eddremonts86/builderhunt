@@ -325,6 +325,12 @@ else
   accessibility_gate() {
     pnpm exec drizzle-kit migrate >/dev/null || return 1
     pnpm db:seed:admin >/dev/null || return 1
+    # Seeding creates the admin *user*; ADMIN_USER_IDS is what makes them a platform admin, and
+    # `seed-admin.ts` mints a fresh UUID per run — so `.env`'s value names an id this throwaway
+    # database does not contain. Read it back, exactly as the workflow does.
+    ADMIN_USER_IDS="$(psql "${PG_BASE}/${DB}" -Atc "select id from auth_users where email = 'edd_admin@local.com'")"
+    [ -n "$ADMIN_USER_IDS" ] || { echo "seeded admin not found — every /admin/* gate would redirect" >&2; return 1; }
+    export ADMIN_USER_IDS
     # vite preview runs the build as production, which turns on the production env rules: the runtime
     # role may not be an owner and must differ from the migration identity. The per-run fixture roles
     # satisfy that; the owner URL stays on DATABASE_MIGRATION_URL.
@@ -342,6 +348,16 @@ else
     pnpm test:a11y
   }
   step accessibility accessibility_gate
+
+  # Runs against the same preview the accessibility gate just started, which is why it lives here
+  # rather than as its own step.
+  #
+  # It was CI-only until now, and that is a fidelity gap of a different kind from the environment
+  # one: a step this script does not run is a step its green cannot speak for. It went unnoticed
+  # because the e2e step failed ahead of it in every recent run, so CI never reached it either —
+  # and the first time it did, it found `/admin/incidents` redirecting because ADMIN_USER_IDS was
+  # never set. Two gates that had both been quiet for months, agreeing about nothing.
+  step status-trust pnpm test:status-trust
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────────────────────────

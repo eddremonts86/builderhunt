@@ -370,6 +370,24 @@ jobs:
         run: |
           pnpm exec drizzle-kit migrate
           pnpm db:seed:admin
+
+          # Seeding creates the admin *user*; ADMIN_USER_IDS is what makes them a platform admin —
+          # `auth-session.ts` reads that env list and nothing else. Without it every `/admin/*`
+          # route's `requirePlatformAdminPage` redirects, which is why the status-trust regression
+          # timed out waiting for `admin-incidents-page`: the page was never going to render, and
+          # the screenshot showed the dashboard it had been redirected to.
+          #
+          # It cannot be hardcoded — `seed-admin.ts` mints a fresh `crypto.randomUUID()` per run —
+          # so it is read back from the row that was just written and exported for the preview
+          # server that later steps start. A developer never hits this because their `.env` names
+          # the id their local database already has.
+          ADMIN_ID="$(psql "$DATABASE_MIGRATION_URL" -Atc "select id from auth_users where email = 'edd_admin@local.com'")"
+          if [ -z "$ADMIN_ID" ]; then
+            echo "Seeded admin not found — every /admin/* gate would redirect." >&2
+            exit 1
+          fi
+          echo "ADMIN_USER_IDS=$ADMIN_ID" >> "$GITHUB_ENV"
+          echo "Platform admin: $ADMIN_ID"
       # `pnpm preview --port 3000 &` on its own loses the server the moment the step ends: the
       # background process inherits the step's stdout pipe, the runner closes that pipe at the step
       # boundary, and the next write earns an EPIPE. `/api/health` is a static 200 that touches neither
