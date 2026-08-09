@@ -898,6 +898,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # The harness serves the build, so it has to exist before the suite starts.
+      - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end suite
         # Was `tests/e2e/team-accounts.spec.ts` — one file, ten tests, out of

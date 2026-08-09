@@ -320,6 +320,9 @@ if [ "$FAST" -eq 1 ]; then
   skip accessibility "--fast"
 else
   if [ "$REDIS_OK" -eq 1 ]; then
+    # The harness serves `dist/` now, so this is a precondition of the e2e step rather than a
+    # check that happens to follow it.
+    step build pnpm build
     step e2e env -u APP_URL -u VITE_APP_URL E2E_MODE=true pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings"
   else
     skip e2e "no Redis on 6379"
@@ -336,7 +339,6 @@ else
   # as expected, not that the images CI will diff are current. Refreshing those means taking them
   # from a CI artifact — see the commit that last did it.
   step visual pnpm test:visual
-  step build pnpm build
 
   # Only meaningful after `build`, and it is the only step that runs the entrypoint that actually ships.
   # `server/security.mjs` had 22 unit cases and nothing proved the server *sent* the headers — the e2e

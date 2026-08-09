@@ -1,4 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { once } from 'node:events'
 import net from 'node:net'
 import type { WorkerDatabase } from './database'
@@ -25,28 +27,36 @@ async function freePort(): Promise<number> {
 }
 
 /**
- * `vite dev`, and not `vite preview` — which was tried, measured and reverted on 2026-08-09.
+ * `vite preview` — the built app, not the dev server.
  *
- * The idea was sound on paper: each spec file gets its own server, and under `dev` that server
- * starts with nothing compiled, so the first request pays to transform the route tree and
- * everything it imports. Serving a build instead would skip that, and would test the bundle users
- * actually receive rather than one adjacent to it.
+ * Each spec file gets its own server, and under `dev` that server starts with nothing compiled, so
+ * the first request pays to transform the route tree and everything it imports. Serving a build
+ * skips that, and tests the bundle a user actually receives rather than one adjacent to it.
  *
- * It does not work, for a reason no amount of tuning fixes. `VITE_APP_URL` is inlined into the
- * client bundle at build time, and every worker server here listens on a *different* ephemeral
- * port. A pre-built client therefore calls whatever origin was baked in — observed as
- * `third-party egress: http://localhost:3010/api/auth/get-session` from a page served on
- * 127.0.0.1:51983, and a CORS failure behind it. One build cannot serve N origins. Twelve specs in
- * `public-and-consent.spec.ts` failed exactly that way.
+ * This was tried once and reverted, because a built client called the origin baked into it at build
+ * time — `http://localhost:3010/api/auth/get-session` from a page served on 127.0.0.1:51983 — and
+ * the browser blocked it on CORS. Twelve `public-and-consent` specs failed that way. The blocker was
+ * never the server mode: it was `auth/client.ts` passing `import.meta.env.VITE_APP_URL` as its
+ * `baseURL`, which Vite replaces statically. A same-origin client now asks for
+ * `window.location.origin`, one build serves any origin, and the same batch that failed goes green.
  *
- * The measurement did not justify pursuing it either: a page-heavy spec went 47s → 33s, but a
- * five-file batch went 188s → 189s. The compile cost is real and mostly paid once per process, not
- * once per request, so a warm machine barely notices it. CI, cold and two-core, would gain more —
- * but not enough to justify either baking a fixed port (which breaks any parallel local run) or
- * moving the app to relative API URLs (a product change, with its own risk, for a test speedup).
+ * Measured on that batch, five files: dev 188s, preview 144s. The first attempt read 189s and
+ * looked like no gain at all — that number was twelve failing specs burning their retries, not the
+ * server mode.
  *
- * If someone revisits this: the blocker is the baked origin, not the server mode.
+ * `E2E_SERVER_MODE=dev` opts out, for iterating on source without rebuilding between runs.
  */
+function serverArgv(): string[] {
+  if (process.env.E2E_SERVER_MODE === 'dev') return ['dev']
+  if (!existsSync(join(process.cwd(), 'dist'))) {
+    throw new Error(
+      'The E2E harness serves a production build and none exists. Run `pnpm build` first, or set '
+      + 'E2E_SERVER_MODE=dev to use the dev server — slower, and not what CI measures.',
+    )
+  }
+  return ['preview']
+}
+
 export async function startWorkerServer(
   workerIndex: number,
   database: WorkerDatabase,
@@ -56,7 +66,7 @@ export async function startWorkerServer(
   if (existing) return existing
   const port = await freePort()
   const baseURL = `http://127.0.0.1:${port}`
-  const child = spawn('pnpm', ['exec', 'vite', 'dev', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+  const child = spawn('pnpm', ['exec', 'vite', ...serverArgv(), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
     cwd: process.cwd(),
     env: {
       ...process.env,
