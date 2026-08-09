@@ -230,6 +230,11 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # `empty-states.spec.ts` drives the same worker harness the e2e suite uses, and that harness
+      # serves `dist/` now — so this job needs a build exactly as the e2e job does. Without it those
+      # two specs die on "no build exists" while the twelve public-surface ones, which use the
+      # config's own webServer, pass around them.
+      - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
 
       # Before the preview, not after it. Playwright starts its own dev server for these

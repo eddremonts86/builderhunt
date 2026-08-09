@@ -104,6 +104,35 @@ const local = pnpmScripts(readFileSync(join(root, 'scripts/ci/local-quality.sh')
 const exempt = (script) =>
   Object.keys(RUNNER_PLUMBING).some((prefix) => script === prefix || script.startsWith(`${prefix} `))
 
+/**
+ * Any job that drives the worker harness has to build first.
+ *
+ * `tests/e2e/harness/server.ts` serves `dist/` rather than starting a dev server, so a job that runs
+ * the suite without `pnpm build` dies on "no build exists" — which is what the advisory visual job
+ * did, and what the nightly run would have done at 03:00 where nobody would have seen it. Three jobs
+ * needed this and I added it to two of them by hand.
+ */
+function jobsMissingABuild() {
+  const problems = []
+  for (const file of CHECKING_WORKFLOWS.concat('.github/workflows/nightly-serial.yml')) {
+    const source = readFileSync(join(root, file), 'utf8')
+    // Only inside `jobs:` — an earlier version matched two-space keys anywhere and counted `push:`
+    // from the trigger block as a job.
+    const section = /^jobs:$([\s\S]*)$/m.exec(source)
+    if (!section) continue
+    // `$(?![\s\S])` rather than `\Z`, which JavaScript does not have: it was matching a literal Z,
+    // so the last job in every file fell outside the split and this check quietly passed.
+    for (const m of section[1].matchAll(/^ {2}([a-z][a-z-]*):$([\s\S]*?)(?=^ {2}[a-z][a-z-]*:$|$(?![\s\S]))/gm)) {
+      const [, job, body] = m
+      if (!/pnpm test:(e2e|visual)\b/.test(body)) continue
+      if (/^ +- run: pnpm build$/m.test(body)) continue
+      problems.push(`${file.split('/').pop()}'s ${job} job runs the suite without building first`)
+    }
+  }
+  return problems
+}
+
+const missingBuilds = jobsMissingABuild()
 const envDrift = envBlocksAgree()
 const missing = [...workflow].filter((script) => !local.has(script) && !exempt(script)).sort()
 const stale = Object.keys(RUNNER_PLUMBING).filter(
@@ -116,6 +145,7 @@ console.log(JSON.stringify({
   plumbingExempt: Object.keys(RUNNER_PLUMBING).length,
   missingLocally: missing.length,
   envBlocksDrifted: envDrift.length,
+  jobsMissingABuild: missingBuilds.length,
 }))
 
 if (stale.length > 0) {
@@ -142,4 +172,10 @@ if (envDrift.length > 0) {
   console.error('\n  Actions cannot share an env block between jobs, so the copies have to be kept identical by hand.\n')
 }
 
-if (missing.length > 0 || stale.length > 0 || envDrift.length > 0) process.exit(1)
+if (missingBuilds.length > 0) {
+  console.error(`\n${missingBuilds.length} job${missingBuilds.length === 1 ? '' : 's'} running the e2e harness without a build:\n`)
+  for (const line of missingBuilds) console.error(`  - ${line}`)
+  console.error('\n  The harness serves dist/. Without `pnpm build` the suite dies before its first assertion.\n')
+}
+
+if (missing.length > 0 || stale.length > 0 || envDrift.length > 0 || missingBuilds.length > 0) process.exit(1)
