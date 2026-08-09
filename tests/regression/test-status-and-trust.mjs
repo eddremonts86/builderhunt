@@ -10,7 +10,11 @@
 import { chromium } from 'playwright'
 import { writeFileSync } from 'fs'
 
-const BASE = process.env.REGRESSION_BASE_URL ?? 'http://localhost:3000'
+// REGRESSION_BASE_URL still wins, for pointing this at a deployed environment. APP_URL is the
+// fallback because that is what both runners already export for the preview they just started —
+// three regression suites reading three different variable names is how this one ended up talking
+// to a dev server on :3000 while the preview it was meant to audit ran on another port.
+const BASE = process.env.REGRESSION_BASE_URL ?? process.env.APP_URL ?? 'http://localhost:3000'
 const ADMIN_EMAIL = 'edd_admin@local.com'
 const ADMIN_PASSWORD = 'Passw0rd!234'
 

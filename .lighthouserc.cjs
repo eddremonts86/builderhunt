@@ -15,7 +15,10 @@
 module.exports = {
   ci: {
     collect: {
-      url: ['http://localhost:3000/'],
+      // Honours APP_URL like the other two regression suites. It was pinned to :3000, which is where
+      // CI serves its preview and nowhere else — locally the preview is on CI_LOCAL_PREVIEW_PORT and
+      // :3000 is usually a dev server, so this audited whatever happened to be there, or 404'd.
+      url: [`${(process.env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')}/`],
       numberOfRuns: 3,
       settings: {
         preset: 'desktop',
