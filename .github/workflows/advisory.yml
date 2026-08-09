@@ -17,8 +17,9 @@ name: Advisory
 # that had not run in months). A red mark on the commit is the entire point of running these.
 
 on:
+  pull_request:
   push:
-    branches: [master]
+    branches: [master, dev]
     paths-ignore:
       - 'docs/**'
       - 'plans/**'

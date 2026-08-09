@@ -11,9 +11,14 @@ name: Quality
 # copy of this file — `scripts/ci/check-env-fidelity.mjs` and `scripts/ci/check-step-parity.mjs` are
 # what keep it one, and both run first, locally, before anything expensive.
 on:
+  # Public repo: Actions minutes are unmetered, so the trigger is about coverage again rather than
+  # cost. It fired on master alone while this was private and every run was billed — which left a
+  # feature branch guarded by the pre-push hook and nothing else. Pull requests are checked before
+  # they merge now, which is the point of requiring them.
+  pull_request:
   push:
-    branches: [master]
-    # A commit that only moves prose costs the same 80-odd runner minutes as one that moves code.
+    branches: [master, dev]
+    # Prose still does not need a run. This is about noise, not money.
     # Nothing under these paths is imported by the app or asserted on by a spec — the checks that do
     # read them (`check:table-surfaces`, the route-graph gates) read source, not documentation.
     paths-ignore:
@@ -663,6 +668,7 @@ jobs:
             [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
             sleep 2
           done
+
           echo "minio and clamav ready"
 
       # ~150 MB per install, and the version only moves when the lockfile does — one download per
@@ -890,7 +896,7 @@ jobs:
       - run: node scripts/db/prepare-rls-fixture.mjs
 
       # Same containers as the single-job version, for the same six documents specs.
-      - name: Object store and virus scanner
+      - name: Object store, virus scanner and embeddings
         run: |
           set -euo pipefail
           docker run -d --name minio -p 9000:9000 \
@@ -911,6 +917,19 @@ jobs:
             [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
             sleep 2
           done
+
+          # Embeddings. Same image and model as docker-compose's `embeddings` service, started the
+          # same way — `ollama serve` in the background, then pull the model it will be asked for.
+          # Without it the semantic-search specs are excluded from CI with `--grep-invert`, which is
+          # a whole retrieval path that only ever runs on a developer's laptop.
+          docker run -d --name ollama -p 11434:11434 --entrypoint /bin/sh ollama/ollama:latest \
+            -c 'ollama serve & pid=$!; sleep 3; ollama pull nomic-embed-text; wait $pid'
+          for i in $(seq 1 90); do
+            curl -sf http://127.0.0.1:11434/api/tags 2>/dev/null | grep -q nomic-embed-text && break
+            [ "$i" = 90 ] && { echo "ollama never served nomic-embed-text"; docker logs ollama | tail -20; exit 1; }
+            sleep 2
+          done
+          echo "ollama ready with nomic-embed-text"
 
       # ~150 MB per install, and the version only moves when the lockfile does — one download per
       # Playwright bump instead of one per shard per push.
@@ -945,7 +964,7 @@ jobs:
         # correctly degrades to keyword-fallback without one. Excluding it is
         # honest; weakening the assertion so it passes here would not be. See the
         # note above that test.
-        run: pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings" --shard=${{ matrix.shard }}/4
+        run: pnpm test:e2e --workers=1 --shard=${{ matrix.shard }}/4
       - name: Upload the Playwright report when a shard fails
         if: failure()
         uses: actions/upload-artifact@v4

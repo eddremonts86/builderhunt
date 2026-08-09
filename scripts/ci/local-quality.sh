@@ -83,10 +83,10 @@ fi
 # MinIO and ClamAV, which `tests/e2e/documents.spec.ts` needs and the workflow starts as containers.
 # They sit behind docker-compose's `interviews` profile locally, so they are off unless asked for —
 # and their absence reads as a storage error inside six specs rather than as a missing container.
-for svc in "object store:9000" "virus scanner:3310"; do
+for svc in "object store:9000" "virus scanner:3310" "embeddings server:11434"; do
   if ! (exec 3<>/dev/tcp/127.0.0.1/"${svc##*:}") 2>/dev/null; then
     echo "No ${svc%%:*} on 127.0.0.1:${svc##*:} — documents specs will fail as storage errors." >&2
-    echo "Start them with: docker compose --profile interviews up -d storage antivirus" >&2
+    echo "Start them with: docker compose --profile interviews --profile standalone up -d storage antivirus embeddings" >&2
     exit 1
   fi
 done
@@ -323,7 +323,7 @@ else
     # The harness serves `dist/` now, so this is a precondition of the e2e step rather than a
     # check that happens to follow it.
     step build pnpm build
-    step e2e env -u APP_URL -u VITE_APP_URL E2E_MODE=true pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings"
+    step e2e env -u APP_URL -u VITE_APP_URL E2E_MODE=true pnpm test:e2e --workers=1
   else
     skip e2e "no Redis on 6379"
   fi
