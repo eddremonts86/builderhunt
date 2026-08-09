@@ -33,6 +33,7 @@ import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
 import {
   expectStrictBrowser,
   gotoHydrated,
+  waitForHydration,
   dismissOverlays,
   type StrictBrowserGuard,
 } from './harness/browser'
@@ -365,9 +366,14 @@ test.describe('ToS acceptance lifecycle', () => {
       // already have the session by hydration time, so React logs a
       // recoverable "Hydration failed" error for the session-dependent
       // header CTA. It is racy — it may or may not fire — and is unrelated
-      // to the consent lifecycle under test. Tracked as a plan issue; these
-      // one-shot allowances keep the strict guard armed for everything else.
+      // to the consent lifecycle under test. These one-shot allowances keep
+      // the strict guard armed for everything else.
       // (one console + one pageerror per full page load; two loads here)
+      //
+      // This used to say "Tracked as a plan issue". Nothing in plans/ mentions it — grep for
+      // "signed-out header" or "Hydration failed" and there is no such entry. So the budget
+      // below is the only thing between this defect and a red CI, which is why the load count
+      // has to be right: see the note at the reload near the end of this test.
       for (let i = 0; i < 4; i++) guard.allowExpectedFailure(/Hydration failed|error while hydrating/)
       await gotoHydrated(page, `${baseURL}/`)
 
@@ -393,8 +399,16 @@ test.describe('ToS acceptance lifecycle', () => {
       expect(rows.map((r) => r.version)).toContain(CURRENT_CONSENT_VERSIONS.tos)
 
       // …and a full reload no longer shows the modal.
+      //
+      // `reload()` then `waitForHydration`, not `reload()` then `gotoHydrated` — the latter is a
+      // *third* full page load, and the allowance budget above is sized for two. Each load can
+      // racily emit one console error and one pageerror, so three loads can produce six messages
+      // against four allowances, and the leftover fails the strict guard. That is what it did:
+      // intermittently, in two of the last several CI runs, only ever in this test. `reload()`
+      // already commits a new document and `waitForHydration`'s own docblock says it is safe to
+      // call after one, so the extra navigation was doing nothing the reload had not already done.
       await page.reload()
-      await gotoHydrated(page, `${baseURL}/`)
+      await waitForHydration(page)
       await expect(page.getByTestId('tos-modal')).toHaveCount(0)
     })
 
