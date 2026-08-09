@@ -1,0 +1,149 @@
+name: Nightly serial E2E
+
+# The half of the gate sharding gives up.
+#
+# `quality.yml` runs the e2e suite in four shards so a push to master is not three quarters of an
+# hour of waiting. Each shard is still `--workers=1`, so serial order holds *within* a shard — but
+# two specs in different shards never share a process, and that is precisely where the bug this
+# guarantee exists for lives: `startInterviewHarness` once leaked its `flags` into `process.env`, so
+# `webhooks-stripe.spec.ts` left STRIPE_WEBHOOK_SECRET set and `harness/fakes.spec.ts` signed with
+# the wrong one. Two specs, one process, one failure. Split them across shards and nothing happens.
+#
+# So the whole suite runs unsharded here, in a single process, once a night. The property is not
+# traded away — it arrives on a different schedule than the deploy, which is the point: a leak of
+# that kind is a latent defect, not a release blocker, and finding it eight hours later costs
+# nothing that finding it at push time would have saved.
+#
+# See docs/operations/development.md § Why the gate stays at `--workers=1`.
+
+on:
+  schedule:
+    # 03:00 UTC, after the day's pushes and before anyone starts.
+    - cron: '0 3 * * *'
+  # So it can be proven to work without waiting a day.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-serial
+  cancel-in-progress: false
+
+jobs:
+  serial:
+    name: Full suite, one process, no shards
+    runs-on: ubuntu-latest
+    # Longer than the sharded job by construction: this is the whole suite, serial, on two cores.
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.5-pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: builderhunt_security_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_CAPABILITY_URL: postgresql://builderhunt_capability:test-capability-password@127.0.0.1:5432/builderhunt_security_test_ci
+      APP_URL: http://localhost:3000
+      VITE_APP_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      CALENDAR_ENABLED: 'true'
+      CRON_SECRET: ci-only-cron-secret-not-a-real-one
+      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      MINIMAX_API_KEY: ci-only-not-a-real-key
+      GITHUB_TOKEN: ci-only-not-a-real-token
+      AI_EMBEDDING_URL: http://localhost:11434/v1/embeddings
+      AI_EMBEDDING_MODEL: nomic-embed-text
+      AI_EMBEDDING_DIM: '768'
+      AI_DISABLED: 'false'
+      SCHEDULING_ENABLED: 'true'
+      CANDIDATE_UPLOADS_ENABLED: 'true'
+      CANDIDATE_WEB_IMPORT_ENABLED: 'true'
+      CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'true'
+      ACCESS_ALLOWLIST_ENABLED: 'true'
+      DEVPOST_ENABLED: 'true'
+      ABUSE_ENFORCEMENT_MODE: warn
+      ENRICHMENT_ALLOWED_CONNECTORS: github
+      STRIPE_BILLING_ENABLED: 'true'
+      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
+      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
+      STRIPE_API_VERSION: 2026-06-24.dahlia
+      INTERVIEW_R2_ACCOUNT_ID: minio
+      INTERVIEW_R2_ENDPOINT: http://127.0.0.1:9000
+      INTERVIEW_R2_BUCKET: builderhunt-interview-documents
+      INTERVIEW_R2_ACCESS_KEY_ID: builderhunt
+      INTERVIEW_R2_SECRET_ACCESS_KEY: builderhunt-local-dev
+      INTERVIEW_CLAMAV_HOST: 127.0.0.1
+      INTERVIEW_CLAMAV_PORT: '3310'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:migrations:local
+      - run: node scripts/db/prepare-rls-fixture.mjs
+      - name: Object store and virus scanner
+        run: |
+          set -euo pipefail
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=builderhunt \
+            -e MINIO_ROOT_PASSWORD=builderhunt-local-dev \
+            minio/minio:latest server /data
+          docker run -d --name clamav -p 3310:3310 clamav/clamav:stable
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1 && break
+            [ "$i" = 60 ] && { echo "MinIO never became ready"; docker logs minio; exit 1; }
+            sleep 2
+          done
+          docker run --rm --network host --entrypoint sh minio/mc:latest -c "
+            mc alias set local http://127.0.0.1:9000 builderhunt builderhunt-local-dev &&
+            mc mb --ignore-existing local/builderhunt-interview-documents"
+          for i in $(seq 1 90); do
+            (echo PING | timeout 2 nc 127.0.0.1 3310 | grep -q PONG) && break
+            [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
+            sleep 2
+          done
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # No `--shard`. That is the entire point of this workflow.
+      - name: End-to-end suite, whole and serial
+        run: pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings"
+
+      - name: Upload the Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-nightly
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+          if-no-files-found: ignore

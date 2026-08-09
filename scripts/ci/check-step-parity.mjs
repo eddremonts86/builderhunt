@@ -31,6 +31,7 @@ const root = process.cwd()
 const RUNNER_PLUMBING = {
   install: 'installs dependencies; a developer already has node_modules',
   'exec playwright': 'installs browsers into a fresh runner image',
+  vitest: 'the Stripe sandbox certification job, which makes real test-mode API calls and is gated on a repository secret rather than run on every push',
 }
 
 /** `pnpm <script>` invocations inside a shell block, ignoring flags and arguments. */
@@ -42,11 +43,40 @@ function pnpmScripts(source) {
   return found
 }
 
+/**
+ * Every job in the workflow, not just `quality`.
+ *
+ * The e2e suite moved into its own sharded job, and a checker that only read `quality` would have
+ * stopped seeing the single most expensive check in the file — reporting parity while the thing it
+ * exists to track had walked out of scope.
+ */
 function workflowScripts() {
+  return pnpmScripts(readFileSync(join(root, '.github/workflows/quality.yml'), 'utf8'))
+}
+
+/**
+ * The sharded e2e job carries its own copy of the job env, because Actions has no way to share one
+ * between jobs. Two copies drift, and `check-env-fidelity.mjs` only reads the first — so it would
+ * keep certifying an env block the e2e suite no longer runs with.
+ */
+function envBlocksAgree() {
   const source = readFileSync(join(root, '.github/workflows/quality.yml'), 'utf8')
-  const job = /^ {2}quality:$([\s\S]*?)(?=^ {2}[a-z][a-z-]*:$)/m.exec(source)
-  if (!job) throw new Error('Could not isolate the quality job in .github/workflows/quality.yml')
-  return pnpmScripts(job[1])
+  // Only the two jobs that boot the app. The Stripe certification job carries a deliberately
+  // different env — comparing every block in the file reported 38 differences, all of them correct
+  // and none of them a problem, which is the shape of a check nobody will keep.
+  const envOf = (job) => {
+    const block = new RegExp(`^ {2}${job}:$([\\s\\S]*?)^ {4}steps:$`, 'm').exec(source)
+    if (!block) return null
+    const env = /^ {4}env:$([\s\S]*)$/m.exec(block[1])
+    return env ? new Set([...env[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((k) => k[1])) : null
+  }
+  const quality = envOf('quality')
+  const e2e = envOf('e2e')
+  if (!quality || !e2e) return []
+  const problems = []
+  for (const key of quality) if (!e2e.has(key)) problems.push(`the e2e job is missing ${key}`)
+  for (const key of e2e) if (!quality.has(key)) problems.push(`the e2e job has an extra ${key}`)
+  return problems
 }
 
 const workflow = workflowScripts()
@@ -55,6 +85,7 @@ const local = pnpmScripts(readFileSync(join(root, 'scripts/ci/local-quality.sh')
 const exempt = (script) =>
   Object.keys(RUNNER_PLUMBING).some((prefix) => script === prefix || script.startsWith(`${prefix} `))
 
+const envDrift = envBlocksAgree()
 const missing = [...workflow].filter((script) => !local.has(script) && !exempt(script)).sort()
 const stale = Object.keys(RUNNER_PLUMBING).filter(
   (prefix) => ![...workflow].some((s) => s === prefix || s.startsWith(`${prefix} `)),
@@ -65,6 +96,7 @@ console.log(JSON.stringify({
   localScripts: local.size,
   plumbingExempt: Object.keys(RUNNER_PLUMBING).length,
   missingLocally: missing.length,
+  envBlocksDrifted: envDrift.length,
 }))
 
 if (stale.length > 0) {
@@ -85,4 +117,10 @@ if (missing.length > 0) {
   )
 }
 
-if (missing.length > 0 || stale.length > 0) process.exit(1)
+if (envDrift.length > 0) {
+  console.error(`\n${envDrift.length} difference${envDrift.length === 1 ? '' : 's'} between the workflow's env blocks:\n`)
+  for (const line of envDrift) console.error(`  - ${line}`)
+  console.error('\n  Actions cannot share an env block between jobs, so the copies have to be kept identical by hand.\n')
+}
+
+if (missing.length > 0 || stale.length > 0 || envDrift.length > 0) process.exit(1)
