@@ -292,65 +292,25 @@ jobs:
       - run: pnpm security:provider-metering
       - name: Tenant schema classification
         run: pnpm db:audit-schema
+      # eslint and tsc both keep a per-file fingerprint and skip what has not changed. Restored across
+      # runs, a push that touches four files stops re-checking two thousand. Keyed loosely on the
+      # lockfile with a run-number suffix so the entry is refreshed rather than pinned — a stale
+      # cache that never rotates is how a checker starts reporting on code that is no longer there.
+      - name: Cache eslint and tsc fingerprints
+        uses: actions/cache@v4
+        with:
+          path: |
+            .eslintcache
+            *.tsbuildinfo
+          key: checkcache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_number }}
+          restore-keys: |
+            checkcache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            checkcache-${{ runner.os }}-
       - run: pnpm lint
       - run: pnpm type-check
       # Includes the ABUSE_ENFORCEMENT_MODE=observe kill-switch smoke
       # (tests/unit/shared/lib/abuse/enforcement-kill-switch.test.ts) — no separate step needed,
       # `pnpm test` picks up every tests/unit/**/*.test.ts file already.
-      # The object store and the virus scanner. This sits *above* `pnpm test`, not just above the
-      # e2e step, because setting INTERVIEW_R2_* is what decides whether the unit suite talks to a
-      # real store: `tests/unit/lib/storage/s3-provider.test.ts` is `describe.skipIf(!configured)`,
-      # so those vars turn a skipped block into a running one. Starting the containers afterwards
-      # gave it "configured but unreachable" and eight assertions failed on ECONNREFUSED — a state
-      # a developer never sees, because MinIO is up whenever their `.env` names it.
-      #
-      # `tests/e2e/documents.spec.ts` needs them too. Its own
-      # comment says so — "MinIO and ClamAV come from docker-compose. Without them every assertion
-      # below would fail as a storage error, which reads as a product bug rather than a missing
-      # container" — and that is precisely how its six failures read here for months.
-      #
-      # `docker run` rather than `services:`, because a service container cannot override the
-      # image's command and MinIO needs `server /data`.
-      #
-      # ClamAV comes from the upstream image here, not from docker/clamav/Dockerfile. That
-      # Dockerfile exists because `clamav/clamav` publishes amd64 only and the deployment target is
-      # ARM; a GitHub runner is amd64, so upstream is both available and closer to what the image
-      # is meant to be. The `stable` tag ships the signature database baked in — `stable_base`
-      # downloads it at boot, which is the "takes minutes" the compose file warns about.
-      - name: Object store and virus scanner
-        run: |
-          set -euo pipefail
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=builderhunt \
-            -e MINIO_ROOT_PASSWORD=builderhunt-local-dev \
-            minio/minio:latest server /data
-          docker run -d --name clamav -p 3310:3310 clamav/clamav:stable
-
-          # Readiness, not a fixed sleep: an unready clamd refuses connections, which looks exactly
-          # like a scan failure, and a bucket created against a half-started MinIO 500s.
-          for i in $(seq 1 60); do
-            curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1 && break
-            [ "$i" = 60 ] && { echo "MinIO never became ready"; docker logs minio; exit 1; }
-            sleep 2
-          done
-          docker run --rm --network host --entrypoint sh minio/mc:latest -c "
-            mc alias set local http://127.0.0.1:9000 builderhunt builderhunt-local-dev &&
-            mc mb --ignore-existing local/builderhunt-interview-documents"
-
-          for i in $(seq 1 90); do
-            (echo PING | timeout 2 nc 127.0.0.1 3310 | grep -q PONG) && break
-            [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
-            sleep 2
-          done
-          echo "minio and clamav ready"
-
-      # ~150 MB per install, and the version only moves when the lockfile does — one download per
-      # Playwright bump instead of one per shard per push.
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps chromium
 
       - run: pnpm security:dependencies
@@ -652,6 +612,60 @@ jobs:
       # The disposable-database suites need the base roles to exist first.
       - run: pnpm test:migrations:local
       - run: node scripts/db/prepare-rls-fixture.mjs
+      # The object store and the virus scanner. It belongs in this job because
+      # setting INTERVIEW_R2_* is what decides whether the unit suite talks to a
+      # real store: `tests/unit/lib/storage/s3-provider.test.ts` is `describe.skipIf(!configured)`,
+      # so those vars turn a skipped block into a running one. Starting the containers afterwards
+      # gave it "configured but unreachable" and eight assertions failed on ECONNREFUSED — a state
+      # a developer never sees, because MinIO is up whenever their `.env` names it.
+      #
+      # `tests/e2e/documents.spec.ts` needs them too. Its own
+      # comment says so — "MinIO and ClamAV come from docker-compose. Without them every assertion
+      # below would fail as a storage error, which reads as a product bug rather than a missing
+      # container" — and that is precisely how its six failures read here for months.
+      #
+      # `docker run` rather than `services:`, because a service container cannot override the
+      # image's command and MinIO needs `server /data`.
+      #
+      # ClamAV comes from the upstream image here, not from docker/clamav/Dockerfile. That
+      # Dockerfile exists because `clamav/clamav` publishes amd64 only and the deployment target is
+      # ARM; a GitHub runner is amd64, so upstream is both available and closer to what the image
+      # is meant to be. The `stable` tag ships the signature database baked in — `stable_base`
+      # downloads it at boot, which is the "takes minutes" the compose file warns about.
+      - name: Object store and virus scanner
+        run: |
+          set -euo pipefail
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=builderhunt \
+            -e MINIO_ROOT_PASSWORD=builderhunt-local-dev \
+            minio/minio:latest server /data
+          docker run -d --name clamav -p 3310:3310 clamav/clamav:stable
+
+          # Readiness, not a fixed sleep: an unready clamd refuses connections, which looks exactly
+          # like a scan failure, and a bucket created against a half-started MinIO 500s.
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1 && break
+            [ "$i" = 60 ] && { echo "MinIO never became ready"; docker logs minio; exit 1; }
+            sleep 2
+          done
+          docker run --rm --network host --entrypoint sh minio/mc:latest -c "
+            mc alias set local http://127.0.0.1:9000 builderhunt builderhunt-local-dev &&
+            mc mb --ignore-existing local/builderhunt-interview-documents"
+
+          for i in $(seq 1 90); do
+            (echo PING | timeout 2 nc 127.0.0.1 3310 | grep -q PONG) && break
+            [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
+            sleep 2
+          done
+          echo "minio and clamav ready"
+
+      # ~150 MB per install, and the version only moves when the lockfile does — one download per
+      # Playwright bump instead of one per shard per push.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm test --shard=${{ matrix.shard }}/2
 
   # The e2e suite, in four shards.

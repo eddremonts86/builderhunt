@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    // Lets `tsc --noEmit` skip files whose inputs have not changed; the workflow restores the
+    // .tsbuildinfo across runs so a four-file push does not retype the whole project.
+    "incremental": true,
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",

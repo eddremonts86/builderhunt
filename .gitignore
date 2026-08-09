@@ -37,3 +37,5 @@ tests/artifacts/
 # image (see plans/phase-1/50-audit-visual-system for the visual-baseline recipe). 674 MB of
 # content-addressed blobs; it belongs to whichever machine installed, never to the repo.
 .pnpm-store/
+.eslintcache
+*.tsbuildinfo

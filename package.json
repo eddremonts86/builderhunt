@@ -47,7 +47,7 @@
     "dev:enrichment": "ENRICHMENT_ENABLED=true ENRICHMENT_ALLOWED_CONNECTORS=github ENRICHMENT_USER_AGENT='BuilderHuntBot/1.0 (+https://builderhunt.dev/crawler)' vite dev --port 3000",
     "e2e:sweep-orphans": "node scripts/e2e/sweep-orphan-databases.mjs",
     "identity:verify": "node --env-file=.env --import tsx scripts/identity/verify-reciprocity.ts",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-location .eslintcache",
     "lint:fix": "eslint . --fix",
     "plans:check-order": "node scripts/check-plan-order.mjs",
     "plans:check-readiness": "node scripts/check-phase-readiness.mjs phase-2 phase-3 && pnpm plans:check-tasks",
