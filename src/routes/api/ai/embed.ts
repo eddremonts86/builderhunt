@@ -47,13 +47,6 @@ export const Route = createFileRoute('/api/ai/embed')({
           throw error
         }
 
-        if (env.AI_DISABLED === 'true') {
-          return Response.json({ error: 'ai_disabled' }, { status: 503 })
-        }
-        if (!env.AI_EMBEDDING_URL || !env.AI_EMBEDDING_MODEL) {
-          return Response.json({ error: 'ai_unconfigured' }, { status: 503 })
-        }
-
         let body: unknown
         try {
           body = await request.json()
@@ -63,6 +56,19 @@ export const Route = createFileRoute('/api/ai/embed')({
 
         const parsed = embedBodySchema.safeParse(body)
         if (!parsed.success) return Response.json({ error: 'invalid_input' }, { status: 400 })
+
+        // Availability last, and it took two goes to land here. Moving these 503s behind the auth
+        // check was right; leaving them in front of the parsing was not, because then an admin's
+        // malformed body came back "the feature is off" — true, and not the answer to what they
+        // asked. A request is well-formed or not regardless of whether the platform can serve it
+        // today, so the order is: who are you (401/403), is this a valid request (400), can we do
+        // it right now (503).
+        if (env.AI_DISABLED === 'true') {
+          return Response.json({ error: 'ai_disabled' }, { status: 503 })
+        }
+        if (!env.AI_EMBEDDING_URL || !env.AI_EMBEDDING_MODEL) {
+          return Response.json({ error: 'ai_unconfigured' }, { status: 503 })
+        }
 
         const limit = await rateLimit('ai-embed', principal.userId, 20, 60)
         if (!limit.allowed) return Response.json({ error: 'rate_limited' }, { status: 429 })
