@@ -73,6 +73,12 @@ export async function startWorkerServer(
       ...database.urls,
       APP_URL: baseURL,
       VITE_APP_URL: baseURL,
+      // `vite preview` sets NODE_ENV=production, and five places in the app change behaviour on it —
+      // `test-trigger.ts` answers 404 outright, stepup and the capability session relax differently.
+      // The point of serving the build is to run the *bundle* that ships, not to run it in an
+      // environment no test has ever used: `vite dev` was NODE_ENV=development and the suite was
+      // written against that. Pinning it back keeps the artefact and drops the surprise.
+      NODE_ENV: 'test',
       E2E_MODE: 'true',
       E2E_REDIS_PREFIX: cache.prefix,
     },
