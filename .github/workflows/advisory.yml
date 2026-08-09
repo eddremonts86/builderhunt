@@ -1,0 +1,447 @@
+name: Advisory
+
+# Checks worth having that must not stand between a correct commit and production.
+#
+# They used to live in `quality.yml`. Marking them `continue-on-error` kept them out of the run's
+# *conclusion* but not out of its *duration*: `deploy.yml` triggers on `workflow_run: completed`,
+# and a run is only complete when every job in it is — so a five-minute screenshot diff and a
+# Lighthouse pass still stood between a green build and a deploy. Moving them to their own workflow
+# is what actually takes them off that path.
+#
+# Same trigger as Quality, so they still run on every push to master. They just run beside it.
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - 'plans/**'
+      - '**/*.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: advisory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual:
+    name: Visual regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Cached across runs: the browser download is ~150 MB and the version only moves when the
+      # lockfile does, so keying on it means one download per Playwright bump rather than per push.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # Before the preview, not after it. Playwright starts its own dev server for these
+      # projects and `reuseExistingServer` is false under CI by design, so running this while
+      # `pnpm preview` held port 3000 failed with "http://localhost:3000 is already used" —
+      # nothing to do with a screenshot. The baselines were generated against that same dev
+      # server, so this is also the configuration they were taken in.
+      - name: Visual regression gate
+        continue-on-error: true
+        # Baselines are named per project *and* per OS, so this compares against the committed
+        # `*-linux.png` files — generated on 2026-08-03 inside `mcr.microsoft.com/playwright:v1.61.1-jammy`,
+        # the image matching this repo's pinned Playwright, and verified in both directions: 22 passing
+        # unchanged, 14 of 22 failing on a deliberate one-pixel `body { padding-top: 1px }`. A visual gate
+        # that cannot fail is decoration, so that second half was the actual precondition for turning this on.
+        #
+        # `test:visual` stands up its own `vite dev` via the config's `webServer` rather than reusing the
+        # preview above. Deliberate: the baselines were captured against the dev server, and a screenshot
+        # taken against a production build differs in ways that have nothing to do with the design.
+        run: pnpm test:visual
+      - name: Upload visual diff artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          # Playwright writes expected/actual/diff triplets here on failure — the only way to review a
+          # screenshot regression without checking out the branch and re-running it.
+          name: visual-diffs
+          path: test-results/
+          retention-days: 14
+
+  lighthouse:
+    name: Lighthouse budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        # Production moved to PostgreSQL 18 on 2026-08-05 (postgres-18-upgrade
+        # Phase 4), so this is once again "the version that is actually
+        # deployed". The transitional second DB-only job that ran the
+        # version-sensitive steps against the newer major is deleted with it —
+        # one DB-bearing job again, pinned to the same major and the same
+        # pgvector build as the production resource `ekq4rkiqtyl5nzzb3cc32kkg`.
+        #
+        # Keep this pin and the production resource's image in lockstep: a plain
+        # `postgres:18` makes `CREATE EXTENSION vector` fail inside migration
+        # 0013, which rolls back every migration in the same transaction.
+        image: pgvector/pgvector:0.8.5-pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: builderhunt_security_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # Required by the E2E harness, not optional. `playwright.config.ts` defaults REDIS_URL to
+      # redis://localhost:6379 and `tests/e2e/harness/cache.ts` refuses to run without it — E2E deliberately
+      # exercises the real cache path, because the in-memory rate-limit fallback is forbidden under
+      # E2E_MODE. Without this service every spec failed with "Connection is closed" against a port
+      # nothing was listening on. Same image and port as the `redis` service in docker-compose.yml, so
+      # local and CI agree.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+      # Not optional here, despite being optional in the app.
+      #
+      # `capability-db.ts` falls back to the worker URL when this is unset, and
+      # `workerDatabaseUrls` only applies its `forceRole` when the source URL names a user
+      # that is *not* already a base role. The worker URL names one, so the fallback kept
+      # `builderhunt_worker` and the public candidate flow connected as the worker.
+      # drizzle/0078 revokes EXECUTE on `scheduling_resolve_capability` from that role and
+      # grants it to `builderhunt_capability`, so every capability exchange raised
+      # `permission denied for function`, which the route catches and reports as a coded
+      # `invalid_input` — about 45 failures across scheduling, interviews, documents and
+      # billing-credits, all reading as one unexplained 400.
+      #
+      # Reproduced locally by removing this variable alone: scheduling.spec.ts goes from 5
+      # failures to 10, with the `permission denied` visible in the server log.
+      DATABASE_CAPABILITY_URL: postgresql://builderhunt_capability:test-capability-password@127.0.0.1:5432/builderhunt_security_test_ci
+      APP_URL: http://localhost:3000
+      VITE_APP_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      # Defaults to 'false' in env.ts; `.env.example` turns it on, which is how it is on
+      # every developer machine. CI has no `.env`, so it ran the calendar surface switched
+      # off and `tests/e2e/calendar.spec.ts` asserted against `503 dependency_unavailable`
+      # instead of the routes it was written for — eight of its eleven failures were that.
+      #
+      # This block used to say CALENDAR_ENABLED was the only flag that belonged here, on the
+      # grounds that SCHEDULING_ENABLED is set per-spec through `startInterviewHarness`'s `flags`
+      # and setting it globally would disturb that restore. Two things were wrong with it. Only
+      # four specs pass that flag, and `.env` sets it globally anyway — so the "leak vector" has
+      # been the local configuration all along, and the suite is green under it. Meanwhile CI ran
+      # every other spec with the feature off, which is the divergence that mattered.
+      CALENDAR_ENABLED: 'true'
+
+      # ── Test-only credentials the app refuses to run without ────────────────────────────────────
+      #
+      # None of these are secrets. They exist because the code checks that a value is *present and
+      # well-formed* before it will do the thing under test, and CI had none of them — so twenty
+      # e2e specs failed here while passing locally, where `.env` supplies them and dotenvx injects
+      # it into every process. That asymmetry is the bug: `scripts/ci/local-quality.sh` cannot
+      # certify a gate whose environment it does not reproduce, and it has now certified a red CI
+      # twice. Anything added to `.env` that the app *requires* has to be mirrored here, with a
+      # CI-only value, or the local gate is measuring a different program.
+      #
+      # Fake on purpose, and visibly so. A real key in a public workflow file would be a leak, and
+      # every one of these paths is stubbed under E2E_MODE — the AI provider by
+      # `tests/e2e/harness/fakes/ai.ts`, outbound calls by the egress fake — so nothing here ever
+      # reaches a third party.
+
+      # Drives the recurrence and retention workers (calendar, interview-privacy). Any non-empty
+      # string; the routes only compare it against the caller's header.
+      CRON_SECRET: ci-only-cron-secret-not-a-real-one
+
+      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
+      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
+      # rather than the assertion — this is 0123456789abcdef four times over.
+      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+      # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
+      # what the AI, work-sample and portfolio specs were actually asserting against.
+      MINIMAX_API_KEY: ci-only-not-a-real-key
+      # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
+      # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
+      # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a
+      # local embedding server being up". It still 503'd here, because the guard fires first.
+      # The specs that genuinely need a provider carry @requires-embeddings and the step below
+      # greps them out; this one does not, and should not.
+      AI_EMBEDDING_URL: http://localhost:11434/v1/embeddings
+      AI_EMBEDDING_MODEL: nomic-embed-text
+      AI_EMBEDDING_DIM: '768'
+      # `analyze.ts` documents its precedence: unavailable (503) is answered before the plan
+      # check (429), so without a token the work-sample spec never reaches the assertion it is
+      # named for. The value is never sent anywhere — the egress fake blocks the call.
+      #
+      # Set at job level rather than on the step: Actions reserves the `GITHUB_` prefix for
+      # variables *it* defines, and `GITHUB_TOKEN` is one of them — it is already present in every
+      # job, holding the real, privileged workflow token. Naming it here shadows that token for
+      # this job with a value that cannot authenticate anything, which is both what the app needs
+      # and strictly safer than leaving the privileged one visible to a test suite that shells out.
+      GITHUB_TOKEN: ci-only-not-a-real-token
+      AI_DISABLED: 'false'
+
+      # ── Flags whose local value is not the app default ──────────────────────────────────────────
+      #
+      # Mirrored from `.env` so CI runs the configuration the suite is green against. They arrive in
+      # the runner locally through `tests/e2e/harness/load-env.ts`, which loads `.env` into the test
+      # process — which is why "each spec sets what it needs" looked true and was true of two of
+      # them. `env.ts` defaults every one of these to off, so CI was exercising a different product.
+      SCHEDULING_ENABLED: 'true'
+      CANDIDATE_UPLOADS_ENABLED: 'true'
+      CANDIDATE_WEB_IMPORT_ENABLED: 'true'
+      CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'true'
+      ACCESS_ALLOWLIST_ENABLED: 'true'
+      DEVPOST_ENABLED: 'true'
+      ABUSE_ENFORCEMENT_MODE: warn
+      ENRICHMENT_ALLOWED_CONNECTORS: github
+      # The billing suite drives the fake provider, but the page still renders its unavailable state
+      # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
+      # going to exist.
+      STRIPE_BILLING_ENABLED: 'true'
+      # Turning billing on makes env.ts require these three. Prefix-validated, so a bare
+      # placeholder fails validation rather than a test. The suite drives the fake provider and
+      # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
+      # well-formed and consistent — the real test-mode keys live in the sandbox job.
+      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
+      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
+      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
+      # or three suites will point a key that authenticates nothing at the real Stripe API.
+      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
+      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
+      STRIPE_API_VERSION: 2026-06-24.dahlia
+
+      # Where the documents suite puts candidate uploads and what scans them. The containers are
+      # started in a step below, because a service container cannot be given a command.
+      #
+      # CANDIDATE_UPLOADS_ENABLED is deliberately NOT set here — `documents.spec.ts` turns it on
+      # through `startInterviewHarness`'s `flags`, for the same reason SCHEDULING_ENABLED is left
+      # to the specs above. These endpoint vars still belong in the job env: `env.ts` validates
+      # them the moment that flag is true, and it validates in the worker process, which inherits
+      # this block. 127.0.0.1 satisfies `isPrivateStorageHost`, so no jurisdiction rule applies.
+      INTERVIEW_R2_ACCOUNT_ID: minio
+      INTERVIEW_R2_ENDPOINT: http://127.0.0.1:9000
+      INTERVIEW_R2_BUCKET: builderhunt-interview-documents
+      INTERVIEW_R2_ACCESS_KEY_ID: builderhunt
+      INTERVIEW_R2_SECRET_ACCESS_KEY: builderhunt-local-dev
+      INTERVIEW_CLAMAV_HOST: 127.0.0.1
+      INTERVIEW_CLAMAV_PORT: '3310'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Migrate + seed admin for the production-preview accessibility gate
+        run: |
+          pnpm exec drizzle-kit migrate
+          pnpm db:seed:admin
+
+          # Seeding creates the admin *user*; ADMIN_USER_IDS is what makes them a platform admin —
+          # `auth-session.ts` reads that env list and nothing else. Without it every `/admin/*`
+          # route's `requirePlatformAdminPage` redirects, which is why the status-trust regression
+          # timed out waiting for `admin-incidents-page`: the page was never going to render, and
+          # the screenshot showed the dashboard it had been redirected to.
+          #
+          # It cannot be hardcoded — `seed-admin.ts` mints a fresh `crypto.randomUUID()` per run —
+          # so it is read back from the row that was just written and exported for the preview
+          # server that later steps start. A developer never hits this because their `.env` names
+          # the id their local database already has.
+          ADMIN_ID="$(psql "$DATABASE_MIGRATION_URL" -Atc "select id from auth_users where email = 'edd_admin@local.com'")"
+          if [ -z "$ADMIN_ID" ]; then
+            echo "Seeded admin not found — every /admin/* gate would redirect." >&2
+            exit 1
+          fi
+          echo "ADMIN_USER_IDS=$ADMIN_ID" >> "$GITHUB_ENV"
+          echo "Platform admin: $ADMIN_ID"
+      # `pnpm preview --port 3000 &` on its own loses the server the moment the step ends: the
+      # background process inherits the step's stdout pipe, the runner closes that pipe at the step
+      # boundary, and the next write earns an EPIPE. `/api/health` is a static 200 that touches neither
+      # the DB nor Redis, so a health timeout here never meant "the app is unhealthy" — it meant the
+      # server was already dead. Redirecting to a file (which is also what scripts/ci/local-quality.sh
+      # does, and why the same gate passed locally while failing here) keeps it alive, and printing
+      # that file on failure means the next timeout arrives with the server's own reason attached
+      # instead of six words and a dead end.
+      # `vite preview` serves the production build with NODE_ENV=production, which switches on the
+      # production half of the env contract (src/shared/lib/env.ts: `if (data.NODE_ENV !== 'production')
+      # return`). The job-level env points every role URL at the postgres superuser, and production
+      # rightly refuses that: the runtime role must not be an owner, and the migration, auth, worker and
+      # product identities must all be distinct. Left unset, the server accepted the connection, then
+      # threw a ZodError on the first request and answered 500 — so `curl -sf` saw an unhealthy server
+      # for sixty seconds while the process itself was perfectly alive.
+      #
+      # Giving it the four real roles is not a workaround: the accessibility gate is the only step that
+      # exercises the app as production assembles it, so it should hold the role separation production
+      # requires. The passwords are the fixture's CI values (scripts/db/prepare-rls-fixture.mjs), which
+      # this job already applied to the shared roles because CI=true.
+      - name: Start production preview
+        env:
+          DATABASE_URL: postgres://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_AUTH_URL: postgres://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_WORKER_URL: postgres://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_PLATFORM_URL: postgres://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_MIGRATION_URL: postgres://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+        run: |
+          nohup pnpm preview --port 3000 > /tmp/preview.log 2>&1 &
+          disown
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          echo "Preview server never became healthy; its output follows." >&2
+          cat /tmp/preview.log >&2 || echo "(no /tmp/preview.log was written)" >&2
+          exit 1
+
+      # Reuses the preview the accessibility gate just stood up — same build,
+      # same least-privilege roles. Running Lighthouse against `vite dev`
+      # instead would measure the dev module graph, which tells you nothing
+      # about what a visitor gets.
+      - name: Lighthouse budgets
+        continue-on-error: true
+        run: pnpm test:lighthouse
+      - name: Upload Lighthouse reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: tests/artifacts/lighthouse/
+          retention-days: 14
+
+  # Optional, additive certification of the real Stripe-backed BillingProvider
+  # (src/shared/lib/billing/real-provider.ts) against Stripe's actual test-mode API — never a
+  # replacement for the `quality` job above, which never talks to Stripe (FakeBillingProvider only).
+  # Runs only when a real Stripe test-mode secret key is configured as a repo/org secret; skipped
+  # entirely (not failed) otherwise, so forks and contributors without Stripe credentials are never
+  # blocked. `continue-on-error: true` because it depends on a live third-party API — network
+  # flakiness or a Stripe-side issue must never block a merge; see
+  # docs/operations/stripe-sandbox-certification.md for what this does and doesn't certify.
+  #
+  # DO NOT gate this job with `if: ${{ secrets.X != '' }}`. The `secrets` context is NOT available in
+  # `jobs.<job_id>.if` (only `github`, `needs`, `vars`, and `inputs` are), and referencing an
+  # unavailable context there is a workflow *validation* error rather than a job error: GitHub
+  # rejects the whole file before creating a single job, so every run — including the `quality` job
+  # below, which has nothing to do with Stripe — dies in 0s with "This run likely failed because of a
+  # workflow file issue" and no logs or annotations to explain it. That is exactly what happened
+  # between 2026-07-24 and 2026-07-27, which also left `deploy.yml` permanently skipped because it
+  # keys off a successful Quality run.
+  #
+  # `secrets` IS available in `jobs.<job_id>.env`, and `env` IS available in a step-level `if`, so the
+  # presence check lives on the steps instead. Every step is gated, so with no key configured the job
+  # claims a runner, skips everything, and finishes in seconds.
+  # Exists only to answer "is the secret configured?" in a place a job-level `if` can read.
+  #
+  # The `secrets` context is not available in `jobs.<id>.if` — only github, needs, vars and inputs
+  # are — so a job that wants to skip itself on a missing secret has to be told by another job.
+  # Without this the certification job ran, skipped all seven of its steps, and reported **success
+  # in 4 seconds**: a green check against the commit for a certification that has not executed
+  # since the secret was last present. That is worse than a red one, because nobody investigates a
+  # tick.
+  stripe-secret-present:
+    name: Is a Stripe sandbox secret configured?
+    runs-on: ubuntu-latest
+    # A hung job bills the runner default of six hours. On a metered account that is the
+    # difference between a bad run and a bad month.
+    timeout-minutes: 5
+    outputs:
+      configured: ${{ steps.probe.outputs.configured }}
+    steps:
+      # Read through `env:` and test the runtime value, rather than comparing the secret inside an
+      # expression. The expression form answered `false` against a secret that `gh secret list`
+      # showed as present — which is the one case worth separating: a secret can exist with an empty
+      # or whitespace value, and the listing shows only names and dates, never values or lengths.
+      #
+      # The length is safe to print. GitHub masks the value itself in logs, and a character count is
+      # what tells "never set" apart from "set to nothing" — the two states that look identical from
+      # outside and have completely different fixes.
+      - id: probe
+        env:
+          KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+        run: |
+          TRIMMED="$(printf '%s' "$KEY" | tr -d '[:space:]')"
+          echo "secret length: ${#KEY} characters (${#TRIMMED} after trimming whitespace)"
+          if [ -n "$TRIMMED" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ STRIPE_SANDBOX_SECRET_KEY exists but is empty — certification skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  stripe-sandbox-certification:
+    name: Stripe sandbox certification (optional, real test-mode API)
+    runs-on: ubuntu-latest
+    # A hung job bills the runner default of six hours. On a metered account that is the
+    # difference between a bad run and a bad month.
+    timeout-minutes: 30
+    needs: stripe-secret-present
+    # Skipped, not green, when there is nothing to certify with. The run page then shows this job
+    # grey and the reason is one click away, instead of a tick that reads as "Stripe is certified".
+    if: needs.stripe-secret-present.outputs.configured == 'true'
+    continue-on-error: true
+    env:
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+      # The same secret under its other name, because the three certification suites do not agree on
+      # which variable to read: `real-provider.test.ts` reads STRIPE_SECRET_KEY, while
+      # `test-clock-lifecycle.test.ts` and `canary-certification.test.ts` read STRIPE_SANDBOX_SECRET_KEY
+      # (deliberately — locally those two create and destroy sandbox objects and should not share an
+      # idempotency namespace with the running app's key). With only the first exported, the other two
+      # suites `describe.skipIf` themselves into a green no-op and CI would report a certification it
+      # never ran. Two names, one secret, all three actually execute.
+      STRIPE_SANDBOX_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+      STRIPE_API_VERSION: '2026-06-24.dahlia'
+      RUN_STRIPE_INTEGRATION_TESTS: '1'
+    steps:
+      # The job only runs when the secret exists, so this says so rather than deciding it. When it
+      # does not exist the job is skipped outright and the run page shows that in grey — which is
+      # the whole point: the previous shape reported success in four seconds with every step
+      # skipped, and a green tick is not a place anyone looks for a missing secret.
+      - run: echo "✅ Certifying against real test-mode Stripe." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Certify the real Stripe adapter (14 provider methods)
+        run: pnpm vitest run tests/unit/shared/lib/billing/real-provider.test.ts
+      # Separate steps rather than one vitest invocation, so a failure names which certification broke.
+      - name: Certify the Denmark canary observations test mode can prove
+        run: pnpm vitest run tests/unit/shared/lib/billing/canary-certification.test.ts
+      - name: Certify the Test Clock subscription lifecycle
+        # Last because it is by far the slowest — it advances real Stripe test clocks and waits for
+        # Stripe to process each jump asynchronously.
+        run: pnpm vitest run tests/unit/shared/lib/billing/test-clock-lifecycle.test.ts

@@ -17,6 +17,9 @@ jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    # A hung job bills the runner default of six hours. On a metered account that is the
+    # difference between a bad run and a bad month.
+    timeout-minutes: 15
     steps:
       - name: Trigger deployment
         id: trigger

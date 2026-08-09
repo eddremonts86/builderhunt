@@ -44,14 +44,23 @@ function pnpmScripts(source) {
 }
 
 /**
- * Every job in the workflow, not just `quality`.
+ * Every job in every workflow that checks the product.
  *
- * The e2e suite moved into its own sharded job, and a checker that only read `quality` would have
- * stopped seeing the single most expensive check in the file — reporting parity while the thing it
- * exists to track had walked out of scope.
+ * Twice now a check has escaped this file's attention by moving: the e2e suite into its own sharded
+ * job, then the visual, Lighthouse and Stripe jobs into `advisory.yml` entirely. A checker scoped to
+ * one job — or one file — reports parity right up until the thing it tracks walks out of scope.
+ *
+ * `nightly-serial.yml` is deliberately absent: it re-runs the e2e suite unsharded and adds nothing
+ * the other two do not already have, so reading it would only duplicate entries.
  */
+const CHECKING_WORKFLOWS = ['.github/workflows/quality.yml', '.github/workflows/advisory.yml']
+
 function workflowScripts() {
-  return pnpmScripts(readFileSync(join(root, '.github/workflows/quality.yml'), 'utf8'))
+  const found = new Set()
+  for (const file of CHECKING_WORKFLOWS) {
+    for (const script of pnpmScripts(readFileSync(join(root, file), 'utf8'))) found.add(script)
+  }
+  return found
 }
 
 /**
