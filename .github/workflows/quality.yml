@@ -513,7 +513,7 @@ jobs:
       #      suite that has quietly not run since the secret was last configured.
       - name: Report whether a Stripe test-mode key is configured
         run: |
-          if [ -n "$STRIPE_SECRET_KEY" ]; then
+          if [ -n "$STRIPE_SANDBOX_SECRET_KEY" ]; then
             echo "STRIPE_SANDBOX_SECRET_KEY is configured — running the three certification suites."
             echo "✅ Stripe sandbox certification ran against real test-mode Stripe." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -522,27 +522,27 @@ jobs:
             echo "This job is advisory (\`continue-on-error\`), so its green never means the certification ran." >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/checkout@v7
-        if: env.STRIPE_SECRET_KEY != ''
+        if: env.STRIPE_SANDBOX_SECRET_KEY != ''
       - uses: pnpm/action-setup@v6
-        if: env.STRIPE_SECRET_KEY != ''
+        if: env.STRIPE_SANDBOX_SECRET_KEY != ''
         with:
           version: 10
       - uses: actions/setup-node@v7
-        if: env.STRIPE_SECRET_KEY != ''
+        if: env.STRIPE_SANDBOX_SECRET_KEY != ''
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-        if: env.STRIPE_SECRET_KEY != ''
+        if: env.STRIPE_SANDBOX_SECRET_KEY != ''
       - name: Certify the real Stripe adapter (14 provider methods)
         run: pnpm vitest run tests/unit/shared/lib/billing/real-provider.test.ts
-        if: env.STRIPE_SECRET_KEY != ''
+        if: env.STRIPE_SANDBOX_SECRET_KEY != ''
       # Separate steps rather than one vitest invocation, so a failure names which certification broke.
       - name: Certify the Denmark canary observations test mode can prove
         run: pnpm vitest run tests/unit/shared/lib/billing/canary-certification.test.ts
-        if: env.STRIPE_SECRET_KEY != ''
+        if: env.STRIPE_SANDBOX_SECRET_KEY != ''
       - name: Certify the Test Clock subscription lifecycle
         # Last because it is by far the slowest — it advances real Stripe test clocks and waits for
         # Stripe to process each jump asynchronously.
         run: pnpm vitest run tests/unit/shared/lib/billing/test-clock-lifecycle.test.ts
-        if: env.STRIPE_SECRET_KEY != ''
+        if: env.STRIPE_SANDBOX_SECRET_KEY != ''
