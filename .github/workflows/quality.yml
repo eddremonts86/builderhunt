@@ -366,6 +366,31 @@ jobs:
             test-results/
           retention-days: 7
           if-no-files-found: ignore
+      # Before the preview, not after it. Playwright starts its own dev server for these
+      # projects and `reuseExistingServer` is false under CI by design, so running this while
+      # `pnpm preview` held port 3000 failed with "http://localhost:3000 is already used" —
+      # nothing to do with a screenshot. The baselines were generated against that same dev
+      # server, so this is also the configuration they were taken in.
+      - name: Visual regression gate
+        # Baselines are named per project *and* per OS, so this compares against the committed
+        # `*-linux.png` files — generated on 2026-08-03 inside `mcr.microsoft.com/playwright:v1.61.1-jammy`,
+        # the image matching this repo's pinned Playwright, and verified in both directions: 22 passing
+        # unchanged, 14 of 22 failing on a deliberate one-pixel `body { padding-top: 1px }`. A visual gate
+        # that cannot fail is decoration, so that second half was the actual precondition for turning this on.
+        #
+        # `test:visual` stands up its own `vite dev` via the config's `webServer` rather than reusing the
+        # preview above. Deliberate: the baselines were captured against the dev server, and a screenshot
+        # taken against a production build differs in ways that have nothing to do with the design.
+        run: pnpm test:visual
+      - name: Upload visual diff artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          # Playwright writes expected/actual/diff triplets here on failure — the only way to review a
+          # screenshot regression without checking out the branch and re-running it.
+          name: visual-diffs
+          path: test-results/
+          retention-days: 14
       - name: Migrate + seed admin for the production-preview accessibility gate
         run: |
           pnpm exec drizzle-kit migrate
@@ -448,26 +473,6 @@ jobs:
         env:
           APP_URL: http://localhost:3000
         run: pnpm test:conversion
-      - name: Visual regression gate
-        # Baselines are named per project *and* per OS, so this compares against the committed
-        # `*-linux.png` files — generated on 2026-08-03 inside `mcr.microsoft.com/playwright:v1.61.1-jammy`,
-        # the image matching this repo's pinned Playwright, and verified in both directions: 22 passing
-        # unchanged, 14 of 22 failing on a deliberate one-pixel `body { padding-top: 1px }`. A visual gate
-        # that cannot fail is decoration, so that second half was the actual precondition for turning this on.
-        #
-        # `test:visual` stands up its own `vite dev` via the config's `webServer` rather than reusing the
-        # preview above. Deliberate: the baselines were captured against the dev server, and a screenshot
-        # taken against a production build differs in ways that have nothing to do with the design.
-        run: pnpm test:visual
-      - name: Upload visual diff artifact
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          # Playwright writes expected/actual/diff triplets here on failure — the only way to review a
-          # screenshot regression without checking out the branch and re-running it.
-          name: visual-diffs
-          path: test-results/
-          retention-days: 14
       - name: Upload sanitized accessibility artifact
         if: failure()
         uses: actions/upload-artifact@v4

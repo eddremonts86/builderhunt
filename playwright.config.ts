@@ -107,9 +107,11 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   // Screenshot baselines are per-OS: the files a developer generates on macOS
-  // are not the files Linux CI compares against. Until Linux baselines exist,
-  // the visual suite is opt-in via its own projects (`pnpm test:visual`) so a
-  // missing baseline cannot fail CI on a change that has nothing to do with it.
+  // are not the files Linux CI compares against. Both sets now exist — 22 darwin
+  // and 22 linux — so the note that used to stand here, that the suite stayed
+  // opt-in "until Linux baselines exist", is spent. It is still its own projects
+  // (`pnpm test:visual`), and the quality workflow runs them as their own step,
+  // before the preview server binds the port they need.
   //
   // `testIgnore` on the two default projects is only half of that: a bare
   // `playwright test` runs EVERY project, so `test:e2e` names the two it wants
