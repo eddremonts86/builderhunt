@@ -73,6 +73,12 @@ test.beforeAll(async () => {
       tier: 'pro',
       seatLimit: 3,
       clock: fixedClockFromEnv(),
+      // Fixed, because the default ends in six random characters and the font is proportional:
+      // `111111` and `WWWWWW` are the same length and not the same width. The org switcher is
+      // masked, but a mask follows its element — so a wider name means a wider rectangle, and a
+      // name wide enough to wrap moves everything below it. That is what made `empty-alerts`
+      // disagree with a baseline taken twenty minutes earlier on this same machine.
+      name: 'E2E visual baseline org',
     })
     harness = {
       workerIndex,
