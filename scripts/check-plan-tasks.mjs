@@ -49,6 +49,11 @@ const SCRIPTS_CREATED_BY_PLANS = new Map([
   ['test:e2e:nightly', '53-exhaustive-local-e2e-design'],
   ['test:conversion', '51-audit-conversion'],
   ['check:table-surfaces', 'phase-3'],
+  ['load:test', '55-load-1000-concurrent-users'],
+  ['load:test:baseline', '55-load-1000-concurrent-users'],
+  ['test:load:smoke', '55-load-1000-concurrent-users'],
+  ['test:db-role-timeouts', '55-load-1000-concurrent-users'],
+  ['load:pooler:preflight', '55-load-1000-concurrent-users'],
   // Phase 4's two career plans specify these as exit criteria for their own phases, and both plans say plainly that
   // nothing creates them yet. Registered so the checker stops reporting a gap the plans already declare, while still
   // failing if any *other* document starts telling someone to run them.

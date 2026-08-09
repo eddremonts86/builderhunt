@@ -1,220 +1,182 @@
-# Load capacity — Delivery Plan
+# Load capacity — Delivery plan
 
 > **Status**: `pending`
+> **Depends on**: [`02-production-infrastructure`](../02-production-infrastructure/spec.md),
+> [`03-postgres-18-upgrade`](../03-postgres-18-upgrade/spec.md)
+> **Blocks**: nothing
+> **Reality check**: the production app currently connects directly to the Coolify PostgreSQL
+> resource. The generic Redis/in-memory limiter already exists and several workload routes already
+> use it; this plan changes connection lifecycle and deployment topology, not request policy.
 
-## Delivery principles
+## Delivery rules
 
-1. **Measure before fixing.** A 10-minute load test runs **before** any config change
-   commits. The baseline numbers go into the spec's verification table. Every subsequent
-   commit is judged against the baseline.
-2. **One mechanism per commit.** Each of the five commits (timeout, pool cap, PgBouncer,
-   rate limit, load test) is reversible on its own. A bad rollback does not regress the
-   other four.
-3. **Defaults are production-safe.** Every new env var has a default that works in
-   production. Misconfiguration logs a warning, never crashes.
-4. **No change to BetterAuth, the postgres.js driver, or the worker topology.** This plan
-   sits at the config + compose layer only.
+1. Use the same app image, host class, fixture set, request schedule, and measurement code for the
+   direct baseline and pooled calibration.
+2. Keep `DATABASE_MIGRATION_URL` direct at every phase.
+3. Never commit credentials, generated `userlist.txt`, raw cookies, or unredacted URLs.
+4. Do not run the two-hour soak or change Coolify without explicit operator confirmation.
+5. A 10-minute or CI run cannot close the plan; only the two-hour certification can.
 
 ## Dependency map
 
-```
-A ["Phase 0: baseline load test (no changes)"] --> B ["Phase 1: statement_timeout + idle_in_transaction"]
-A --> C ["Phase 2: per-role pool cap + idle_timeout"]
-B --> D ["Phase 3: PgBouncer in docker-compose + prod compose"]
-C --> D
-D --> E ["Phase 4: rate limit on business endpoints"]
-E --> F ["Phase 5: full load test + verification report"]
-```
-
-## Phase 0 — Baseline load test (no production changes)
-
-### Outcome
-
-A single JSON file `docs/operations/load-baseline-<date>.json` containing the current
-behaviour of the app under 1000 concurrent sessions for 10 minutes, with zero production
-configuration changes.
-
-### Work
-
-- Author `scripts/audit/load-test.ts` — a k6-or-Artillery-driven (or hand-rolled
-  `postgres-js` + curl mix, whichever lands first) test that:
-  - signs in 1000 seeded users (`pnpm db:seed:test-users` produces 1000 fixtures
-    cheaply, or the script signs up 1000 fresh accounts on the dev stack),
-  - drives a mixed workload (5% search, 60% dashboard overview fetch, 20% alerts inbox,
-    10% recommendations, 5% sprint status),
-  - records p50/p95/p99 latency, error rate, peak `pg_stat_activity` connections,
-    statement-timeout kills, and "sorry, too many clients already" occurrences.
-- Run it against the **current** dev stack (no PgBouncer, no statement_timeout). Capture
-  the numbers.
-- Document the baseline in `docs/operations/load-baseline-<date>.md` — a short table the
-  plan author reads before every subsequent commit.
-
-### Verify
-
-`docs/operations/load-baseline-<date>.json` exists. The dev stack survives 10 minutes
-without a hard crash. **The baseline numbers are the comparison point for every later
-phase.** Numbers worse than the baseline are a regression and block the next phase.
-
-## Phase 1 — `statement_timeout` + `idle_in_transaction_session_timeout`
-
-### Outcome
-
-Every connection from the app to Postgres sets `statement_timeout = 5000` and
-`idle_in_transaction_session_timeout = 10000` at connection time. A query that runs for
-more than 5 seconds is killed by the database, not by the app's pool exhaustion.
-
-### Work
-
-- Add `onconnect` hook to `poolOptions()` in
-  [`src/shared/lib/db/pool-options.ts`](../../src/shared/lib/db/pool-options.ts).
-- Read `DATABASE_STATEMENT_TIMEOUT_MS` (default `5000`) and
-  `DATABASE_IDLE_IN_TRANSACTION_TIMEOUT_MS` (default `10000`) at pool construction time.
-- Add both to `src/shared/lib/env.ts` as optional, with defaults; add to `.env.example`.
-- Keep `prepare: false` (PgBouncer transaction mode requires it; see
-  `pool-options.ts:26`).
-- Test in `tests/unit/shared/lib/db/pool-options.test.ts`: a slow query is killed at
-  the configured timeout.
-
-### Verify
-
-`pnpm vitest run` green. Re-run the load test from Phase 0; `statement_timeout` kills
-the synthetic slow query at 5s, error rate does not exceed the baseline by more than 5%.
-
-## Phase 2 — Per-role pool cap + `idle_timeout`
-
-### Outcome
-
-Every pool (runtime, auth, worker, platform, capability) has an explicit `max` cap and
-`idle_timeout` configurable from the environment. Defaults are 20 and 30 seconds
-respectively. The `postgres.js` default of 10 (and the absence of an idle_timeout)
-ceases to apply.
-
-### Work
-
-- Replace the `if (!isE2E) return { prepare: false }` line in `poolOptions()` with an
-  env-driven shape: `{ prepare: false, max, idle_timeout, onconnect }`. The values come
-  from `env.DATABASE_POOL_MAX` (default 20), `env.DATABASE_IDLE_TIMEOUT` (default 30),
-  and the timeouts from Phase 1.
-- E2E still gets `max: 3, idle_timeout: 20` (`pool-options.ts:25`).
-- Document in the spec why 20 is the right number (10 from the baseline + headroom for
-  PgBouncer sharing) — not 100, not 50. The plan author calibrates this in Phase 0.
-
-### Verify
-
-Re-run load test. `pg_stat_activity` count stays below 100 steady-state, below 200 peak.
-No regression in latency.
-
-## Phase 3 — PgBouncer in `docker-compose.yml` + production compose
-
-### Outcome
-
-A `pgbouncer` service in `docker-compose.yml` runs alongside Postgres on port `6432`. The
-app connects through PgBouncer. Postgres `max_connections=500`; PgBouncer
-`pool_size=20, max_client_conn=5000, pool_mode=transaction`.
-
-### Work
-
-- Add the `pgbouncer` service block to `docker-compose.yml`. Reuse the existing
-  `pgvector/pgvector:0.8.5-pg18` Postgres image — no version bump.
-- Bump `max_connections` from 200 to 500. Bump `shared_buffers` to 512MB and
-  `effective_cache_size` to 2GB on the Postgres command line.
-- Add `pgbouncer/` directory with `userlist.txt`, `pgbouncer.ini`, and `Dockerfile`
-  (or use `bitnami/pgbouncer:1.22` directly — the simpler choice).
-- Update the dev `.env` so `DATABASE_URL` points to PgBouncer (`localhost:6432`) instead
-  of Postgres (`localhost:5432`). Add `DATABASE_AUTH_URL`, `DATABASE_WORKER_URL`,
-  `DATABASE_PLATFORM_URL` all pointing to PgBouncer with different database names
-  (already split in env.ts).
-- For production: `02-production-infrastructure` owns the production compose. The
-  plan author adds a one-line `pgbouncer` service to whatever compose Coolify uses
-  today; the topology stays `app → pgbouncer → postgres`.
-
-### Verify
-
-Re-run load test. With PgBouncer pooling in front of Postgres, peak `pg_stat_activity`
-is at most `pool_size × 5 roles × app processes` — under 200 even at peak. p95 latency
-is unchanged or lower than Phase 2.
-
-## Phase 4 — Rate limit on business endpoints
-
-### Outcome
-
-A middleware (or `loader`-time check) on every `/api/*` route except `/api/auth/*`
-applies a per-user rate limit. The default is 60 requests per minute per user-id.
-The limit covers the connection-time cost: one bad client looping
-`GET /api/dashboard/overview` does not monopolize a pool connection.
-
-### Work
-
-- Extend `src/shared/lib/rate-limit.ts` (currently scoped to search) with a generic
-  helper `rateLimit(key, limit, windowMs)`. The key is `${userId}:${route}` so
-  per-user, per-route limits compose.
-- Add the helper to every `/api/dashboard/*`, `/api/builders/*`, `/api/alerts/*`,
-  `/api/shortlists/*`, `/api/sprints/*` route loader. Not a global middleware — explicit
-  per-route keeps audit trails clear.
-- The `search` rate limit stays as-is.
-- 429 responses include a `Retry-After` header.
-
-### Verify
-
-Re-run load test. Synthetic client that fires 1000 requests/sec from one user gets
-429s after the first 60 in a window; the rest of the 999 users are unaffected.
-
-## Phase 5 — Full load test + verification report
-
-### Outcome
-
-`docs/operations/load-verification-<date>.md` is the plan's done-state: every quantitative
-target from the spec's Goal section is met or the plan is not done.
-
-### Work
-
-- Run the Phase 0 load test against the new stack. Capture the post-state numbers.
-- Compare against the Phase 0 baseline. Every target met (or exceeded): connections,
-  latency, error rate, statement_timeout kills, "sorry" occurrences.
-- Document the verification report. Link it from the plan's Status header.
-- Add `pnpm load-test:smoke` to `ci:local` — a 1-minute version of the load test. CI fails
-  if it does not pass.
-
-### Verify
-
-`docs/operations/load-verification-<date>.md` lists the targets and the achieved numbers.
-Every target is met or exceeded. The plan's Status header flips to `closed`.
-
-## Order of commits
-
-```
-test(load): baseline load test runner + first run
-fix(db): statement_timeout + idle_in_transaction_session_timeout
-fix(db): per-role pool cap + idle_timeout (env-driven)
-chore(compose): add PgBouncer; bump postgres max_connections + memory
-feat(rate-limit): per-user rate limit on business endpoints
-docs(load): verification report
-ci: add pnpm load-test:smoke to the local gate
+```text
+load contract + fixtures + runner
+          ├──> direct baseline
+          ├──> canonical role pools ──┐
+          └──> role timeouts ─────────┼──> PgBouncer local integration
+                                      └──> production-sized calibration
+                                                     └──> 2-hour soak + report
 ```
 
-7 commits. Each is reversible on its own.
+## Phase 0 — Freeze the reproducible workload
 
-## Risks
+Create a Node/TypeScript harness under `scripts/load/`; do not introduce a second test runner. It
+must seed 1,000 deterministic users and non-empty tenant data into a disposable database, sign in
+through Better Auth, validate every route once, ramp virtual users, collect bounded histograms, and
+write redacted JSON plus Markdown.
 
-1. **PgBouncer breaks BetterAuth's auth flow.** BetterAuth uses prepared statements;
-   `pool-options.ts:26` documents `prepare: false` because "prepared statements do not
-   survive between checkouts" in transaction-pooling mode. **This is already a
-   pre-existing constraint.** The plan author verifies BetterAuth's startup flow under
-   PgBouncer before Phase 3 lands.
-2. **statement_timeout kills legitimate long queries.** A 5-second default kills any
-   admin-paged query that hits a slow path. The plan author keeps the timeout configurable
-   per-route via `DATABASE_STATEMENT_TIMEOUT_MS` (and a per-route override header for
-  ops); the default is 5s but `/api/admin/*` can opt up to 60s.
-3. **PgBouncer is a new dependency.** The Coolify deployment template must include it.
-   `02-production-infrastructure` ships the production compose that adds the service;
-   this plan only ships the dev compose.
-4. **Load test is local, not prod.** The load test runs against the dev stack with
-   `pnpm dev`. Production has different hardware (Hetzner VPS vs Mac dev). The plan ships
-   the smoke gate for CI; a full production load test is a separate ops task.
+The runner owns cancellation and timeout behavior. Each request has a 10-second client timeout.
+The route mix and two-second think time are constants tested in
+`tests/unit/scripts/load/config.test.ts`. A run manifest records commit SHA, app image digest,
+host CPU/RAM/architecture, database version, pool mode, user count, duration, and thresholds.
+
+Exit codes are contractual: `0` thresholds passed, `1` thresholds failed, `2` invalid setup, and
+`130` interrupted after writing a partial artifact.
+
+## Phase 1 — Capture the direct baseline
+
+Run the 10-minute profile against a production build connected directly to PostgreSQL. Use the
+same disposable database and production-sized host intended for calibration. Record failures even
+if the app or database collapses; a failed baseline is evidence, not a prerequisite for the fix.
+
+Commit only `docs/operations/load-baseline-<date>.md`. Upload raw JSON as an artifact.
+
+## Phase 2 — Bound and consolidate app pools
+
+Change `poolOptions()` to `poolOptions(role)` with the five-role union and the defaults from the
+spec. Add validated env overrides:
+
+```text
+DATABASE_RUNTIME_POOL_MAX=16
+DATABASE_AUTH_POOL_MAX=4
+DATABASE_WORKER_POOL_MAX=8
+DATABASE_PLATFORM_POOL_MAX=4
+DATABASE_CAPABILITY_POOL_MAX=4
+DATABASE_POOL_IDLE_TIMEOUT_SECONDS=30
+DATABASE_POOL_CONNECT_TIMEOUT_SECONDS=5
+```
+
+Retain the E2E override. Move all imports to the lazy platform client exported by `db/client.ts`
+and delete the second singleton from `db/platform-db.ts` (a compatibility re-export is acceptable
+for one commit, but it must reference the same object). Add `application_name` per role so
+`pg_stat_activity` identifies the client.
+
+Unit tests assert pure option selection. An integration test exercises all five exact roles; it
+must not attempt to inspect a private `drizzle` client field.
+
+## Phase 3 — Enforce database-role timeouts
+
+Add one new Drizzle migration with `ALTER ROLE ... SET statement_timeout` and
+`ALTER ROLE ... SET idle_in_transaction_session_timeout` for the five login roles. Mirror the
+settings in `scripts/db/roles.sql` so a restore/bootstrap preserves them.
+
+Do not edit an applied migration. Do not add an unsupported `onconnect` option and do not send a
+session `SET` through transaction pooling. Tests query `SHOW` as each exact role, directly and later
+through PgBouncer, and verify SQLSTATE `57014` with a bounded `pg_sleep` probe.
+
+## Phase 4 — Add PgBouncer locally
+
+Build PgBouncer 1.25.2 from upstream in a multi-stage ARM64/AMD64 image. The build pins and verifies
+the source checksum. Add a compose service and healthcheck with these caps:
+
+```ini
+pool_mode = transaction
+default_pool_size = 12
+reserve_pool_size = 4
+max_db_connections = 80
+max_client_conn = 500
+auth_type = scram-sha-256
+```
+
+Generate the auth file at container start into `tmpfs`; never commit it. Bind local port 6432 to
+loopback. Keep PostgreSQL at `max_connections=120`; do not apply speculative `shared_buffers` or
+`effective_cache_size` changes in the connection-capacity commit.
+
+Add a readiness script that proves all five roles can execute `SELECT 1` through PgBouncer, the
+migration role still connects directly, the role timeouts survive pooling, and `SHOW POOLS` never
+exceeds the configured database cap.
+
+## Phase 5 — Calibration and CI smoke
+
+Repeat the 10-minute run through PgBouncer. If thresholds fail, use route histograms, PostgreSQL
+activity, PgBouncer waiting-client samples, and host saturation to identify the bottleneck. Pool
+numbers may only be lowered or changed within the hard 80-backend/120-PostgreSQL budget; every
+change updates the spec table and report.
+
+Add `test:load:smoke` and a dedicated `.github/workflows/load-smoke.yml` job that provisions
+PostgreSQL, Redis, PgBouncer, a production app build, and 25 users for 30 seconds. It uploads raw
+artifacts on success and failure. The normal `pnpm ci:local` gate remains required but does not
+pretend a desktop smoke is the capacity certificate.
+
+## Phase 6 — Two-hour certification and production rollout
+
+Document the exact Coolify service, private-network host names, role-secret injection, healthcheck,
+and rollback. Repoint only the five runtime role URLs; keep the migration URL direct. Run deploy
+preflight, auth smoke, RLS/API-isolation checks, and a low-rate route smoke before any load.
+
+The two-hour load runs against an isolated 4-vCPU/8-GB ARM64 environment, not the customer-facing
+production app. Provisioning that environment and starting the load are outward/cost-bearing
+operator actions and require confirmation.
+
+Only after certification passes, roll out PgBouncer as a dark healthy Coolify service, lower the
+production resource to `max_connections=120` during an approved restart window, repoint the five
+runtime URLs, redeploy, and perform low-rate auth/RLS/route smoke checks. No high-rate production
+canary is implied by this plan.
+
+Close the plan only after `docs/operations/load-certification-<date>.md` records every success
+criterion, the exact artifact identifiers, and a pass. If the host is CPU-saturated before the DB
+targets fail, report application capacity as the bottleneck; do not raise database connections.
+
+## Commit sequence
+
+```text
+test(load): add deterministic fixtures and HTTP load harness
+docs(load): record direct database baseline
+fix(db): consolidate and bound role-specific pools
+fix(db): enforce per-role query and transaction timeouts
+build(pgbouncer): add pinned multi-arch pooler and secret-safe config
+test(load): add pooler readiness and CI smoke workflow
+docs(ops): document Coolify pooler rollout and rollback
+docs(load): record two-hour capacity certification
+ops(db): route production runtime roles through PgBouncer
+```
+
+The migration and `scripts/db/roles.sql` mirror must land together. PgBouncer configuration and the
+readiness check must land together. Do not split either invariant across deployable commits.
+
+## Risks and mitigations
+
+| risk                                               | mitigation                                                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Transaction pooling breaks session state           | Keep `prepare: false`; test Better Auth, tenant context, and every role through PgBouncer before rollout. |
+| Auth-file secrets leak                             | Generate into container `tmpfs`, mode `0600`; redact environment and URLs from logs/artifacts.            |
+| A five-second timeout kills legitimate worker work | Worker has a 30-second role default; existing backfills retain explicit `SET LOCAL` overrides.            |
+| Pool caps merely move failure into a queue         | Sample `cl_waiting` and `maxwait`; fail certification when queue targets are missed.                      |
+| 1,000 empty tenants produce a false green result   | Seed bounded but non-empty dashboard, builder, alert, recommendation, and sprint data.                    |
+| External providers distort DB results              | Keep them disabled in the core profile; report cached federated search separately.                        |
+| ARM image is unavailable or vulnerable             | Build 1.25.2 from upstream and verify both target architectures plus `pgbouncer --version`.               |
+| Rollout locks out migrations                       | Migration URL never traverses PgBouncer and is checked before runtime URLs are changed.                   |
+| The 4-vCPU app saturates before PostgreSQL         | Report the actual bottleneck; do not “fix” CPU saturation by raising connection counts.                   |
 
 ## Rollback
 
-Each phase is a single commit. `git revert <commit-hash>` returns to the prior state.
-PgBouncer is the biggest blast radius; reverting Phase 3 means app connections go back to
-Postgres directly, which is what works today (just at the documented 50-connection idle
-floor).
+1. Stop new load and preserve the partial artifact.
+2. In Coolify, restore the five runtime URLs to the direct PostgreSQL host and redeploy the previous
+   green app image. Do not change `DATABASE_MIGRATION_URL`.
+3. Verify `/api/health`, sign-in, dashboard overview, and one exact-role RLS probe.
+4. Stop the PgBouncer service only after direct traffic is healthy.
+5. Pool-option and timeout commits are independently revertible. Role defaults may be reset with a
+   new migration/approved operator command; never edit the applied migration.
+
+Rollback restores availability, not the 1,000-user guarantee. The incident report must retain the
+PgBouncer and PostgreSQL samples that triggered rollback.

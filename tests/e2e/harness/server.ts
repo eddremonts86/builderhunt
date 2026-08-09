@@ -24,6 +24,29 @@ async function freePort(): Promise<number> {
   return port
 }
 
+/**
+ * `vite dev`, and not `vite preview` — which was tried, measured and reverted on 2026-08-09.
+ *
+ * The idea was sound on paper: each spec file gets its own server, and under `dev` that server
+ * starts with nothing compiled, so the first request pays to transform the route tree and
+ * everything it imports. Serving a build instead would skip that, and would test the bundle users
+ * actually receive rather than one adjacent to it.
+ *
+ * It does not work, for a reason no amount of tuning fixes. `VITE_APP_URL` is inlined into the
+ * client bundle at build time, and every worker server here listens on a *different* ephemeral
+ * port. A pre-built client therefore calls whatever origin was baked in — observed as
+ * `third-party egress: http://localhost:3010/api/auth/get-session` from a page served on
+ * 127.0.0.1:51983, and a CORS failure behind it. One build cannot serve N origins. Twelve specs in
+ * `public-and-consent.spec.ts` failed exactly that way.
+ *
+ * The measurement did not justify pursuing it either: a page-heavy spec went 47s → 33s, but a
+ * five-file batch went 188s → 189s. The compile cost is real and mostly paid once per process, not
+ * once per request, so a warm machine barely notices it. CI, cold and two-core, would gain more —
+ * but not enough to justify either baking a fixed port (which breaks any parallel local run) or
+ * moving the app to relative API URLs (a product change, with its own risk, for a test speedup).
+ *
+ * If someone revisits this: the blocker is the baked origin, not the server mode.
+ */
 export async function startWorkerServer(
   workerIndex: number,
   database: WorkerDatabase,

@@ -1,193 +1,218 @@
-# Load capacity — 1000 concurrent users × 2h sustained (spec)
+# Load capacity — 1,000 concurrent authenticated users (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`02-production-infrastructure`](../02-production-infrastructure/spec.md)
-> (Coolify/VPS topology, docker-compose baseline); [`03-postgres-18-upgrade`](../03-postgres-18-upgrade/spec.md)
-> (pg18 image + `pgvector` extension). Reads [`app-reality`](../../_meta/app-reality.md) for the
-> ground truth on connection pools, worker topology, and rate limiting today.
-> **Blocks**: nothing. Every other plan already depends on this one being correct — without
-> bounded pools, statement_timeout, and PgBouncer, every other plan's load assumptions are
-> fiction. **This plan is the floor.**
-> **Reality check (verified at HEAD 2026-08-07)**: `src/shared/lib/db/pool-options.ts` has no
-> production cap on `max` connections. `if (!isE2E) return { prepare: false }` returns
-> `postgres.js`'s default of `max: 10` per pool, but the file imports **no cap** beyond that.
-> Five DB roles (`runtime`/`auth`/`worker`/`platform`/`capability`) each open their own pool,
-> so a single app process holds up to 50 idle connections. docker-compose pins
-> `max_connections=200` (`docker-compose.yml:14`, raised from 100 on 2026-07-29 because
-> vitest + ad-hoc tsx scripts had already exhausted 100). `worker-db.ts`,
-> `platform-db.ts`, `capability-db.ts` all import the same `poolOptions()` with no override.
-> `src/shared/lib/db/client.ts:24` documents that **the app already runs behind a
-> transaction-pooling proxy in production** ("the app runs behind a transaction-pooling proxy
-> in production, where prepared statements do not survive between checkouts"), but the proxy is
-> not yet in `docker-compose.yml` — the comment is forward-looking. There is no
-> `statement_timeout`, no `idle_in_transaction_session_timeout`, no rate limit on business
-> endpoints beyond `search`, and no load test script. There are 15 queries in `repositories/`
-> with no `.limit()` (`grep -rEn "FROM " src/shared/lib/repositories/ | grep -v limit | wc -l = 15`).
+> **Depends on**: [`02-production-infrastructure`](../02-production-infrastructure/spec.md),
+> [`03-postgres-18-upgrade`](../03-postgres-18-upgrade/spec.md)
+> **Blocks**: nothing
+> **Reality check**: `src/shared/lib/db/pool-options.ts` leaves production on the
+> `postgres.js` default of 10 connections per client and only caps E2E at 3. The runtime creates
+> five role-specific clients plus a second platform client exported from `db/client.ts` and
+> `db/platform-db.ts`. `src/shared/lib/rate-limit.ts` is already Redis-backed and generic;
+> `scripts/db/seed-test-users.ts` creates three users, not 1,000. There is no load harness or
+> PgBouncer service at HEAD (verified 2026-08-09).
+
+## Decision
+
+Protect PostgreSQL with three independent controls:
+
+1. one canonical app pool per database role, with an explicit per-process connection budget;
+2. database-role statement and idle-transaction timeouts that also apply behind transaction
+   pooling;
+3. PgBouncer 1.25.2 in transaction mode, with a hard database-wide backend cap.
+
+Capacity is certified by a 1,000-session, two-hour soak on an isolated production-sized host.
+The 10-minute run is a calibration gate, not evidence for the two-hour claim. Rate limiting is
+not part of the capacity fix: legitimate traffic must pass without being converted to `429`.
 
 ## Problem
 
-The DB "hangs" intermittently when 1000 users work at full capacity for 2 hours. Three
-mutually reinforcing root causes, in order of how much they actually contribute:
+The current connection budget is implicit and multiplied by client objects and app processes.
+`postgres.js` opens connections lazily, so this is a maximum rather than an idle floor, but the
+worst case is still unbounded at the deployment level:
 
-1. **No statement timeout.** A single slow query parks on its pool connection for as long
-   as Postgres takes to return — measured on busy weeks at 30-90 seconds for unbounded reads
-   that hit full-table scans when an index is missing or `WHERE` is non-sargable. While one
-   connection is parked, the next request blocks on `pool.acquire()`. After 10 of these, the
-   pool is full and every subsequent request fails with `sorry, too many clients already`
-   (or, with the in-memory fallback, hangs). The user sees "DB hung".
-2. **Pool without a hard production cap.** `poolOptions()` returns
-   `{ prepare: false }` outside E2E. `postgres.js`'s default is `max: 10`. Five DB roles ×
-   `max: 10` = 50 connections per app process. With one Coolify container per role and one
-   app process, that is **50 connections used even at idle**. With two app processes
-   (e.g., a worker container + a web container, both legitimate under
-   `02-production-infrastructure`), 100 idle connections. With four workers + a side
-   process, **200 connections at idle**. `docker-compose` `max_connections=200` is already
-   saturated by idle connections before any user request lands.
-3. **No transaction-pooling proxy.** `pool-options.ts:26` documents the design intent:
-   "the app runs behind a transaction-pooling proxy in production". The proxy is not in
-   `docker-compose.yml`. Without it, the app holds a TCP+backend connection for the full
-   duration of every request. Under 1000 concurrent users, even with `max: 10`, requests
-   queue on `pool.acquire()` for as long as the slowest in-flight query, because each
-   connection is checked out, not pooled for the duration of a transaction.
+- runtime, auth, worker, capability, and **two** platform clients can each grow to 10 connections;
+- a second app process doubles that ceiling;
+- requests wait behind slow queries with no role-level `statement_timeout`;
+- production connects directly to the Coolify PostgreSQL resource;
+- no repeatable workload proves the service survives the stated concurrency or duration.
 
-Two secondary contributors:
+PgBouncer does not make slow SQL faster and does not replace bounded application pools. It limits
+the number of PostgreSQL backends and turns excess demand into a measurable queue instead of a
+database-wide connection failure.
 
-4. **15 unbounded reads** in `src/shared/lib/repositories/`. Some are admin pages (cost is
-   one-time); some are dashboard overviews (cost is per-page-load); one is a public endpoint
-   that returns a list of slugs. Each is a candidate for "parking on a connection while we
-   read 50,000 rows". Bounded pagination (phase-3 plan 03-keyset-pagination ships the contract)
-   is the long-term fix; this plan's fix is the **timeout**, not the rewrite.
-5. **No rate limit on business endpoints.** `src/shared/lib/rate-limit.ts` covers `search` only.
-   A single bad client looping `GET /api/dashboard/overview` can monopolize one of the
-   five-role pools. Plan `phase-1/32-abuse-and-usage-integrity` has a per-seat daily quota
-   but the quota is counted per-request, not enforced per-connection-time.
+## Load contract
 
-## Goal
+“1,000 concurrent users” means all of the following, not 1,000 simultaneous TCP connections:
 
-The app sustains **1000 signed-in users, each running a mixed workload (search,
-dashboard, alerts inbox refresh, recommendations fetch, sprint status) for 2 hours straight,
-with no DB-side outage, no 5xx storm, and p95 page-load latency under 1.5 seconds.**
+- 1,000 distinct authenticated sessions are kept live for the steady-state window.
+- Each virtual user performs one request, waits two seconds plus deterministic jitter in the
+  range 0–500 ms, then repeats. The expected offered rate is 400–500 requests/second.
+- The runner ramps from 0 to 1,000 users over two minutes. Thresholds are evaluated after ramp-up.
+- The workload is read-heavy and uses seeded local data only:
+  - 45% `GET /api/dashboard/overview`
+  - 15% `GET /api/builders/recent`
+  - 15% `GET /api/alerts/triggers/unread-count`
+  - 15% `GET /api/recommendations`
+  - 10% `GET /api/sprints/:sprintId/results`
+- A separate 5% federated-search profile may be run after warming its cache. It is reported
+  separately because third-party latency is not PostgreSQL capacity.
+- Every endpoint is exercised once during fixture validation before the timed run. A missing
+  fixture, `401`, `403`, `404`, or feature-disabled response aborts instead of becoming load.
+- The load database is disposable and contains enough per-organization rows to avoid certifying
+  empty-state queries. External AI, email, payment, and scraping calls remain disabled.
 
-Quantitative targets the plan verifies against at every commit:
+## Certification stages
 
-| metric | target |
-|---|---|
-| `pg_stat_activity` connections used at steady state | ≤ 100 (target 60) |
-| `pg_stat_activity` connections used at peak | ≤ 200 |
-| `statement_timeout` default | ≤ 5s |
-| `idle_in_transaction_session_timeout` default | ≤ 10s |
-| App pool `max` per role | 20 |
-| App pool `idle_timeout` | 30s |
-| p50 page-load latency | ≤ 250 ms |
-| p95 page-load latency | ≤ 1.5 s |
-| p99 page-load latency | ≤ 3 s |
-| 5xx rate | ≤ 0.1% over the 2h window |
-| Pool-acquire wait time p95 | ≤ 50 ms |
+1. **Baseline** — 10 minutes, direct app-to-PostgreSQL, same build, data, host, and workload.
+2. **Calibration** — 10 minutes through PgBouncer. Tune only within the connection budget below.
+3. **Soak** — two hours through PgBouncer on an isolated 4-vCPU/8-GB ARM64 host, matching the
+   production CAX21 class documented in `docs/operations/host-maintenance.md`.
+4. **Smoke** — 25 users for 30 seconds in a dedicated CI workflow. This detects broken wiring;
+   it does not certify 1,000 users.
+
+Raw samples are CI artifacts under `artifacts/load/` and are not committed. The repository keeps
+the redacted baseline and certification summaries under `docs/operations/`.
+
+## Connection budget
+
+### Application clients (per app process)
+
+| role       | default `max` | statement timeout | idle-in-transaction timeout |
+| ---------- | ------------: | ----------------: | --------------------------: |
+| runtime    |            16 |               5 s |                        10 s |
+| auth       |             4 |               5 s |                        10 s |
+| worker     |             8 |              30 s |                        30 s |
+| platform   |             4 |              15 s |                        10 s |
+| capability |             4 |               5 s |                        10 s |
+
+Total: 36 possible PgBouncer client connections per app process. `idle_timeout` is 30 seconds and
+`connect_timeout` is 5 seconds for every role. E2E keeps its existing `max: 3` and
+`idle_timeout: 20` override.
+
+The initial values are conservative starting points, not proof. Calibration may lower them.
+Raising them requires updating this table and proving that:
+
+```text
+app process count × sum(per-role max) < PgBouncer max_client_conn
+```
+
+### PgBouncer and PostgreSQL
+
+```text
+PgBouncer pool_mode              transaction
+PgBouncer default_pool_size      12 per (database, user) pool
+PgBouncer reserve_pool_size       4 per pool
+PgBouncer max_db_connections     80 across all role pools
+PgBouncer max_client_conn       500
+PostgreSQL max_connections      120
+```
+
+Five role users therefore consume at most 60 normal and 80 peak PgBouncer backends. PostgreSQL
+retains 40 connections for the migration URL, monitoring, backup, and operator access. These are
+hard caps; the plan does not raise PostgreSQL to 500 connections on an 8-GB host.
+
+`default_pool_size` is per `(database, user)` pool, not a global number. This is why the design also
+sets `max_db_connections=80` and verifies `SHOW POOLS`/`SHOW STATS` instead of multiplying an
+informal pool-size estimate.
+
+## Timeout design
+
+The plan does **not** use an `onconnect` callback: `postgres@3.4.9` has no such option. It also does
+not rely on session `SET` commands, which are unsafe assumptions in transaction mode.
+
+Timeouts are applied with `ALTER ROLE ... SET` in a new migration and mirrored in
+`scripts/db/roles.sql`, so every new PostgreSQL backend inherits the correct values whether the
+client connects directly or through PgBouncer. Backfills that already use `SET LOCAL
+statement_timeout` keep their explicit transaction-scoped override.
+
+`prepare: false` remains set on all app clients. `DATABASE_MIGRATION_URL` always bypasses PgBouncer
+so migrations, role provisioning, backup, and restore do not run through transaction pooling.
+
+## PgBouncer deployment and secrets
+
+- Build PgBouncer 1.25.2 from the signed upstream release in
+  `docker/pgbouncer/Dockerfile`; pin the release checksum and verify both `linux/amd64` and
+  `linux/arm64`. Do not use the stale `pgbouncer/pgbouncer` Docker Hub image or the old
+  `bitnami/pgbouncer:1.22` draft.
+- `docker/pgbouncer/pgbouncer.ini` contains no credentials.
+- An entrypoint writes `userlist.txt` into a `tmpfs` from the five explicit role-password
+  environment variables (`PGBOUNCER_RUNTIME_PASSWORD`, `PGBOUNCER_AUTH_PASSWORD`,
+  `PGBOUNCER_WORKER_PASSWORD`, `PGBOUNCER_PLATFORM_PASSWORD`, and
+  `PGBOUNCER_CAPABILITY_PASSWORD`) plus a dedicated `PGBOUNCER_ADMIN_PASSWORD`, sets mode `0600`,
+  and never prints their values. No generated auth file is committed or stored in a host-mounted
+  volume.
+- Local compose exposes PgBouncer only on `127.0.0.1:6432`.
+- Production PgBouncer is a separate Coolify service on the private network between the app and
+  the managed PostgreSQL resource. Runtime/auth/worker/platform/capability URLs use the pooler;
+  the migration URL continues to use PostgreSQL directly.
+- `auth_type=scram-sha-256`; the PgBouncer admin console uses a dedicated admin identity, not a
+  runtime role.
+- The image retains the upstream ISC license and release provenance in its build metadata.
+
+## Success criteria
+
+Measured after ramp-up, excluding the separately labelled timeout probe:
+
+| metric                                          |                 calibration and soak target |
+| ----------------------------------------------- | ------------------------------------------: |
+| authenticated sessions                          |                            1,000 maintained |
+| offered throughput                              |                               400–500 req/s |
+| HTTP p50                                        |                                    ≤ 250 ms |
+| HTTP p95                                        |                                     ≤ 1.5 s |
+| HTTP p99                                        |                                       ≤ 3 s |
+| 5xx responses                                   |                                      ≤ 0.1% |
+| unexpected non-2xx responses, including `429`   |                                      ≤ 0.1% |
+| PostgreSQL `pg_stat_activity` total             |                                  ≤ 100 peak |
+| PgBouncer database backends                     |                                   ≤ 80 peak |
+| PgBouncer `cl_waiting`                          |       0 in at least 95% of 5-second samples |
+| PgBouncer `maxwait`                             | ≤ 50 ms in at least 95% of 5-second samples |
+| `too many clients` / SQLSTATE 53300             |                                           0 |
+| process RSS growth from minute 15 to minute 120 |                                       < 10% |
+
+The timeout probe connects as each real role, verifies `SHOW statement_timeout` and
+`SHOW idle_in_transaction_session_timeout`, then runs `pg_sleep` outside the timed workload.
+SQLSTATE `57014` must occur within the configured bound. Query text and credentials are never
+written to the report.
+
+## Observability contract
+
+The monitor samples every five seconds through credentials separate from load traffic:
+
+- PostgreSQL: total/active/idle-in-transaction connections and SQLSTATE 53300/57014 counts;
+- PgBouncer admin console: `SHOW POOLS` and `SHOW STATS`, including `sv_active`, `sv_idle`,
+  `cl_waiting`, and `maxwait`/`maxwait_us`;
+- app: status counts and latency histogram by route;
+- host/container: CPU, RSS, restart count, and open file descriptors.
+
+The runner must handle `SIGINT`/`SIGTERM`, stop scheduling new requests, wait up to 30 seconds for
+in-flight requests, close database clients, and still write a partial report marked `aborted`.
 
 ## Non-goals
 
-- **Not a re-architecture.** This plan ships within the existing app topology. No move to
-  microservices, no new database, no change to the existing `postgres.js` driver.
-- **Not a sharding plan.** Single-DB with PgBouncer is enough for 1000 concurrent users at
-  this traffic profile. Sharding is premature; revisit at 10,000 concurrent.
-- **Not an HA / failover plan.** Multi-AZ failover is `02-production-infrastructure`'s job
-  (`blocks 7+`).
-- **No new env vars added to `env.ts` that fail closed in production.** Every new env var
-  has a sensible default; misconfiguration in any environment logs a warning, never a crash.
-- **Not a benchmark.** This plan ships the production hardening, not the comparison between
-  PgBouncer and Odyssey or HAProxy. PgBouncer is chosen because `pool-options.ts:26`
-  documents the design intent and PgBouncer is the smallest, most boring option that satisfies
-  the intent.
+- Query/index optimization and pagination changes.
+- High availability, failover, or app replica/load-balancer work.
+- Hiding insufficient capacity behind broader rate limits.
+- Federated-source or AI-provider capacity certification.
+- Running a destructive or surprise load test against production.
+- Claiming the 30-second CI smoke proves the two-hour requirement.
 
-## Architecture (before / after)
+## Resolved edge cases
 
-### Before
+- The two platform client exports are consolidated before sizing; aliases (`publicDb`,
+  `accountDb`) remain aliases and do not count as additional pools.
+- A PgBouncer outage fails readiness and deployment smoke checks; the app does not silently switch
+  to the direct database URL.
+- Pooler and direct URLs are distinct in reports and are redacted before serialization.
+- Intentional timeout-probe failures are excluded from the user error-rate numerator but reported
+  separately.
+- Load fixtures are created only on loopback or an explicitly named disposable database. The seed
+  refuses the production DB marker and never reuses `scripts/db/seed-test-users.ts`.
+- A baseline crash is valid evidence and does not block hardening; post-change results are judged
+  against the explicit targets, not an impossible “every metric must beat baseline” rule.
 
-```
-[ App process 1 ]     [ App process 2 ]     [ Worker process ]
-  ├─ runtimeDb (max: 10)  ├─ runtimeDb       ├─ workerDb (max: 10)
-  ├─ authDb   (max: 10)  ├─ authDb            (separate file, same default)
-  ├─ publicDb (alias)    ├─ publicDb
-  ├─ platformDb (max: 10)
-  └─ accountDb (alias)   └─ capabilityDb (max: 10)
+## References
 
-   5 pools × 10 max = 50 idle conn per process
-   1000 users × ~30 req/min = 500 req/s
-   Pools queue on acquire; one slow query parks a connection.
-```
-
-### After
-
-```
-          [ App processes × N ]   [ Worker processes × N ]
-              │                          │
-              ▼                          ▼
-        ┌─────────────────────────────────────────┐
-        │        PgBouncer (transaction mode)      │
-        │   pool_size: 20  max_client_conn: 5000  │
-        └─────────────────────────────────────────┘
-                          │
-                          ▼
-              [ Postgres 18 — max_connections=500 ]
-
-App pools (per role, per process): max 20, idle_timeout 30s
-   onconnect: SET statement_timeout = 5000
-              SET idle_in_transaction_session_timeout = 10000
-
-Worker pools: same, but max 30 each (workers tolerate more contention).
-
-PgBouncer sees up to 5000 client connections (across N processes × 5 roles),
-opens at most 500 backend connections to Postgres (100× pool_size 20 × roles
-scaled), and reuses them transaction-by-transaction.
-```
-
-## Constraints this plan respects
-
-1. `app-reality.md` — every config number is justified by a current-code base, not invented.
-2. `security-and-multitenancy` §2 — pools are role-separated (`runtime`/`auth`/`worker`/
-   `platform`/`capability`); PgBouncer routes by database name; RLS still gates rows.
-3. `02-production-infrastructure` — Coolify/VPS topology stays; PgBouncer fits as another
-   container on the same host, or as a sidecar. No topology rewrite.
-4. `03-postgres-18-upgrade` — pg18 image already pinned (`pgvector/pgvector:0.8.5-pg18`).
-   The `statement_timeout` GUC is supported as a connection-time parameter.
-5. `phase-3/03-keyset-pagination` — keyset pagination is the long-term bounded-read fix.
-   This plan adds the timeout that prevents unbounded reads from parking the pool; the
-   pagination plan prevents them from being unbounded in the first place.
-6. `phase-1/32-abuse-and-usage-integrity` — per-seat daily quotas remain the
-   request-volume gate. Rate limit (this plan) is the connection-time gate.
-7. `conventions.md` rule 8 (do not hand-edit `.env` outside `.env.example`); this plan adds
-   new env vars only to `.env.example` with sensible defaults; production deployment reads
-   them from Coolify's environment config.
-
-## Out of scope
-
-- **Read/query optimization.** Slow queries get killed by `statement_timeout`, not optimized
-  by this plan. Optimizing each query is a separate plan (the 15 unbounded reads from the
-  Problem section).
-- **BetterAuth connection model.** BetterAuth uses `auth-db.ts` (its own pool). This plan
-  applies the same pool sizing to it but does not change BetterAuth's internals.
-- **Worker scheduling.** The 10 admin-triggered workers
-  (`OPERATIONAL_SCHEDULES` in `src/shared/lib/operational-schedules.ts`) are out of scope.
-  They already run via cron and one-shot endpoints.
-- **Search-result caching.** Redis cache TTL and keyset fallbacks are out of scope; this
-  plan does not change caching behaviour, only pool behaviour.
-
-## Verification
-
-1. **Load test passes**. The script in [`scripts/audit/load-test.ts`](./scripts/load-test.ts)
-   drives 1000 concurrent sessions for 10 minutes against the dev stack with a docker
-   PgBouncer container, reports p50/p95/p99 latency, error rate, peak connections, and
-   statement_timeout kills. The CI gate (`pnpm load-test:smoke`) runs a 1-minute smoke and
-   fails on p95 > 1.5s or error rate > 0.1%.
-2. **pg_stat_activity stays bounded**. During the load test, a parallel `psql` snapshot
-   every 5 seconds records `SELECT count(*) FROM pg_stat_activity`. The peak count never
-   exceeds 200. The steady-state average stays under 100.
-3. **statement_timeout fires when expected**. The load test includes a synthetic slow
-   query (`SELECT pg_sleep(10)`) which the production config kills at 5s, returning a
-   500 to the test client. The kill is logged at WARN with the query text and the
-   `statement_timeout` value.
-4. **No "sorry, too many clients already"**. The load test asserts that the error rate
-   for this Postgres error code is 0 across 10 minutes.
-5. **Process restart under pool churn**. The load test holds 1000 sessions; mid-test,
-   one app process is killed. Sessions redistribute to the remaining processes within 60
-   seconds, and the load test continues without error-rate spike > 1%.
+- [PgBouncer configuration](https://www.pgbouncer.org/config.html)
+- [PgBouncer features and transaction-pooling limits](https://www.pgbouncer.org/features.html)
+- [PgBouncer 1.25.2 release](https://github.com/pgbouncer/pgbouncer/releases/tag/pgbouncer_1_25_2)
+- `node_modules/.pnpm/postgres@3.4.9/node_modules/postgres/README.md` (supported client options)
