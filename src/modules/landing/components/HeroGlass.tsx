@@ -10,12 +10,21 @@ import * as React from 'react'
 import { ArrowRight } from 'lucide-react'
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 import { LinkButton } from '~/components/ui'
-import { useSession } from '~/shared/lib/auth/client'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
 
-export function HeroGlass() {
-  const session = useSession()
-  const isAuthed = !!session.data?.user
+export interface HeroGlassProps {
+  /**
+   * A prop, not `useSession()`, for the reason spelled out in `_landing/route.tsx`: a client hook
+   * leaves the server rendering the signed-out CTA and hydration disagreeing with it.
+   *
+   * Nothing renders this component today — it is reachable only from this file. That is exactly why
+   * the prop is required rather than defaulted: whoever mounts it has to supply an answer the server
+   * also has, instead of silently reintroducing the mismatch.
+   */
+  isAuthed: boolean
+}
+
+export function HeroGlass({ isAuthed }: HeroGlassProps) {
   const reduce = useReducedMotion()
   const ref = React.useRef<HTMLDivElement>(null)
 

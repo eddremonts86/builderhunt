@@ -4,16 +4,22 @@ import {
   Sparkles, Target, ArrowRight, Check, Search,
   Bell, FileText, Download, Zap, Shield
 } from 'lucide-react'
-import { useSession } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
-export function HomePage() {
-  const session = useSession()
+export interface HomePageProps {
+  /**
+   * Resolved on the server by `_landing/route.tsx`'s `beforeLoad` and passed in by
+   * `_landing/index.tsx`. Read from `useSession()` here, it was absent during SSR and possibly
+   * present on the client's first render — a hydration mismatch on every CTA below.
+   */
+  isAuthed: boolean
+}
+
+export function HomePage({ isAuthed }: HomePageProps) {
   const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
-  const isAuthed = !!session.data?.user
 
   React.useEffect(() => {
     trackConversionEvent('landing_view', 'hero')

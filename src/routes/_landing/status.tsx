@@ -2,7 +2,9 @@ import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { z } from 'zod'
 import { CheckCircle2, AlertTriangle, XCircle, Activity, Clock, Mail } from 'lucide-react'
-import { useSession } from '~/shared/lib/auth/client'
+// No `useSession()` here on purpose — see `_landing/route.tsx`. This route picks between two
+// entirely different trees at the bottom of the component, so a client-only session answer made the
+// server and the first client render disagree about the whole page rather than one button.
 import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
 import { TenantQueryProvider } from '~/shared/components/TenantQueryProvider'
 
@@ -88,7 +90,7 @@ function StatusPage() {
     return () => clearInterval(id)
   }, [load])
 
-  const { data: session } = useSession()
+  const { user } = Route.useRouteContext()
   const search = Route.useSearch()
   const allOk = status?.status === 'ok'
   const openIncidents = incidents.filter((i) => i.status !== 'resolved')
@@ -218,8 +220,8 @@ function StatusPage() {
   // `QueryClient` — `_dashboard/route.tsx` provides one via
   // `TenantQueryProvider`, but this route sits outside that tree entirely
   // (that's the point, for signed-out visitors), so it must supply its own.
-  return session?.user ? (
-    <TenantQueryProvider activeOrganizationId={session.session?.activeOrganizationId ?? null}>
+  return user.userId ? (
+    <TenantQueryProvider activeOrganizationId={user.activeOrganizationId}>
       <DashboardLayout>{content}</DashboardLayout>
     </TenantQueryProvider>
   ) : content
