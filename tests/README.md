@@ -18,9 +18,30 @@ suite therefore lives in its own pair of projects and is excluded from
 `pnpm test:e2e`: a baseline that does not exist for the current platform would
 otherwise fail every unrelated change.
 
-Regenerate after a deliberate design change with
-`pnpm test:visual --update-snapshots`, and commit the resulting files. Wiring
-this into CI needs Linux baselines generated in the CI environment first.
+The gate is wired in and required: `advisory.yml`'s visual job runs it on every
+pull request and every push to `dev` and `master`, comparing against the
+committed `*-linux.png` files.
+
+Which is why regenerating is a two-sided job, and why doing only the first side
+is what this section used to tell you to do:
+
+- **macOS baselines** — `pnpm test:visual --update-snapshots`, then commit the
+  `*-darwin.png` files. This is the half a developer can produce, and it is the
+  half CI never looks at.
+- **Linux baselines** — dispatch **Refresh Linux visual baselines**
+  (`gh workflow run visual-baselines.yml`, optionally `-f grep=<filter>`),
+  download the `linux-visual-baselines` artifact, unzip it over
+  `tests/e2e/visual/`, and commit the files that changed for the reason you
+  expect. The workflow rewrites the baselines on the runner that judges them and
+  then re-runs the suite bare against the result — a baseline captured from a
+  page that had not settled is accepted by `--update-snapshots` and fails on the
+  next push, so that second run is the one that certifies it.
+
+Do both. Skipping the second is not a cosmetic omission: it leaves the linux
+baselines showing the old design, and they drift silently until a diff grows past
+`MAX_DIFF_PIXEL_RATIO`. The alerts empty state moved to the table shell and its
+mobile baseline failed at ratio 0.02 — while its desktop twin, stale in exactly
+the same way, passed at roughly 0.0098.
 
 ## Conventions
 
