@@ -135,6 +135,57 @@ least one such item is already recorded: `../runbook.md` notes that
 
 ---
 
+## Hardening SSH
+
+**State as of 2026-08-09, measured from outside the host:** the server advertises
+`publickey,password` for `root`, on `OpenSSH_9.6p1 Ubuntu-3ubuntu13.18` (current for 24.04). So
+password authentication is live on an account this document tells people to log in as, on an IP that
+`builderhunt.eduardoinerarte.dk` resolves to publicly. Making the repository public does not leak
+that address — DNS already does — but it does raise how many people look.
+
+Two changes close it. **Do them in this order, and keep a second SSH session open the whole time**:
+a mistake in `sshd_config` is only recoverable through the Hetzner console once you have been
+disconnected.
+
+```bash
+# 1. Prove a key works BEFORE removing the password route.
+ssh -i ~/.ssh/<your-key> root@178.105.106.79 'echo ok'
+
+# 2. Find every file that sets these. This is the step people skip.
+sudo grep -rnE 'PasswordAuthentication|PermitRootLogin' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/
+```
+
+Ubuntu 24.04 ships `/etc/ssh/sshd_config.d/50-cloud-init.conf`, and **a file in that directory wins
+over `sshd_config`** — cloud images routinely set `PasswordAuthentication yes` there. Editing only
+the main file is the classic way to believe you have hardened a host that is exactly as open as it
+was. Set the values wherever the grep found them:
+
+```bash
+PasswordAuthentication no
+PermitRootLogin prohibit-password   # keys still work; passwords never do
+```
+
+```bash
+# 3. Validate the syntax, then reload. Never reload without the check.
+sudo sshd -t && sudo systemctl reload ssh
+
+# 4. From a different terminal, confirm the password route is gone:
+ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no root@178.105.106.79
+# expected: "Permission denied (publickey)" — note the list no longer contains `password`
+```
+
+Then rate-limit what is left:
+
+```bash
+sudo apt-get install -y fail2ban && sudo systemctl enable --now fail2ban
+sudo fail2ban-client status sshd
+```
+
+`HETZNER_PASSWORD` in `ai-os/dev-env/env-config/.env` stops being an SSH credential once this is
+done. It remains the Hetzner *console* password, which is the recovery route if a key is ever lost —
+so it should stay in the file, and stay correct.
+
+
 ## Access
 
 The root password and the API token live in `ai-os/dev-env/env-config/.env` (`HETZNER_PASSWORD`,
