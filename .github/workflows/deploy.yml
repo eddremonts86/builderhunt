@@ -48,3 +48,33 @@ jobs:
             esac
           done
           echo "::error::timeout"; exit 1
+
+      # Coolify saying "finished" means the container started, not that the app works. Those are not
+      # the same claim, and this repo has the scar: a deploy reported finished against a Postgres
+      # image without pgvector, `CREATE EXTENSION vector` rolled back every migration in its
+      # transaction, the org tables vanished and sign-in answered 500 — all while the pipeline showed
+      # green. A deploy that is not verified is a deploy you find out about from a user.
+      #
+      # `/api/health` is deliberately static: it proves the process is serving. The second probe asks
+      # for a real page, because a process that answers a constant and nothing else is exactly the
+      # failure above.
+      - name: Verify production actually answers
+        run: |
+          set -uo pipefail
+          BASE="https://builderhunt.dev"
+          for i in $(seq 1 30); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$BASE/api/health" || echo 000)
+            [ "$code" = "200" ] && break
+            echo "poll $i: /api/health -> $code"
+            [ "$i" = 30 ] && { echo "::error::$BASE/api/health never returned 200 after the deploy"; exit 1; }
+            sleep 5
+          done
+          echo "health ok"
+
+          page=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/" || echo 000)
+          if [ "$page" != "200" ]; then
+            echo "::error::$BASE/ returned $page — the process is up but not serving the app"
+            exit 1
+          fi
+          echo "landing ok"
+          echo "✅ Deployed and verified: $BASE" >> "$GITHUB_STEP_SUMMARY"

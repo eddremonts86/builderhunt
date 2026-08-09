@@ -9,6 +9,12 @@ name: Advisory
 # is what actually takes them off that path.
 #
 # Same trigger as Quality, so they still run on every push to master. They just run beside it.
+#
+# And they are allowed to fail. They carried `continue-on-error` while they lived in `quality.yml`,
+# where it was the only way to keep them out of the deploy's way — here it would do nothing except
+# report green on a check that failed, which is the state this repo has already been bitten by twice
+# (a Stripe certification "succeeding" in four seconds with every step skipped, and a visual gate
+# that had not run in months). A red mark on the commit is the entire point of running these.
 
 on:
   push:
@@ -56,7 +62,6 @@ jobs:
       # nothing to do with a screenshot. The baselines were generated against that same dev
       # server, so this is also the configuration they were taken in.
       - name: Visual regression gate
-        continue-on-error: true
         # Baselines are named per project *and* per OS, so this compares against the committed
         # `*-linux.png` files — generated on 2026-08-03 inside `mcr.microsoft.com/playwright:v1.61.1-jammy`,
         # the image matching this repo's pinned Playwright, and verified in both directions: 22 passing
@@ -329,7 +334,6 @@ jobs:
       # instead would measure the dev module graph, which tells you nothing
       # about what a visitor gets.
       - name: Lighthouse budgets
-        continue-on-error: true
         run: pnpm test:lighthouse
       - name: Upload Lighthouse reports
         if: failure()
@@ -408,7 +412,6 @@ jobs:
     # Skipped, not green, when there is nothing to certify with. The run page then shows this job
     # grey and the reason is one click away, instead of a tick that reads as "Stripe is certified".
     if: needs.stripe-secret-present.outputs.configured == 'true'
-    continue-on-error: true
     env:
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
       # The same secret under its other name, because the three certification suites do not agree on
