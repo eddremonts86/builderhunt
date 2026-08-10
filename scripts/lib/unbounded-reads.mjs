@@ -107,13 +107,36 @@ export function scopeOf(node) {
   return { name: '<module scope>', exported: true, kind: 'module' }
 }
 
-/** The statement a node sits in, which is where an `unbounded-read-ok:` comment belongs. */
+/** The statement a node sits in, which is the outermost place an `unbounded-read-ok:` may sit. */
 function statementOf(node) {
   let cur = node
   while (cur?.parent && !ts.isSourceFile(cur.parent) && !ts.isBlock(cur.parent) && !ts.isModuleBlock(cur.parent)) {
     cur = cur.parent
   }
   return cur ?? node
+}
+
+/**
+ * The reason on an `unbounded-read-ok:` comment governing this read, or null.
+ *
+ * Checked innermost-first — the read's own chain, then each enclosing expression, and only last the
+ * whole statement. Granularity is the point: `loadAccountExportSource` assembles five reads inside
+ * one `Promise.all`, so a statement-level exemption would silently excuse a sixth read that somebody
+ * adds to that array later. An exemption should cover the read whose reason it states and nothing
+ * else.
+ */
+function exemptionFor(node, text) {
+  const statement = statementOf(node)
+  let cur = node
+  for (;;) {
+    const comments = ts.getLeadingCommentRanges(text, cur.pos) ?? []
+    for (const comment of comments) {
+      const match = EXEMPTION.exec(text.slice(comment.pos, comment.end))
+      if (match) return match[1].trim()
+    }
+    if (cur === statement || !cur.parent) return null
+    cur = cur.parent
+  }
 }
 
 /**
@@ -189,16 +212,7 @@ export function analyzeSource({ path, text }) {
         if (isSelectRead && isScalarAggregate(selectCalls, text)) {
           aggregates.push(entry)
         } else {
-          const statement = statementOf(node)
-          const comments = ts.getLeadingCommentRanges(text, statement.pos) ?? []
-          let reason = null
-          for (const comment of comments) {
-            const match = EXEMPTION.exec(text.slice(comment.pos, comment.end))
-            if (match) {
-              reason = match[1].trim()
-              break
-            }
-          }
+          const reason = exemptionFor(node, text)
           if (reason) exempted.push({ ...entry, reason })
           else unbounded.push(entry)
         }
