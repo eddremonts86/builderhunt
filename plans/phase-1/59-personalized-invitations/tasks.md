@@ -11,7 +11,7 @@
 
 ## Phase 0 — Contract and persistence
 
-- [ ] **Define the invitation-personalization contract and copy registry**
+- [x] **Define the invitation-personalization contract and copy registry**
   - Files: `src/shared/lib/organizations/invitation-personalization.ts`,
     `tests/unit/shared/lib/organizations/invitation-personalization.test.ts`
   - Do: Export `INVITATION_INTENTS`, `InvitationIntent`, strict input normalization,
@@ -24,7 +24,7 @@
     and `pnpm type-check` pass; tests cover all four values plus missing, whitespace-only,
     120-character, 121-character, and unknown-intent inputs.
 
-- [ ] **Add constrained nullable columns through a generated migration**
+- [x] **Add constrained nullable columns through a generated migration**
   - Files: `src/shared/lib/db/schema.ts`, the newly generated
     `drizzle/*_invitation_personalization.sql`, its matching
     `drizzle/meta/*_snapshot.json`, `drizzle/meta/_journal.json`,
@@ -42,7 +42,7 @@
     pass. The schema/SQL tests pin column names, nullability, all four allowed values,
     invalid-value rejection, trimming checks, and null defaults for legacy rows.
 
-- [ ] **Carry personalization through create, deduplication, reads, and resend**
+- [x] **Carry personalization through create, deduplication, reads, and resend**
   - Files: `src/shared/lib/auth/organization-lifecycle.ts`,
     `tests/unit/shared/lib/auth/organization-lifecycle.test.ts`
   - Do: Extend `InvitationRecord`, `LifecycleDependencies.createInvitation`, database inserts,
@@ -57,7 +57,7 @@
 
 ## Phase 1 — Recipient authorization and HTTP contracts
 
-- [ ] **Add one recipient-eligibility boundary for review, accept, and reject**
+- [x] **Add one recipient-eligibility boundary for review, accept, and reject**
   - Files: `src/shared/lib/auth/organization-lifecycle.ts`,
     `tests/unit/shared/lib/auth/organization-lifecycle.test.ts`
   - Do: Factor the authenticated, verified-email, normalized-email-match, pending, and unexpired
@@ -71,7 +71,7 @@
     passes a table-driven matrix for missing, expired, accepted, canceled, rejected, wrong-email,
     unverified, and valid rows, plus the accept-vs-reject loser behavior.
 
-- [ ] **Publish allowlisted invitation DTOs**
+- [x] **Publish allowlisted invitation DTOs**
   - Files: `src/shared/lib/organizations/contracts.ts`,
     `tests/unit/shared/lib/organizations/contracts.test.ts`
   - Do: Add `InvitationReviewDto` and serializers that convert a null stored intent to `other` and
@@ -83,7 +83,7 @@
     passes exact-key assertions for personalized and legacy rows and proves forbidden fields are
     absent.
 
-- [ ] **Validate and persist the extended create request**
+- [x] **Validate and persist the extended create request**
   - Files: `src/routes/api/organizations/invitations/index.ts`,
     `tests/e2e/api/organizations-invitations.spec.ts`
   - Do: Make the authenticated body schema strict and accept optional `intent` and `roleTitle` in
@@ -96,7 +96,7 @@
     cross-tenant, duplicate-race, exact `deduplicated` values, seat-limit, resend, and audit
     assertions.
 
-- [ ] **Add recipient review and reject routes**
+- [x] **Add recipient review and reject routes**
   - Files: `src/routes/api/organizations/invitations/$invitationId/review.ts`,
     `src/routes/api/organizations/invitations/$invitationId/reject.ts`,
     `src/routeTree.gen.ts`, `tests/e2e/api/organizations-invitations.spec.ts`
@@ -109,7 +109,7 @@
     pass. API cases prove a valid recipient can review/reject, all invalid identities/states return
     the same 403 body, rejected rows cannot be accepted, and no response contains forbidden keys.
 
-- [ ] **Return truthful organization activation after acceptance**
+- [x] **Return truthful organization activation after acceptance**
   - Files: `src/shared/lib/auth/organization-lifecycle.ts`,
     `src/routes/api/organizations/invitations/$invitationId/accept.ts`,
     `tests/unit/shared/lib/auth/organization-lifecycle.test.ts`,
@@ -130,7 +130,7 @@
 
 ## Phase 2 — Email and sender experience
 
-- [ ] **Personalize the organization invitation email safely**
+- [x] **Personalize the organization invitation email safely**
   - Files: `src/shared/lib/email.ts`,
     `src/shared/lib/auth/organization-lifecycle.ts`,
     `tests/unit/shared/lib/email.test.ts`,
