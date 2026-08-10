@@ -4321,3 +4321,29 @@ export const securityAuditEvents = pgTable(
     check('security_audit_events_result_check', sql`${table.result} in ('allowed', 'denied', 'failed')`),
   ],
 )
+
+/**
+ * The one global beta-mode switch (plan 58, drizzle/0167).
+ *
+ * Exactly one row, `id = 'global'`, enforced by a CHECK alongside the primary key — otherwise "the
+ * flag" becomes "whichever row came back first". No RLS: the table holds no tenant column, so there is
+ * no predicate a policy could express, and access is controlled entirely by GRANT.
+ *
+ * `revision` counts writes so a stale admin screen is refused rather than allowed to overwrite someone
+ * else's decision. `updatedBy` has no foreign key on purpose: the record of who enabled beta mode has
+ * to survive that operator's account being deleted.
+ */
+export const platformBetaMode = pgTable(
+  'platform_beta_mode',
+  {
+    id: text('id').primaryKey(),
+    enabled: boolean('enabled').notNull().default(false),
+    revision: integer('revision').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedBy: text('updated_by'),
+  },
+  (table) => [
+    check('platform_beta_mode_singleton_check', sql`${table.id} = 'global'`),
+    check('platform_beta_mode_revision_check', sql`${table.revision} >= 0`),
+  ],
+)

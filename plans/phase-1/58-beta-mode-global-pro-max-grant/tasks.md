@@ -8,7 +8,7 @@
 
 ## Phase 0 — Global state and administration
 
-- [ ] **Add the singleton platform setting through a generated migration**
+- [x] **Add the singleton platform setting through a generated migration**
   - Files: `src/shared/lib/db/schema.ts`, the next `drizzle/*_platform_beta_mode.sql` migration and
     matching snapshot assigned by Drizzle, `drizzle/meta/_journal.json`, `drizzle/migration-hashes.json`,
     `tests/unit/shared/lib/db/beta-mode-schema.test.ts`, and
@@ -29,7 +29,7 @@
     passes. The focused test must first fail for the missing table/migration, and the final replay
     must succeed twice on a disposable database.
 
-- [ ] **Implement authoritative state, display cache, and optimistic writes**
+- [x] **Implement authoritative state, display cache, and optimistic writes**
   - Files: `src/shared/lib/billing/beta-mode.ts`,
     `tests/unit/shared/lib/billing/beta-mode.test.ts`.
   - Do: Export `BetaModeState { enabled, revision, updatedAt, updatedBy }`,
@@ -72,7 +72,7 @@
 
 ## Phase 1 — Effective product entitlement
 
-- [ ] **Create one raw/effective entitlement boundary and update feature authorization**
+- [x] **Create one raw/effective entitlement boundary and update feature authorization**
   - Files: `src/shared/lib/repositories/entitlements.ts`,
     `tests/unit/shared/lib/repositories/entitlements.test.ts`,
     `src/shared/lib/billing/feature-authorization.ts`,

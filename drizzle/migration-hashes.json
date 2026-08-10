@@ -668,6 +668,10 @@
     "0166_invitation_preview_builders_index": {
       "sql": "466a5d286f09464e183adaa43b9a019b8c1a39b0eca415fd614f3dcd85a9581a",
       "snapshot": "212c921bd34aa91cf7853f22d8ccb54916bb3fc26abb7f2f4d26048f62eaed49"
+    },
+    "0167_platform_beta_mode": {
+      "sql": "0bff95e9945433dca10d619f44473c63e6118147d4ed4fe28f3bc2a10bee339f",
+      "snapshot": "eeb6fab22d1f85667d8faf4d0331983b607c000de4bb6f2b3f08a0d99911a0d6"
     }
   }
 }
