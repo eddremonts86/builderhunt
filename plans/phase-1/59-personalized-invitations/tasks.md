@@ -218,7 +218,7 @@
 
 ## Phase 4 — Gates and evidence
 
-- [ ] **Run security, migration, and static quality gates**
+- [x] **Run security, migration, and static quality gates**
   - Files: `docs/operations/personalized-invitations-verification.md`
   - Do: Record the current commit/worktree scope and run migration integrity/replay, RLS, tenant
     boundaries, auth-before-validation, route client boundaries, route methods, UI route graph,

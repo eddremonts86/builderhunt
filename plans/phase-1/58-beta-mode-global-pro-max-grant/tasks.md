@@ -190,7 +190,7 @@
   - Verify: `pnpm vitest run tests/unit/modules/admin/billing/BetaModeControl.test.tsx tests/unit/routes/api/admin/billing/beta-mode.test.ts && pnpm type-check`
     passes after the component's initial missing-module red run.
 
-- [~] **Expose minimal authenticated status and render a presentational member badge**
+- [x] **Expose minimal authenticated status and render a presentational member badge**
   - Files: `src/routes/api/beta-mode.ts`, `tests/unit/routes/api/beta-mode.test.ts`,
     `src/modules/dashboard/hooks/useBetaModeStatus.ts`,
     `tests/unit/modules/dashboard/hooks/useBetaModeStatus.test.tsx`,
@@ -211,7 +211,7 @@
 
 ## Phase 4 — Runtime certification and operations
 
-- [ ] **Certify enable, disable, re-enable, rollover, and rollback end to end**
+- [x] **Certify enable, disable, re-enable, rollover, and rollback end to end**
   - Files: `tests/e2e/beta-mode.spec.ts`, `docs/operations/beta-mode-runbook.md`, and this plan trio
     only after every gate passes.
   - Do: Write a Playwright journey with separate platform-admin and free-tenant sessions. Prove
