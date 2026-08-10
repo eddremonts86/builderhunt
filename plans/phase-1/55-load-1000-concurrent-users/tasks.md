@@ -9,7 +9,7 @@
 
 ## Phase 0 — Reproducible workload
 
-- [ ] **Define and test the load contract**
+- [x] **Define and test the load contract**
   - Files: `scripts/load/config.ts`, `tests/unit/scripts/load/config.test.ts`
   - Do: Encode the five-route mix, two-second think time plus deterministic 0–500 ms jitter,
     10-second request timeout, ramp/steady stages, threshold table, and exit-code contract from
