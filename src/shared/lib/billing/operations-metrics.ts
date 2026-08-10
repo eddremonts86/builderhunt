@@ -16,7 +16,7 @@
  * without either a new "platform sees everything" policy or this per-organization loop — the loop was
  * chosen as the smaller, zero-schema-change option for a beta-scale organization count.
  */
-import { and, desc, eq, gte, isNotNull, lt } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, isNotNull, lt, sum } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { metrics } from '../metrics'
 import { platformDb } from '../db/client'
@@ -105,11 +105,30 @@ export interface BillingOperationsMetricsDeps {
   worker?: Parameters<typeof withWorkerOrganization>[2]
 }
 
+/**
+ * Five counters, grouped in SQL.
+ *
+ * This used to `select({ status })` the whole of `billing_webhook_events` with no predicate and tally
+ * the five buckets in a `for` loop — the shape plan 01 called "the worst in the audit, not the exempt
+ * one: they pay the full transfer cost and hide it behind a scalar return type". The webhook table is
+ * append-only and grows with every event Stripe has ever sent, and this ran on a 15-second timer.
+ *
+ * `GROUP BY status` returns at most one row per status value, which is what makes the read bounded by
+ * the data model rather than by a ceiling.
+ */
 async function countWebhookBacklog(db: PostgresJsDatabase | typeof platformDb): Promise<WebhookBacklogMetrics> {
-  const rows = await db.select({ status: billingWebhookEvents.status }).from(billingWebhookEvents)
   const counts: WebhookBacklogMetrics = { pending: 0, processing: 0, failed: 0, ignored: 0, processed: 0 }
+  const rows = await db
+    .select({ status: billingWebhookEvents.status, total: count() })
+    .from(billingWebhookEvents)
+    .groupBy(billingWebhookEvents.status)
+    // The ceiling is the status domain, which the database enforces:
+    // `billing_webhook_events_status_check` restricts it to these same five values
+    // (drizzle/0027_overconfident_angel.sql:225). Derived from `counts` rather than written as 5, so
+    // adding a status to the type carries the bound with it.
+    .limit(Object.keys(counts).length)
   for (const row of rows) {
-    if (row.status in counts) counts[row.status as keyof WebhookBacklogMetrics] += 1
+    if (row.status in counts) counts[row.status as keyof WebhookBacklogMetrics] = Number(row.total)
   }
   return counts
 }
@@ -123,14 +142,22 @@ async function getLastReconciliationRun(db: PostgresJsDatabase | typeof platform
   return row ? { windowEnd: row.windowEnd.toISOString(), result: row.result } : null
 }
 
+/**
+ * The oldest pending webhook, as one row.
+ *
+ * Was every pending row loaded and `reduce`d to a minimum in Node. `ORDER BY received_at LIMIT 1` is
+ * the same answer, and during exactly the incident this metric exists to detect — a backlog that is
+ * not draining — the old shape scaled with the size of the backlog it was reporting on.
+ */
 async function getOldestPendingWebhookAgeMinutes(db: PostgresJsDatabase | typeof platformDb, now: Date): Promise<number | null> {
-  const rows = await db
+  const [oldest] = await db
     .select({ receivedAt: billingWebhookEvents.receivedAt })
     .from(billingWebhookEvents)
-    .where(and(eq(billingWebhookEvents.status, 'pending')))
-  if (rows.length === 0) return null
-  const oldest = rows.reduce((min, row) => (row.receivedAt < min ? row.receivedAt : min), rows[0].receivedAt)
-  return Math.floor((now.getTime() - oldest.getTime()) / (60 * 1000))
+    .where(eq(billingWebhookEvents.status, 'pending'))
+    .orderBy(asc(billingWebhookEvents.receivedAt))
+    .limit(1)
+  if (!oldest) return null
+  return Math.floor((now.getTime() - oldest.receivedAt.getTime()) / (60 * 1000))
 }
 
 export async function getBillingOperationsMetrics(deps: BillingOperationsMetricsDeps = {}): Promise<BillingOperationsMetrics> {
@@ -166,8 +193,9 @@ export async function getBillingOperationsMetrics(deps: BillingOperationsMetrics
         listBillingRefunds(transaction, organizationId),
         listOrganizationDisputes(transaction, organizationId),
         listRiskExceptions(organizationId, transaction),
+        // Counted in SQL: the ids were selected only to read `.length` off the array.
         transaction
-          .select({ id: billingCreditReservations.id })
+          .select({ total: count() })
           .from(billingCreditReservations)
           .where(and(
             eq(billingCreditReservations.organizationId, organizationId),
@@ -178,16 +206,25 @@ export async function getBillingOperationsMetrics(deps: BillingOperationsMetrics
         transaction
           .select({ state: billingAutoRechargeRules.state })
           .from(billingAutoRechargeRules)
-          .where(eq(billingAutoRechargeRules.organizationId, organizationId)),
+          .where(eq(billingAutoRechargeRules.organizationId, organizationId))
+          // `organization_id` is the primary key of `billing_auto_recharge_rules` (schema.ts:1812),
+          // so this is one row by construction rather than by convention.
+          .limit(1),
         transaction
           .select({ id: billingSubscriptions.id })
           .from(billingSubscriptions)
           .where(and(eq(billingSubscriptions.organizationId, organizationId), isNotNull(billingSubscriptions.paymentBlockedAt)))
           .limit(1),
+        // Grouped in SQL for the same reason as the webhook backlog: the four buckets were tallied
+        // from every attempt row in the window.
         transaction
-          .select({ status: billingCheckoutAttempts.status })
+          .select({ status: billingCheckoutAttempts.status, total: count() })
           .from(billingCheckoutAttempts)
-          .where(and(eq(billingCheckoutAttempts.organizationId, organizationId), gte(billingCheckoutAttempts.createdAt, oneDayAgo))),
+          .where(and(eq(billingCheckoutAttempts.organizationId, organizationId), gte(billingCheckoutAttempts.createdAt, oneDayAgo)))
+          .groupBy(billingCheckoutAttempts.status)
+          // Same shape of bound: `billing_checkout_attempts_status_check` restricts the status to the
+          // four keys of `checkout` (drizzle/0027_overconfident_angel.sql:33).
+          .limit(Object.keys(checkout).length),
       ])
 
       if (grace.length > 0) organizationsInGrace += 1
@@ -195,7 +232,7 @@ export async function getBillingOperationsMetrics(deps: BillingOperationsMetrics
       pendingRefundRequests += refunds.filter((r) => r.state === 'pending').length
       openDisputes += disputes.filter((d) => d.outcome === 'open').length
       activeRiskExceptions += riskExceptions.filter((r) => !r.revokedAt && (!r.expiresAt || r.expiresAt > now)).length
-      staleReservations += staleReservationRows.length
+      staleReservations += Number(staleReservationRows[0]?.total ?? 0)
 
       for (const rule of autoRechargeRule) {
         if (rule.state === 'active') autoRechargeActive += 1
@@ -204,15 +241,21 @@ export async function getBillingOperationsMetrics(deps: BillingOperationsMetrics
       }
 
       for (const attempt of checkoutAttempts) {
-        if (attempt.status in checkout) checkout[attempt.status as keyof typeof checkout] += 1
+        // `+=` rather than `=`: the grouping is per organization, and this accumulates across every
+        // organization in the scan.
+        if (attempt.status in checkout) checkout[attempt.status as keyof typeof checkout] += Number(attempt.total)
       }
 
       for (const grant of activeGrants) {
-        const ledgerRows = await transaction
-          .select({ unitsDelta: billingLedgerEntries.unitsDelta })
+        // Summed in SQL. The ledger is append-only, so this read grew with every reservation,
+        // settlement and refund ever recorded against the grant — once per active grant, per
+        // organization, on a 15-second timer.
+        const [ledgerTotal] = await transaction
+          .select({ total: sum(billingLedgerEntries.unitsDelta) })
           .from(billingLedgerEntries)
           .where(and(eq(billingLedgerEntries.organizationId, organizationId), eq(billingLedgerEntries.grantId, grant.id)))
-        const computedRemaining = ledgerRows.reduce((sum, row) => sum + row.unitsDelta, 0)
+        // `SUM` over no rows is SQL NULL, and postgres returns a numeric as a string.
+        const computedRemaining = Number(ledgerTotal?.total ?? 0)
         if (computedRemaining !== grant.remainingUnits) ledgerInvariantViolations += 1
       }
     }, deps.worker)
