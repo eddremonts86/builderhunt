@@ -1,6 +1,10 @@
 # Plan: Launch Checklist
 
-> **Status**: `pending`
+> **Status**: `blocked` — on phase-5. All four of this plan's own tasks are done; what remains is
+> the launch itself (go-to-market, production sign-off, the soak window), and the launch happens
+> when phase-5 closes. `blocked` rather than the free-text "moved to phase-5" that was here:
+> `check-phase-readiness.mjs` allows exactly `pending | partially-implemented | implemented |
+> blocked | superseded`, and a status outside that set is a status no gate can read.
 > **Depends on**: [`production-infrastructure`](../02-production-infrastructure/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md), [`public-landing-pages`](../45-public-landing-pages/spec.md), [`content-marketing`](../46-content-marketing/spec.md), [`status-and-trust`](../47-status-and-trust/spec.md), [`pricing-and-billing`](../31-pricing-and-billing/spec.md)
 > **Blocks**: nothing
 > **Reality check**: No waitlist code exists and none will be built (decision in spec). The

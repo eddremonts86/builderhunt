@@ -1,6 +1,10 @@
 # Tasks: Launch Checklist
 
-> **Status**: `moved to phase-5` — this plan *is* the launch, and the launch happens when phase-5 closes.
+> **Status**: `blocked` — on phase-5. All four of this plan's own tasks are done; what remains is
+> the launch itself (go-to-market, production sign-off, the soak window), and the launch happens
+> when phase-5 closes. `blocked` rather than the free-text "moved to phase-5" that was here:
+> `check-phase-readiness.mjs` allows exactly `pending | partially-implemented | implemented |
+> blocked | superseded`, and a status outside that set is a status no gate can read.
 > Its five remaining items moved to `plans/phase-5/{01-production-readiness-audit,03-launch-and-distribution}`
 > on 2026-08-05. What stays here is the evidence gathered while verifying their prerequisites.
 > **Historic status**: `non-actionable for an autonomous coding session` — every task here is a manual
