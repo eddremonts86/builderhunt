@@ -146,7 +146,10 @@ describe('TeamSettingsPage — authorization matrix', () => {
     // a capacity rule — a personal org can legitimately have real seats, and
     // must be invitable exactly like any team once it does.
     expect(ids).toContain('invite-form')
-    const submitButton = container!.querySelector('[data-testid="invite-submit-btn"]') as HTMLButtonElement
+    // `invite-review-btn` is step one's button (plan 59 staged the form: Details → Review → Send), and
+    // step one is what a user first meets — so it is the one whose enabled/disabled state these two
+    // authorization assertions are about. `invite-submit-btn` only exists after Review.
+    const submitButton = container!.querySelector('[data-testid="invite-review-btn"]') as HTMLButtonElement
     expect(submitButton.disabled).toBe(false)
   })
 
@@ -155,7 +158,10 @@ describe('TeamSettingsPage — authorization matrix', () => {
     seatsFull.seatUsage = { used: 1, limit: 1 }
 
     await render(seatsFull, 'user-owner')
-    const submitButton = container!.querySelector('[data-testid="invite-submit-btn"]') as HTMLButtonElement
+    // `invite-review-btn` is step one's button (plan 59 staged the form: Details → Review → Send), and
+    // step one is what a user first meets — so it is the one whose enabled/disabled state these two
+    // authorization assertions are about. `invite-submit-btn` only exists after Review.
+    const submitButton = container!.querySelector('[data-testid="invite-review-btn"]') as HTMLButtonElement
     expect(submitButton.disabled).toBe(true)
     expect(submitButton.textContent).toContain('Seat limit reached')
   })

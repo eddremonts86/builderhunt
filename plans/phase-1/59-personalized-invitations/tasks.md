@@ -145,7 +145,7 @@
     passes all four intent variants, legacy fallback, hostile HTML/title input, resend, outbox,
     and no-secret-log assertions.
 
-- [ ] **Build the shared static invitation value preview**
+- [x] **Build the shared static invitation value preview**
   - Files: `src/shared/components/organizations/InvitationValuePreview.tsx`,
     `tests/unit/shared/components/organizations/InvitationValuePreview.test.tsx`
   - Do: Render organization/role/title context when supplied, three capabilities for the selected
@@ -157,7 +157,7 @@
     passes exact copy for every intent, legacy fallback, omitted title, accessible structure, and
     a fetch spy asserting zero network calls.
 
-- [ ] **Replace the Team inline form with a reviewed invitation composer**
+- [x] **Replace the Team inline form with a reviewed invitation composer**
   - Files: `src/modules/dashboard/components/TeamInvitationComposer.tsx`,
     `src/modules/dashboard/components/TeamSettingsPage.tsx`,
     `src/routes/_dashboard/settings/team.tsx`,
@@ -176,7 +176,7 @@
 
 ## Phase 3 — Recipient experience and onboarding
 
-- [ ] **Render secure personalized review, accept, and decline states**
+- [x] **Render secure personalized review, accept, and decline states**
   - Files: `src/modules/auth/components/OrganizationInvitationPage.tsx`,
     `tests/unit/modules/auth/components/OrganizationInvitationPage.test.tsx`,
     `tests/e2e/auth-and-sessions.spec.ts`, `tests/e2e/team-accounts.spec.ts`
@@ -192,7 +192,7 @@
     pass signed-out return, stale-session recovery, wrong/unverified account, legacy-null, review,
     accept, decline, replay, request failure, and activation-fallback cases.
 
-- [ ] **Prefill the existing onboarding search from validated query state**
+- [x] **Prefill the existing onboarding search from validated query state**
   - Files: `src/routes/onboarding/search.tsx`,
     `tests/unit/routes/onboarding-search.test.tsx`, `tests/e2e/onboarding.spec.ts`
   - Do: Add route search validation for optional `q`, trimming it and bounding it to 300

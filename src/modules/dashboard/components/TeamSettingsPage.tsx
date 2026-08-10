@@ -138,6 +138,16 @@ export function TeamSettingsPage({
   const inviteRoleId = React.useId()
   const inviteIntentId = React.useId()
   const inviteRoleTitleId = React.useId()
+  /**
+   * Two steps, one form.
+   *
+   * A dialog was the plan's word for it; a staged form is the same two steps without moving focus out
+   * of the page and back, which is the part of a dialog that most often goes wrong. `Review` exists so
+   * the sender reads the card before it is sent rather than after — and Back must be non-destructive,
+   * so the field values live above this state and survive the toggle.
+   */
+  const [inviteStep, setInviteStep] = React.useState<'details' | 'review'>('details')
+  const inviteSubmitRef = React.useRef<HTMLButtonElement | null>(null)
 
   async function copyInviteLink(invitationId: string, link: string) {
     try {
@@ -408,12 +418,22 @@ export function TeamSettingsPage({
               onSubmit={(e) => {
                 e.preventDefault()
                 if (!inviteEmail.trim()) return
+                // Step one only advances. Nothing is sent until the sender has seen the review, which
+                // is the entire point of having two steps.
+                if (inviteStep === 'details') {
+                  setInviteStep('review')
+                  return
+                }
                 // Trimmed to `null` here as well as on the server: an all-whitespace title must not
                 // travel as a string the CHECK constraint would then reject with a 500.
                 const roleTitle = inviteRoleTitle.trim() || null
                 ;(onInvite ?? noop)(inviteEmail.trim(), inviteRole, { intent: inviteIntent, roleTitle })
                 setInviteEmail('')
                 setInviteRoleTitle('')
+                setInviteStep('details')
+                // Focus returns to the control the sender pressed, so a keyboard user is not dropped at
+                // the top of the document after a send.
+                inviteSubmitRef.current?.focus()
               }}
               data-testid="invite-form"
             >
@@ -493,14 +513,23 @@ export function TeamSettingsPage({
                 The card the recipient will see, from the same component they will see it from — so the
                 sender is reviewing the real thing rather than a description of it.
               */}
-              <div className="sm:col-span-2">
-                <InvitationValuePreview
-                  intent={inviteIntent}
-                  roleTitle={inviteRoleTitle.trim() || null}
-                  role={inviteRole}
-                  audience="sender"
-                />
-              </div>
+              {/*
+                Shown on the review step only. On the details step it would be a card the sender edits
+                while reading, which is a preview of a moving target rather than a decision point.
+              */}
+              {inviteStep === 'review' && (
+                <div className="sm:col-span-2" data-testid="invite-review-step">
+                  <p className="mb-2 text-xs uppercase tracking-wider text-bh-text-dim">
+                    Sending to <strong className="text-bh-text normal-case">{inviteEmail.trim()}</strong>
+                  </p>
+                  <InvitationValuePreview
+                    intent={inviteIntent}
+                    roleTitle={inviteRoleTitle.trim() || null}
+                    role={inviteRole}
+                    audience="sender"
+                  />
+                </div>
+              )}
 
               {/*
                 Rendered as a notice, not as an error and not as a success.
@@ -518,15 +547,32 @@ export function TeamSettingsPage({
                 </p>
               )}
 
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
+                {/*
+                  Back before Send in the DOM, so tab order reaches the reversible action first — and
+                  `type="button"`, or it would submit the form it is meant to step back from.
+                */}
+                {inviteStep === 'review' && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => setInviteStep('details')}
+                    className="text-sm"
+                    data-testid="invite-back-btn"
+                  >
+                    Back
+                  </Button>
+                )}
                 <Button
+                  ref={inviteSubmitRef}
                   type="submit"
                   disabled={busy || seatsFull}
                   className="text-sm"
-                  data-testid="invite-submit-btn"
+                  data-testid={inviteStep === 'details' ? 'invite-review-btn' : 'invite-submit-btn'}
                 >
                   <UserPlus className="w-4 h-4" aria-hidden="true" />
-                  {seatsFull ? 'Seat limit reached' : 'Invite'}
+                  {seatsFull ? 'Seat limit reached' : inviteStep === 'details' ? 'Review invitation' : 'Send invitation'}
                 </Button>
               </div>
             </form>

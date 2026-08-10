@@ -173,6 +173,11 @@ async function seedTeamEntitlement(teamName: string, seatLimit: number) {
 async function inviteAndGetDevLink(page: Page, email: string): Promise<string> {
   await goto(page, '/settings/team')
   await page.getByTestId('invite-email-input').fill(email)
+  // Two steps since plan 59: Review shows the card the recipient will see, then Send. The intent
+  // defaults to `other`, so a caller that only wants to invite somebody presses through unchanged.
+  await page.getByTestId('invite-review-btn').click()
+  await expect(page.getByTestId('invite-review-step')).toBeVisible()
+  await expect(page.getByTestId('invitation-value-preview')).toBeVisible()
   await page.getByTestId('invite-submit-btn').click()
   const copyLink = page.locator('[data-testid^="copy-invitation-link-"]').first()
   await expect(copyLink).toBeVisible()
