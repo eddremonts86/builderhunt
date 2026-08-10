@@ -1,7 +1,15 @@
-// table-surface-bounded: one row per entry in OPERATIONAL_SCHEDULES, the code-side registry this page reconciles against. See plans/phase-3/08 for the shell migration.
+// table-surface-bounded: one row per entry in OPERATIONAL_SCHEDULES, the code-side registry this page
+// reconciles against. Now on the shell (plan 08's last task), driven by `registryPage` rather than by
+// a table capability — there is no database column to sort and no cursor to page, because the row set
+// is a property of the codebase. See `registry-page.ts` for why sorting it in the browser is correct
+// here and wrong on every surface backed by a growing table.
 import * as React from 'react'
 import { AlertTriangle, BookOpen, CheckCircle2, Clock, Pause, Play, RefreshCw, XCircle } from 'lucide-react'
 import { Button } from '~/components/ui'
+import { DataTable } from '~/shared/components/table'
+import type { ColumnDef } from '~/shared/lib/table/columns'
+import { registryPage, type RegistryTableSpec } from '~/shared/lib/table/registry-page'
+import type { TableQuery } from '~/shared/lib/table/types'
 
 interface JobRunSummary {
   state: string
@@ -14,7 +22,9 @@ interface JobRunSummary {
   errorCode: string | null
 }
 
-interface JobRow {
+// `extends Record<string, unknown>` because `DataTableProps<Row>` constrains on it, and a plain
+// interface gets no implicit index signature. Same declaration as every other migrated surface.
+interface JobRow extends Record<string, unknown> {
   jobKey: string
   label: string
   scope: 'platform' | 'organization'
@@ -35,6 +45,40 @@ interface OperationsResponse {
 }
 
 const RUNBOOK_PATH = 'docs/operations/deploy-runbook.md'
+
+/**
+ * What an operator may sort, filter and search on.
+ *
+ * `status` is derived rather than stored — the same three-way `StatusPill` decision (paused, needs
+ * attention, healthy) expressed as a value, so filtering by it and reading it off the pill cannot
+ * disagree. `attention` covers overdue, stale and a failed last run, which is exactly the set the
+ * header's "needs attention" count uses.
+ */
+type JobStatus = 'paused' | 'attention' | 'healthy'
+
+function jobStatus(job: JobRow): JobStatus {
+  if (!job.enabled) return 'paused'
+  if (job.overdue || job.stale || job.lastRun?.state === 'failed') return 'attention'
+  return 'healthy'
+}
+
+const JOB_SPEC: RegistryTableSpec<JobRow> = {
+  searchable: (job) => [job.label, job.jobKey, job.cronExpression],
+  filterable: { scope: (job) => job.scope, status: (job) => jobStatus(job) },
+  sortable: {
+    label: (job) => job.label,
+    scope: (job) => job.scope,
+    status: (job) => jobStatus(job),
+    nextRunAt: (job) => (job.enabled ? job.nextRunAt : null),
+    lastRunAt: (job) => job.lastRun?.scheduledFor ?? null,
+    durationMs: (job) => job.lastRun?.durationMs ?? null,
+  },
+  tiebreaker: (job) => job.jobKey,
+}
+
+const OPERATIONS_FILTER_LABELS = { scope: 'Scope', status: 'Status' }
+
+const EMPTY_QUERY: TableQuery = { search: '', filters: {}, sort: [{ id: 'label', dir: 'asc' }] } as TableQuery
 
 function formatDuration(ms: number | null): string {
   if (ms === null) return '—'
@@ -152,17 +196,18 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
   const [data, setData] = React.useState<OperationsResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [scopeFilter, setScopeFilter] = React.useState<'all' | 'platform' | 'organization'>('all')
+  const [query, setQuery] = React.useState<TableQuery>(EMPTY_QUERY)
   const [pausingKey, setPausingKey] = React.useState<string | null>(null)
   const [runningKey, setRunningKey] = React.useState<string | null>(null)
   const [confirmRunKey, setConfirmRunKey] = React.useState<string | null>(null)
   const [rowMessages, setRowMessages] = React.useState<Record<string, string>>({})
-  const highlightedRowRef = React.useRef<HTMLTableRowElement | null>(null)
-
+  // Located by test id rather than by a row ref: the shell owns row rendering now, and both the table
+  // and the stacked presentation carry the same key in their test id, so whichever one is visible is
+  // the one that gets scrolled.
   React.useEffect(() => {
-    if (highlightJobKey && highlightedRowRef.current) {
-      highlightedRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    }
+    if (!highlightJobKey) return
+    const row = document.querySelector(`[data-testid="operations-row-${highlightJobKey}"], [data-testid="operations-card-${highlightJobKey}"]`)
+    row?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [highlightJobKey, data])
 
   const load = React.useCallback(async () => {
@@ -242,8 +287,105 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
     }
   }, [load, setRowMessage])
 
-  const jobs = data?.jobs.filter((job) => scopeFilter === 'all' || job.scope === scopeFilter) ?? []
-  const attentionCount = data?.jobs.filter((job) => job.enabled && (job.overdue || job.stale || job.lastRun?.state === 'failed')).length ?? 0
+  const attentionCount = data?.jobs.filter((job) => jobStatus(job) === 'attention').length ?? 0
+
+  const columns = React.useMemo<ColumnDef<JobRow>[]>(() => [
+    {
+      id: 'label',
+      header: 'Job',
+      sortable: true,
+      weight: 2,
+      value: (job) => job.label,
+      cell: (job) => (
+        <div>
+          <div className="font-medium text-bh-text">{job.label}</div>
+          <div className="text-xs text-bh-text-dim font-mono">{job.cronExpression} · {job.timezone}</div>
+        </div>
+      ),
+    },
+    { id: 'status', header: 'Status', sortable: true, value: (job) => jobStatus(job), cell: (job) => <StatusPill job={job} /> },
+    { id: 'scope', header: 'Scope', sortable: true, value: (job) => job.scope, cell: (job) => <span className="capitalize text-bh-text-muted">{job.scope}</span> },
+    {
+      id: 'nextRunAt',
+      header: 'Next run',
+      sortable: true,
+      value: (job) => (job.enabled ? job.nextRunAt : null),
+      cell: (job) => <span className="text-bh-text-muted">{job.enabled ? formatWhen(job.nextRunAt) : '—'}</span>,
+    },
+    {
+      id: 'lastRunAt',
+      header: 'Last run',
+      sortable: true,
+      value: (job) => job.lastRun?.scheduledFor ?? null,
+      cell: (job) => <span className="text-bh-text-muted">{formatWhen(job.lastRun?.scheduledFor ?? null)}</span>,
+    },
+    {
+      id: 'durationMs',
+      header: 'Duration',
+      sortable: true,
+      value: (job) => job.lastRun?.durationMs ?? null,
+      cell: (job) => <span className="text-bh-text-muted">{formatDuration(job.lastRun?.durationMs ?? null)}</span>,
+    },
+    {
+      id: 'counters',
+      header: 'Counters',
+      value: (job) => (job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : null),
+      cell: (job) => (
+        <span className="text-bh-text-muted">
+          {job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'error',
+      header: 'Error',
+      value: (job) => job.lastRun?.errorCode ?? null,
+      cell: (job) => <span className="text-bh-text-dim font-mono text-xs">{job.lastRun?.errorCode ?? '—'}</span>,
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      align: 'end',
+      // No `value`: there is nothing to sort or group a button by, and giving it one would put a
+      // sort control on a column whose order means nothing.
+      cell: (job) => (
+        <RowActions
+          job={job}
+          pausing={pausingKey === job.jobKey}
+          running={runningKey === job.jobKey}
+          confirmingRun={confirmRunKey === job.jobKey}
+          rowMessage={rowMessages[job.jobKey] ?? null}
+          onTogglePause={() => togglePause(job)}
+          onStartRunConfirm={() => setConfirmRunKey(job.jobKey)}
+          onCancelRunConfirm={() => setConfirmRunKey(null)}
+          onConfirmRun={() => runNow(job)}
+        />
+      ),
+    },
+  ], [confirmRunKey, pausingKey, rowMessages, runNow, runningKey, togglePause])
+
+  const page = React.useMemo(() => registryPage(data?.jobs ?? [], query, JOB_SPEC), [data?.jobs, query])
+
+  // Both presentations render the same page, and only one is visible at a time. Two instances rather
+  // than one, because `renderer` picks a single presentation and the breakpoint is what decides here —
+  // the same `hidden md:block` / `md:hidden` pair this page already used. The test ids stay distinct
+  // (`operations-row-*` and `operations-card-*`) because the existing unit and e2e specs assert on
+  // both, and collapsing them would break passing tests for no product reason.
+  const shared = {
+    label: 'Registered background workers',
+    columns,
+    page,
+    query,
+    onQueryChange: setQuery,
+    status: (loading && !data ? 'loading' : error ? 'error' : 'ready') as 'loading' | 'error' | 'ready',
+    error: { message: error ?? '', onRetry: () => void load() },
+    searchable: true,
+    filterLabels: OPERATIONS_FILTER_LABELS,
+    rowId: (job: JobRow) => job.jobKey,
+    emptyState: (
+      <p className="text-bh-text-muted py-6 text-center" data-testid="operations-empty">No jobs match this filter.</p>
+    ),
+  }
 
   return (
     <div data-testid="admin-operations-page">
@@ -265,127 +407,57 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
         </Button>
       </header>
 
+      {/*
+        The scope shortcuts stay, and now write into the shell's own filter state rather than into a
+        separate `scopeFilter`. Two sources of truth for "which rows are showing" is how a page ends up
+        with a chip that disagrees with its table; `all` is the absence of the dimension, which is the
+        same thing `TableQuery` means by an empty array.
+      */}
       <div className="mb-4 flex items-center gap-2" role="group" aria-label="Filter by scope">
-        {(['all', 'platform', 'organization'] as const).map((scope) => (
-          <button
-            key={scope}
-            type="button"
-            onClick={() => setScopeFilter(scope)}
-            aria-pressed={scopeFilter === scope}
-            data-testid={`operations-filter-${scope}`}
-            className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${
-              scopeFilter === scope ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
-            }`}
-          >
-            {scope}
-          </button>
-        ))}
+        {(['all', 'platform', 'organization'] as const).map((scope) => {
+          const selected = scope === 'all'
+            ? (query.filters.scope ?? []).length === 0
+            : (query.filters.scope ?? []).includes(scope)
+          return (
+            <button
+              key={scope}
+              type="button"
+              onClick={() => setQuery((current) => ({
+                ...current,
+                filters: scope === 'all'
+                  ? Object.fromEntries(Object.entries(current.filters).filter(([key]) => key !== 'scope'))
+                  : { ...current.filters, scope: [scope] },
+              }))}
+              aria-pressed={selected}
+              data-testid={`operations-filter-${scope}`}
+              className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${
+                selected ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
+              }`}
+            >
+              {scope}
+            </button>
+          )
+        })}
       </div>
 
-      {loading ? (
-        <p className="text-bh-text-muted">Loading…</p>
-      ) : error ? (
-        <p className="text-bh-danger" role="alert">{error}</p>
-      ) : (
-        <>
-          {/* Desktop/tablet: table. Mobile: stacked cards below — same data, actions, testids. */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm" data-testid="operations-table">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-bh-text-dim border-b border-bh-border">
-                  <th className="py-2 pr-4">Job</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Scope</th>
-                  <th className="py-2 pr-4">Next run</th>
-                  <th className="py-2 pr-4">Last run</th>
-                  <th className="py-2 pr-4">Duration</th>
-                  <th className="py-2 pr-4">Counters</th>
-                  <th className="py-2 pr-4">Error</th>
-                  <th className="py-2 pr-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((job) => (
-                  <tr
-                    key={job.jobKey}
-                    ref={job.jobKey === highlightJobKey ? highlightedRowRef : undefined}
-                    className={`border-b border-bh-border/50 ${job.jobKey === highlightJobKey ? 'bg-bh-accent-soft' : ''}`}
-                    data-testid={`operations-row-${job.jobKey}`}
-                  >
-                    <td className="py-2.5 pr-4">
-                      <div className="font-medium text-bh-text">{job.label}</div>
-                      <div className="text-xs text-bh-text-dim font-mono">{job.cronExpression} · {job.timezone}</div>
-                    </td>
-                    <td className="py-2.5 pr-4"><StatusPill job={job} /></td>
-                    <td className="py-2.5 pr-4 capitalize text-bh-text-muted">{job.scope}</td>
-                    <td className="py-2.5 pr-4 text-bh-text-muted">{job.enabled ? formatWhen(job.nextRunAt) : '—'}</td>
-                    <td className="py-2.5 pr-4 text-bh-text-muted">{formatWhen(job.lastRun?.scheduledFor ?? null)}</td>
-                    <td className="py-2.5 pr-4 text-bh-text-muted">{formatDuration(job.lastRun?.durationMs ?? null)}</td>
-                    <td className="py-2.5 pr-4 text-bh-text-muted">
-                      {job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : '—'}
-                    </td>
-                    <td className="py-2.5 pr-4 text-bh-text-dim font-mono text-xs">{job.lastRun?.errorCode ?? '—'}</td>
-                    <td className="py-2.5 pr-4">
-                      <RowActions
-                        job={job}
-                        pausing={pausingKey === job.jobKey}
-                        running={runningKey === job.jobKey}
-                        confirmingRun={confirmRunKey === job.jobKey}
-                        rowMessage={rowMessages[job.jobKey] ?? null}
-                        onTogglePause={() => togglePause(job)}
-                        onStartRunConfirm={() => setConfirmRunKey(job.jobKey)}
-                        onCancelRunConfirm={() => setConfirmRunKey(null)}
-                        onConfirmRun={() => runNow(job)}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <ul className="md:hidden flex flex-col gap-3">
-            {jobs.map((job) => (
-              <li
-                key={job.jobKey}
-                className={`card p-3 ${job.jobKey === highlightJobKey ? 'bg-bh-accent-soft' : ''}`}
-                data-testid={`operations-card-${job.jobKey}`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <div className="font-medium text-bh-text">{job.label}</div>
-                    <div className="text-xs text-bh-text-dim font-mono">{job.cronExpression} · {job.timezone}</div>
-                  </div>
-                  <StatusPill job={job} />
-                </div>
-                <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-bh-text-muted mb-3">
-                  <dt className="text-bh-text-dim">Scope</dt><dd className="capitalize">{job.scope}</dd>
-                  <dt className="text-bh-text-dim">Next run</dt><dd>{job.enabled ? formatWhen(job.nextRunAt) : '—'}</dd>
-                  <dt className="text-bh-text-dim">Last run</dt><dd>{formatWhen(job.lastRun?.scheduledFor ?? null)}</dd>
-                  <dt className="text-bh-text-dim">Duration</dt><dd>{formatDuration(job.lastRun?.durationMs ?? null)}</dd>
-                  <dt className="text-bh-text-dim">Counters</dt><dd>{job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : '—'}</dd>
-                  <dt className="text-bh-text-dim">Error</dt><dd className="font-mono">{job.lastRun?.errorCode ?? '—'}</dd>
-                </dl>
-                <RowActions
-                  job={job}
-                  pausing={pausingKey === job.jobKey}
-                  running={runningKey === job.jobKey}
-                  confirmingRun={confirmRunKey === job.jobKey}
-                  rowMessage={rowMessages[job.jobKey] ?? null}
-                  onTogglePause={() => togglePause(job)}
-                  onStartRunConfirm={() => setConfirmRunKey(job.jobKey)}
-                  onCancelRunConfirm={() => setConfirmRunKey(null)}
-                  onConfirmRun={() => runNow(job)}
-                />
-              </li>
-            ))}
-          </ul>
-
-          {jobs.length === 0 && (
-            <p className="text-bh-text-muted py-6 text-center">No jobs match this filter.</p>
-          )}
-        </>
-      )}
+      {/*
+        Loading and error are the shell's states now, not a ternary around it. The page used to render
+        a bare "Loading…" paragraph in place of the whole table, so the header, the filters and the
+        column headings all disappeared and came back on every 30-second refresh; the shell keeps the
+        chrome and its own skeleton keeps the layout from shifting under it.
+      */}
+      {/*
+        `operations-table` and `operations-cards` name the two presentations, not the markup inside
+        them — the shell renders a `role="grid"` over divs rather than a `<table>`. The names are kept
+        because two e2e tests scope their assertions to "the one visible at this viewport", and that
+        intent survives the migration even though the element under it changed.
+      */}
+      <div className="hidden md:block" data-testid="operations-table">
+        <DataTable {...shared} renderer="table" rowTestId={(job) => `operations-row-${job.jobKey}`} />
+      </div>
+      <div className="md:hidden" data-testid="operations-cards">
+        <DataTable {...shared} renderer="stacked" rowTestId={(job) => `operations-card-${job.jobKey}`} />
+      </div>
 
       <section className="card p-4 mt-6" data-testid="operations-runbook">
         <h2 className="font-semibold text-sm flex items-center gap-2 mb-1">

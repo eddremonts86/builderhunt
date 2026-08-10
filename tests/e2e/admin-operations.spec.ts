@@ -253,4 +253,65 @@ test.describe('admin operations', () => {
       await context.close()
     }
   })
+
+  test('sorting reorders every registered job, not just the ones on screen', async ({ browser }) => {
+    // The registry is complete in the browser, which is the only reason sorting it there is honest —
+    // see `registry-page.ts`. This asserts the property that makes it so: the row count does not
+    // change when the order does. A sort that quietly dropped rows would still look sorted.
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    const guard = expectStrictBrowser(page)
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/admin/operations`)
+      await dismissOverlays(page)
+
+      const grid = page.getByTestId('operations-table').getByRole('grid')
+      await expect(grid).toBeVisible()
+      const rowCount = async () => Number(await grid.getAttribute('aria-rowcount'))
+      const before = await rowCount()
+      expect(before).toBeGreaterThan(1)
+
+      const firstJobLabel = async () =>
+        (await page.getByRole('row').nth(1).textContent())?.trim() ?? ''
+      const ascending = await firstJobLabel()
+
+      await page.getByRole('columnheader', { name: /job/i }).getByRole('button').first().click()
+      await expect.poll(async () => await firstJobLabel(), { timeout: 10_000 }).not.toBe(ascending)
+
+      // Same set, different order.
+      expect(await rowCount()).toBe(before)
+      guard.assertClean()
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
+  test('the scope shortcut and the shell filter stay in agreement', async ({ browser }) => {
+    // Two sources of truth for "which rows are showing" is how a page ends up with a chip that
+    // disagrees with its table. The shortcut writes into the shell's own filter state, so this checks
+    // the row count actually falls and that `all` restores it rather than leaving a stuck filter.
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    const guard = expectStrictBrowser(page)
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/admin/operations`)
+      await dismissOverlays(page)
+
+      const grid = page.getByTestId('operations-table').getByRole('grid')
+      const rowCount = async () => Number(await grid.getAttribute('aria-rowcount'))
+      const all = await rowCount()
+
+      await page.getByTestId('operations-filter-platform').click()
+      await expect(page.getByTestId('operations-filter-platform')).toHaveAttribute('aria-pressed', 'true')
+      await expect.poll(async () => await rowCount(), { timeout: 10_000 }).toBeLessThan(all)
+
+      await page.getByTestId('operations-filter-all').click()
+      await expect.poll(async () => await rowCount(), { timeout: 10_000 }).toBe(all)
+      guard.assertClean()
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
 })
