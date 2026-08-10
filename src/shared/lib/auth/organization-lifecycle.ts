@@ -2,6 +2,7 @@ import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
 import { createDatabaseSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
 import {
+  INVITATION_SUGGESTED_QUERY,
   normalizeInvitationIntent,
   normalizeRoleTitle,
   type InvitationIntent,
@@ -156,7 +157,16 @@ export interface LifecycleDependencies {
    */
   findPendingInvitation?(organizationId: string, email: string): Promise<InvitationRecord | null>
   cancelInvitationRecord(invitationId: string): Promise<void>
-  acceptInvitationRecord(invitationId: string, userId: string): Promise<void>
+  /**
+   * Creates the membership and flips `pending` to `accepted`, atomically.
+   *
+   * Returns whether it actually transitioned the row. `void` is still accepted so every existing
+   * fake-deps test keeps its meaning — `undefined` is read as "transitioned", and only an explicit
+   * `false` is a lost race.
+   */
+  acceptInvitationRecord(invitationId: string, userId: string): Promise<void | boolean>
+  /** Flips `pending` to `rejected` and creates nothing. Returns whether it transitioned the row. */
+  rejectInvitationRecord(invitationId: string): Promise<boolean>
   removeMemberRecord(organizationId: string, userId: string): Promise<void>
   updateMemberRoleRecord(organizationId: string, userId: string, role: InvitableRole): Promise<void>
   transferOwnershipRecord(organizationId: string, fromUserId: string, toUserId: string): Promise<void>
@@ -528,9 +538,30 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
   // already accepted/rejected/canceled — returns the exact same error and
   // status so a caller can't use this endpoint to probe invitation state or
   // harvest the invited email address.
-  async function acceptInvitation(request: Request, invitationId: string): Promise<{ organizationId: string }> {
+  /**
+   * The one place that decides whether a caller may see or act on an invitation.
+   *
+   * Review, accept and reject share it, which is the point: three copies of these four conditions
+   * would be three chances for one of them to forget `emailVerified`, or to let an expired invitation
+   * through on the read path while the write path refuses it — and a read that reveals an
+   * organization's name is the leak, whether or not a membership follows.
+   *
+   * **Every failure is the same response.** Missing, expired, already used, rejected, cancelled,
+   * unverified, wrong account, and fabricated id all raise `GENERIC_INVITATION_ERROR` with 403. A
+   * distinguishable 404 would turn this endpoint into an oracle: hold a random id, read the status
+   * code, learn whether that invitation exists. The audit entry carries the detail instead, where only
+   * an operator can read it.
+   */
+  async function resolveEligibleInvitation(
+    request: Request,
+    invitationId: string,
+    action: 'organization.invite.review' | 'organization.invite.accept' | 'organization.invite.reject',
+    rateLimitKey: string,
+  ): Promise<{ session: LifecycleSession; invitation: InvitationRecord }> {
     const session = await requireSession(request, deps)
-    await requireRateLimit(deps, 'org-invite-accept', session.userId, 20, 60 * 60)
+    // Keyed on the authenticated user, not on the invitation id: keying on the id would let one
+    // account walk a list of guessed ids at the full budget each.
+    await requireRateLimit(deps, rateLimitKey, session.userId, 20, 60 * 60)
 
     const invitation = await deps.getInvitation(invitationId)
     const isValid =
@@ -544,7 +575,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       await audit(deps, {
         organizationId: invitation?.organizationId ?? null,
         actorUserId: session.userId,
-        action: 'organization.invite.accept',
+        action,
         targetType: 'invitation',
         targetId: invitationId,
         result: 'denied',
@@ -553,7 +584,116 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       throw new OrganizationLifecycleError(GENERIC_INVITATION_ERROR, 403)
     }
 
-    await deps.acceptInvitationRecord(invitation.id, session.userId)
+    return { session, invitation }
+  }
+
+  /**
+   * What a verified recipient may read before deciding.
+   *
+   * Allowlisted by construction — it names five fields rather than spreading the record — so a field
+   * added to `InvitationRecord` later cannot arrive here by accident. `inviterId`, `organizationId` and
+   * the invitee's own stored email are all absent: the first two are internal identifiers, and echoing
+   * the third would confirm to a wrong-account holder which address the invitation was for.
+   */
+  async function reviewInvitation(
+    request: Request,
+    invitationId: string,
+  ): Promise<{
+    organizationName: string
+    role: InvitableRole
+    intent: InvitationIntent
+    roleTitle: string | null
+    expiresAt: Date
+  }> {
+    const { invitation } = await resolveEligibleInvitation(
+      request,
+      invitationId,
+      'organization.invite.review',
+      'org-invite-review',
+    )
+    return {
+      organizationName: invitation.organizationName,
+      role: invitation.role,
+      intent: invitation.intent,
+      roleTitle: invitation.roleTitle,
+      expiresAt: invitation.expiresAt,
+    }
+  }
+
+  /**
+   * Declining. Moves `pending` to `rejected` and creates no membership.
+   *
+   * The same conditional-update race as accept: if the row is no longer `pending` by the time the
+   * update runs, the caller lost to an accept and gets the generic invalid response rather than a
+   * cheerful "declined" for something that was already joined.
+   */
+  async function rejectInvitation(request: Request, invitationId: string): Promise<void> {
+    const { session, invitation } = await resolveEligibleInvitation(
+      request,
+      invitationId,
+      'organization.invite.reject',
+      'org-invite-reject',
+    )
+
+    const transitioned = await deps.rejectInvitationRecord(invitation.id)
+    if (!transitioned) {
+      await audit(deps, {
+        organizationId: invitation.organizationId,
+        actorUserId: session.userId,
+        action: 'organization.invite.reject',
+        targetType: 'invitation',
+        targetId: invitation.id,
+        result: 'denied',
+        requestId: requestIdFrom(request),
+      })
+      throw new OrganizationLifecycleError(GENERIC_INVITATION_ERROR, 403)
+    }
+
+    await audit(deps, {
+      organizationId: invitation.organizationId,
+      actorUserId: session.userId,
+      action: 'organization.invite.reject',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  async function acceptInvitation(
+    request: Request,
+    invitationId: string,
+  ): Promise<{ organizationId: string; activeOrganization: boolean; suggestedQuery: string }> {
+    const { session, invitation } = await resolveEligibleInvitation(
+      request,
+      invitationId,
+      'organization.invite.accept',
+      'org-invite-accept',
+    )
+
+    const transitioned = await deps.acceptInvitationRecord(invitation.id, session.userId)
+    /**
+     * A lost race is not a success.
+     *
+     * `acceptInvitationRecord` updates conditionally on `pending`, so two accepts — or an accept
+     * against a reject — leave exactly one winner. The loser used to receive `{ ok: true }` with a
+     * membership it did not create, which is the worst of both: it reads as joined and is not.
+     *
+     * `undefined` counts as transitioned, so a fake-deps test whose `acceptInvitationRecord` returns
+     * nothing keeps its old meaning instead of every one of them suddenly failing.
+     */
+    if (transitioned === false) {
+      await audit(deps, {
+        organizationId: invitation.organizationId,
+        actorUserId: session.userId,
+        action: 'organization.invite.accept',
+        targetType: 'invitation',
+        targetId: invitation.id,
+        result: 'denied',
+        requestId: requestIdFrom(request),
+      })
+      throw new OrganizationLifecycleError(GENERIC_INVITATION_ERROR, 403)
+    }
     await audit(deps, {
       organizationId: invitation.organizationId,
       actorUserId: session.userId,
@@ -563,7 +703,35 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       result: 'allowed',
       requestId: requestIdFrom(request),
     })
-    return { organizationId: invitation.organizationId }
+
+    /**
+     * Activation is attempted after the membership is committed, and its failure is reported rather
+     * than thrown.
+     *
+     * The membership transaction has already succeeded at this point: the person *is* a member. Letting
+     * a failed session switch reject the whole call would tell them their acceptance failed when it did
+     * not, and the retry they would reasonably attempt then hits an invitation that is no longer
+     * `pending` and answers with the generic invalid error. `activeOrganization: false` sends them to
+     * `/dashboard`, where the organization switcher still works.
+     */
+    let activeOrganization = false
+    try {
+      await deps.setActiveOrganization(session, invitation.organizationId)
+      activeOrganization = true
+    } catch (error) {
+      // Redacted: the organization id is already in the audit entry above, and this line is for
+      // correlating a switch failure, not for carrying tenant data into the log.
+      console.error('Invitation accepted but organization activation failed', {
+        invitationId: invitation.id,
+        reason: error instanceof Error ? error.name : 'unknown',
+      })
+    }
+
+    return {
+      organizationId: invitation.organizationId,
+      activeOrganization,
+      suggestedQuery: INVITATION_SUGGESTED_QUERY[invitation.intent],
+    }
   }
 
   async function removeMember(request: Request, organizationId: string, targetUserId: string): Promise<void> {
@@ -719,6 +887,8 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     resendInvitation,
     cancelInvitation,
     acceptInvitation,
+    reviewInvitation,
+    rejectInvitation,
     removeMember,
     changeMemberRole,
     transferOwnership,
@@ -935,13 +1105,16 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
     },
 
     async acceptInvitationRecord(invitationId, userId) {
-      await authDb.transaction(async (tx) => {
+      // Returns the transition, rather than swallowing it. The conditional `WHERE status = 'pending'`
+      // already made this the single winner of any race; what was missing was telling the caller, which
+      // is why a loser used to receive `{ ok: true }` for a membership it did not create.
+      return authDb.transaction(async (tx) => {
         const [invitation] = await tx
           .update(organizationInvitations)
           .set({ status: 'accepted' })
           .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.status, 'pending')))
           .returning({ organizationId: organizationInvitations.organizationId, role: organizationInvitations.role })
-        if (!invitation) return
+        if (!invitation) return false
         await tx
           .insert(organizationMembers)
           .values({
@@ -951,7 +1124,19 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
             role: invitation.role ?? 'member',
           })
           .onConflictDoNothing()
+        return true
       })
+    },
+
+    async rejectInvitationRecord(invitationId) {
+      // Only `pending` may become `rejected`, so declining something already accepted changes nothing
+      // and reports false. No membership is touched: this row is the whole state a decline owns.
+      const rows = await authDb
+        .update(organizationInvitations)
+        .set({ status: 'rejected' })
+        .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.status, 'pending')))
+        .returning({ id: organizationInvitations.id })
+      return rows.length > 0
     },
 
     async removeMemberRecord(organizationId, userId) {
