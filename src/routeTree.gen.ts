@@ -277,6 +277,8 @@ import { Route as ApiPublicSchedulingInvitationIdRescheduleRouteImport } from '.
 import { Route as ApiPublicSchedulingInvitationIdDeclineRouteImport } from './routes/api/public/scheduling/$invitationId/decline'
 import { Route as ApiPublicSchedulingInvitationIdCancelRouteImport } from './routes/api/public/scheduling/$invitationId/cancel'
 import { Route as ApiPublicSchedulingInvitationIdBookRouteImport } from './routes/api/public/scheduling/$invitationId/book'
+import { Route as ApiOrganizationsInvitationsInvitationIdReviewRouteImport } from './routes/api/organizations/invitations/$invitationId/review'
+import { Route as ApiOrganizationsInvitationsInvitationIdRejectRouteImport } from './routes/api/organizations/invitations/$invitationId/reject'
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
@@ -1736,6 +1738,18 @@ const ApiPublicSchedulingInvitationIdBookRoute =
     path: '/api/public/scheduling/$invitationId/book',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiOrganizationsInvitationsInvitationIdReviewRoute =
+  ApiOrganizationsInvitationsInvitationIdReviewRouteImport.update({
+    id: '/review',
+    path: '/review',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
+  } as any)
+const ApiOrganizationsInvitationsInvitationIdRejectRoute =
+  ApiOrganizationsInvitationsInvitationIdRejectRouteImport.update({
+    id: '/reject',
+    path: '/reject',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
+  } as any)
 const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
   ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
     id: '/accept',
@@ -2109,6 +2123,8 @@ export interface FileRoutesByFullPath {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/organizations/invitations/$invitationId/reject': typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  '/api/organizations/invitations/$invitationId/review': typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
   '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
   '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
   '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
@@ -2393,6 +2409,8 @@ export interface FileRoutesByTo {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/organizations/invitations/$invitationId/reject': typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  '/api/organizations/invitations/$invitationId/review': typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
   '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
   '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
   '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
@@ -2682,6 +2700,8 @@ export interface FileRoutesById {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/organizations/invitations/$invitationId/reject': typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  '/api/organizations/invitations/$invitationId/review': typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
   '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
   '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
   '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
@@ -2970,6 +2990,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/organizations/invitations/$invitationId/reject'
+    | '/api/organizations/invitations/$invitationId/review'
     | '/api/public/scheduling/$invitationId/book'
     | '/api/public/scheduling/$invitationId/cancel'
     | '/api/public/scheduling/$invitationId/decline'
@@ -3254,6 +3276,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/organizations/invitations/$invitationId/reject'
+    | '/api/organizations/invitations/$invitationId/review'
     | '/api/public/scheduling/$invitationId/book'
     | '/api/public/scheduling/$invitationId/cancel'
     | '/api/public/scheduling/$invitationId/decline'
@@ -3542,6 +3566,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/organizations/invitations/$invitationId/reject'
+    | '/api/organizations/invitations/$invitationId/review'
     | '/api/public/scheduling/$invitationId/book'
     | '/api/public/scheduling/$invitationId/cancel'
     | '/api/public/scheduling/$invitationId/decline'
@@ -5634,6 +5660,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSchedulingInvitationIdBookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organizations/invitations/$invitationId/review': {
+      id: '/api/organizations/invitations/$invitationId/review'
+      path: '/review'
+      fullPath: '/api/organizations/invitations/$invitationId/review'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdReviewRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
+    }
+    '/api/organizations/invitations/$invitationId/reject': {
+      id: '/api/organizations/invitations/$invitationId/reject'
+      path: '/reject'
+      fullPath: '/api/organizations/invitations/$invitationId/reject'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRejectRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
+    }
     '/api/organizations/invitations/$invitationId/accept': {
       id: '/api/organizations/invitations/$invitationId/accept'
       path: '/accept'
@@ -6151,12 +6191,18 @@ const ApiMeBuilderBuilderIdRouteWithChildren =
 
 interface ApiOrganizationsInvitationsInvitationIdRouteChildren {
   ApiOrganizationsInvitationsInvitationIdAcceptRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  ApiOrganizationsInvitationsInvitationIdRejectRoute: typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  ApiOrganizationsInvitationsInvitationIdReviewRoute: typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
 }
 
 const ApiOrganizationsInvitationsInvitationIdRouteChildren: ApiOrganizationsInvitationsInvitationIdRouteChildren =
   {
     ApiOrganizationsInvitationsInvitationIdAcceptRoute:
       ApiOrganizationsInvitationsInvitationIdAcceptRoute,
+    ApiOrganizationsInvitationsInvitationIdRejectRoute:
+      ApiOrganizationsInvitationsInvitationIdRejectRoute,
+    ApiOrganizationsInvitationsInvitationIdReviewRoute:
+      ApiOrganizationsInvitationsInvitationIdReviewRoute,
   }
 
 const ApiOrganizationsInvitationsInvitationIdRouteWithChildren =

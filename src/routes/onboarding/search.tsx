@@ -7,7 +7,33 @@ import { Button, Input, LinkButton } from '~/components/ui'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
+/**
+ * `?q=` prefills the input and nothing else (plan 59).
+ *
+ * It arrives from an accepted invitation, where the server chose it from the invitation's intent. It is
+ * treated as **editable text**, never as authorization and never as something to persist: nothing is
+ * saved until the visitor runs the search themselves, so a tampered value costs a stranger a prefilled
+ * box and no more.
+ *
+ * Trimmed and capped at 300 characters, because it lands in an `<input>` whose value ends up in a URL
+ * — and an unbounded string here would be a way to make that URL arbitrarily long. A visit with no `q`
+ * behaves exactly as before: `undefined` in, empty string out.
+ */
+const MAX_PREFILL_LENGTH = 300
+
+function normalizePrefill(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value.trim().slice(0, MAX_PREFILL_LENGTH)
+}
+
 export const Route = createFileRoute('/onboarding/search')({
+  // Omitted rather than empty when absent, so `q` stays optional for every other navigation into this
+  // route — `onboarding/save.tsx` links here without it, and a required param would have made that a
+  // type error for a page that has no query to suggest.
+  validateSearch: (search: Record<string, unknown>): { q?: string } => {
+    const q = normalizePrefill(search.q)
+    return q ? { q } : {}
+  },
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) {
@@ -20,7 +46,11 @@ export const Route = createFileRoute('/onboarding/search')({
 
 function SearchStep() {
   const navigate = useNavigate()
-  const [query, setQuery] = React.useState('')
+  // Initial value only: `useState`'s initializer runs once, so a later navigation that changes `q` does
+  // not overwrite what the visitor has typed. That is the difference between a suggestion and a field
+  // that fights the person filling it in.
+  const { q } = Route.useSearch()
+  const [query, setQuery] = React.useState(q ?? '')
   const [skipping, setSkipping] = React.useState(false)
 
   React.useEffect(() => {
