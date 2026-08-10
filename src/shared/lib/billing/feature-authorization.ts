@@ -30,6 +30,10 @@ import {
 import { adjustCreditGrant, grantCredits, isActivePaidSubscription } from './credits'
 import type { CatalogTier } from './catalog'
 import { getRateCard, tierMeetsMinimum, type RateCard } from './rate-cards'
+import { getBetaModeState, type BetaModeState } from './beta-mode'
+import { activeBetaSourceReference, ensureBetaMonthlyCreditGrant } from './beta-credits'
+import { applyBetaModeEntitlement } from './effective-entitlement'
+import { getOrganizationEntitlement } from '../repositories/entitlements'
 
 const CATALOG_TIERS: ReadonlySet<string> = new Set<CatalogTier>(['free', 'pro', 'pro_max', 'team'])
 function isCatalogTier(value: string): value is CatalogTier {
@@ -79,10 +83,53 @@ export async function checkEntitlement(
   transaction: TenantTransaction,
   principal: TenantPrincipal,
   input: CheckEntitlementInput,
+  /**
+   * The beta state the caller already read, if it has one.
+   *
+   * `reserveCredits` reads it once and threads it through, because reading it twice inside one
+   * reservation takes the shared advisory lock twice and — worse — lets the second read disagree with
+   * the first if a disable commits between them. A caller with nothing to thread passes nothing and
+   * this reads for itself.
+   */
+  betaState?: Pick<BetaModeState, 'enabled'>,
 ): Promise<EntitlementCheckResult> {
   const rateCard = getRateCard(input.feature)
   if (!rateCard) return { allowed: false, reason: 'unknown_feature' }
   if (!rateCard.minimumTier) return { allowed: true }
+
+  /**
+   * Beta mode authorizes from the **entitlement**, not from a Stripe subscription (plan 58).
+   *
+   * This branch is the whole reason plan 58 exists. The path below reads
+   * `findActiveBillingSubscription`, and `STRIPE_BILLING_ENABLED` is false in every environment — so
+   * there is no active subscription anywhere and every rate-carded feature answers `no_subscription`.
+   * Raising a tier elsewhere changes nothing here, which is exactly the inconsistency the plan
+   * describes: the UI and the non-metered limits saying Pro Max while provider-backed work still
+   * refuses.
+   *
+   * `getBetaModeState` throws rather than returning false when it cannot read the row, and that throw
+   * must propagate. Answering `allowed: false` on a database error would deny a paying customer and
+   * read, to every surface above, as the flag simply being off.
+   */
+  const beta = betaState ?? await getBetaModeState(transaction)
+  if (beta.enabled) {
+    const effective = applyBetaModeEntitlement(
+      await getOrganizationEntitlement(transaction, principal.organizationId),
+      beta,
+    )
+    /**
+     * `paymentBlocked` still wins, and it reports as `no_subscription` on purpose.
+     *
+     * Not a fourth reason code: every consumer of `EntitlementCheckResult` — the UI copy, the abuse
+     * signals, `billing-state.ts` — would grow a branch for a state that is operationally identical to
+     * "you cannot pay right now". An organization in dunning must not get free provider work by way of
+     * a promotional flag.
+     */
+    if (!effective.paidActionsAllowed) return { allowed: false, reason: 'no_subscription' }
+    return tierMeetsMinimum(effective.tier, rateCard.minimumTier)
+      ? { allowed: true }
+      : { allowed: false, reason: 'tier_too_low' }
+  }
 
   const subscription = await findActiveBillingSubscription(transaction, principal.organizationId, false)
   if (!subscription || !isActivePaidSubscription(subscription)) return { allowed: false, reason: 'no_subscription' }
@@ -96,11 +143,12 @@ async function requireEntitledRateCard(
   transaction: TenantTransaction,
   principal: TenantPrincipal,
   feature: string,
+  betaState?: Pick<BetaModeState, 'enabled'>,
 ): Promise<RateCard> {
   const rateCard = getRateCard(feature)
   if (!rateCard) throw new FeatureBillingError(`Unknown feature: ${feature}`, 'unknown_feature')
 
-  const entitlement = await checkEntitlement(transaction, principal, { feature })
+  const entitlement = await checkEntitlement(transaction, principal, { feature }, betaState)
   if (!entitlement.allowed) {
     throw new FeatureBillingError(`Not entitled to ${feature}: ${entitlement.reason}`, 'insufficient_entitlement')
   }
@@ -129,9 +177,32 @@ export async function reserveCredits(
   input: ReserveCreditsInput,
   deps?: EmitAbuseSignalDeps,
 ): Promise<FeatureReservationResult> {
-  const rateCard = await requireEntitledRateCard(transaction, principal, input.operation)
+  /**
+   * One read of the flag for the whole reservation (plan 58).
+   *
+   * Read once and threaded, because each extra read takes the shared advisory lock again and — worse —
+   * a second read can disagree with the first if a disable commits between them. A reservation
+   * authorized under "beta on" must allocate under "beta on" or refuse; it must never do half of each.
+   */
+  const beta = await getBetaModeState(transaction)
+  const rateCard = await requireEntitledRateCard(transaction, principal, input.operation, beta)
   const today = todayUtc()
   const now = new Date()
+
+  /**
+   * The grant is minted here, just before the first non-zero reservation of the month can need it —
+   * not by a sweep over every organization when the flag flips.
+   *
+   * Zero-cost operations are skipped deliberately: a free action must not be what creates a 700-unit
+   * promotional grant, or an organization that never does paid work accrues an allowance every month
+   * for nothing.
+   */
+  if (beta.enabled && rateCard.maxUnits > 0) {
+    await withCreditWriteRole(transaction, () =>
+      ensureBetaMonthlyCreditGrant(transaction, principal.organizationId, beta, now),
+    )
+  }
+  const betaReference = activeBetaSourceReference(beta, principal.organizationId, now)
 
   // Per-seat credit sub-budget (Phase 4B "G2") — checked BEFORE reserving so a blocked seat never
   // partially reserves against the shared pool. Only a real `enforce`-mode gate; `observe`/`warn`
@@ -173,6 +244,7 @@ export async function reserveCredits(
       idempotencyKey: input.idempotencyKey,
       maximumUnits: rateCard.maxUnits,
       maxDurationSeconds: rateCard.maxDurationSeconds,
+      activeBetaSourceReference: betaReference,
     }))
 
     // Record the acting seat's credit units into seat_usage_daily on every reservation — always,
@@ -234,11 +306,17 @@ export async function extendReservation(
   input: ExtendReservationInput,
 ): Promise<FeatureReservationResult> {
   try {
+    /**
+     * Re-read, not carried over. If beta mode ended while the provider was working, this extension must
+     * not be able to draw on the allowance the reservation started under.
+     */
+    const beta = await getBetaModeState(transaction)
     const result = await withCreditWriteRole(transaction, () => extendReservationRaw(transaction, {
       organizationId: principal.organizationId,
       reservationId: input.reservationId,
       additionalMaximumUnits: input.additionalMaximumUnits,
       idempotencyKey: input.idempotencyKey,
+      activeBetaSourceReference: activeBetaSourceReference(beta, principal.organizationId, new Date()),
     }))
     return { reservation: result.reservation, allocations: result.allocations }
   } catch (error) {

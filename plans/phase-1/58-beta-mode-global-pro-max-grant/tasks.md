@@ -91,7 +91,7 @@
   - Verify: `pnpm vitest run tests/unit/shared/lib/repositories/entitlements.test.ts tests/unit/shared/lib/billing/feature-authorization.test.ts && pnpm type-check`
     passes after the new resolver/authorization cases are observed red.
 
-- [ ] **Route every product allowance—and only product allowances—through the effective resolver**
+- [x] **Route every product allowance—and only product allowances—through the effective resolver**
   - Files: `src/routes/api/alerts/index.ts`, `src/routes/api/queries/index.ts`,
     `src/routes/api/builders/track.ts`, `src/routes/api/search/semantic.ts`,
     `src/routes/api/sprints/index.ts`, `src/routes/api/sprints/$sprintId.ts`,
@@ -144,7 +144,7 @@
   - Verify: `pnpm vitest run tests/unit/shared/lib/billing/beta-credits.test.ts tests/unit/shared/lib/billing/credits.test.ts tests/unit/shared/lib/repositories/billing-ledger.test.ts`
     passes. The concurrency assertion must be observed failing before the lock and green afterward.
 
-- [ ] **Use one beta-grant predicate for reservation, spendable balance, and downstream billing**
+- [x] **Use one beta-grant predicate for reservation, spendable balance, and downstream billing**
   - Files: `src/shared/lib/repositories/billing-ledger.ts`,
     `src/shared/lib/billing/reservations.ts`, `src/shared/lib/billing/credits.ts`,
     `src/shared/lib/repositories/billing.ts`, `src/shared/lib/billing/contracts.ts`,

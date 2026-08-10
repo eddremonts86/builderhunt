@@ -106,6 +106,15 @@ export interface ActiveCreditGrantBatch {
   after?: CreditGrantCursor | null
   /** Defaults to `CREDIT_GRANT_BATCH`. */
   limit?: number
+  /**
+   * The beta window whose promotional grant may be spent right now, or null (plan 58).
+   *
+   * **Absent means excluded**, and that default is deliberate. A caller that has not been taught about
+   * beta mode must not spend promotional beta units: a new consumer that forgets this field should
+   * under-count a balance, never over-spend one. The other default's failure mode is a customer
+   * spending an allowance an operator has already switched off.
+   */
+  activeBetaSourceReference?: string | null
 }
 
 /**
@@ -124,6 +133,38 @@ function activeGrantConditions(organizationId: string, options: ActiveCreditGran
   if (options.after) {
     conditions.push(sql`(${billingCreditGrants.expiresAt}, ${billingCreditGrants.id}) > (${options.after.expiresAt}, ${options.after.id})`)
   }
+
+  /**
+   * The one beta-grant predicate, in the one place every consumer already routes through (plan 58).
+   *
+   * `lockActiveCreditGrantsByEarliestExpiry`, `listActiveCreditGrantsByEarliestExpiry` and
+   * `drainActiveCreditGrants` all build their WHERE here — so reservation, spendable balance, the
+   * active-grant projection and auto-recharge share this by construction rather than by four callers
+   * remembering to pass the same flag. A fifth consumer added later inherits it instead of being the
+   * one that forgot.
+   *
+   * Three behaviours fall out of this single clause:
+   *   - **disable is immediate** — the reference goes null and the grant stops matching, with no row
+   *     mutated and no ledger history lost;
+   *   - **a new month retires the old grant** before the expiry worker has run;
+   *   - **re-enabling in the same month restores the unused remainder**, because nothing was clawed back.
+   *
+   * `coalesce` is load-bearing, not defensive. `source_reference` is nullable, and `NULL LIKE
+   * 'beta-mode:%'` is NULL — so `not (source = 'promotional' and NULL)` is NULL rather than true, and a
+   * grant with no reference would be silently **dropped from every balance**. Verified against Postgres
+   * directly: `select (not ('promotional' = 'promotional' and null like 'beta-mode:%')) is null` → `t`.
+   * There are no such rows in development today, which is precisely why this would have shipped unseen
+   * and taken somebody's `legacy_manual` balance with it.
+   */
+  const isBetaGrant = sql`(${billingCreditGrants.source} = 'promotional'
+    and coalesce(${billingCreditGrants.sourceReference}, '') like 'beta-mode:%')`
+  const activeBeta = options.activeBetaSourceReference ?? null
+  conditions.push(
+    activeBeta === null
+      ? sql`not ${isBetaGrant}`
+      : sql`(not ${isBetaGrant} or ${billingCreditGrants.sourceReference} = ${activeBeta})`,
+  )
+
   return conditions
 }
 
