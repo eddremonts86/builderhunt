@@ -261,7 +261,7 @@
   - Do: Label fixture lanes as demo/preview, expose server-owned prerequisite readiness, remove production-success wording, and keep the same route ready for real plan 43 endpoints.
   - Verify: incomplete prerequisites can never render an unlabeled generated-result success state.
 
-- [ ] **Bind Solutions UI to real plan 43 endpoints after prerequisites ship**
+- [x] **Bind Solutions UI to real plan 43 endpoints after prerequisites ship**
   - Files: `src/modules/solutions/components/SolutionsPage.tsx`, `src/routes/api/solutions/index.ts`, `src/routes/api/solutions/$solutionId.ts`, `tests/e2e/solutions.spec.ts`
   - Do: Replace demo fixtures with real brief interpretation, clarification, explicit charge confirmation, generation progress, evidence-backed result lanes, and deterministic error/retry states. Do not duplicate plan 43's domain services.
   - Verify: real Pro/Pro Max/Team journey passes against the fake provider and real database; Free, insufficient-credit, unavailable route, stale version, and cross-tenant cases fail honestly.
@@ -378,7 +378,7 @@
   "1 with NEW horizontal document overflow", and restoring it turns it green — which is the first half of the
   next task's verify line, done here because the layout was already in hand.
 
-- [ ] **Add visual snapshots and route-structure checks to CI** — route-graph done; visual blocked on Linux baselines
+- [~] **Add visual snapshots and route-structure checks to CI** — route-graph done; visual blocked on Linux baselines
   - Files: `tests/e2e/visual/ui-coverage.spec.ts`, `.github/workflows/quality.yml`, `package.json`
   - Do: Snapshot Calendar views/agenda, Operations, Integrations, Claims, status form, and public mobile navigation; require route-graph and visual structural checks in CI.
   - Verify: intentionally change one key layout and one route to prove each gate fails, restore baselines, then run `pnpm test:visual` and `node scripts/check-ui-route-graph.mjs`.
