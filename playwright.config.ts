@@ -59,7 +59,20 @@ const PORT = new URL(baseURL).port || '80'
 // Pre-compute a single REDIS_URL pointing at the local Redis container.
 // The container is expected to be running on the standard 6379 port (the
 // repo's docker-compose.yml's `redis` service publishes it).
-const redisURL = process.env.REDIS_URL ?? `redis://localhost:${process.env.REDIS_PORT ?? '6379'}`
+/**
+ * `127.0.0.1`, not `localhost`, and the difference is a whole afternoon.
+ *
+ * This file is evaluated by a bare `playwright test` with no dotenvx wrapper (see the comment above),
+ * so `.env`'s `REDIS_URL=redis://127.0.0.1:6379` is often **not** in `process.env` yet and this
+ * fallback is what the webServer actually gets. On macOS `localhost` resolves to `::1` first, while
+ * docker-compose publishes Redis on IPv4 — so the app cannot reach Redis, and
+ * `rate-limit.ts` **fails closed under E2E_MODE by design**.
+ *
+ * The symptom is nothing like the cause: every sign-up is refused with "Too many accounts created
+ * from this device recently", while every counter in Redis reads 1. The message describes a limit that
+ * was never consulted.
+ */
+const redisURL = process.env.REDIS_URL ?? `redis://127.0.0.1:${process.env.REDIS_PORT ?? '6379'}`
 // Wave 1 Task 1 — single global prefix for this run is the baseline;
 // per-worker prefixes are derived inside `tests/e2e/harness/cache.ts` and
 // written into the test process's process.env.E2E_REDIS_PREFIX by the
