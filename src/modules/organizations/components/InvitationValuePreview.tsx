@@ -35,6 +35,19 @@ export interface InvitationValuePreviewProps {
  * shipped, cross-tier behaviour, so they stay true whatever plan the organization is on the day they
  * click.
  */
+/**
+ * Role → prose, as a lookup rather than a comparison.
+ *
+ * `role === 'admin' ? … : …` is a role literal compared outside `permissions.ts`, which
+ * `check-tenant-boundaries.mjs` fails — correctly, even though this one is a display string. The rule
+ * exists because that is exactly how an authorization decision starts life as "just a label". Indexing a
+ * closed map has no comparison to drift into one, and it fails to compile if the role union grows.
+ */
+const ROLE_PROSE: Record<'admin' | 'member', string> = {
+  admin: 'an admin',
+  member: 'a member',
+}
+
 export function InvitationValuePreview({
   intent,
   roleTitle,
@@ -61,7 +74,7 @@ export function InvitationValuePreview({
       {organizationName && (
         <p className="text-sm text-bh-text mb-1" data-testid="invitation-preview-organization">
           <strong className="font-semibold">{organizationName}</strong>
-          {role && <> invited you to join as {role === 'admin' ? 'an admin' : 'a member'}.</>}
+          {role && <> invited you to join as {ROLE_PROSE[role]}.</>}
         </p>
       )}
 

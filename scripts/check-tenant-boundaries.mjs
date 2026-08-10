@@ -103,6 +103,26 @@ function importPattern(specifier) {
 const globalDbImportPattern = importPattern(String.raw`[^'"]*\/db\/index|[^'"]*\/db`)
 const authDbImportPattern = importPattern(String.raw`[^'"]*auth-db`)
 
+/**
+ * The source with comments removed, for the role-literal rule only.
+ *
+ * A rule that fires on prose *describing* it teaches people to delete the prose. The role-literal check
+ * flagged `InvitationValuePreview.tsx` for a comment that read "`role === 'admin' ? … : …` is a role
+ * literal compared outside permissions.ts" — an explanation of why the file does **not** do that. Same
+ * defect the read-path detector had until it learned to strip comments: matching the description instead
+ * of the code.
+ *
+ * Strings are deliberately kept. A role literal inside a template or a SQL fragment is still a role
+ * decision worth seeing, and stripping those would hide real ones.
+ *
+ * Scoped to this one rule: the import rules must keep reading the raw source, because a commented-out
+ * import is not an import but a *dynamic* one assembled in a template is, and narrowing them here would
+ * be an unrelated change to a boundary.
+ */
+function withoutComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+}
+
 for (const absolutePath of files) {
   const path = relative(root, absolutePath)
   const source = await readFile(absolutePath, 'utf8')
@@ -115,7 +135,7 @@ for (const absolutePath of files) {
   if (authDbImportPattern.test(source) && !authDbAllowlist.has(path)) {
     findings.push(`${path}: auth broker import (static or dynamic) is not allowlisted`)
   }
-  if (roleLiteralCheckPattern.test(source) && !roleLiteralCheckAllowlist.has(path)) {
+  if (roleLiteralCheckPattern.test(withoutComments(source)) && !roleLiteralCheckAllowlist.has(path)) {
     findings.push(`${path}: role literal comparison outside permissions.ts — use can() instead`)
   }
 }
