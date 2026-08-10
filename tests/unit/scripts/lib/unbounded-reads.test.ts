@@ -154,6 +154,25 @@ describe('unbounded-read detector', () => {
     })
   })
 
+  it('treats selectDistinct as a list read', () => {
+    // Found in the sweep, not in the design: `listNotedOrganizationBuilders` opens with
+    // `selectDistinct({ builderId }).from(builderNotes)` over a whole organization's notes, and only
+    // the *second* query in that function was being reported. `selectDistinctOn` is the same shape.
+    const distinct = analyze(`
+      export async function listNoted(tx: TenantTransaction) {
+        return tx.selectDistinct({ builderId: builderNotes.builderId }).from(builderNotes).where(eq(builderNotes.organizationId, id))
+      }
+    `)
+    expect(distinct.unbounded).toHaveLength(1)
+
+    const distinctOn = analyze(`
+      export async function listLatest(tx: TenantTransaction) {
+        return tx.selectDistinctOn([things.key], { key: things.key }).from(things)
+      }
+    `)
+    expect(distinctOn.unbounded).toHaveLength(1)
+  })
+
   it('reports one entry per chain, not one per method call in the chain', () => {
     // Walking the spine twice would report `.where`, `.orderBy` and `.from` as three reads.
     const result = analyze(`

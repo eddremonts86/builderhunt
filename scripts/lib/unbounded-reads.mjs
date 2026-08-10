@@ -24,8 +24,8 @@ const AGGREGATE_VALUE = /\b(?:count|sum|avg|min|max)\s*\(|\bcount\b\s*\(\s*\)|::
 
 const EXEMPTION = /\/\/\s*unbounded-read-ok:\s*(\S.*)$/
 
-/** Files with neither token cannot contain the shape, so they are never parsed. */
-export const MIGHT_CONTAIN_READ = /\.select\s*\(|\.findMany\s*\(/
+/** Files with none of these tokens cannot contain the shape, so they are never parsed. */
+export const MIGHT_CONTAIN_READ = /\.select\w*\s*\(|\.findMany\s*\(/
 
 /**
  * The method names of the call chain ending at `call`, outermost first.
@@ -45,7 +45,11 @@ function chainOf(call) {
     if (!ts.isPropertyAccessExpression(callee)) break
     const name = callee.name.text
     methods.push(name)
-    if (name === 'select') selectCalls.push(cur)
+    // `selectDistinct` and `selectDistinctOn` are list reads exactly like `select`, and missing them
+    // was a live gap: `listNotedOrganizationBuilders` opens with
+    // `selectDistinct({ builderId }).from(builderNotes)` over a whole organization's notes, and that
+    // read was invisible while the *second* query in the same function was reported.
+    if (name === 'select' || name === 'selectDistinct' || name === 'selectDistinctOn') selectCalls.push(cur)
     else if (name === 'findMany') findManyCalls.push(cur)
     cur = callee.expression
   }
@@ -191,7 +195,7 @@ export function analyzeSource({ path, text }) {
     // both makes two documented false positives structurally impossible rather than excluded by
     // name: `inputRef.current.select()` is the DOM method (which needed a file-level "does this
     // file reach a database" regex) and `Buffer.from(…)` (which needed a strip list).
-    const isSelectRead = methods.includes('select') && methods.includes('from')
+    const isSelectRead = selectCalls.length > 0 && methods.includes('from')
     const isFindManyRead = findManyCalls.length > 0
 
     if (isSelectRead || isFindManyRead) {
