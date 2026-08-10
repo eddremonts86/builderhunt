@@ -129,12 +129,22 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
 
-      # `--update-snapshots` reports a test whose baseline it had to write as failed, so its exit
-      # code says "snapshots changed", not "something is wrong". The verification run below is what
-      # decides that — and it is the half that matters: a baseline captured from a page that had not
-      # settled will be rewritten happily here and then fail on the very next push.
+      # `=all`, and the mode is the whole point.
+      #
+      # A bare `--update-snapshots` presets to `changed`, and Playwright's idea of "changed" is
+      # "exceeded `maxDiffPixelRatio`" — 1% here. A line of footer copy is a rounding error in a
+      # full-page screenshot, so renaming the cities in `Footer.tsx` moved every public surface and
+      # `--update-snapshots` rewrote **nothing**: 22 passed, zero files touched. The baselines would
+      # have kept showing the old text indefinitely, with the gate green the entire time.
+      #
+      # So the refresh has to be unconditional. Sub-threshold drift is exactly the drift that needs
+      # a deliberate refresh, because it is the drift nothing else will ever report.
+      #
+      # Its exit code still says "snapshots were written", not "something is wrong", hence `|| true`.
+      # The verification run below is what decides that, and it is the half that matters: a baseline
+      # captured from a page that had not settled is rewritten happily here and fails on the next push.
       - name: Rewrite the Linux baselines
-        run: pnpm test:visual --update-snapshots ${{ inputs.grep && format('-g "{0}"', inputs.grep) || '' }} || true
+        run: pnpm test:visual --update-snapshots=all ${{ inputs.grep && format('-g "{0}"', inputs.grep) || '' }} || true
 
       - name: Show what moved
         run: |

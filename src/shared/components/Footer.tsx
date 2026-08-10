@@ -73,7 +73,7 @@ export function Footer() {
 
         <div className="pt-8 border-t border-bh-border/50 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-bh-text-dim">
           <p>© {new Date().getFullYear()} BuilderHunt. Built for builders, by builders.</p>
-          <p>Made with ☕ in Barcelona, Madrid &amp; remote.</p>
+          <p>Made with ☕ in Copenhagen, Malaga &amp; remote.</p>
         </div>
       </div>
     </footer>
