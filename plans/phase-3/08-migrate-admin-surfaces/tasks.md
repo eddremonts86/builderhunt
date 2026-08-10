@@ -44,7 +44,7 @@
     Rows here **are** tabular — every incident shows the same fields — which is what separates this
     one from the three audited below.
 
-- [ ] **Migrate integrations, metrics, and operations tables**
+- [x] **Migrate integrations, metrics, and operations tables**
   - Files: `src/modules/admin/integrations/IntegrationsPage.tsx`,
     `src/modules/admin/metrics/AdminMetricsPage.tsx`,
     `src/modules/admin/operations/OperationsPage.tsx`,
@@ -56,7 +56,63 @@
     Classify and bound each backing read before migration. Never recreate the retired plan-request queue.
   - Verify: platform-admin e2e covers sorting/filtering and existing actions for all three; read-path
     detector does not increase; `rg "plan-requests" src/routes` returns nothing.
-  - **Not started.** Added to this plan by a later revision, after the other six were migrated.
+  - **Done 2026-08-10, and two of the three named capabilities were never written — deliberately.**
+
+    **A table capability cannot describe these surfaces.** A capability declares sortable *database*
+    columns, a tiebreaker column and a keyset cursor. `/admin/integrations` builds its rows with
+    `SOURCE_NAMES.map(…)` and `Object.keys(AI_TASKS).map(…)`; `/admin/operations` reads a schedule
+    registry this repository's own audit calls "the registry is code-defined". There is no column to
+    sort in Postgres and no cursor to page through — the row set is a property of the codebase, and
+    each page already receives all of it.
+
+    So the shell is driven by `registryPage()` (`src/shared/lib/table/registry-page.ts`, 13 tests): a
+    `PageResult` over the complete in-memory set, with exact totals, exact facets, and `nextCursor`
+    always `null`. This is **not** a hole in principle 3. That principle's wrongness is the "50 of
+    214" — sorting 19 sources out of 19 gives the same answer Postgres would, because there is no
+    20th row. The moment one of these is backed by a growing table, `registryPage` is the wrong tool
+    and a capability is the right one.
+
+    **`/admin/metrics` has no real row collection, so nothing there was migrated.** This task's own
+    wording is what decides it: "migrate only real row collections … charts/cards remain semantic
+    charts/cards." Audited section by section:
+    - the conversion `<table>` is `METRIC_ORDER.map(…)` — a funnel comparison whose *order is its
+      meaning*. Adding a sort control to a funnel offers to destroy the thing it displays.
+    - `metrics-removal-aging` is four fixed buckets; `INTERVIEW_COUNTER_GROUPS` and
+      `CAPABILITY_LABELS` are code constants rendered as counters. Cards, not tables.
+    - `metrics-removal-by-source` is the only collection that grows with data, and it is a
+      **k-anonymity truncation**: `profile-removal.ts:198` says "the rest are folded into
+      `otherSourcesCount` so their existence is visible without their identity". Sorting or searching
+      a deliberately-unnamed top-N invites surfacing exactly what the truncation exists to prevent,
+      and it is a partial set with an "Other" bucket, which is the "50 of 214" case again.
+
+    So `platform-metrics.ts` is absent because there is nothing for it to describe, and
+    `platform-integrations.ts`/`platform-operations.ts` are absent because `registryPage` replaced
+    what they would have held.
+
+    **Four columns were deleted rather than migrated.** Quota, Last success, Last failure and
+    Indexed / backlog are typed `null` in `SourceRow` and rendered the literal "Not tracked" in every
+    cell — half the table's width repeating one non-fact nineteen times. Stated once below the table
+    now, the same correction already applied to `/admin/metrics`'s three hardcoded-`null` counts and
+    their "three permanent em-dashes".
+
+    **A total-order and a duplicate-predicate defect fixed on the way.** Operations sorted nothing
+    before; the derived `jobStatus()` now feeds sorting, filtering *and* the header's attention count,
+    which were three separate expressions of one rule. Integrations' filter shortcuts re-implemented
+    active/dormant/attention inline beside a `SourceBadge` deciding the same three things separately;
+    both read `sourceState()` now.
+
+    **Verified:** 10/10 `tests/e2e/admin-operations.spec.ts` (including two new tests for sorting and
+    filtering, the sort one asserting `aria-rowcount` is unchanged when the order changes — a sort
+    that dropped rows would still look sorted), 6/6 `tests/e2e/admin-integrations.spec.ts`, 8/8 and
+    9/9 in the two unit specs, `pnpm type-check` 0, `check:unbounded` still 0, and
+    `rg "plan-requests" src/routes` empty.
+
+    **One near-miss worth recording.** The first operations e2e run reported 8 passed — including two
+    tests scoped to `page.getByTestId('operations-table')`, an id the migration had just deleted. The
+    harness serves `dist/`, which was 2.5 hours stale. After `pnpm build` the same suite failed
+    exactly where it should have. An e2e green is evidence only if a build ran after the last edit.
+
+  - **Previously: not started.** Added to this plan by a later revision, after the other six were migrated.
 
     The edit form in the expansion slot needed a new shell capability: **expansion state a surface
     can own**. Opening a row here *is* editing that incident, so the page has to load it into its
