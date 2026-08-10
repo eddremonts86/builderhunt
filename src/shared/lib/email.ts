@@ -1,3 +1,8 @@
+import {
+  INVITATION_INTENT_EMAIL_LEAD,
+  normalizeInvitationIntent,
+  type InvitationPersonalization,
+} from './organizations/invitation-personalization'
 import { env } from '~/shared/lib/env'
 import { recordOutbox } from '~/shared/lib/email/outbox'
 import { SITE_URL } from '~/shared/lib/site-url'
@@ -53,12 +58,13 @@ export async function sendOrganizationInvitationEmail(
   to: string,
   organizationName: string,
   link: string,
+  personalization?: InvitationPersonalization,
 ): Promise<SendResult> {
   if (isE2EOutboxActive()) {
     return dispatchEmail({
       to,
       subject: `Invitation to join ${organizationName} on BuilderHunt`,
-      html: organizationInvitationEmailHtml(organizationName, link),
+      html: organizationInvitationEmailHtml(organizationName, link, personalization),
       devLink: link,
     })
   }
@@ -78,7 +84,7 @@ export async function sendOrganizationInvitationEmail(
         from: 'BuilderHunt <noreply@builderhunt.dev>',
         to,
         subject: `Invitation to join ${organizationName} on BuilderHunt`,
-        html: organizationInvitationEmailHtml(organizationName, link),
+        html: organizationInvitationEmailHtml(organizationName, link, personalization),
       }),
     })
     if (!res.ok) return { ok: false, error: `Resend request failed (${res.status})` }
@@ -351,20 +357,35 @@ function claimEmailHtml(link: string): string {
 </html>`
 }
 
-function organizationInvitationEmailHtml(organizationName: string, link: string): string {
-  const safeName = organizationName
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
+/**
+ * Subject, link, expiry and sign-in guidance are unchanged by plan 59 — only two lines are added.
+ *
+ * The intent sentence comes from `INVITATION_INTENT_EMAIL_LEAD`, the same map the recipient's review
+ * card reads, so the email and the card cannot describe different reasons for the same invitation. The
+ * role title is sender-typed free text and is escaped like the organization name; it is also phrased as
+ * *their* description rather than as a fact about the recipient, because nobody verified it.
+ */
+function organizationInvitationEmailHtml(
+  organizationName: string,
+  link: string,
+  personalization?: InvitationPersonalization,
+): string {
+  const safeName = escapeHtml(organizationName)
   const safeLink = link.replaceAll('&', '&amp;').replaceAll('"', '&quot;')
+  const intent = normalizeInvitationIntent(personalization?.intent)
+  const lead = escapeHtml(INVITATION_INTENT_EMAIL_LEAD[intent])
+  const roleTitle = personalization?.roleTitle
+  const roleLine = roleTitle
+    ? `<p style="color:#6b7280;">They described the role as &ldquo;${escapeHtml(roleTitle)}&rdquo;.</p>`
+    : ''
 
   return `<!doctype html>
 <html>
   <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
     <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Join ${safeName}</h1>
     <p>You have been invited to collaborate in BuilderHunt.</p>
+    <p>${lead}</p>
+    ${roleLine}
     <p style="margin:1.5rem 0;"><a href="${safeLink}" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review invitation</a></p>
     <p style="color:#6b7280;font-size:0.85rem;">This invitation expires in 7 days. Sign in with the invited email address to accept it.</p>
   </body>

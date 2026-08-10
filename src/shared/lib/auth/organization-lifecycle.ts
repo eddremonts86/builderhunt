@@ -1202,9 +1202,12 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         .where(and(eq(authSessions.activeOrganizationId, organizationId), inArray(authSessions.userId, userIds)))
     },
 
-    async sendInvitationEmail(email, organizationName, invitationId) {
+    async sendInvitationEmail(email, organizationName, invitationId, personalization) {
       const invitationUrl = new URL(`/team/invite/${encodeURIComponent(invitationId)}`, env.APP_URL).toString()
-      const result = await sendOrganizationInvitationEmail(email, organizationName, invitationUrl)
+      // Forwarded, not dropped. The parameter is optional on the contract so existing fake-deps keep
+      // compiling, and an optional parameter is exactly the shape a real implementation can silently
+      // ignore while the type checker stays quiet — so this line is the one that has to be right.
+      const result = await sendOrganizationInvitationEmail(email, organizationName, invitationUrl, personalization)
       if (!result.ok) throw new Error('Unable to deliver organization invitation')
       return { devLink: result.devLink }
     },
