@@ -133,6 +133,19 @@ export const organizationInvitations = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     inviterId: text('inviter_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    /**
+     * Why the sender is inviting this person, and the role title they typed (plan 59).
+     *
+     * Both nullable, and they stay nullable: every invitation created before this column existed has
+     * `NULL` here, and the read path normalizes that to the `other` intent rather than backfilling.
+     * A backfill would have to invent a sender's reason.
+     *
+     * No index. They are read only after locating an invitation by primary key, or inside a
+     * tenant-scoped query that is already indexed — so an index here would be a write cost with no
+     * reader.
+     */
+    invitationIntent: text('invitation_intent'),
+    roleTitle: text('invitee_role_title'),
   },
   (table) => [
     index('organization_invitations_email_idx').on(table.organizationId, table.email),

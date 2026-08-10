@@ -1156,6 +1156,13 @@
       "when": 1786352922624,
       "tag": "0164_reseed_solution_source_register",
       "breakpoints": true
+    },
+    {
+      "idx": 165,
+      "version": "7",
+      "when": 1786387803782,
+      "tag": "0165_invitation_personalization",
+      "breakpoints": true
     }
   ]
 }

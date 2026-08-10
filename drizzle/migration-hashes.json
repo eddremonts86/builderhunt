@@ -660,6 +660,10 @@
     "0164_reseed_solution_source_register": {
       "sql": "321f0d50a82c6715777b61a9c43f939e3d1a4cf8f08a7b1552bdb1d897909434",
       "snapshot": "18b3f6cbeed6be002d7cc28df16276bb1489a11c859895bcb7cc863ae4dead88"
+    },
+    "0165_invitation_personalization": {
+      "sql": "18a7f3401499b521dfeeb5a33f0f93ebbb8c024f0118111cd390a69f7f4ccd93",
+      "snapshot": "43d4910da737d290200da23f101e0246c7adb51c3d15dac35f1e2a11cac8cf4a"
     }
   }
 }
