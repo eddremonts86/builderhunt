@@ -46,7 +46,14 @@ cd "$(dirname "$0")/../.." || exit 1
 RUN_ID="local$(date +%s)"
 DB="builderhunt_security_test_${RUN_ID}"
 RESTORE_DB="${DB}_restore"
-PREVIEW_PORT="${CI_LOCAL_PREVIEW_PORT:-3210}"
+# 3260, not 3210. `edd-remonts-dashboard` runs its dev server on 3210, and this gate refusing to start
+# is the *correct* behaviour when the port is taken — the mistake is picking a default that collides
+# with a sibling project on the same machine. Twice I read "Port 3210 is in use" and killed the process
+# instead of the one thing the message actually asks for, taking that project's dev server down with it.
+#
+# Override with CI_LOCAL_PREVIEW_PORT if 3260 is busy too. Nothing else in the repository references
+# this port: the preview is started here and Lighthouse is pointed at it through APP_URL.
+PREVIEW_PORT="${CI_LOCAL_PREVIEW_PORT:-3260}"
 
 FAST=0
 START_AT=""
