@@ -232,25 +232,29 @@ test.describe('POST /api/organizations/invitations', () => {
     expect(row?.email).toBe(email)
   })
 
-  test('ignores an organizationId in the body rather than honouring it', async () => {
+  test('refuses an organizationId in the body rather than honouring it', async () => {
     /**
      * The property the route comment claims — "always comes from the caller's own session, never the request
      * body" — asserted rather than trusted. A route that honoured this field would let any authenticated user
      * mint a seat in any organization whose id they could obtain.
+     *
+     * **The refusal is stricter than it used to be, and deliberately so.** The schema was permissive, so an
+     * unknown key was silently stripped and the request succeeded against the caller's own organization. Plan
+     * 59 made the body `.strict()`: "client-supplied organization/inviter IDs … return the existing generic
+     * 400". Both behaviours are safe — neither writes to B — but a 400 tells a caller its field did nothing,
+     * where stripping let it believe otherwise.
      */
     const email = inviteeEmail('body-org')
     const response = await harness.a.principal.api!.post('/api/organizations/invitations', {
       data: { email, role: 'member', organizationId: harness.b.organization.organizationId },
     })
-    expect(response.status(), await response.text()).toBe(200)
-    const invitation = await response.json() as InvitationSummary
+    expect(response.status(), await response.text()).toBe(400)
 
-    const [row] = await harness.sql<{ organization_id: string }[]>`
-      select organization_id from organization_invitations where id = ${invitation.id}
+    // The part that matters either way: nothing was written, for **either** organization.
+    const rows = await harness.sql<{ organization_id: string }[]>`
+      select organization_id from organization_invitations where email = ${email}
     `
-    expect(row?.organization_id, 'the body must not choose the organization').toBe(
-      harness.a.organization.organizationId,
-    )
+    expect(rows, 'a refused body must create no invitation at all').toHaveLength(0)
   })
 
   test.describe('invalid bodies', () => {

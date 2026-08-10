@@ -719,14 +719,27 @@ test('an unverified user cannot accept an invitation', async ({ browser }) => {
   const context = await browser.newContext({ storageState: harness.unverified.storageState! })
   const page = await context.newPage()
   const guard = expectStrictBrowser(page)
-  // One expected 4xx: POST .../accept is denied (403, generic message).
+  // One expected 4xx: GET .../review is denied (403, generic message).
   guard.allowExpectedFailure(/Failed to load resource/)
   try {
     await gotoHydrated(page, url(`/team/invite/${invitationId}`))
     await dismissOverlays(page)
     await expect(page.getByTestId('invitation-page')).toBeVisible()
-    await page.getByTestId('invitation-accept-btn').click()
+
+    /**
+     * The refusal moved earlier, and that is the improvement.
+     *
+     * Before plan 59 the page rendered Accept immediately and the click was denied. It now fetches the
+     * review DTO first, and `resolveEligibleInvitation` refuses an unverified session with the same
+     * generic 403 that accept and reject answer with — so the control is never offered at all. The
+     * property under test is unchanged and asserted below; what changed is that the user is not invited
+     * to press a button that cannot work.
+     */
     await expect(page.getByTestId('invitation-error')).toContainText('no longer valid')
+    await expect(page.getByTestId('invitation-accept-btn')).toHaveCount(0)
+    await expect(page.getByTestId('invitation-decline-btn')).toHaveCount(0)
+    // And nothing about the organization leaked on the way — no name, no role, no card.
+    await expect(page.getByTestId('invitation-value-preview')).toHaveCount(0)
 
     // Denied means denied: no membership row appeared.
     const rows = await harness.sql<{ id: string }[]>`
@@ -776,8 +789,14 @@ test('a signed-out invitation link round-trips through sign-in back to the origi
     expect((await pageSession(page))?.email).toBe(harness.verified.email)
     await dismissOverlays(page)
     await expect(page.getByTestId('invitation-page')).toBeVisible()
+    // The control appears after the review fetch resolves (plan 59), so wait for it rather than for the
+    // page shell — clicking the shell's absence is how this would flake.
+    await expect(page.getByTestId('invitation-accept-btn')).toBeVisible()
     await page.getByTestId('invitation-accept-btn').click()
-    await page.waitForURL(/\/dashboard/)
+    // Either destination is a correct outcome: `/onboarding/search` when the organization switch
+    // succeeded, `/dashboard` when it did not. Asserting one would be asserting a race this test does
+    // not control.
+    await page.waitForURL(/\/(dashboard|onboarding\/search)/)
     await dismissOverlays(page)
 
     const rows = await harness.sql<{ role: string }[]>`
