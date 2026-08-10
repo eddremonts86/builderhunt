@@ -1,6 +1,12 @@
 import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
 import { createDatabaseSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
+import {
+  normalizeInvitationIntent,
+  normalizeRoleTitle,
+  type InvitationIntent,
+  type InvitationPersonalization,
+} from '../organizations/invitation-personalization'
 import type { OrganizationRole, TenantPrincipal } from '../authorization/permissions'
 import type { PlanStatus } from '../billing-shared'
 import type { EntitlementTier } from '../repositories/entitlements'
@@ -98,6 +104,15 @@ export interface InvitationRecord {
   status: 'pending' | 'accepted' | 'rejected' | 'canceled'
   expiresAt: Date
   inviterId: string
+  /**
+   * Why the sender is inviting this person, and the role title they typed (plan 59).
+   *
+   * `intent` is already normalized — a `NULL` column and an unknown value both arrive as `other`, so
+   * no consumer has to remember to normalize and no consumer can forget. `roleTitle` stays nullable,
+   * because "no title" is a real state the card renders differently rather than an empty string.
+   */
+  intent: InvitationIntent
+  roleTitle: string | null
 }
 
 export interface OrganizationRecord {
@@ -127,6 +142,9 @@ export interface LifecycleDependencies {
     email: string
     role: InvitableRole
     inviterId: string
+    /** Already normalized by the caller — the dependency persists it, it does not validate it. */
+    intent: InvitationIntent
+    roleTitle: string | null
   }): Promise<InvitationRecord>
   getInvitation(invitationId: string): Promise<InvitationRecord | null>
   /**
@@ -147,7 +165,16 @@ export interface LifecycleDependencies {
   cancelOrganizationDeletionRecord(organizationId: string): Promise<{ id: string } | null>
   clearActiveOrganizationForUsers(organizationId: string, userIds: string[]): Promise<void>
   /** `devLink` is set only when no real email provider is configured (dev mode) — the invite/resend UI shows it as a manual-share fallback, since no email is actually going out. */
-  sendInvitationEmail(email: string, organizationName: string, invitationId: string): Promise<{ devLink?: string }>
+  /**
+   * `personalization` is optional so every existing fake-deps unit test keeps compiling, and so an
+   * email implementation that has not learned about intent still receives a well-formed call.
+   */
+  sendInvitationEmail(
+    email: string,
+    organizationName: string,
+    invitationId: string,
+    personalization?: InvitationPersonalization,
+  ): Promise<{ devLink?: string }>
   rateLimit(scope: string, id: string, limit: number, windowSeconds: number): Promise<{ allowed: boolean }>
   audit: SecurityAuditSink
   now(): Date
@@ -314,14 +341,25 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
 
   async function inviteMember(
     request: Request,
-    input: { organizationId: string; email: string; role: InvitableRole },
-  ): Promise<InvitationRecord & { devLink?: string }> {
+    input: {
+      organizationId: string
+      email: string
+      role: InvitableRole
+      /** Omitted by a caller that predates plan 59; normalized to `other` / `null` here. */
+      intent?: InvitationIntent
+      roleTitle?: string | null
+    },
+  ): Promise<InvitationRecord & { devLink?: string; deduplicated: boolean }> {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, input.organizationId)
     requireElevated(membership)
     await requireRateLimit(deps, 'org-invite', `${session.userId}:${input.organizationId}`, 20, 60 * 60)
 
     const email = normalizeInvitationEmail(input.email)
+    // Normalized once, here, so the insert, the email and the audit entry cannot disagree about what
+    // was recorded. A caller that never learned the field lands on `other`, which is a real intent.
+    const intent = normalizeInvitationIntent(input.intent)
+    const roleTitle = normalizeRoleTitle(input.roleTitle) ?? null
     let invitation: InvitationRecord
     try {
       invitation = await deps.createInvitation({
@@ -330,6 +368,8 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
         email,
         role: input.role,
         inviterId: session.userId,
+        intent,
+        roleTitle,
       })
     } catch (error) {
       if (error instanceof SeatLimitExceededError) {
@@ -352,6 +392,11 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
        *
        * Deliberately **no second email**: the winning request already sent one, and the whole point of the index is
        * that the invitee receives one working link instead of four, at most one of which still resolves.
+       *
+       * And deliberately **no overwrite of the winner's personalization**. The loser's intent and role title are
+       * discarded, because the email that already went out describes the winner's context and rewriting the row
+       * would leave the recipient's card saying something the email they received did not. `deduplicated: true`
+       * is how the sender's UI knows to say so rather than reporting a newly sent invitation.
        */
       if (isPendingInvitationConflict(error)) {
         const existing = await deps.findPendingInvitation?.(input.organizationId, email)
@@ -366,13 +411,18 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
             requestId: requestIdFrom(request),
             details: { deduplicated: true },
           })
-          return existing
+          return { ...existing, deduplicated: true }
         }
       }
       throw error
     }
 
-    const { devLink } = await deps.sendInvitationEmail(invitation.email, invitation.organizationName, invitation.id)
+    const { devLink } = await deps.sendInvitationEmail(
+      invitation.email,
+      invitation.organizationName,
+      invitation.id,
+      { intent: invitation.intent, roleTitle: invitation.roleTitle },
+    )
     await audit(deps, {
       organizationId: input.organizationId,
       actorUserId: session.userId,
@@ -382,7 +432,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       result: 'allowed',
       requestId: requestIdFrom(request),
     })
-    return { ...invitation, devLink }
+    return { ...invitation, devLink, deduplicated: false }
   }
 
   async function resendInvitation(request: Request, invitationId: string): Promise<InvitationRecord & { devLink?: string }> {
@@ -411,6 +461,11 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
         email: invitation.email,
         role: invitation.role,
         inviterId: session.userId,
+        // Copied, not re-derived. A resend is the same invitation with a working link; the recipient
+        // would otherwise get a second email describing a different reason for the same request, and a
+        // legacy row with no context would silently acquire some on its first resend.
+        intent: invitation.intent,
+        roleTitle: invitation.roleTitle,
       })
     } catch (error) {
       if (error instanceof SeatLimitExceededError) {
@@ -427,7 +482,12 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       }
       throw error
     }
-    const { devLink } = await deps.sendInvitationEmail(fresh.email, fresh.organizationName, fresh.id)
+    const { devLink } = await deps.sendInvitationEmail(
+      fresh.email,
+      fresh.organizationName,
+      fresh.id,
+      { intent: fresh.intent, roleTitle: fresh.roleTitle },
+    )
     await audit(deps, {
       organizationId: invitation.organizationId,
       actorUserId: session.userId,
@@ -804,6 +864,10 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
           status: 'pending',
           expiresAt,
           inviterId: input.inviterId,
+          // Already normalized by `inviteMember`; the CHECK constraints in 0165 are the backstop for
+          // anything that reaches this table another way.
+          invitationIntent: input.intent,
+          roleTitle: input.roleTitle,
         })
 
         const [row] = await tx
@@ -823,6 +887,8 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         status: 'pending',
         expiresAt,
         inviterId: input.inviterId,
+        intent: input.intent,
+        roleTitle: input.roleTitle,
       }
     },
 
@@ -837,6 +903,8 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
           status: organizationInvitations.status,
           expiresAt: organizationInvitations.expiresAt,
           inviterId: organizationInvitations.inviterId,
+          invitationIntent: organizationInvitations.invitationIntent,
+          roleTitle: organizationInvitations.roleTitle,
         })
         .from(organizationInvitations)
         .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
@@ -852,6 +920,10 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         status: row.status as InvitationRecord['status'],
         expiresAt: row.expiresAt,
         inviterId: row.inviterId,
+        // Normalized at the boundary, so `NULL` on a pre-0165 row and an unrecognised value both become
+        // `other` once — and no consumer downstream has to remember to do it.
+        intent: normalizeInvitationIntent(row.invitationIntent),
+        roleTitle: row.roleTitle,
       }
     },
 
@@ -981,6 +1053,9 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         status: 'pending' as const,
         expiresAt: row.expiresAt,
         inviterId: row.inviterId,
+        // The winner's context, which is what the already-sent email describes.
+        intent: normalizeInvitationIntent(row.invitationIntent),
+        roleTitle: row.roleTitle,
       }
     },
 
@@ -1287,6 +1362,8 @@ export async function pageOrganizationInvitations(
           status: organizationInvitations.status,
           expiresAt: organizationInvitations.expiresAt,
           inviterId: organizationInvitations.inviterId,
+          invitationIntent: organizationInvitations.invitationIntent,
+          roleTitle: organizationInvitations.roleTitle,
         },
         mapRow: (row) => ({
           id: row.id as string,
@@ -1296,6 +1373,8 @@ export async function pageOrganizationInvitations(
           status: row.status as InvitationRecord['status'],
           expiresAt: row.expiresAt as Date,
           inviterId: row.inviterId as string,
+          intent: normalizeInvitationIntent(row.invitationIntent),
+          roleTitle: (row.roleTitle as string | null) ?? null,
         }),
       },
     ))
@@ -1329,6 +1408,8 @@ export async function listInvitationsForEmail(email: string): Promise<Invitation
       status: organizationInvitations.status,
       expiresAt: organizationInvitations.expiresAt,
       inviterId: organizationInvitations.inviterId,
+      invitationIntent: organizationInvitations.invitationIntent,
+      roleTitle: organizationInvitations.roleTitle,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
@@ -1347,6 +1428,8 @@ export async function listInvitationsForEmail(email: string): Promise<Invitation
       email: row.email,
       role: (row.role ?? 'member') as InvitableRole,
       status: row.status as InvitationRecord['status'],
+      intent: normalizeInvitationIntent(row.invitationIntent),
+      roleTitle: row.roleTitle,
       expiresAt: row.expiresAt,
       inviterId: row.inviterId,
     }))

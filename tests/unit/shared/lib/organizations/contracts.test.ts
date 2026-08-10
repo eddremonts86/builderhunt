@@ -23,6 +23,10 @@ describe('organization contracts', () => {
       status: 'pending',
       expiresAt: new Date('2026-08-01T00:00:00Z'),
       inviterId: 'user-a',
+      // Present on the record and deliberately absent from the DTO below — this test's whole point is
+      // that extra fields do not reach it, and personalization is now two more of them.
+      intent: 'hiring',
+      roleTitle: 'Staff Engineer',
     }
     const dto = toInvitationSummaryDto(record)
     expect(dto).toEqual({

@@ -35,6 +35,10 @@ function invitation(overrides: Partial<InvitationRecord> = {}): InvitationRecord
     status: 'pending',
     expiresAt: new Date('2026-07-29T12:00:00Z'),
     inviterId: 'user-a',
+    // `other` is the default rather than a per-test choice: it is what a pre-0165 row and a client
+    // that never sent an intent both normalize to, so it is the state most existing tests describe.
+    intent: 'other',
+    roleTitle: null,
     ...overrides,
   }
 }
@@ -188,9 +192,130 @@ describe('inviteMember', () => {
     expect(second.status).toBe('rejected')
     expect((second as PromiseRejectedResult).reason).toMatchObject({ status: 409 })
   })
+
+  describe('personalization (plan 59)', () => {
+    it('normalizes intent and role title once, before they reach the insert', async () => {
+      const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      await lifecycle.inviteMember(request, {
+        organizationId: 'org-1',
+        email: 'x@example.com',
+        role: 'member',
+        intent: 'hiring',
+        roleTitle: '  Staff Engineer  ',
+      })
+
+      expect(deps.createInvitation).toHaveBeenCalledWith(
+        expect.objectContaining({ intent: 'hiring', roleTitle: 'Staff Engineer' }),
+      )
+    })
+
+    it('defaults a caller that sends no personalization at all to other/null', async () => {
+      // Every route and test that predates plan 59 is this caller. `other` is a real intent with its
+      // own copy, so their invitations still render a complete card.
+      const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      await lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member' })
+
+      expect(deps.createInvitation).toHaveBeenCalledWith(
+        expect.objectContaining({ intent: 'other', roleTitle: null }),
+      )
+    })
+
+    it('reports deduplicated: false on a newly created invitation', async () => {
+      const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      const result = await lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member' })
+
+      expect(result.deduplicated).toBe(false)
+    })
+
+    it('returns the winner untouched on a duplicate race, with deduplicated: true and no second email', async () => {
+      // The loser's context is discarded on purpose: the email that already went out describes the
+      // winner's intent, and rewriting the row would leave the recipient's card saying something the
+      // email they received did not.
+      const conflict = Object.assign(new Error('duplicate key'), { code: '23505', constraint_name: 'organization_invitations_one_pending_unique' })
+      const winner = invitation({ intent: 'hiring', roleTitle: 'Staff Engineer' })
+      const deps = buildDeps({
+        findMembership: vi.fn().mockResolvedValue(membership('admin')),
+        createInvitation: vi.fn().mockRejectedValue(conflict),
+        findPendingInvitation: vi.fn().mockResolvedValue(winner),
+      })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      const result = await lifecycle.inviteMember(request, {
+        organizationId: 'org-1',
+        email: 'x@example.com',
+        role: 'member',
+        intent: 'investing',
+        roleTitle: 'Partner',
+      })
+
+      expect(result.deduplicated).toBe(true)
+      expect(result.intent).toBe('hiring')
+      expect(result.roleTitle).toBe('Staff Engineer')
+      expect(deps.sendInvitationEmail).not.toHaveBeenCalled()
+    })
+
+    it('passes the stored personalization to the email, not the request body', async () => {
+      // The email describes what was persisted. If a normalization ever diverges between the two, the
+      // recipient's email and their review card disagree — so the email reads from the record.
+      const stored = invitation({ intent: 'building', roleTitle: 'Maintainer' })
+      const deps = buildDeps({
+        findMembership: vi.fn().mockResolvedValue(membership('admin')),
+        createInvitation: vi.fn().mockResolvedValue(stored),
+      })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      await lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member', intent: 'hiring' })
+
+      expect(deps.sendInvitationEmail).toHaveBeenCalledWith(
+        stored.email,
+        stored.organizationName,
+        stored.id,
+        { intent: 'building', roleTitle: 'Maintainer' },
+      )
+    })
+  })
 })
 
 describe('resendInvitation', () => {
+  it('copies the personalization onto the fresh row', async () => {
+    // A resend is the same invitation with a working link. Re-deriving the context would send a second
+    // email describing a different reason for the same request, and a legacy row with no context would
+    // silently acquire some on its first resend.
+    const original = invitation({ intent: 'investing', roleTitle: 'Partner' })
+    const deps = buildDeps({
+      findMembership: vi.fn().mockResolvedValue(membership('admin')),
+      getInvitation: vi.fn().mockResolvedValue(original),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await lifecycle.resendInvitation(request, 'invite-1')
+
+    expect(deps.createInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ intent: 'investing', roleTitle: 'Partner' }),
+    )
+  })
+
+  it('keeps a legacy invitation with no personalization at other/null on resend', async () => {
+    const legacy = invitation({ intent: 'other', roleTitle: null })
+    const deps = buildDeps({
+      findMembership: vi.fn().mockResolvedValue(membership('admin')),
+      getInvitation: vi.fn().mockResolvedValue(legacy),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await lifecycle.resendInvitation(request, 'invite-1')
+
+    expect(deps.createInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ intent: 'other', roleTitle: null }),
+    )
+  })
+
   it('cancels the pending invitation and creates a fresh one', async () => {
     const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
     const lifecycle = createOrganizationLifecycle(deps)
