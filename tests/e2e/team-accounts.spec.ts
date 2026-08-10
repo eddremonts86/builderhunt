@@ -232,8 +232,23 @@ test.describe('team accounts release matrix', () => {
     const path = new URL(devLink).pathname
     await goto(pageB, path)
     await expect(pageB.getByTestId('invitation-page')).toBeVisible()
+
+    // Plan 59: the page now shows the value card before the buttons, and both Accept and Decline are
+    // present. The invitation came from the plain inline form with no intent, so it is the `other`
+    // experience — which is exactly the legacy path that has to keep working.
+    const preview = pageB.getByTestId('invitation-value-preview')
+    await expect(preview).toBeVisible()
+    await expect(preview).toHaveAttribute('data-intent', 'other')
+    await expect(pageB.getByTestId('invitation-preview-organization')).toContainText(teamName)
+    await expect(pageB.getByTestId('invitation-decline-btn')).toBeVisible()
+    // No role title was given, so that line must be absent rather than empty.
+    await expect(pageB.getByTestId('invitation-preview-role-title')).toHaveCount(0)
+
     await pageB.getByTestId('invitation-accept-btn').click()
-    await pageB.waitForURL(/\/dashboard/)
+    // Acceptance lands on the onboarding search with the intent's suggested query prefilled, not on
+    // `/dashboard` — `/dashboard` is now only the fallback for a failed organization switch.
+    await pageB.waitForURL(/\/onboarding\/search/)
+    await expect(pageB.getByTestId('onboarding-query-input')).toHaveValue('open source builders')
   })
 
   test('A sees B as a member and promotes them to admin', async () => {
@@ -262,6 +277,10 @@ test.describe('team accounts release matrix', () => {
     await expect(pageA.getByTestId('billing-settings-content')).toBeVisible()
     await expect(pageA.getByTestId('open-portal-button')).toBeVisible()
 
+    // B is on `/onboarding/search` after accepting (plan 59), and onboarding routes are outside the
+    // dashboard shell — so there is no organization switcher on the page yet. Go to the dashboard
+    // first, which is where a real new member would find it.
+    await goto(pageB, '/dashboard')
     await switchToOrg(pageB, teamName)
     await goto(pageB, '/settings/billing')
     await expect(pageB.getByTestId('billing-settings-content')).toBeVisible()
@@ -280,11 +299,15 @@ test.describe('team accounts release matrix', () => {
     const path = new URL(devLink).pathname
     await goto(pageB, path)
     await pageB.getByTestId('invitation-accept-btn').click()
-    await pageB.waitForURL(/\/dashboard/)
-    // Being removed (previous test) cleared B's active-org pointer
-    // (`clearActiveOrganizationForUsers`) and accepting an invitation adds
-    // the membership without activating it — switch explicitly, same as any
-    // real user would from the dashboard after accepting.
+    // Either destination is a correct outcome of one acceptance, which is the point of the branch:
+    // `/onboarding/search` when the organization switch succeeded, `/dashboard` when it did not. Being
+    // removed in the previous test cleared B's active-org pointer, so which one happens here depends on
+    // whether `setActiveOrganization` succeeds for a re-added member — and the test must not assert a
+    // guess about that.
+    await pageB.waitForURL(/\/(dashboard|onboarding\/search)/)
+    // Onboarding routes sit outside the dashboard shell and carry no organization switcher, so come
+    // back to the dashboard first — which is what a real user would do — then switch explicitly.
+    await goto(pageB, '/dashboard')
     await switchToOrg(pageB, teamName)
 
     await goto(pageA, '/settings/team')

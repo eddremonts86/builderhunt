@@ -174,6 +174,21 @@ export default defineConfig({
       // instead of switching it off to make fixtures pass.
       REDIS_URL: redisURL,
       E2E_RUN_ID: e2eRunId,
+      /**
+       * The per-device signup limit, raised for the harness only.
+       *
+       * `SIGNUP_DEVICE_DAILY_LIMIT` defaults to **3** and keys on a hash of the device cookie, the UA
+       * family and `BETTER_AUTH_SECRET` over a 24-hour window. `team-accounts.spec.ts` alone signs up
+       * three accounts from one machine by design, so a full run exhausts the budget and the *next*
+       * test to sign up fails with "Too many accounts created from this device recently" — a failure
+       * that looks like a broken sign-up flow and is a working abuse control doing its job.
+       *
+       * Raised rather than disabled: the gate stays in the request path, so a regression that breaks it
+       * still surfaces. And it is safe to pin here for the reason the comment above explains in the
+       * negative — dotenvx overrides only keys that exist in `.env`, and this one lives only as a
+       * default in `env.ts`.
+       */
+      SIGNUP_DEVICE_DAILY_LIMIT: '500',
     },
   },
 })
