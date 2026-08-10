@@ -253,6 +253,7 @@ import { Route as ApiAdminBillingReconcileRouteImport } from './routes/api/admin
 import { Route as ApiAdminBillingMetricsRouteImport } from './routes/api/admin/billing/metrics'
 import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/billing/disputes'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
+import { Route as ApiAdminBillingBetaModeRouteImport } from './routes/api/admin/billing/beta-mode'
 import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
 import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/admin/analytics/run-retention'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
@@ -1596,6 +1597,11 @@ const ApiAdminBillingConfigurationRoute =
     path: '/api/admin/billing/configuration',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminBillingBetaModeRoute = ApiAdminBillingBetaModeRouteImport.update({
+  id: '/api/admin/billing/beta-mode',
+  path: '/api/admin/billing/beta-mode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminBillingAccountingExportRoute =
   ApiAdminBillingAccountingExportRouteImport.update({
     id: '/api/admin/billing/accounting-export',
@@ -2010,6 +2016,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
+  '/api/admin/billing/beta-mode': typeof ApiAdminBillingBetaModeRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
@@ -2296,6 +2303,7 @@ export interface FileRoutesByTo {
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
+  '/api/admin/billing/beta-mode': typeof ApiAdminBillingBetaModeRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
@@ -2587,6 +2595,7 @@ export interface FileRoutesById {
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
+  '/api/admin/billing/beta-mode': typeof ApiAdminBillingBetaModeRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
@@ -2877,6 +2886,7 @@ export interface FileRouteTypes {
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
+    | '/api/admin/billing/beta-mode'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
     | '/api/admin/billing/metrics'
@@ -3163,6 +3173,7 @@ export interface FileRouteTypes {
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
+    | '/api/admin/billing/beta-mode'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
     | '/api/admin/billing/metrics'
@@ -3453,6 +3464,7 @@ export interface FileRouteTypes {
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
+    | '/api/admin/billing/beta-mode'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
     | '/api/admin/billing/metrics'
@@ -3682,6 +3694,7 @@ export interface RootRouteChildren {
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminAnalyticsRunRetentionRoute: typeof ApiAdminAnalyticsRunRetentionRoute
   ApiAdminBillingAccountingExportRoute: typeof ApiAdminBillingAccountingExportRoute
+  ApiAdminBillingBetaModeRoute: typeof ApiAdminBillingBetaModeRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
   ApiAdminBillingDisputesRoute: typeof ApiAdminBillingDisputesRoute
   ApiAdminBillingMetricsRoute: typeof ApiAdminBillingMetricsRoute
@@ -5492,6 +5505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBillingConfigurationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/beta-mode': {
+      id: '/api/admin/billing/beta-mode'
+      path: '/api/admin/billing/beta-mode'
+      fullPath: '/api/admin/billing/beta-mode'
+      preLoaderRoute: typeof ApiAdminBillingBetaModeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/accounting-export': {
       id: '/api/admin/billing/accounting-export'
       path: '/api/admin/billing/accounting-export'
@@ -6370,6 +6390,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminAnalyticsRunRetentionRoute: ApiAdminAnalyticsRunRetentionRoute,
   ApiAdminBillingAccountingExportRoute: ApiAdminBillingAccountingExportRoute,
+  ApiAdminBillingBetaModeRoute: ApiAdminBillingBetaModeRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
   ApiAdminBillingDisputesRoute: ApiAdminBillingDisputesRoute,
   ApiAdminBillingMetricsRoute: ApiAdminBillingMetricsRoute,

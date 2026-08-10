@@ -52,7 +52,7 @@
   - Verify: `pnpm vitest run tests/unit/shared/lib/billing/beta-mode.test.ts && pnpm type-check`
     passes after the initial missing-module red run, with zero failed tests and zero type errors.
 
-- [ ] **Publish a recent-authenticated, revision-safe platform-admin API**
+- [x] **Publish a recent-authenticated, revision-safe platform-admin API**
   - Files: `src/routes/api/admin/billing/beta-mode.ts`,
     `tests/unit/routes/api/admin/billing/beta-mode.test.ts`, and `src/routeTree.gen.ts` only through
     the normal TanStack generation/build flow.
@@ -121,7 +121,7 @@
 
 ## Phase 2 — Real beta credits and spend safety
 
-- [ ] **Derive and mint one concurrency-safe monthly beta grant**
+- [x] **Derive and mint one concurrency-safe monthly beta grant**
   - Files: `src/shared/lib/billing/beta-credits.ts`,
     `tests/unit/shared/lib/billing/beta-credits.test.ts`, and
     `src/shared/lib/billing/credits.ts` only if an injectable lock seam is required.
