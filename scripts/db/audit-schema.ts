@@ -363,6 +363,13 @@ const classifications: Classification[] = [
   // deliberately blunt so the gap cannot be mistaken for a decision).
   operational('access_requests', 'email (plaintext, platform-owned; no tenant scope)', ['waitlist-launch']),
 
+  // Beta mode (plan 58). One global row, `id = 'global'`, pinned by a CHECK alongside the primary key.
+  // It holds no tenant column and no personal data beyond the operator id that made the last change —
+  // so there is no predicate an RLS policy could express, and access is controlled entirely by GRANT:
+  // SELECT for app/readonly/worker, SELECT+INSERT+UPDATE for platform, DELETE for nobody. Same
+  // RLS-exception rationale as `status_checks` and `access_requests` above.
+  operational('platform_beta_mode', 'updated_by (platform operator id, no FK so history survives account deletion)', ['beta-mode-global-pro-max-grant']),
+
   operational('profile_removal_requests', 'source + source_id (hashed challenge, no PII)', ['audit-trust']),
   operational('profile_suppressions', 'source + source_id (revoked/active, audited admin action)', ['audit-trust']),
 
