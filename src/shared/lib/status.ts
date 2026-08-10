@@ -91,15 +91,44 @@ export function computeUptime(
   days: number,
   intervalMinutes = 5,
 ): number | null {
-  const oneDayMs = 24 * 60 * 60 * 1000
   if (checks.length === 0) return null
-  const oldest = checks.reduce((min, c) => (c.checkedAt < min ? c.checkedAt : min), checks[0].checkedAt)
-  const spanMs = Date.now() - oldest.getTime()
-  if (spanMs < oneDayMs) return null
+  return computeUptimeFromAggregate(
+    {
+      oldest: checks.reduce((min, c) => (c.checkedAt < min ? c.checkedAt : min), checks[0].checkedAt),
+      okSamples: checks.filter((c) => c.ok).length,
+    },
+    days,
+    intervalMinutes,
+  )
+}
+
+/**
+ * The same calculation from two aggregates instead of from every row.
+ *
+ * `computeUptime` only ever reduced its array to these two numbers — a minimum and a count of `ok` —
+ * and the array itself was a real cost: `/api/status` is public and unauthenticated, the window is 30
+ * days, and the cron samples every 5 minutes, so the route was loading up to
+ * `30 × 24 × 60 / 5 = 8640` rows on **every request** to produce two integers.
+ *
+ * It could not simply be capped, either. `expectedSamples` is the denominator, so a `LIMIT 1000` would
+ * have returned `1000 / 8640 ≈ 11.6%` and published a catastrophic outage on the status page of a
+ * healthy service. A ceiling here is not lossy, it is wrong — which is what makes SQL aggregation the
+ * only correct bound.
+ *
+ * `oldest` stays part of the contract because the under-a-day rule depends on it: a percentage drawn
+ * from a handful of samples is misleading, and the status page hides the figure entirely in that case.
+ */
+export function computeUptimeFromAggregate(
+  aggregate: { oldest: Date | null; okSamples: number },
+  days: number,
+  intervalMinutes = 5,
+): number | null {
+  const oneDayMs = 24 * 60 * 60 * 1000
+  if (!aggregate.oldest) return null
+  if (Date.now() - aggregate.oldest.getTime() < oneDayMs) return null
 
   const expectedSamples = Math.round((days * 24 * 60) / intervalMinutes)
-  const okSamples = checks.filter((c) => c.ok).length
-  return Math.min(100, (okSamples / expectedSamples) * 100)
+  return Math.min(100, (aggregate.okSamples / expectedSamples) * 100)
 }
 
 export type ComponentStatus = 'operational' | 'degraded' | 'outage'

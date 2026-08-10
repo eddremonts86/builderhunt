@@ -112,6 +112,10 @@ export async function pageSprints(
     .from(sprintResults)
     .where(inArray(sprintResults.sprintId, result.rows.map((row) => row.id)))
     .groupBy(sprintResults.sprintId)
+    // Model-bounded by the page above: grouped by sprint id, so one row per sprint on this page at
+    // most. This is the read the text-matching detector missed — the keyset page beside it is
+    // bounded, and a `.limit(` anywhere in the body used to count for the whole function.
+    .limit(result.rows.length)
   const bySprint = new Map(counts.map((row) => [row.sprintId, row.value]))
 
   return {

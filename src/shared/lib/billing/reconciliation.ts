@@ -135,6 +135,9 @@ async function collectInternalRefunds(organizationIds: string[], worker?: RunRec
   const results: Array<InternalRecord & { state: string; amountCents: number }> = []
   for (const organizationId of organizationIds) {
     await withWorkerOrganization(organizationId, async (transaction) => {
+      // unbounded-read-ok: reconciliation compares this set against Stripe's, so a missing row is not
+      // a shorter list — it is a refund reported as existing only at the provider, which is a
+      // discrepancy this job would then raise against itself. Per organization, per run.
       const rows = await transaction
         .select({ stripeRefundId: billingRefunds.stripeRefundId, state: billingRefunds.state, amountCents: billingRefunds.amountCents })
         .from(billingRefunds)
@@ -151,6 +154,8 @@ async function collectInternalPaymentIntents(organizationIds: string[], worker?:
   const results: InternalRecord[] = []
   for (const organizationId of organizationIds) {
     await withWorkerOrganization(organizationId, async (transaction) => {
+      // unbounded-read-ok: same reason as the refunds above — an omitted payment intent becomes a
+      // false "present at Stripe, absent internally" finding.
       const rows = await transaction
         .select({ stripePaymentIntentId: billingCreditGrants.stripePaymentIntentId })
         .from(billingCreditGrants)

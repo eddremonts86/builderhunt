@@ -1148,6 +1148,9 @@ export async function pageOrganizationMembers(
     .select({ id: authUsers.id, name: authUsers.name, email: authUsers.email })
     .from(authUsers)
     .where(inArray(authUsers.id, result.rows.map((row) => row.userId)))
+    // Model-bounded by the page above: `authUsers.id` is the primary key, so at most one row per
+    // member on this page.
+    .limit(result.rows.length)
   const byId = new Map(identities.map((identity) => [identity.id, identity]))
 
   return {

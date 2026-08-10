@@ -29,10 +29,11 @@
  * microformat this was expected to use, matched **zero** of them, so it is accepted as a stronger variant
  * where present and never required.
  */
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm'
 import { resolveTxt } from 'node:dns/promises'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '~/shared/lib/db/client'
+import { ENTITY_DETAIL_LIMIT } from '~/shared/lib/db/read-bounds'
 import { workerDb } from '~/shared/lib/db/worker-db'
 import { builderIdentities, identityDeclaredLinks } from '~/shared/lib/db/schema'
 import { ENRICHMENT_DEFAULT_USER_AGENT, SafeFetchError, safeFetch } from '~/lib/enrichment/network'
@@ -152,6 +153,36 @@ async function loadPendingWebsiteDeclarations(
   db: PostgresJsDatabase,
   domainLimit: number,
 ): Promise<Map<string, Claimant[]>> {
+  const pending = and(
+    eq(identityDeclaredLinks.linkKind, 'website'),
+    eq(identityDeclaredLinks.verificationState, 'declared'),
+    eq(builderIdentities.kind, 'person'),
+  )
+
+  // Choose the domains first, in SQL.
+  //
+  // `domainLimit` was always the real bound — the run only ever checks that many domains — but it was
+  // applied to a JavaScript array *after* every pending declaration in the table had been loaded,
+  // grouped into a Map and sorted. So the read grew with the whole verification backlog while the work
+  // stayed constant, and the ranking rule ("domains claimed by more than one account first") is one
+  // `count(*) DESC` away from being the database's job.
+  //
+  // `normalizedValue` breaks ties so the choice is deterministic across runs — with `count(*)` alone,
+  // two domains claimed once each swap places between runs and the cursor-less worker re-checks one it
+  // already did while never reaching the other.
+  const domains = await db
+    .select({ normalizedValue: identityDeclaredLinks.normalizedValue, claimants: count() })
+    .from(identityDeclaredLinks)
+    .innerJoin(builderIdentities, eq(builderIdentities.id, identityDeclaredLinks.builderIdentityId))
+    .where(pending)
+    .groupBy(identityDeclaredLinks.normalizedValue)
+    .orderBy(desc(count()), asc(identityDeclaredLinks.normalizedValue))
+    .limit(domainLimit)
+
+  if (domains.length === 0) return new Map()
+  const chosen = domains.map((row) => row.normalizedValue)
+
+  // Then the claimants, for those domains only.
   const rows = await db
     .select({
       declaredLinkId: identityDeclaredLinks.id,
@@ -163,33 +194,25 @@ async function loadPendingWebsiteDeclarations(
     })
     .from(identityDeclaredLinks)
     .innerJoin(builderIdentities, eq(builderIdentities.id, identityDeclaredLinks.builderIdentityId))
-    .where(and(
-      eq(identityDeclaredLinks.linkKind, 'website'),
-      eq(identityDeclaredLinks.verificationState, 'declared'),
-      eq(builderIdentities.kind, 'person'),
-    ))
+    .where(and(pending, inArray(identityDeclaredLinks.normalizedValue, chosen)))
     .orderBy(identityDeclaredLinks.normalizedValue, identityDeclaredLinks.firstSeenAt)
+    // The claimants of `domainLimit` domains. `ENTITY_DETAIL_LIMIT` per domain is the same ceiling a
+    // per-entity list gets everywhere else: a domain claimed by more accounts than that is evidence to
+    // investigate, not a set to page through.
+    .limit(domainLimit * ENTITY_DETAIL_LIMIT)
 
-  const byDomain = new Map<string, Claimant[]>()
+  // Insertion order follows `chosen`, so the caller still sees the most-claimed domains first.
+  const byDomain = new Map<string, Claimant[]>(chosen.map((domain) => [domain, []]))
   for (const row of rows) {
-    const list = byDomain.get(row.normalizedValue) ?? []
-    list.push({
+    byDomain.get(row.normalizedValue)?.push({
       declaredLinkId: row.declaredLinkId,
       builderIdentityId: row.builderIdentityId,
       source: row.source,
       username: row.username,
       profileUrl: row.profileUrl,
     })
-    byDomain.set(row.normalizedValue, list)
   }
-
-  // Domains claimed by more than one account first: those are the ones that can unify accounts, which is the
-  // whole point, and a bounded run should spend its requests where they pay.
-  return new Map(
-    [...byDomain.entries()]
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, domainLimit),
-  )
+  return byDomain
 }
 
 type DomainOutcome =

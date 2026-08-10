@@ -10,6 +10,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
 import type { TenantTransaction } from '~/shared/lib/db/client'
+import { USER_SCOPED_LIMIT } from '~/shared/lib/db/read-bounds'
 import { builders, onboardingProgress, onboardingSelectedBuilders, savedQueries } from '~/shared/lib/db/schema'
 
 export interface OnboardingStatus {
@@ -56,6 +57,9 @@ export async function getOnboardingStatus(
       eq(onboardingSelectedBuilders.userId, userId),
       eq(onboardingSelectedBuilders.organizationId, organizationId),
     ))
+    // The builders one person picked during onboarding — a per-user set that grows only by a
+    // deliberate choice in a flow that runs once.
+    .limit(USER_SCOPED_LIMIT)
 
   return {
     step: row.step,

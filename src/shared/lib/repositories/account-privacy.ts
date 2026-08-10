@@ -255,6 +255,11 @@ export async function listOwnedOrganizationsWithOtherMembers(userId: string) {
   // read through authDb, which has unrestricted access via the auth-broker
   // policy, not accountDb (which would silently return zero rows and let
   // the ownership guard wrongly conclude the user owns nothing).
+  // unbounded-read-ok: this is the guard that *blocks* account deletion, so a truncated result does
+  // not shorten a list — it drops a blocking organization and lets the deletion proceed. The failure
+  // is in the permissive direction, which is the one that cannot be allowed to happen quietly. The
+  // comment above already records the RLS variant of exactly this mistake: read through the wrong
+  // connection and the guard "wrongly conclude[s] the user owns nothing".
   return authDb
     .selectDistinct({
       organizationId: organizationMembers.organizationId,

@@ -337,10 +337,21 @@ export async function expireStaleInvites(db: any, now: Date = new Date()): Promi
 /** Admin queue, newest request first. */
 export async function listAccessRequests(db: any, status?: AccessRequestStatus): Promise<AccessRequestRow[]> {
   // The operator's allowlist queue, newest first.
-  const query = db.select().from(accessRequests)
+  //
+  // Written as one chain per branch rather than as a shared `const query = db.select().from(...)`
+  // that each branch finishes. Both shapes are bounded, but only this one is *visibly* bounded: the
+  // read-path detector associates a bound with the call chain it appears in, and a chain split across
+  // statements is the blind spot it cannot follow (see scripts/lib/unbounded-reads.mjs). This read was
+  // reported as unbounded while carrying `OPERATOR_LIST_LIMIT` on both branches — a false positive
+  // then, and indistinguishable from a real one at review time.
   const rows = status
-    ? await query.where(eq(accessRequests.status, status)).orderBy(sql`${accessRequests.requestedAt} desc`).limit(OPERATOR_LIST_LIMIT)
-    : await query.orderBy(sql`${accessRequests.requestedAt} desc`).limit(OPERATOR_LIST_LIMIT)
+    ? await db.select().from(accessRequests)
+      .where(eq(accessRequests.status, status))
+      .orderBy(sql`${accessRequests.requestedAt} desc`)
+      .limit(OPERATOR_LIST_LIMIT)
+    : await db.select().from(accessRequests)
+      .orderBy(sql`${accessRequests.requestedAt} desc`)
+      .limit(OPERATOR_LIST_LIMIT)
   return rows as AccessRequestRow[]
 }
 
