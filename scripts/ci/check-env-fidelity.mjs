@@ -19,7 +19,7 @@
 //
 // It does nothing on CI, where there is no `.env` to diverge from.
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -41,7 +41,6 @@ const CI_RUNS_WITHOUT = {
   REDDIT_CLIENT_ID: 'connector credential; e2e uses the egress fake, never the real API',
   REDDIT_CLIENT_SECRET: 'connector credential; e2e uses the egress fake, never the real API',
   STACKOVERFLOW_API_KEY: 'connector credential; e2e uses the egress fake, never the real API',
-  DEEPGRAM_API_KEY: 'transcription vendor; no spec asserts a real transcription',
   RESEND_API_KEY: 'email vendor; delivery is asserted through tests/e2e/harness/fakes/email.ts',
   MISTRAL_API_KEY: 'sensitive-AI vendor; SENSITIVE_AI_ENABLED is off in CI',
   MISTRAL_BASE_URL: 'sensitive-AI vendor; SENSITIVE_AI_ENABLED is off in CI',
@@ -65,7 +64,6 @@ const CI_RUNS_WITHOUT = {
   // ── Supplied by other means in CI ───────────────────────────────────────────────────────────
   REDIS_URL: 'playwright.config.ts defaults it to the redis service on 6379',
   NODE_ENV: 'set by the tooling that runs each step, not by the job',
-  ADMIN_USER_IDS: 'exported into $GITHUB_ENV after seeding, from the row seed-admin.ts just wrote — the id is random per run so it cannot be a literal',
 
   // ── Tuning with defaults that CI has no reason to override ──────────────────────────────────
   AI_DISABLED_TASKS: 'defaulted to empty',
@@ -91,12 +89,25 @@ const DIVERGENCE_ACCEPTED = {
   SENSITIVE_AI_ENABLED: 'needs a real EU Azure/Mistral deployment, which env.ts validates by region',
 }
 
+/**
+ * Keys a workflow step writes into `$GITHUB_ENV`, which are as present as any `env:` entry.
+ *
+ * Three of them are minted per run rather than written down — the Stripe pair and the webhook
+ * encryption key — because `env.ts` validates their shape and a placeholder carrying that shape is
+ * indistinguishable from a leak to a secret scanner. Reading only the `env:` block would report them
+ * missing and be wrong.
+ */
+function keysSetAtRuntime(source) {
+  return new Set([...source.matchAll(/^\s*echo "([A-Z_][A-Z0-9_]*)=/gm)].map((m) => m[1]))
+}
+
 /** The quality job's `env:` block — six-space keys between `quality:` and its `steps:`. */
 function workflowEnvKeys() {
   const source = readFileSync(join(root, '.github/workflows/quality.yml'), 'utf8')
   const job = /^ {2}quality:$([\s\S]*?)^ {4}steps:$/m.exec(source)
   if (!job) throw new Error('Could not find the quality job\'s env block in .github/workflows/quality.yml')
-  return new Set([...job[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((m) => m[1]))
+  const declared = [...job[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((m) => m[1])
+  return new Set([...declared, ...keysSetAtRuntime(source)])
 }
 
 /**
@@ -107,6 +118,33 @@ function workflowEnvKeys() {
  * STRIPE_BILLING_ENABLED on cost a run for exactly that: three more keys became required, one of
  * them exempted here as "defaulted in env.ts", which it is only while billing is off.
  */
+/**
+ * Flags the *specs* switch on, which the workflow never mentions.
+ *
+ * `startInterviewHarness` writes its `flags` into the runner's `process.env`, so a spec can enable a
+ * feature the job env says nothing about — and `env.ts` then demands that feature's dependencies at
+ * the moment the worker server boots. Reading only the workflow's own flags misses this entirely,
+ * which is how one absent DEEPGRAM_API_KEY took down 26 specs across two shards: the first
+ * interview spec set INTERVIEW_TRANSCRIPTION_ENABLED, its harness threw before teardown could put
+ * the value back, and every spec after it inherited a flag whose dependency was missing.
+ */
+function flagsSpecsEnable() {
+  const enabled = new Set()
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name.endsWith('.ts')) {
+        for (const m of readFileSync(full, 'utf8').matchAll(/flags:\s*\{([^}]*)\}/g)) {
+          for (const f of m[1].matchAll(/([A-Z_][A-Z0-9_]*)\s*:\s*'true'/g)) enabled.add(f[1])
+        }
+      }
+    }
+  }
+  walk(join(root, 'tests/e2e'))
+  return enabled
+}
+
 function conditionalRequirements() {
   const source = readFileSync(join(root, 'src/shared/lib/env.ts'), 'utf8')
   const required = new Map()
@@ -198,9 +236,16 @@ const workflowValues = (() => {
 })()
 
 const unmetConditions = []
+const specFlags = flagsSpecsEnable()
 for (const [flag, keys] of conditional) {
-  if (workflowValues.get(flag) !== 'true') continue
-  for (const key of keys) if (!workflow.has(key)) unmetConditions.push(`${flag}=true requires ${key}`)
+  if (workflowValues.get(flag) !== 'true' && !specFlags.has(flag)) continue
+  for (const key of keys) {
+    // A key with a declared default cannot make the app fail to *parse* for being absent — only for
+    // holding a wrong value, and the default is the app's own answer to that. DEEPGRAM_BASE_URL is
+    // named in one of these branches and defaults to the endpoint the branch demands.
+    if (defaults.has(key)) continue
+    if (!workflow.has(key)) unmetConditions.push(`${flag}=true requires ${key}`)
+  }
 }
 
 const gaps = [...local].filter((key) => used.has(key) && !workflow.has(key) && !(key in CI_RUNS_WITHOUT)).sort()

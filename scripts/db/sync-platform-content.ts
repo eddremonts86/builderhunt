@@ -41,7 +41,7 @@ import {
   serializeRoadmapItem,
   type ChangelogSourceEntry,
   type RoadmapSourceItem,
-} from '../../src/shared/lib/platform-content-source.ts'
+} from '../lib/platform-content-source.ts'
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const PRUNE = process.argv.includes('--prune')

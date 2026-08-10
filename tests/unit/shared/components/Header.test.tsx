@@ -12,13 +12,14 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createRouter, createRootRoute, createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { Header } from '~/shared/components/Header'
 
+// `signOut` only — the header takes `isAuthed` as a prop now, so there is no session hook left to
+// mock. It used to read `useSession()` itself, which is what made the server render the signed-out
+// tree for a signed-in visitor and hydration disagree with it (see `_landing/route.tsx`).
 const mocks = vi.hoisted(() => ({
-  useSession: vi.fn(),
   signOut: vi.fn(),
 }))
 
 vi.mock('~/shared/lib/auth/client', () => ({
-  useSession: mocks.useSession,
   signOut: mocks.signOut,
 }))
 
@@ -44,8 +45,7 @@ afterEach(() => {
 })
 
 async function render(path = '/', authed = false) {
-  mocks.useSession.mockReturnValue(authed ? { data: { user: { id: 'u1' } } } : { data: null })
-  const rootRoute = createRootRoute({ component: () => <Header /> })
+  const rootRoute = createRootRoute({ component: () => <Header isAuthed={authed} /> })
   const router = createRouter({ routeTree: rootRoute, history: createMemoryHistory({ initialEntries: [path] }) })
   container = document.createElement('div')
   document.body.appendChild(container)

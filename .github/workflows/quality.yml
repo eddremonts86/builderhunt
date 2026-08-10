@@ -11,9 +11,14 @@ name: Quality
 # copy of this file — `scripts/ci/check-env-fidelity.mjs` and `scripts/ci/check-step-parity.mjs` are
 # what keep it one, and both run first, locally, before anything expensive.
 on:
+  # Public repo: Actions minutes are unmetered, so the trigger is about coverage again rather than
+  # cost. It fired on master alone while this was private and every run was billed — which left a
+  # feature branch guarded by the pre-push hook and nothing else. Pull requests are checked before
+  # they merge now, which is the point of requiring them.
+  pull_request:
   push:
-    branches: [master]
-    # A commit that only moves prose costs the same 80-odd runner minutes as one that moves code.
+    branches: [master, dev]
+    # Prose still does not need a run. This is about noise, not money.
     # Nothing under these paths is imported by the app or asserted on by a spec — the checks that do
     # read them (`check:table-surfaces`, the route-graph gates) read source, not documentation.
     paths-ignore:
@@ -138,14 +143,16 @@ jobs:
       # string; the routes only compare it against the caller's header.
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
 
-      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
-      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
-      # rather than the assertion — this is 0123456789abcdef four times over.
-      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      # Required the moment a spec turns INTERVIEW_TRANSCRIPTION_ENABLED on, which several do through
+      # `startInterviewHarness`'s flags — and then env.ts refuses to parse and the worker server never
+      # boots. One missing key took down 26 specs across two shards: the first interview spec set the
+      # flag, its harness threw before teardown could restore it, and every spec after it inherited a
+      # flag whose dependency was absent.
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
       # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
       # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
       # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a
@@ -185,16 +192,6 @@ jobs:
       # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
       # going to exist.
       STRIPE_BILLING_ENABLED: 'true'
-      # Turning billing on makes env.ts require these three. Prefix-validated, so a bare
-      # placeholder fails validation rather than a test. The suite drives the fake provider and
-      # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
-      # well-formed and consistent — the real test-mode keys live in the sandbox job.
-      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
-      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
-      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
-      # or three suites will point a key that authenticates nothing at the real Stripe API.
-      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
-      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
 
       # Where the documents suite puts candidate uploads and what scans them. The containers are
@@ -214,6 +211,20 @@ jobs:
       INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
@@ -251,6 +262,7 @@ jobs:
         run: pg_dump --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:migration-integrity
+      - run: pnpm test:deploy-imports
       - run: pnpm exec drizzle-kit check
       - run: pnpm test:migrations:local
       - run: node scripts/db/prepare-rls-fixture.mjs
@@ -525,10 +537,6 @@ jobs:
       # string; the routes only compare it against the caller's header.
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
 
-      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
-      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
-      # rather than the assertion — this is 0123456789abcdef four times over.
-      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
@@ -572,16 +580,6 @@ jobs:
       # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
       # going to exist.
       STRIPE_BILLING_ENABLED: 'true'
-      # Turning billing on makes env.ts require these three. Prefix-validated, so a bare
-      # placeholder fails validation rather than a test. The suite drives the fake provider and
-      # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
-      # well-formed and consistent — the real test-mode keys live in the sandbox job.
-      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
-      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
-      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
-      # or three suites will point a key that authenticates nothing at the real Stripe API.
-      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
-      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
 
       # Where the documents suite puts candidate uploads and what scans them. The containers are
@@ -601,6 +599,20 @@ jobs:
       INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
@@ -657,6 +669,7 @@ jobs:
             [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
             sleep 2
           done
+
           echo "minio and clamav ready"
 
       # ~150 MB per install, and the version only moves when the lockfile does — one download per
@@ -792,14 +805,11 @@ jobs:
       # string; the routes only compare it against the caller's header.
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
 
-      # Encrypts stored webhook payloads (billing operations, stripe webhooks, worker replay).
-      # `env.ts` enforces exactly 64 hex characters, so a shorter placeholder fails validation
-      # rather than the assertion — this is 0123456789abcdef four times over.
-      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
       # `run-enrichment.ts` answers 503 `ai_unconfigured` when either of these is missing, which is
       # what the AI, work-sample and portfolio specs were actually asserting against.
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
       # Present, not reachable. `embed.ts` guards on these being *set* before it will do anything,
       # and `embeddings.ts` swaps in the E2E stub before any HTTP call whenever a spec sets
       # E2E_EMBEDDINGS_SCENARIO — which is why its own docblock says it has "no dependency on a
@@ -839,16 +849,6 @@ jobs:
       # unless billing is on — `billing-journeys.spec.ts` waited 20s for content that was never
       # going to exist.
       STRIPE_BILLING_ENABLED: 'true'
-      # Turning billing on makes env.ts require these three. Prefix-validated, so a bare
-      # placeholder fails validation rather than a test. The suite drives the fake provider and
-      # signs its own webhooks with STRIPE_WEBHOOK_SECRET, so the values only have to be
-      # well-formed and consistent — the real test-mode keys live in the sandbox job.
-      # Carries the sk_test_ prefix because env.ts validates it, which means it also satisfies the
-      # `hasRealTestKey` half of the certification suites' `shouldRun`. The only thing keeping them
-      # skipped in this job is that RUN_STRIPE_INTEGRATION_TESTS is not set here — do not set it,
-      # or three suites will point a key that authenticates nothing at the real Stripe API.
-      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
-      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
 
       # Where the documents suite puts candidate uploads and what scans them. The containers are
@@ -868,6 +868,20 @@ jobs:
       INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
@@ -883,7 +897,7 @@ jobs:
       - run: node scripts/db/prepare-rls-fixture.mjs
 
       # Same containers as the single-job version, for the same six documents specs.
-      - name: Object store and virus scanner
+      - name: Object store, virus scanner and embeddings
         run: |
           set -euo pipefail
           docker run -d --name minio -p 9000:9000 \
@@ -904,6 +918,20 @@ jobs:
             [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
             sleep 2
           done
+
+          # Embeddings. Same image and model as docker-compose's `embeddings` service, started the
+          # same way — `ollama serve` in the background, then pull the model it will be asked for.
+          # Without it the semantic-search specs had to be excluded with `--grep-invert`, which left a
+          # whole retrieval path — semantic ranking, cursor invalidation — running only on a
+          # developer's laptop.
+          docker run -d --name ollama -p 11434:11434 --entrypoint /bin/sh ollama/ollama:latest \
+            -c 'ollama serve & pid=$!; sleep 3; ollama pull nomic-embed-text; wait $pid'
+          for i in $(seq 1 90); do
+            curl -sf http://127.0.0.1:11434/api/tags 2>/dev/null | grep -q nomic-embed-text && break
+            [ "$i" = 90 ] && { echo "ollama never served nomic-embed-text"; docker logs ollama | tail -20; exit 1; }
+            sleep 2
+          done
+          echo "ollama ready with nomic-embed-text"
 
       # ~150 MB per install, and the version only moves when the lockfile does — one download per
       # Playwright bump instead of one per shard per push.
@@ -938,7 +966,7 @@ jobs:
         # correctly degrades to keyword-fallback without one. Excluding it is
         # honest; weakening the assertion so it passes here would not be. See the
         # note above that test.
-        run: pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings" --shard=${{ matrix.shard }}/4
+        run: pnpm test:e2e --workers=1 --shard=${{ matrix.shard }}/4
       - name: Upload the Playwright report when a shard fails
         if: failure()
         uses: actions/upload-artifact@v4

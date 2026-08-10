@@ -72,8 +72,13 @@ jobs:
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
       CALENDAR_ENABLED: 'true'
       CRON_SECRET: ci-only-cron-secret-not-a-real-one
-      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       MINIMAX_API_KEY: ci-only-not-a-real-key
+      # Required the moment a spec turns INTERVIEW_TRANSCRIPTION_ENABLED on, which several do through
+      # `startInterviewHarness`'s flags — and then env.ts refuses to parse and the worker server never
+      # boots. One missing key took down 26 specs across two shards: the first interview spec set the
+      # flag, its harness threw before teardown could restore it, and every spec after it inherited a
+      # flag whose dependency was absent.
+      DEEPGRAM_API_KEY: ci-only-not-a-real-key
       GITHUB_TOKEN: ci-only-not-a-real-token
       AI_EMBEDDING_URL: http://localhost:11434/v1/embeddings
       AI_EMBEDDING_MODEL: nomic-embed-text
@@ -88,8 +93,6 @@ jobs:
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       STRIPE_BILLING_ENABLED: 'true'
-      STRIPE_SECRET_KEY: sk_test_ci_only_not_a_real_key
-      STRIPE_WEBHOOK_SECRET: whsec_ci_only_not_a_real_secret
       STRIPE_API_VERSION: 2026-06-24.dahlia
       INTERVIEW_R2_ACCOUNT_ID: minio
       INTERVIEW_R2_ENDPOINT: http://127.0.0.1:9000
@@ -100,6 +103,20 @@ jobs:
       INTERVIEW_CLAMAV_PORT: '3310'
     steps:
       - uses: actions/checkout@v7
+      # Minted per run, never written down.
+      #
+      # `env.ts` validates the *shape* of these before the app boots — `^sk_(test|live)_`, `^whsec_`,
+      # exactly 64 hex — so a CI placeholder has to look like the real thing, and looking like the real
+      # thing is what a secret scanner reports. GitGuardian failed a pull request over literals that
+      # said `ci_only_not_a_real_key` in their own text, and it was right to: a scanner cannot take a
+      # string's word for it. Generating them removes the question instead of arguing it.
+      - name: Mint CI-only credential placeholders
+        run: |
+          {
+            echo "STRIPE_SECRET_KEY=sk_test_$(openssl rand -hex 12)"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_$(openssl rand -hex 16)"
+            echo "WEBHOOK_PAYLOAD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v6
         with:
           version: 10
@@ -110,7 +127,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:migrations:local
       - run: node scripts/db/prepare-rls-fixture.mjs
-      - name: Object store and virus scanner
+      - name: Object store, virus scanner and embeddings
         run: |
           set -euo pipefail
           docker run -d --name minio -p 9000:9000 \
@@ -131,11 +148,28 @@ jobs:
             [ "$i" = 90 ] && { echo "clamd never answered PING"; docker logs clamav | tail -30; exit 1; }
             sleep 2
           done
+
+          # Embeddings. Same image and model as docker-compose's `embeddings` service, started the
+          # same way — `ollama serve` in the background, then pull the model it will be asked for.
+          # Without it the semantic-search specs had to be excluded with `--grep-invert`, which left a
+          # whole retrieval path — semantic ranking, cursor invalidation — running only on a
+          # developer's laptop.
+          docker run -d --name ollama -p 11434:11434 --entrypoint /bin/sh ollama/ollama:latest \
+            -c 'ollama serve & pid=$!; sleep 3; ollama pull nomic-embed-text; wait $pid'
+          for i in $(seq 1 90); do
+            curl -sf http://127.0.0.1:11434/api/tags 2>/dev/null | grep -q nomic-embed-text && break
+            [ "$i" = 90 ] && { echo "ollama never served nomic-embed-text"; docker logs ollama | tail -20; exit 1; }
+            sleep 2
+          done
+          echo "ollama ready with nomic-embed-text"
+      # The harness serves `dist/`, so a build is a precondition of the suite, not a check that
+      # follows it.
+      - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
 
       # No `--shard`. That is the entire point of this workflow.
       - name: End-to-end suite, whole and serial
-        run: pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings"
+        run: pnpm test:e2e --workers=1
 
       - name: Upload the Playwright report on failure
         if: failure()
