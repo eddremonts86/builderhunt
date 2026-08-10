@@ -656,6 +656,10 @@
     "0163_reseed_search_source_register": {
       "sql": "cc69394260f743643c8d44b3d3cd3114743a133094a68efbdcb2f02d93bacc52",
       "snapshot": "c0263b428d20aa6ed06486eba1dca5d8bf1186edc9117a389ef4acbaf04623ff"
+    },
+    "0164_reseed_solution_source_register": {
+      "sql": "321f0d50a82c6715777b61a9c43f939e3d1a4cf8f08a7b1552bdb1d897909434",
+      "snapshot": "18b3f6cbeed6be002d7cc28df16276bb1489a11c859895bcb7cc863ae4dead88"
     }
   }
 }
