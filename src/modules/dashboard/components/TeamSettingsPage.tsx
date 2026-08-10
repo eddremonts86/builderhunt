@@ -13,6 +13,13 @@ import {
   type TeamSnapshotDto,
   type TenantPrincipal,
 } from '~/shared/lib/organizations/contracts'
+import { InvitationValuePreview } from '~/modules/organizations/components/InvitationValuePreview'
+import {
+  INVITATION_INTENT_LABELS,
+  INVITATION_INTENTS,
+  ROLE_TITLE_MAX_LENGTH,
+  type InvitationIntent,
+} from '~/shared/lib/organizations/invitation-personalization'
 import { Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { DataTable } from '~/shared/components/table'
 import type { ColumnDef } from '~/shared/lib/table/columns'
@@ -56,7 +63,19 @@ export interface TeamSettingsPageProps {
   devLinkByInvitationId?: Record<string, string>
   /** Audit/reference id from the most recent danger-zone action (transfer/request-deletion/cancel) — passed through to OrganizationDangerZone. */
   dangerZoneReferenceId?: string | null
-  onInvite?: (email: string, role: InvitableRole) => void | Promise<void>
+  /**
+   * Plan 59 widened this: the sender's reason for inviting travels with the invitation.
+   *
+   * `personalization` is a third parameter rather than two more positional ones so the call site reads
+   * as one thing — and so a caller that has not learned about intent still type-checks.
+   */
+  /** A deduplicated create, or any other truthful non-error outcome the sender must be told. */
+  inviteNotice?: string | null
+  onInvite?: (
+    email: string,
+    role: InvitableRole,
+    personalization?: { intent: InvitationIntent; roleTitle: string | null },
+  ) => void | Promise<void>
   onCancelInvite?: (invitationId: string) => void | Promise<void>
   onResendInvite?: (invitationId: string) => void | Promise<void>
   onChangeRole?: (userId: string, role: InvitableRole) => void | Promise<void>
@@ -96,6 +115,7 @@ export function TeamSettingsPage({
   error = null,
   devLinkByInvitationId,
   dangerZoneReferenceId = null,
+  inviteNotice = null,
   onInvite,
   onCancelInvite,
   onResendInvite,
@@ -109,9 +129,15 @@ export function TeamSettingsPage({
 }: TeamSettingsPageProps) {
   const [inviteEmail, setInviteEmail] = React.useState('')
   const [inviteRole, setInviteRole] = React.useState<InvitableRole>('member')
+  // Defaulted to `other`, never to empty. `other` is a real intent with its own copy, so a sender who
+  // does not want to answer still produces a complete card rather than a blank one.
+  const [inviteIntent, setInviteIntent] = React.useState<InvitationIntent>('other')
+  const [inviteRoleTitle, setInviteRoleTitle] = React.useState('')
   const [copiedInvitationId, setCopiedInvitationId] = React.useState<string | null>(null)
   const inviteEmailId = React.useId()
   const inviteRoleId = React.useId()
+  const inviteIntentId = React.useId()
+  const inviteRoleTitleId = React.useId()
 
   async function copyInviteLink(invitationId: string, link: string) {
     try {
@@ -378,12 +404,16 @@ export function TeamSettingsPage({
 
           {canInvite && (
             <form
-              className="grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-2 sm:items-end"
+              className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2 sm:items-end"
               onSubmit={(e) => {
                 e.preventDefault()
                 if (!inviteEmail.trim()) return
-                ;(onInvite ?? noop)(inviteEmail.trim(), inviteRole)
+                // Trimmed to `null` here as well as on the server: an all-whitespace title must not
+                // travel as a string the CHECK constraint would then reject with a 500.
+                const roleTitle = inviteRoleTitle.trim() || null
+                ;(onInvite ?? noop)(inviteEmail.trim(), inviteRole, { intent: inviteIntent, roleTitle })
                 setInviteEmail('')
+                setInviteRoleTitle('')
               }}
               data-testid="invite-form"
             >
@@ -417,15 +447,88 @@ export function TeamSettingsPage({
                   </SelectContent>
                 </Select>
               </div>
-              <Button
-                type="submit"
-                disabled={busy || seatsFull}
-                className="text-sm"
-                data-testid="invite-submit-btn"
-              >
-                <UserPlus className="w-4 h-4" aria-hidden="true" />
-                {seatsFull ? 'Seat limit reached' : 'Invite'}
-              </Button>
+              <div>
+                <Label htmlFor={inviteIntentId}>Why are you inviting them?</Label>
+                <Select
+                  value={inviteIntent}
+                  onValueChange={(v) => setInviteIntent(v as InvitationIntent)}
+                  disabled={busy || seatsFull}
+                >
+                  <SelectTrigger id={inviteIntentId} className="mt-1 w-full text-sm" data-testid="invite-intent-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INVITATION_INTENTS.map((intent) => (
+                      <SelectItem key={intent} value={intent}>{INVITATION_INTENT_LABELS[intent]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor={inviteRoleTitleId}>
+                  Role title <span className="text-bh-text-dim font-normal">(optional)</span>
+                </Label>
+                <Input
+                  id={inviteRoleTitleId}
+                  type="text"
+                  value={inviteRoleTitle}
+                  onChange={(e) => setInviteRoleTitle(e.target.value.slice(0, ROLE_TITLE_MAX_LENGTH))}
+                  placeholder="Staff Engineer"
+                  disabled={busy || seatsFull}
+                  className="mt-1 text-sm"
+                  maxLength={ROLE_TITLE_MAX_LENGTH}
+                  aria-describedby={`${inviteRoleTitleId}-count`}
+                  data-testid="invite-role-title-input"
+                />
+                {/*
+                  A visible count, not just a `maxLength`. `maxLength` silently stops accepting
+                  characters, which reads as a broken keyboard; the number explains why typing stopped.
+                */}
+                <p id={`${inviteRoleTitleId}-count`} className="mt-1 text-xs text-bh-text-dim" data-testid="invite-role-title-count">
+                  {inviteRoleTitle.length} / {ROLE_TITLE_MAX_LENGTH}
+                </p>
+              </div>
+
+              {/*
+                The card the recipient will see, from the same component they will see it from — so the
+                sender is reviewing the real thing rather than a description of it.
+              */}
+              <div className="sm:col-span-2">
+                <InvitationValuePreview
+                  intent={inviteIntent}
+                  roleTitle={inviteRoleTitle.trim() || null}
+                  role={inviteRole}
+                  audience="sender"
+                />
+              </div>
+
+              {/*
+                Rendered as a notice, not as an error and not as a success.
+                A deduplicated create succeeded — the person is invited — but the context the sender
+                just typed did not reach them, and the email that went out describes the first
+                invitation's reason. `role="status"` rather than `role="alert"`: nothing went wrong.
+              */}
+              {inviteNotice && (
+                <p
+                  className="sm:col-span-2 rounded border border-bh-warning/30 bg-bh-warning/5 p-2 text-xs text-bh-warning"
+                  role="status"
+                  data-testid="invite-notice"
+                >
+                  {inviteNotice}
+                </p>
+              )}
+
+              <div className="sm:col-span-2">
+                <Button
+                  type="submit"
+                  disabled={busy || seatsFull}
+                  className="text-sm"
+                  data-testid="invite-submit-btn"
+                >
+                  <UserPlus className="w-4 h-4" aria-hidden="true" />
+                  {seatsFull ? 'Seat limit reached' : 'Invite'}
+                </Button>
+              </div>
             </form>
           )}
         </section>
