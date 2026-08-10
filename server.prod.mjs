@@ -117,6 +117,26 @@ if (!app || typeof app.fetch !== 'function') {
 console.error('[server] App handler loaded OK');
 
 const server = createServer(async (req, res) => {
+  /**
+   * `PUBLIC_ORIGIN`, deliberately — not the request's `Host` header.
+   *
+   * Every request the application sees therefore carries the origin from `APP_URL`, whatever host the
+   * client actually asked for. That is the property worth keeping: the app's notion of itself cannot be
+   * moved by a spoofed `Host`, and its self-referential URLs stay stable behind any proxy.
+   *
+   * The consequence is easy to miss, so: **a redirect that depends on which hostname was requested
+   * cannot be implemented anywhere above this line.** A TanStack `requestMiddleware` was written to send
+   * a retired hostname to the canonical one, it passed its unit tests, it returned a correct 301 when
+   * called directly against the built handler — and in production it never fired once, because the host
+   * it compares had already been replaced by the constant above. The suite could not catch it either:
+   * with the feature unconfigured the middleware is a no-op, and a no-op is indistinguishable from
+   * never being invoked.
+   *
+   * If a host-based redirect is ever needed, it belongs here, reading `req.headers.host`, with its
+   * helper under `server/` (the way `server/security.mjs` lives there) because the runtime image does
+   * not contain `src/`. The retired `builderhunt.eduardoinerarte.dk` was dropped from the application's
+   * domains instead, which needs no code at all.
+   */
   const url = new URL(req.url ?? '/', PUBLIC_ORIGIN);
 
   // Paths may contain invitation/reset/export identifiers; do not log them.
