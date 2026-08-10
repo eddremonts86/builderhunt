@@ -25,9 +25,17 @@ committed `*-linux.png` files.
 Which is why regenerating is a two-sided job, and why doing only the first side
 is what this section used to tell you to do:
 
-- **macOS baselines** — `pnpm test:visual --update-snapshots`, then commit the
+- **macOS baselines** — `pnpm test:visual --update-snapshots=all`, then commit the
   `*-darwin.png` files. This is the half a developer can produce, and it is the
   half CI never looks at.
+
+  **`=all`, not a bare `--update-snapshots`.** Without a mode the flag presets to
+  `changed`, and Playwright's "changed" means "exceeded `MAX_DIFF_PIXEL_RATIO`".
+  Renaming the footer's cities moved every public surface and a bare
+  `--update-snapshots` rewrote nothing at all — 22 passed, zero files touched —
+  because one line of copy is a rounding error in a full-page screenshot. Drift
+  under the threshold is precisely the drift that needs a deliberate refresh, since
+  it is the drift nothing else will ever report.
 - **Linux baselines** — dispatch **Refresh Linux visual baselines**
   (`gh workflow run visual-baselines.yml`, optionally `-f grep=<filter>`),
   download the `linux-visual-baselines` artifact, unzip it over
