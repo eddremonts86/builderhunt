@@ -175,7 +175,7 @@
 
 ## Phase 3 — Operator and member UX
 
-- [ ] **Build the conflict-safe admin control on the existing billing page**
+- [~] **Build the conflict-safe admin control on the existing billing page**
   - Files: `src/modules/admin/billing/BetaModeControl.tsx`,
     `tests/unit/modules/admin/billing/BetaModeControl.test.tsx`,
     `src/routes/_dashboard/admin/billing.tsx`.
@@ -190,7 +190,7 @@
   - Verify: `pnpm vitest run tests/unit/modules/admin/billing/BetaModeControl.test.tsx tests/unit/routes/api/admin/billing/beta-mode.test.ts && pnpm type-check`
     passes after the component's initial missing-module red run.
 
-- [ ] **Expose minimal authenticated status and render a presentational member badge**
+- [~] **Expose minimal authenticated status and render a presentational member badge**
   - Files: `src/routes/api/beta-mode.ts`, `tests/unit/routes/api/beta-mode.test.ts`,
     `src/modules/dashboard/hooks/useBetaModeStatus.ts`,
     `tests/unit/modules/dashboard/hooks/useBetaModeStatus.test.tsx`,

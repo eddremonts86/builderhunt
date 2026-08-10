@@ -146,6 +146,8 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'alerts/run-worker.ts', method: 'POST', path: '/api/admin/alerts/run-worker' },
   { file: 'analytics/run-retention.ts', method: 'POST', path: '/api/admin/analytics/run-retention' },
   { file: 'billing/accounting-export.ts', method: 'GET', path: '/api/admin/billing/accounting-export' },
+  { file: 'billing/beta-mode.ts', method: 'GET', path: '/api/admin/billing/beta-mode' },
+  { file: 'billing/beta-mode.ts', method: 'PUT', path: '/api/admin/billing/beta-mode' },
   { file: 'billing/configuration.ts', method: 'GET', path: '/api/admin/billing/configuration' },
   { file: 'billing/configuration.ts', method: 'PUT', path: '/api/admin/billing/configuration' },
   { file: 'billing/disputes.ts', method: 'GET', path: '/api/admin/billing/disputes' },

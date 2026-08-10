@@ -30,6 +30,7 @@ import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as AuthResetRouteImport } from './routes/auth/reset'
 import { Route as AuthForgotRouteImport } from './routes/auth/forgot'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiBetaModeRouteImport } from './routes/api/beta-mode'
 import { Route as LandingStatusRouteImport } from './routes/_landing/status'
 import { Route as LandingSecurityRouteImport } from './routes/_landing/security'
 import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
@@ -400,6 +401,11 @@ const AuthForgotRoute = AuthForgotRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBetaModeRoute = ApiBetaModeRouteImport.update({
+  id: '/api/beta-mode',
+  path: '/api/beta-mode',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LandingStatusRoute = LandingStatusRouteImport.update({
@@ -1880,6 +1886,7 @@ export interface FileRoutesByFullPath {
   '/roadmap': typeof LandingRoadmapRoute
   '/security': typeof LandingSecurityRoute
   '/status': typeof LandingStatusRoute
+  '/api/beta-mode': typeof ApiBetaModeRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
@@ -2168,6 +2175,7 @@ export interface FileRoutesByTo {
   '/roadmap': typeof LandingRoadmapRoute
   '/security': typeof LandingSecurityRoute
   '/status': typeof LandingStatusRoute
+  '/api/beta-mode': typeof ApiBetaModeRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
@@ -2458,6 +2466,7 @@ export interface FileRoutesById {
   '/_landing/roadmap': typeof LandingRoadmapRoute
   '/_landing/security': typeof LandingSecurityRoute
   '/_landing/status': typeof LandingStatusRoute
+  '/api/beta-mode': typeof ApiBetaModeRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
@@ -2750,6 +2759,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/security'
     | '/status'
+    | '/api/beta-mode'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
@@ -3038,6 +3048,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/security'
     | '/status'
+    | '/api/beta-mode'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
@@ -3327,6 +3338,7 @@ export interface FileRouteTypes {
     | '/_landing/roadmap'
     | '/_landing/security'
     | '/_landing/status'
+    | '/api/beta-mode'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
@@ -3612,6 +3624,7 @@ export interface RootRouteChildren {
   OnboardingRouteRoute: typeof OnboardingRouteRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiBetaModeRoute: typeof ApiBetaModeRoute
   ApiHealthRoute: typeof ApiHealthRoute
   BlogAtomDotxmlRoute: typeof BlogAtomDotxmlRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
@@ -3942,6 +3955,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/beta-mode': {
+      id: '/api/beta-mode'
+      path: '/api/beta-mode'
+      fullPath: '/api/beta-mode'
+      preLoaderRoute: typeof ApiBetaModeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_landing/status': {
@@ -6306,6 +6326,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRouteRoute: OnboardingRouteRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiBetaModeRoute: ApiBetaModeRoute,
   ApiHealthRoute: ApiHealthRoute,
   BlogAtomDotxmlRoute: BlogAtomDotxmlRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
