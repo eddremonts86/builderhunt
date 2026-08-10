@@ -26,7 +26,7 @@
       ran over comments, so the explanation was counted as the read. Comments are now stripped
       before matching (strings are not — a `.limit(` there is still a bound worth seeing).
 
-- [~] **Validate the detector against synthetic and historical cases**
+- [x] **Validate the detector against synthetic and historical cases**
   - Files: `scripts/check-unbounded-reads.mjs`
   - Do: add scratch fixtures for an exported repository function, nested route handler,
     non-exported helper, scalar aggregate, two queries in one function where only one is limited,
@@ -34,7 +34,28 @@
     difference, but never force the count to match history.
   - Verify: each positive fixture increments exactly once, each negative fixture increments zero,
     scratch files are removed, and the committed classification records the current git SHA.
-  - **Partly done, against the older wording of this task.** Three fixtures were run and behaved:
+  - **Done 2026-08-10, and the fixtures are tests rather than scratch files.** All six shapes this task
+    names live in `tests/unit/scripts/lib/unbounded-reads.test.ts` — 14 cases, run by `ci:local`.
+    Deliberately not "scratch files are removed": three of the six were recorded below as cases the
+    text detector got *wrong*, so deleting the fixtures would delete the only thing standing between
+    the rewrite and that regression returning.
+
+    Each positive fixture increments by exactly 1 and each negative by 0, including the three that used
+    to score 0 — nested route handler, non-exported helper, and two-queries-one-limit. Both retired
+    false positives (the DOM `.select()` and `Buffer.from`) have cases too, and are now excluded
+    *structurally*: a Drizzle read is `select` **and** `from`, so the file-level `REACHES_DATABASE`
+    regex and the `NON_DRIZZLE_FROM` strip list are deleted rather than maintained.
+
+    The output carries the commit SHA in both modes, closing the last clause of the Verify line.
+
+    **What the rewrite found: 45 reads the text version reported as zero.** Two shapes beyond the six
+    fixtures turned up in the sweep — `selectDistinct`/`selectDistinctOn` were not recognised as list
+    reads at all, and `listAccessRequests` was a *false positive*, bounded on both branches but built
+    from a shared `const query = db.select().from(…)`. Both now have fixtures. All 45 are resolved and
+    the count is zero again; see `spec.md` for the updated blind-spot list, where four of five are
+    closed and one new one replaces them.
+
+  - **Historical comparison, from the earlier revision of this task.** Three fixtures were run and behaved:
     an exported repository read incremented by exactly 1, an aggregate-only projection moved
     `aggregates` and not `unbounded`, and an `unbounded-read-ok` comment moved `exempted` and not
     `unbounded`. `Buffer.from(...)` produced nothing.

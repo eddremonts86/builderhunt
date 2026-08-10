@@ -15,6 +15,7 @@
 //   node scripts/check-unbounded-reads.mjs --list               # one `path:line scope` per read
 //   node scripts/check-unbounded-reads.mjs --list --aggregates   # also aggregate and exempt reads
 //   node scripts/check-unbounded-reads.mjs --json               # every entry, machine-readable
+import { execFileSync } from 'node:child_process'
 import { readdir, readFile } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import { analyzeSource, MIGHT_CONTAIN_READ } from './lib/unbounded-reads.mjs'
@@ -63,8 +64,20 @@ for (const absolutePath of files) {
 
 const byPath = (a, b) => (a.path === b.path ? a.line - b.line : a.path.localeCompare(b.path))
 
+/**
+ * The commit the counts describe, so a recorded classification can be re-derived rather than trusted.
+ * `null` outside a checkout — the number is still valid, it just has nothing to be pinned to.
+ */
+function currentCommit() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  } catch {
+    return null
+  }
+}
+
 if (wantJson) {
-  console.log(JSON.stringify({ unbounded, aggregates, exempted }, null, 2))
+  console.log(JSON.stringify({ commit: currentCommit(), unbounded, aggregates, exempted }, null, 2))
 } else {
   if (wantList) {
     for (const entry of unbounded.sort(byPath)) {
@@ -87,6 +100,7 @@ if (wantJson) {
 
   console.log(
     JSON.stringify({
+      commit: currentCommit(),
       unbounded: unbounded.length,
       aggregates: aggregates.length,
       exempted: exempted.length,

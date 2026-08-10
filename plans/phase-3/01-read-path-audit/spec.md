@@ -74,57 +74,83 @@ needed completeness and no data-model ceiling could be named.
   increments the count by exactly 2.
 - No false positive from `Buffer.from`/`Array.from` and no aggregate counted as a list read.
 
-## Not yet met by the shipped detector
+## Met by the shipped detector, 2026-08-10
 
 This plan was revised (upstream `e5bc8a2d5`) after a text-matching detector had already shipped, and
-the revision raises the bar in three ways the current script does not clear:
+the revision raised the bar in four ways the text version did not clear. The rewrite onto the
+TypeScript compiler API (`scripts/lib/unbounded-reads.mjs`) clears all four:
 
-| Required now | Shipped | Gap |
+| Required | Now | Evidence |
 |---|---|---|
-| TypeScript compiler API | Text matching with a brace scanner | Blind spots 1 and 4 below are structural, not fixable by better regex |
-| `commit` and `entries[]` in the JSON | `{unbounded, aggregates, exempted}` only | Plan 13 wants entries to reconcile against |
-| A route handler *and* a non-exported helper each increment by 1 | Neither is seen at all | Blind spots 1 and 4 |
-| `.limit()` associated with its own query chain | Any `.limit(` in the body counts | Blind spot 2 — nine live cases, one in the GDPR export path |
+| TypeScript compiler API | Yes | `ts.createSourceFile` per file; the brace scanner and its `skipString`/`skipTrivia` lexer are gone |
+| `commit` and `entries[]` in the JSON | Yes | `--json` emits every entry; both output modes carry the commit SHA |
+| A route handler *and* a non-exported helper each increment by 1 | Yes | `scopeOf` resolves method, `const`, and property-assignment scopes regardless of export |
+| `.limit()` associated with its own query chain | Yes | `chainOf` walks only the call spine, so a sibling query's bound never counts |
 
-The blind-spot list below is what the shipped detector honestly cannot see, and it is precisely the
-list the revision asks to eliminate. Rewriting it on the AST closes 1, 2 and 4 outright; 3 and 5 stay.
+The rewrite found **45 reads the text version reported as zero**, in exactly the shapes the blind-spot
+list predicted. All 45 are resolved — bounded, computed in SQL, drained, or exempted with a stated
+reason — and the count is back to zero, this time against a detector that can see the whole surface.
+
+Two shapes were found during the sweep rather than predicted here:
+
+- **`selectDistinct` / `selectDistinctOn`.** List reads exactly like `select`, and initially unseen.
+  `listNotedOrganizationBuilders` opens with `selectDistinct({ builderId }).from(builderNotes)` across
+  a whole organization's notes; only the *second* query in that function was being reported.
+- **A bounded read reported as unbounded.** `listAccessRequests` carried `OPERATOR_LIST_LIMIT` on both
+  branches but built them from a shared `const query = db.select().from(…)` — blind spot 2 below,
+  firing in the false-positive direction. Rewritten as one chain per branch, because at review time a
+  false positive is indistinguishable from a real one.
 
 ## Known blind spots
 
-The detector reads source text, so it sees the shapes it was told to look for and nothing else.
-Each of these is a way an unbounded read can exist in `src/` and be reported as absent. Plan 13's
-gate is worth exactly as much as this list is honest.
+Plan 13's gate is worth exactly as much as this list is honest. Four of the five recorded here are
+closed; each closure has a case in `tests/unit/scripts/lib/unbounded-reads.test.ts`, so a regression
+fails a test rather than quietly widening the gap again.
 
-1. **Reads inside a route handler.** Only exported *function* declarations and exported
-   `const … = () =>` bindings are examined. A TanStack route is `export const Route =
-   createFileRoute(…)({…})`, which matches neither, so every read written inline in a handler is
-   invisible — `src/routes/api/me/sessions/index.ts:48` (unbounded, bounded in practice only by
-   the caller's id array) and `src/routes/api/admin/solutions/gold-briefs.ts:46` (bounded, by a
-   `.limit(500)` the detector also cannot see).
+1. ~~**Reads inside a route handler.**~~ **Closed.** `scopeOf` walks to the nearest named scope,
+   including a property assignment inside an object literal, so `{ GET: async () => … }` inside
+   `createFileRoute(…)({…})` is attributed to `GET`. Found the read at
+   `src/routes/api/me/sessions/index.ts:48` this list predicted, and the one in `/api/status` it did
+   not.
 
-2. **A `.limit(` that bounds only part of the function.** The heuristic is "the body contains
-   `.limit(`", so one bounded lookup marks the whole function bounded. Nine functions in `src/`
-   have more selects than limits — run `node scripts/check-unbounded-reads.mjs --mixed`. The
-   consequential one is `src/shared/lib/repositories/account-privacy.ts:61`
-   `loadAccountExportSource`: it bounds its user and account lookups with `.limit(1)` and then
-   reads `builder_claim_requests` by email with no bound at all, inside the GDPR export path.
+2. ~~**A `.limit(` that bounds only part of the function.**~~ **Closed.** The bound belongs to the
+   call chain, not to the body. This was the worst of the five: not a coverage gap but a false
+   negative in a required gate, reportable only under an opt-in `--mixed` flag which is now gone.
+   `loadAccountExportSource` was exactly as described — `.limit(1)` on its user and account lookups
+   and no bound on the `builder_claim_requests` read beside them.
 
-3. **Raw `sql` templates and `db.execute`.** `src/shared/lib/repositories/platform-billing.ts:69`
-   `getPlatformUserBillingSummary` reads through `db.execute(sql\`select * from
-   platform_admin_user_billing_summary(…)\`)`. Whatever that Postgres function returns, this
-   script has no opinion about it.
+   It also fired in the *other* direction, which this list did not anticipate: a genuinely bounded
+   read written as `const query = db.select().from(…)` and finished by two branches was reported as
+   unbounded. See item 5.
 
-4. **Reads inside a non-exported helper.** `loadProjectableComponents`
-   (`src/lib/solutions/indexing/project-components.ts:131`) is where the projection sweep's read
-   actually lives; it is counted here only because its exported caller `projectComponents`
-   happens to contain a second, visible `.select`. A non-exported helper whose exported caller
-   has no select of its own would not be counted at all.
+3. **Raw `sql` templates and `db.execute`.** *Still open, unchanged.*
+   `src/shared/lib/repositories/platform-billing.ts:69` `getPlatformUserBillingSummary` reads through
+   `db.execute(sql\`select * from platform_admin_user_billing_summary(…)\`)`. Whatever that Postgres
+   function returns, this script has no opinion about it. Closing it means reading SQL text or the
+   function body, neither of which a syntax tree provides.
 
-5. **The relational `findMany({ limit })` form.** `LIST_READ` matches `.findMany(`, but
-   `HAS_LIMIT` matches `.limit(` — the relational API passes `limit` as an object property, so a
-   properly bounded `findMany` would be reported as unbounded. There are zero `findMany` call
-   sites in `src/` today, so this branch has never run against real code and should be treated as
-   untested rather than working.
+4. ~~**Reads inside a non-exported helper.**~~ **Closed.** Export status is recorded on the entry
+   (`exported: false`) and never used to filter. `loadProjectableComponents` is now reported in its own
+   right rather than by accident of its caller.
+
+5. ~~**The relational `findMany({ limit })` form.**~~ **Closed, and it was worth closing before a call
+   site existed.** `findMany` takes `limit` as an object property, not as a `.limit()` method, so the
+   old pairing would have reported every correctly bounded relational query as unbounded. There are
+   still zero `findMany` call sites in `src/`, but the branch is no longer untested: three fixtures
+   cover bounded, unbounded, and the property-versus-method distinction.
+
+**New, replacing them: a chain split across statements.**
+
+```ts
+const q = db.select().from(t)
+if (wantAll) return q          // unbounded
+return q.limit(50)             // bounded
+```
+
+The detector sees two chains and cannot connect them. It has fired in both directions —
+`listAccessRequests` was a false positive of exactly this shape — and following it needs the type
+checker plus a dataflow pass, not a syntax tree. The mitigation is stylistic and stated where it
+matters: write the chain whole, so its bound is visible to a reader and to the gate at the same time.
 
 ## Resolved edge cases
 
