@@ -664,6 +664,10 @@
     "0165_invitation_personalization": {
       "sql": "18a7f3401499b521dfeeb5a33f0f93ebbb8c024f0118111cd390a69f7f4ccd93",
       "snapshot": "43d4910da737d290200da23f101e0246c7adb51c3d15dac35f1e2a11cac8cf4a"
+    },
+    "0166_invitation_preview_builders_index": {
+      "sql": "466a5d286f09464e183adaa43b9a019b8c1a39b0eca415fd614f3dcd85a9581a",
+      "snapshot": "212c921bd34aa91cf7853f22d8ccb54916bb3fc26abb7f2f4d26048f62eaed49"
     }
   }
 }

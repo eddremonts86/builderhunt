@@ -249,6 +249,20 @@ test.describe('team accounts release matrix', () => {
     // No role title was given, so that line must be absent rather than empty.
     await expect(pageB.getByTestId('invitation-preview-role-title')).toHaveCount(0)
 
+    // Three real builders, from `builder_identities` rather than from the federated pipeline. Asserted
+    // as "0 or 3, never 1 or 2" plus safe links: the harness database may hold no person-kind rows with
+    // an avatar, and an empty result must render no section rather than an empty heading. Demanding 3
+    // unconditionally would make this spec fail on a freshly seeded cluster for no product reason.
+    const builders = pageB.getByTestId('invitation-preview-builders')
+    if (await builders.count() > 0) {
+      const links = builders.locator('a')
+      await expect(links).toHaveCount(3)
+      for (const link of await links.all()) {
+        expect(await link.getAttribute('rel')).toContain('noopener')
+        expect(await link.getAttribute('target')).toBe('_blank')
+      }
+    }
+
     await pageB.getByTestId('invitation-accept-btn').click()
     // Acceptance lands on the onboarding search with the intent's suggested query prefilled, not on
     // `/dashboard` — `/dashboard` is now only the fallback for a failed organization switch.

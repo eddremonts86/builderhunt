@@ -204,7 +204,7 @@
     valid prefill, edited prefill, empty/overlong/untrusted values, no-query regression, explicit
     search submission, back, and skip.
 
-- [ ] **Add the end-to-end personalized invitation security journey**
+- [x] **Add the end-to-end personalized invitation security journey**
   - Files: `tests/e2e/personalized-organization-invitations.spec.ts`,
     `tests/e2e/api/organizations-invitations.spec.ts`
   - Do: Use the real E2E database, roles, email outbox, and HTTP routes to cover sender compose and

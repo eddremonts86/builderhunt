@@ -16,6 +16,14 @@ interface InvitationReview {
   intent: InvitationIntent
   roleTitle: string | null
   expiresAt: string
+  /** Three already-discovered public identities, or empty when the read failed or found none. */
+  builders?: Array<{
+    username: string
+    displayName: string | null
+    avatarUrl: string | null
+    source: string
+    profileUrl: string
+  }>
 }
 
 /** The one message every invalid case gets. Never made more specific here — see the fetch below. */
@@ -197,6 +205,41 @@ export function OrganizationInvitationPage({ invitationId }: { invitationId: str
 
       {reviewState === 'ready' && review && state !== 'declined' && (
         <>
+          {/*
+            Three real people, and every one of them a link out.
+            Rendered only when the server sent some: an empty array becomes no section, not an empty
+            heading, because "here is what you could find" above nothing is worse than silence. The
+            names are public discovery data — `builder_identities` holds no tenant rows — so this is
+            safe for a recipient who is not a member yet.
+          */}
+          {review.builders && review.builders.length > 0 && (
+            <div className="mb-6" data-testid="invitation-preview-builders">
+              <p className="mb-2 text-xs uppercase tracking-wider text-bh-text-dim">
+                People already indexed here
+              </p>
+              <ul className="flex flex-wrap gap-3">
+                {review.builders.map((builder) => (
+                  <li key={`${builder.source}:${builder.username}`}>
+                    <a
+                      href={builder.profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-full border border-bh-border bg-bh-bg-alt px-2 py-1 text-xs text-bh-text-muted hover:border-bh-accent/40 hover:text-bh-text transition-colors"
+                    >
+                      {builder.avatarUrl && (
+                        // `alt=""` and `aria-hidden`: the accessible name is the text beside it, and a
+                        // screen reader announcing "avatar of X" then "X" says the name twice.
+                        <img src={builder.avatarUrl} alt="" aria-hidden className="size-5 rounded-full" loading="lazy" />
+                      )}
+                      <span>{builder.displayName ?? builder.username}</span>
+                      <span className="text-bh-text-dim">{builder.source}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="mb-6">
             <InvitationValuePreview
               intent={review.intent}

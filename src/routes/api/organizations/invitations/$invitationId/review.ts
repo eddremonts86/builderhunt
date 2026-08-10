@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { getOrganizationLifecycle, OrganizationLifecycleError } from '~/shared/lib/auth/organization-lifecycle'
+import { readInvitationPreviewBuilders } from '~/shared/lib/organizations/invitation-preview-builders'
 
 /**
  * What a verified recipient may read before deciding (plan 59).
@@ -22,8 +23,27 @@ export const Route = createFileRoute('/api/organizations/invitations/$invitation
       GET: async ({ request, params }) => {
         try {
           const lifecycle = await getOrganizationLifecycle()
+          /**
+           * Eligibility first, and the ordering is the security property.
+           *
+           * `reviewInvitation` throws for a signed-out, wrong-account, unverified, expired or
+           * fabricated request. Reading the builders before it would let anyone holding a guessed
+           * invitation id spend a database query — cheap here, but it is the shape of the mistake that
+           * matters: the preview is a reward for passing the check, not something computed alongside it.
+           */
           const review = await lifecycle.reviewInvitation(request, params.invitationId)
-          return Response.json({ ...review, expiresAt: review.expiresAt.toISOString() })
+          /**
+           * A failed preview must not fail the invitation.
+           *
+           * The three builders are decoration on a decision the recipient came here to make. If this
+           * read throws, they still get the organization, the role and the buttons — an empty array,
+           * which the page renders as no section at all rather than as an error.
+           */
+          const builders = await readInvitationPreviewBuilders(review.intent).catch((error) => {
+            console.error('Invitation preview builders failed:', error)
+            return []
+          })
+          return Response.json({ ...review, expiresAt: review.expiresAt.toISOString(), builders })
         } catch (error) {
           const response = lifecycleErrorResponse(error)
           if (response) return response
