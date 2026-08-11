@@ -3,7 +3,8 @@
 Every plan in this directory is **done and tested**. That is the only thing this folder means, and it
 means exactly that — nothing here is aspirational, in progress, or "code-complete pending a review".
 
-Moved here on 2026-08-11: **47 plans**.
+Moved here on 2026-08-11: **48 plans** (47 in the first pass, plus `59-personalized-invitations` once
+its closing evidence was written).
 
 ## What a plan had to satisfy to be in here
 
@@ -22,19 +23,18 @@ and why it changed, so the claim is auditable rather than asserted.
 
 ## What is deliberately *not* in here
 
-Twelve plans stayed in `plans/phase-1/`, and the reason differs by plan:
+Eleven plans stayed in `plans/phase-1/`, and the reason differs by plan:
 
 | Plan | Status | Why it stayed |
 |---|---|---|
 | `55-load-1000-concurrent-users` | `pending` | 5 open + 2 partial — the cost-bearing certification runs |
 | `57-ui-dashboard` | `pending` | 17 open + 9 partial |
-| `59-personalized-invitations` | `pending` | 1 partial — a human still has to look at the screenshots |
 | `07-responsive-mobile-design` | `partially-implemented` | sprint wizard steps 2-3 need a live check |
 | `49-audit-performance-qa` | `partially-implemented` | Lighthouse and CI-gate tasks never attempted |
 | `51-audit-conversion` | `partially-implemented` | baseline collection and staged rollout not started |
-| `11-sourcehut-integration` | `retired` | not built, by decision |
-| `16-hashnode-integration` | `retired` | not built, by decision |
-| `20-indiehackers-integration` | `closed — skipped` | not built, by decision |
+| `11-sourcehut-integration` | `superseded` | retired 2026-08-04, not built |
+| `16-hashnode-integration` | `superseded` | retired 2026-08-04, not built |
+| `20-indiehackers-integration` | `superseded` | closed and skipped, not built |
 | `31-pricing-and-billing` | `superseded` | replaced by `30-stripe-billing-platform` |
 | `39-technical-sandbox` | `superseded` | replaced elsewhere |
 | `54-waitlist-launch` | `blocked` | its own tasks are done; the launch is phase-5 work |
@@ -43,20 +43,21 @@ The last six are not implemented and never will be under these numbers, which is
 here. They are also not *pending* — filing them with live work is the second-best option, and one worth
 revisiting.
 
-Three of those statuses — `retired` twice and `closed — skipped` once — are values
-`scripts/check-phase-readiness.mjs` cannot read. It allows exactly `pending`,
-`partially-implemented`, `implemented`, `blocked` and `superseded`. Choosing between `superseded` and
-widening that set is a product decision, so those three were left as they are.
+Three of them — `11`, `16` and `20` — used to say `retired` and `closed — skipped`, values `scripts/check-phase-readiness.mjs`
+cannot read — it allows exactly `pending`, `partially-implemented`, `implemented`, `blocked` and
+`superseded`. They now say `superseded` with the original word kept beside it as prose, because
+"retired" and "superseded" are not the same story and the distinction was worth keeping. Every status
+across both directories is now a value the gate can read.
 
 ## The numbers did not move
 
 A plan's two-digit prefix is its position in the canonical build order recorded in
 [`../_meta/phase-1-order.md`](../_meta/phase-1-order.md), and that order is a property of the work
 rather than of where the file is filed. So `01-security-and-multitenancy` is still `01` in here, and
-`plans/phase-1/` still holds `07`, `11`, `16`, `20`, `31`, `39`, `49`, `51`, `54`, `55`, `57` and `59`.
+`plans/phase-1/` still holds `07`, `11`, `16`, `20`, `31`, `39`, `49`, `51`, `54`, `55` and `57`.
 
 `scripts/check-plan-order.mjs` therefore reads the **union** of the two directories. Left pointed at
-`plans/phase-1/` alone it would have passed vacuously — twelve directories asked to be numbered 01-12,
+`plans/phase-1/` alone it would have passed vacuously — eleven directories asked to be numbered 01-11,
 and every dependency on a moved plan resolving to "not a plan directory". It now reports
 `OK: 59 plans numbered 01-59, every dependency points backward`, which is the same guarantee as before
 the split.

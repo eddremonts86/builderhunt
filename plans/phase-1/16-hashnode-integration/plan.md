@@ -1,6 +1,6 @@
 # Plan: Hashnode Integration
 
-> **Status**: `retired`
+> **Status**: `superseded` — retired, not built
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: The original "likely skip" decision is obsolete — the connector was

@@ -1,6 +1,6 @@
 # Tasks: IndieHackers Integration
 
-> **Status**: `closed — skipped`
+> **Status**: `superseded` — closed and skipped, not built
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Blocking decision made 2026-07-25 (product owner): option (a), skip

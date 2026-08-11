@@ -307,6 +307,71 @@ test.describe('team accounts release matrix', () => {
     await expect(pageB.getByTestId('plan-picker')).toHaveCount(0)
   })
 
+  test('a third invitee declines, and the decline is a real outcome rather than a message', async () => {
+    /**
+     * The gap this closes.
+     *
+     * Two specs referenced `invitation-decline-btn` before this one and neither pressed it: one asserted
+     * it was visible, the other that it was absent on an invalid invitation. So the button was known to
+     * render and its outcome was never exercised — the `POST …/reject` call, the declined state, and
+     * whether anything was left behind. Found while writing the plan's closing evidence, by checking a
+     * coverage claim instead of trusting it.
+     *
+     * A third invitee rather than reusing B: B is a member by now, and re-inviting a member to decline
+     * would test a different path than the one a real declining recipient takes.
+     */
+    const emailC = uniqueEmail('decliner')
+    const link = await inviteAndGetDevLink(pageA, emailC)
+
+    const contextC = await pageA.context().browser()!.newContext()
+    const pageC = await contextC.newPage()
+    try {
+      await signUp(pageC, emailC, 'Invitee C')
+      await goto(pageC, new URL(link).pathname)
+      await expect(pageC.getByTestId('invitation-page')).toBeVisible()
+      await expect(pageC.getByTestId('invitation-decline-btn')).toBeVisible()
+
+      await pageC.getByTestId('invitation-decline-btn').click()
+
+      // The declined state replaces the card and both buttons — declining is terminal on this page, so
+      // leaving Accept clickable would offer an action the invitation can no longer satisfy.
+      await expect(pageC.getByTestId('invitation-declined')).toBeVisible()
+      await expect(pageC.getByTestId('invitation-accept-btn')).toHaveCount(0)
+      await expect(pageC.getByTestId('invitation-decline-btn')).toHaveCount(0)
+      await expect(pageC.getByTestId('invitation-value-preview')).toHaveCount(0)
+
+      // And it is an outcome in the database, not only in the DOM: no membership in *A's team*, and
+      // nothing left pending that a later accept could still redeem.
+      const sql = observerSql()
+      try {
+        /**
+         * Scoped to the team, not to the user.
+         *
+         * The first version asserted C had no membership rows at all and failed on
+         * `org_personal_…:owner`: sign-up gives every user their own personal organization, so "no
+         * memberships" is never true of a signed-up user and the assertion was about the wrong thing.
+         * Declining an invitation means not joining *that* organization.
+         */
+        const members = await sql`
+          select m.id from organization_members m
+          join auth_users u on u.id = m.user_id
+          join organizations o on o.id = m.organization_id
+          where u.email = ${emailC} and o.name = ${teamName}
+        `
+        expect(members).toHaveLength(0)
+        const pending = await sql`
+          select id from organization_invitations
+          where email = ${emailC} and status = 'pending'
+        `
+        expect(pending).toHaveLength(0)
+      } finally {
+        await sql.end({ timeout: 5 }).catch(() => undefined)
+      }
+    } finally {
+      await contextC.close()
+    }
+  })
+
   test('A removes B from the team', async () => {
     await goto(pageA, '/settings/team')
     await pageA.locator('button[data-testid^="remove-member-"]').first().click()

@@ -1,6 +1,6 @@
 # Feature: SourceHut Integration
 
-> **Status**: `retired`
+> **Status**: `superseded` — retired, not built
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector exists at `src/lib/sources/sourcehut.ts` and is fully wired

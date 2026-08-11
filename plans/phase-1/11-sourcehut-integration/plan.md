@@ -1,6 +1,6 @@
 # Plan: SourceHut Integration
 
-> **Status**: `retired`
+> **Status**: `superseded` — retired, not built
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: The original "deferred" decision is obsolete — the connector shipped

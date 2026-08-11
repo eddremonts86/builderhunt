@@ -1,6 +1,6 @@
 # Tasks: SourceHut Integration
 
-> **Status**: `retired` (2026-08-04)
+> **Status**: `superseded` — retired 2026-08-04, not built
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: the connector shipped and **never returned a single result** — meta.sr.ht has no

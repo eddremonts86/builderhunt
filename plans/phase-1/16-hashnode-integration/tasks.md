@@ -1,6 +1,6 @@
 # Tasks: Hashnode Integration
 
-> **Status**: `retired` (2026-08-04)
+> **Status**: `superseded` — retired 2026-08-04, not built
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: the connector shipped and then **stopped working silently**. Hashnode closed free

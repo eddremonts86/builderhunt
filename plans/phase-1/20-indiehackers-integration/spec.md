@@ -1,6 +1,6 @@
 # Feature: IndieHackers Integration
 
-> **Status**: `closed — skipped`
+> **Status**: `superseded` — closed and skipped, not built
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Closed 2026-07-25 — product owner chose option (a), skip permanently

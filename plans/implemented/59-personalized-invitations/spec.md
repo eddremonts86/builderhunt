@@ -1,6 +1,6 @@
 # Personalized organization invitations — Specification
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`27-team-accounts`](../../implemented/27-team-accounts/spec.md)
 > **Blocks**: nothing
 > **Reality check**: verified against HEAD on 2026-08-09. Organization invitations are

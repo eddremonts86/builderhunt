@@ -1,6 +1,6 @@
 # Personalized organization invitations — Tasks
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`27-team-accounts`](../../implemented/27-team-accounts/spec.md)
 > **Blocks**: nothing
 > **Reality check**: execute against the existing organization lifecycle and route files named
@@ -231,11 +231,11 @@
     `pnpm security:route-methods`, `pnpm security:ui-route-graph`, `pnpm type-check`,
     `pnpm lint`, and `pnpm build` all exit 0 and their results are copied into the evidence file.
 
-- [~] **Verify the complete flow manually and close only on the full gate**
+- [x] **Verify the complete flow manually and close only on the full gate**
   - Files: `docs/operations/personalized-invitations-verification.md`,
-    `plans/phase-1/59-personalized-invitations/spec.md`,
-    `plans/phase-1/59-personalized-invitations/plan.md`,
-    `plans/phase-1/59-personalized-invitations/tasks.md`
+    `plans/implemented/59-personalized-invitations/spec.md`,
+    `plans/implemented/59-personalized-invitations/plan.md`,
+    `plans/implemented/59-personalized-invitations/tasks.md`
   - Do: In the real local browser, execute sender preview/send, outbox link, signed-out sign-in
     return, recipient review, accept, organization activation, onboarding prefill, decline,
     wrong-account, legacy-null, and simulated activation-fallback flows at mobile and desktop
@@ -243,8 +243,19 @@
     `pnpm ci:local`. Only after it is completely green, record dated evidence, check every task,
     and change all three status headers to `implemented`.
   - Verify: the evidence file maps every acceptance criterion to a screenshot/test/command and
-    includes a zero exit code for the final `pnpm ci:local`; `rg -n '^- \[ \]' plans/phase-1/59-personalized-invitations/tasks.md`
+    includes a zero exit code for the final `pnpm ci:local`; `rg -n '^- \[ \]' plans/implemented/59-personalized-invitations/tasks.md`
     returns no matches after closure.
+  - **Closed on automated evidence, not on a human pass.** The maintainer decided this explicitly on
+    2026-08-11. `docs/operations/personalized-invitations-verification.md` opens by naming what was
+    therefore *not* checked — no screen-reader pass, no human review of keyboard focus, no human eye on
+    the mobile widths — so a checked box here is not mistaken for a sign-off.
+  - Writing that evidence file found a real gap, by checking a coverage claim instead of trusting it:
+    two specs referenced `invitation-decline-btn` and **neither pressed it**. The Decline outcome — the
+    `POST …/reject`, the declined state, whether anything was left behind — had never been exercised.
+    `tests/e2e/team-accounts.spec.ts` now covers it with a third invitee, and asserts no membership in
+    *that team* plus nothing left `pending`.
+  - Result: 11 screenshots in `tests/artifacts/walkthrough/`, `team-accounts.spec.ts` 11/11,
+    `invitation-walkthrough.spec.ts` 3/3, and `pnpm ci:local` at 34/34 steps.
 
 ## Explicitly deferred
 

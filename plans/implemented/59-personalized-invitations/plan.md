@@ -1,6 +1,6 @@
 # Personalized organization invitations — Delivery Plan
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`27-team-accounts`](../../implemented/27-team-accounts/spec.md)
 > **Blocks**: nothing
 > **Reality check**: implementation extends the current organization lifecycle, invitation
