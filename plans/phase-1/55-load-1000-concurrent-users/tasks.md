@@ -17,9 +17,9 @@
   - Verify: `pnpm vitest run tests/unit/scripts/load/config.test.ts` passes and the test pins the
     1,000-user/400–500 req/s contract.
 
-- [~] **Create disposable load fixtures**
+- [x] **Create disposable load fixtures**
   - Files: `scripts/load/seed.ts`, `scripts/load/cleanup.ts`,
-    `tests/unit/scripts/load/seed-safety.test.ts`
+    `tests/unit/scripts/load/seed-safety.test.ts`, `scripts/load/verify-fixtures.ts`, `package.json`
   - Do: Create 1,000 deterministic Better Auth users, one organization per user, and bounded
     non-empty builder, alert-trigger, recommendation-source, and sprint-result rows. Refuse a
     production DB marker, a non-loopback host unless `LOAD_DISPOSABLE_DATABASE=true`, or a database
@@ -27,6 +27,17 @@
   - Verify: `pnpm vitest run tests/unit/scripts/load/seed-safety.test.ts` passes; an integration run
     against a disposable database creates exactly 1,000 login-capable users and cleanup returns all
     run-scoped row counts to zero.
+  - The integration run is `pnpm load:verify-fixtures`, which creates its own database, migrates,
+    seeds, asserts, cleans up and drops it — repeatable rather than a one-off, because the properties
+    that matter (a *login-capable* account, delete order under real foreign keys) are ones a mock
+    cannot have.
+  - Found while verifying: the first `cleanup.ts` deleted organizations by a guessed slug pattern.
+    `personalOrganizationSlug` returns `personal-<opaque hash>`, so it would have matched nothing,
+    left 1,000 organizations behind, and still reported a clean run — `remaining` did not count the
+    table it had just failed to touch. Now resolved from the membership rows that created them, and
+    counted the same way it deletes.
+  - Result: 1,000 login-capable users, 1,000 owning memberships, 33,200 rows across nine tables;
+    cleanup returned every run-scoped count to zero.
 
 - [ ] **Implement the HTTP load runner and reporter**
   - Files: `scripts/load/runner.ts`, `scripts/load/auth.ts`, `scripts/load/histogram.ts`,
