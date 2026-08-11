@@ -1,24 +1,47 @@
 /**
  * Wave 5 — organization-admin overview projection.
  *
- * Tenant-scoped aggregator that composes the six org-admin overview
- * sections (members, billing, blocked workflows, feature adoption,
- * security posture, privacy requests) from real organization data.
+ * Tenant-scoped aggregator that composes the six org-admin overview sections (members, billing, blocked
+ * workflows, feature adoption, security posture, privacy requests) for one organization.
  *
- * Every field is minimized by owner/admin authority: members sees
- * counts + roles only, never per-user identity; billing surfaces the
- * plan tier and a single boolean for cap proximity; security posture
- * counts unverified admins but never their email.
+ * Every field is minimized by owner/admin authority: members sees counts and roles only, never per-user identity,
+ * and billing surfaces the plan tier and a single boolean for cap proximity rather than a percentage.
  *
  * Privacy contract (enforced in `admin-contracts.ts`):
- *   - The 8 forbidden markers (`memberEmail`, `candidateEmail`,
- *     `productivityScore`, `rank`, `sessionDetail`, `individualAdoption`,
- *     `searchContent`, `noteContent`) MUST NOT appear anywhere in the
- *     serialized output. A grep CI gate is the structural guarantee;
- *     this file is the place to look first.
+ *   - The 8 forbidden markers (`memberEmail`, `candidateEmail`, `productivityScore`, `rank`, `sessionDetail`,
+ *     `individualAdoption`, `searchContent`, `noteContent`) MUST NOT appear anywhere in the serialized output. A
+ *     grep CI gate is the structural guarantee; this file is the place to look first.
  *
- * The repository is read-only and parameterized by `organizationId`; it
- * never reads cross-tenant data, even for a platform-admin caller.
+ * The repository is read-only and parameterized by `organizationId`; it never reads cross-tenant data, even for a
+ * platform-admin caller.
+ *
+ * ## Rewritten 2026-08-11, because the first version could not run
+ *
+ * It was written against a schema that does not exist, and nothing imported it — so it type-checked, parsed its
+ * own contract, and had never executed a single query successfully. Called for real it threw
+ * `column "email_verified" does not exist`, and that was only the first of four problems:
+ *
+ * - `email_verified` and `last_sign_in_at` were selected **from `organization_members`**. They are not there.
+ *   `email_verified` is on `auth_users` — and the join that looks like the fix answers `permission denied`, because
+ *   `builderhunt_app` is not granted on the account table at all. `last_sign_in_at` **does not exist anywhere**:
+ *   `auth_users` has seven columns and none of them is a sign-in time.
+ * - `entitlements` is really `organization_entitlements`.
+ * - `data_privacy_requests` is really two tables, `deletion_requests` and `data_export_requests`, and both are
+ *   keyed on `user_id` rather than on an organization — so an organization-scoped count has to go through
+ *   membership.
+ * - `blocked_workflows` and `feature_adoption` exist in no form at all.
+ *
+ * ## What it does now
+ *
+ * Three sections read real tables — members, billing, privacy requests. Three answer
+ * `unavailable: 'dependency-missing'`, which is what that state is for: the alternative is inventing a count, and
+ * "0 blocked workflows" on a dashboard reads as a healthy workspace rather than as an unbuilt feature. Same rule
+ * the Admin Metrics sections follow, and this plan's whole subject.
+ *
+ * The third of those three is the interesting one, because its dependency is a **privilege** rather than a table.
+ * See `securityPosture` below. The per-admin stale-days map the original write-up described is gone for a plainer
+ * reason: there is no sign-in timestamp to compute it from, and a map of zeros would say every admin signed in
+ * today.
  */
 import type { Sql } from 'postgres'
 import type { z } from 'zod'
@@ -27,195 +50,191 @@ import { orgAdminOverviewSchema } from '~/shared/lib/dashboard/admin-contracts'
 export type OrgAdminOverview = z.infer<typeof orgAdminOverviewSchema>
 
 /**
- * Inputs the projection needs. Every field is a tenant-scoped
- * server-internal reference; the route handler resolves the
- * organizationId from the session, never from a client-supplied value.
+ * Inputs the projection needs. Every field is a tenant-scoped server-internal reference; the route handler
+ * resolves the organizationId from the session, never from a client-supplied value.
  */
 export interface OrgAdminProjectionInput {
   organizationId: string
   range: '24h' | '7d' | '30d'
   now: Date
-  clock: { now: () => Date }
 }
 
+/** A section with no table behind it. The reason is closed by the contract; `dependency-missing` is the honest one. */
+const dependencyMissing = { state: 'unavailable' as const, reason: 'dependency-missing' as const }
+
 /**
- * Aggregate the six org-admin sections for a single organization.
- * Returns the typed overview directly — the route handler
- * (`GET /api/dashboard/organization-admin`) is responsible for auth
- * and serialization; this function is pure data.
+ * The cap proximity threshold: 80 % of the seat limit.
+ *
+ * A boolean rather than a percentage, deliberately. "You are at 87 % of your seats" invites arithmetic on a
+ * number the reader cannot act on precisely; "you are approaching your seat limit" is the decision. And the
+ * *count* of seats is already in the members section, so the percentage would be derivable anyway — by whoever
+ * wants it, rather than published as a headline.
  */
+const SEAT_CAP_WARNING_RATIO = 0.8
+
 export async function readOrgAdminOverview(
   sql: Sql,
   input: OrgAdminProjectionInput,
 ): Promise<OrgAdminOverview> {
   const { organizationId, range, now } = input
+  const generatedAt = now.toISOString()
 
-  // Members and seats — counts only. The query explicitly does NOT
-  // SELECT user email, name, or any per-member identity.
-  const membersRow = await sql<
-    {
-      total: number
-      active: number
-      pending: number
-      owners: number
-      admins: number
-      members: number
-    }[]
-  >`
+  /**
+   * Members and seats — counts and role breakdown only, and **no join to `auth_users`**.
+   *
+   * The obvious fix for the original `column "email_verified" does not exist` was to join the account table, since
+   * that is where the column lives. Running it proved that wrong for a better reason: `builderhunt_app` is not
+   * granted `SELECT` on `auth_users` at all — only `builderhunt_auth` and `builderhunt_platform` are — so the join
+   * answers `permission denied for table auth_users`.
+   *
+   * That is the role separation working, not an oversight to route around. A tenant-facing projection has no
+   * business reading the account table, and granting it that privilege to populate a dashboard tile would be a
+   * real regression traded for a number. So the verified count is gone and `securityPosture` says why.
+   *
+   * The pending-invitation count is gone for the same kind of reason, found the same way: `organization_invitations`
+   * is granted to `builderhunt_auth` only, because invitations are managed by Better Auth. Three of the original
+   * design's numbers turned out to need a privilege this connection does not have, and each one was discovered by
+   * running the query rather than by reading it — which is exactly why a projection nothing imports proves nothing.
+   *
+   * The `FILTER` clauses are parenthesised before their casts because `count(*)::int filter (…)` is a syntax
+   * error — a shape this repository has already shipped once, in a load monitor that reported a peak of zero while
+   * every sample threw.
+   */
+  const [memberRow] = await sql<{ total: number; owners: number; admins: number; members: number }[]>`
     SELECT
-      count(*)::int as total,
-      count(*) FILTER (WHERE email_verified)::int as active,
-      (SELECT count(*)::int FROM organization_invitations
-        WHERE organization_id = ${organizationId} AND status = 'pending') as pending,
-      count(*) FILTER (WHERE role = 'owner')::int as owners,
-      count(*) FILTER (WHERE role = 'admin')::int as admins,
-      count(*) FILTER (WHERE role = 'member')::int as members
-    FROM organization_members
-    WHERE organization_id = ${organizationId}
-  `.then((rows) => rows[0] ?? {
-    total: 0, active: 0, pending: 0, owners: 0, admins: 0, members: 0,
-  })
+      count(*)::int AS total,
+      (count(*) FILTER (WHERE m.role = 'owner'))::int AS owners,
+      (count(*) FILTER (WHERE m.role = 'admin'))::int AS admins,
+      (count(*) FILTER (WHERE m.role = 'member'))::int AS members
+    FROM organization_members m
+    WHERE m.organization_id = ${organizationId}
+  `
 
-  // Billing + entitlement
-  const billingRow = await sql<
-    { tier: 'free' | 'pro' | 'team'; seats_used: number; seats_total: number; renews_at: Date | null }[]
+  /** The plan row. Absent is a real state: an organization with no entitlement row has never been provisioned. */
+  const [entitlement] = await sql<
+    { tier: string; status: string; seat_limit: number | null; current_period_end: Date | null }[]
   >`
-    SELECT tier, seats_used, seats_total, renews_at
-    FROM entitlements
+    SELECT tier::text, status::text, seat_limit, current_period_end
+    FROM organization_entitlements
     WHERE organization_id = ${organizationId}
-  `.then((rows) => rows[0])
-  const approachingCap =
-    billingRow !== undefined && billingRow.seats_total > 0
-      ? billingRow.seats_used / billingRow.seats_total >= 0.8
-      : false
-  const renewalDaysRemaining =
-    billingRow?.renews_at
-      ? Math.max(
-          0,
-          Math.round((new Date(billingRow.renews_at).getTime() - now.getTime()) / 86_400_000),
-        )
+    LIMIT 1
+  `
+
+  /**
+   * Privacy requests — counts per status across both request kinds, joined through membership.
+   *
+   * Both tables are keyed on `user_id`, so "this organization's requests" means "requests by people in it". That
+   * is an approximation and worth naming: a member who left keeps their request, and it stops being counted here.
+   * The alternative — recording an organization on the request — is a schema change, and for a *deletion* request
+   * it is arguably the wrong one: the request belongs to the person, not to a workspace they happened to be in.
+   */
+  const privacyRows = await sql<{ kind: string; status: string; total: number }[]>`
+    SELECT 'deletion' AS kind, d.status::text, count(*)::int AS total
+    FROM deletion_requests d
+    WHERE d.user_id IN (SELECT user_id FROM organization_members WHERE organization_id = ${organizationId})
+    GROUP BY d.status
+    UNION ALL
+    SELECT 'export' AS kind, e.status::text, count(*)::int AS total
+    FROM data_export_requests e
+    WHERE e.user_id IN (SELECT user_id FROM organization_members WHERE organization_id = ${organizationId})
+    GROUP BY e.status
+  `
+
+  const memberTotal = Number(memberRow?.total ?? 0)
+  const seatLimit = entitlement?.seat_limit ?? null
+  const renewalDays =
+    entitlement?.current_period_end != null
+      ? Math.max(0, Math.ceil((new Date(entitlement.current_period_end).getTime() - now.getTime()) / 86_400_000))
       : null
 
-  // Blocked workflows — counts per kind, no row identity. The kinds are
-  // a server-controlled enum; the table column stores them as text.
-  const blockedRows = await sql<{ kind: string; count: number }[]>`
-    SELECT kind::text, count(*)::int as count
-    FROM blocked_workflows
-    WHERE organization_id = ${organizationId}
-    GROUP BY kind
-  `
-  const blockedCounts: Record<string, number> = {}
-  let blockedTotal = 0
-  for (const r of blockedRows) {
-    if (/^[a-z0-9_-]+$/.test(r.kind)) {
-      blockedCounts[r.kind] = r.count
-      blockedTotal += r.count
-    }
-  }
-
-  // Feature adoption — org-aggregated fractions. Never per-member.
-  const adoptionRows = await sql<{ feature_key: string; total: number; used: number }[]>`
-    SELECT feature_key, total, used
-    FROM feature_adoption
-    WHERE organization_id = ${organizationId}
-      AND window_days = ${rangeDays(range)}
-  `
-  const rates: Record<string, number> = {}
-  for (const r of adoptionRows) {
-    if (/^[a-z0-9_-]+$/.test(r.feature_key) && r.total > 0) {
-      rates[r.feature_key] = Math.min(1, Math.max(0, r.used / r.total))
-    }
-  }
-
-  // Security posture — counts and stale-admin map (adminUserId, days).
-  // Only `admin` and `owner` rows are returned; member rows are excluded.
-  const securityRows = await sql<{ user_id: string; last_sign_in: Date | null; verified: boolean }[]>`
-    SELECT user_id, last_sign_in_at as last_sign_in, email_verified as verified
-    FROM organization_members
-    WHERE organization_id = ${organizationId}
-      AND role IN ('owner', 'admin')
-  `
-  const unverifiedAdmins = securityRows.filter((r) => !r.verified).length
-  const staleAdminDays: Record<string, number> = {}
-  for (const r of securityRows) {
-    if (r.last_sign_in) {
-      const days = Math.floor((now.getTime() - new Date(r.last_sign_in).getTime()) / 86_400_000)
-      if (days > 30 && Object.keys(staleAdminDays).length < 50) {
-        staleAdminDays[r.user_id] = days
-      }
-    }
-  }
-
-  // Privacy requests — public statuses only, never request bodies.
-  const privacyRow = await sql<{ pending: number }[]>`
-    SELECT count(*)::int as pending
-    FROM data_privacy_requests
-    WHERE organization_id = ${organizationId}
-      AND status IN ('pending', 'processing')
-  `.then((rows) => rows[0] ?? { pending: 0 })
-
-  const built = orgAdminOverviewSchema.parse({
+  return orgAdminOverviewSchema.parse({
     schemaVersion: 1 as const,
     organizationId,
     range,
-    generatedAt: now.toISOString(),
+    generatedAt,
     sections: {
-      members: {
-        state: 'ready',
-        generatedAt: now.toISOString(),
-        actions: [],
-        data: {
-          totalMembers: membersRow.total,
-          activeSeats: membersRow.active,
-          pendingInvitations: membersRow.pending,
-          byRole: { owner: membersRow.owners, admin: membersRow.admins, member: membersRow.members },
-        },
-      },
-      billing: {
-        state: 'ready',
-        generatedAt: now.toISOString(),
-        actions: [],
-        data: {
-          tier: billingRow?.tier ?? 'free',
-          approachingCap,
-          renewalDaysRemaining,
-        },
-      },
-      blockedWorkflows: {
-        state: 'ready',
-        generatedAt: now.toISOString(),
-        actions: [],
-        data: { blockedCounts, total: blockedTotal },
-      },
-      featureAdoption: {
-        state: 'ready',
-        generatedAt: now.toISOString(),
-        actions: [],
-        data: { rates },
-      },
-      securityPosture: {
-        state: 'ready',
-        generatedAt: now.toISOString(),
-        actions: [],
-        data: { unverifiedAdmins, staleAdminDays },
-      },
-      privacyRequests: {
-        state: 'ready',
-        generatedAt: now.toISOString(),
-        actions: [],
-        data: {
-          pending: privacyRow.pending,
-          allowedStatuses: ['pending', 'processing'],
-        },
-      },
+      members:
+        memberTotal === 0
+          ? // A workspace with no members cannot exist while somebody is reading this page as its admin, so this
+            // is really "the join found nothing", which is a state worth showing as empty rather than as zeros.
+            { state: 'empty' as const }
+          : {
+              state: 'ready' as const,
+              generatedAt,
+              actions: [],
+              data: {
+                total: memberTotal,
+                byRole: {
+                  owner: Number(memberRow?.owners ?? 0),
+                  admin: Number(memberRow?.admins ?? 0),
+                  member: Number(memberRow?.members ?? 0),
+                },
+                seatLimit,
+              },
+            },
+
+      billing: entitlement
+        ? {
+            state: 'ready' as const,
+            generatedAt,
+            actions: [],
+            data: {
+              tier: entitlement.tier,
+              status: entitlement.status,
+              seatLimit,
+              /** A boolean, not a percentage — see `SEAT_CAP_WARNING_RATIO`. */
+              approachingSeatCap: seatLimit !== null && seatLimit > 0 && memberTotal / seatLimit >= SEAT_CAP_WARNING_RATIO,
+              renewalDays,
+            },
+          }
+        : // Never provisioned. Not an error, and not a free tier either — the absence of a row is not a plan.
+          { state: 'empty' as const },
+
+      /**
+       * No table exists in any form for either of these, so both say so.
+       *
+       * `dependency-missing` rather than `empty`: empty means "nothing to show", which a reader takes as "no
+       * blocked workflows" — a healthy workspace. This says the feature is not there, which is the truth.
+       */
+      blockedWorkflows: dependencyMissing,
+      featureAdoption: dependencyMissing,
+
+      /**
+       * Security posture: `dependency-missing`, and the dependency is a *privilege* rather than a table.
+       *
+       * Both numbers the original design named need the account table. The unverified-admin count needs
+       * `auth_users.email_verified`, which `builderhunt_app` is not granted — that separation is deliberate, and
+       * granting it to populate a dashboard tile would trade a real boundary for a number. The per-admin
+       * stale-days map needs a sign-in timestamp, and `auth_users` has seven columns of which none is one.
+       *
+       * So this section has no honest content from a tenant-scoped connection. Reporting `elevatedMembers` alone
+       * would be worse than nothing: a count of owners and admins is already in the members section, and putting
+       * it under "security posture" implies it was assessed.
+       */
+      securityPosture: dependencyMissing,
+
+      privacyRequests:
+        privacyRows.length === 0
+          ? { state: 'empty' as const }
+          : {
+              state: 'ready' as const,
+              generatedAt,
+              actions: [],
+              data: {
+                /**
+                 * Counts per kind and status, and nothing else.
+                 *
+                 * No request ids, no subjects, no reasons. A deletion request's *content* is the most sensitive
+                 * thing in this projection, and the shape of the query is what keeps it out: it groups and counts,
+                 * so there is no column to leak rather than a filter that has to remember.
+                 */
+                byKind: privacyRows.reduce<Record<string, Record<string, number>>>((accumulator, row) => {
+                  if (!/^[a-z_]{1,32}$/.test(row.status)) return accumulator
+                  accumulator[row.kind] = { ...(accumulator[row.kind] ?? {}), [row.status]: Number(row.total ?? 0) }
+                  return accumulator
+                }, {}),
+              },
+            },
     },
   })
-
-  return built
-}
-
-function rangeDays(range: '24h' | '7d' | '30d'): number {
-  if (range === '24h') return 1
-  if (range === '7d') return 7
-  return 30
 }

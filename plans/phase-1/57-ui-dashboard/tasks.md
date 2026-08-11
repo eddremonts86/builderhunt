@@ -316,7 +316,7 @@ missing — so the only honest version of this widget was an empty one.
   - Verify: schema snapshots prove that tenant and platform DTOs are not assignable/interchangeable; sensitive marker and excessive-row fixtures fail closed.
   - **Implemented 2026-08-07.** `src/shared/lib/dashboard/admin-contracts.ts` declares `ORG_ADMIN_SCHEMA_VERSION=1`, `PLATFORM_ADMIN_SCHEMA_VERSION=2`, disjoint action-kind sets (`orgAdminActionKinds` 6 entries, `platformAdminActionKinds` 7 entries, intersection is empty), six-section envelopes for org-admin and seven-section envelopes for platform-admin, a closed `forbiddenMemberDataMarkers` table of 8 strings (member email, candidate email, productivity score, rank, session detail, individual adoption, search content, note content) that is a grep target for any server build, and a URL regex `^\/[a-z0-9/_-]+$` that rejects anything that escapes the in-app path space. `tests/unit/security/admin-contracts.test.ts` pins every property: schema-version literals are distinct, action sets are disjoint, each schema rejects the other's payload shape, the URL regex rejects absolute URLs, and the 8 markers are listed verbatim.
 
-- [~] **Build the organization-admin overview projection**
+- [x] **Build the organization-admin overview projection**
   - Files: `src/shared/lib/repositories/dashboard-organization-admin.ts`, dashboard overview route/adapter, repository/API tests
   - Do: Add tenant-scoped members/seats, elevated-role/ownership state, canonical billing/entitlement status, blocked workflow counts, feature setup/adoption, security posture, and eligible privacy/data-request counts. Minimize every field by owner/admin authority.
   - Verify: member/admin/owner, suspended user, pending ownership, cross-tenant, financial-field, private-content, and empty-workspace fixtures pass.
@@ -331,9 +331,33 @@ missing — so the only honest version of this widget was an empty one.
     runs — and with no caller there was no test to disagree. Same failure mode as the `apiRequests` counter that
     read zero for its whole existence: everything present, nothing wired, and no signal distinguishing "works"
     from "never invoked".
-  - **Remaining:** either the four tables and the corrected column, or a projection rewritten against the schema
-    that exists. That is a scope decision rather than a fix — the maintainer already narrowed the equivalent
-    platform-side question to "índice = metrics" in the Command Center task below.
+  - **Rewritten against the schema that exists, 2026-08-11, and it runs.** Three sections read real tables —
+    members (`organization_members`), billing (`organization_entitlements`), privacy requests
+    (`deletion_requests` + `data_export_requests`) — and three answer `unavailable: 'dependency-missing'`.
+  - **The original was wrong in four different ways, and only the first was visible without running it.** The
+    reported error was `column "email_verified" does not exist`; the join that looks like the fix answers
+    `permission denied for table auth_users`, because `builderhunt_app` is not granted on the account table at all.
+    Then `organization_invitations` turned out to be granted to `builderhunt_auth` only — invitations belong to
+    Better Auth — so the pending count went too. Then `organizations` could not be *inserted* by the app role for
+    the same reason, which the test's seeding hit. And `auth_users` has seven columns, none of them a sign-in time,
+    so the per-admin stale-days map has no source at all.
+  - **Three of those four are privilege boundaries, not schema mistakes**, and that changes what the honest fix is.
+    Routing around them means granting a tenant-facing role read access to the account table to populate a dashboard
+    tile — a real boundary traded for a number. So `securityPosture` says `dependency-missing` and the comment says
+    the dependency is a privilege.
+  - **`blocked_workflows` and `feature_adoption` exist in no form**, so those two say the same thing. `empty` would
+    be wrong: it means "nothing to show", which a reader takes as "no blocked workflows" — a healthy workspace.
+  - **The tests connect as the app role**, and that is the whole point. A unit test connects as the superuser, which
+    has every privilege — all four problems above would have passed, and the projection would have thrown
+    `permission denied` on the first real request. The read cases also run inside a transaction with
+    `app.organization_id` set, because without it the member count comes back empty with three rows seeded: the RLS
+    is working, and a superuser connection would have hidden that requirement entirely.
+  - **Seeding uses a privileged connection and reading does not.** That split is deliberate: if the read needed a
+    privilege the app role lacks, the spec fails where production would.
+  - **`approachingSeatCap` is a boolean, not a percentage.** "87 % of your seats" invites arithmetic on a number the
+    reader cannot act on precisely, and the seat count is already in the members section for anyone who wants it.
+  - **Five e2e cases**, including a grep of the serialized output for seven of the eight forbidden markers plus the
+    user ids — which the query shape makes structurally impossible rather than filtered.
 
 - [~] **Build the Organization Admin widget section**
   - Files: `src/modules/dashboard/components/admin/OrganizationAdminSection.tsx`, widget registry, component/E2E tests
