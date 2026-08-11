@@ -169,15 +169,43 @@ async function render(search: Partial<AdminMetricsUrlState> = {}) {
     await router.load()
   })
   /**
-   * Six flushes, because a section is three *chained* asynchronous steps and each needs its own.
+   * Flush until the section has settled, with a deadline — not a fixed number of flushes.
    *
-   * The shell's fetch, then the `React.lazy` chunk resolving, then the widget's own fetch inside its effect —
-   * and each of those settles a promise whose continuation schedules the next. Two flushes was enough for the
-   * cases that only needed the first two steps and left the third unrendered, so a widget that worked failed
-   * its assertion and read as a component bug. Six is comfortably past the longest chain here rather than
-   * exactly it, so adding a step to a widget does not silently start failing unrelated cases.
+   * A section is a chain of asynchronous steps, each settling a promise whose continuation schedules the next:
+   * the shell's fetch, the `React.lazy` chunk resolving, the widget's own fetch inside its effect. This was six
+   * flushes, with a comment saying six was "comfortably past the longest chain… so adding a step to a widget does
+   * not silently start failing unrelated cases". A fixed count cannot deliver that, and on 2026-08-11 it did not:
+   * two cases in this file failed in the **full** unit run and passed on their own or in any smaller slice.
+   *
+   * The cause is not another test file — I bisected all 43 in `tests/unit/routes/api` and no single one triggers
+   * it. It is the cumulative cost of a warm-but-crowded module registry making the lazy import take longer than
+   * six macrotasks, which is a race the count merely hid at smaller scale. I also mis-diagnosed it once as a
+   * flake, on the strength of ten green runs of this directory alone — the directory is exactly the scale at which
+   * the race does not show.
+   *
+   * So the wait is now a condition: keep flushing until the Suspense fallback is gone *and* the section has
+   * rendered one of its three outcomes — values, a named `unavailable` code, or a load error — or the deadline
+   * passes. The deadline is a ceiling on a hang rather than a guess at a duration, and a case whose section
+   * genuinely never resolves still fails on its own assertion instead of being masked here.
+   *
+   * The cost, measured: a case whose section really is broken now takes the full deadline before failing, so a
+   * genuine regression in `MetricSectionView`'s unavailable branch costs five seconds per affected case instead of
+   * failing immediately. That is paid only when something is wrong, which is the right side of the trade for a
+   * suite whose green path is the common one.
    */
-  for (let flush = 0; flush < 6; flush += 1) {
+  const SETTLE_DEADLINE_MS = 5_000
+  const settled = () =>
+    !container!.querySelector('[data-testid="admin-metrics-widget-loading"]') &&
+    Boolean(
+      container!.querySelector('[data-testid="metric-values"]') ??
+        container!.querySelector('[data-testid^="metric-section-unavailable-"]') ??
+        container!.querySelector('[data-testid="metric-section-load-error"]'),
+    )
+
+  const deadline = Date.now() + SETTLE_DEADLINE_MS
+  // A minimum of two flushes even once `settled()` is true, because the first paint of a resolved section can
+  // still have an effect queued behind it — the same reason the old count was not one.
+  for (let flush = 0; flush < 2 || (!settled() && Date.now() < deadline); flush += 1) {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
   }
 }
