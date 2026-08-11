@@ -114,9 +114,35 @@
     left to abort** before navigating away, so an attribute hardcoded to `ready` would return immediately and bring
     back the "Dashboard load error" console noise the strict guard catches. The signal has to keep meaning what it
     means while the shell renders regardless.
-  - **Not attempted here**, deliberately. It is a four-file structural change to a 1,600-line page with 5 browser
-    cases and 222 unit cases resting on it, and it deserves room to verify rather than the tail of a long session.
-    The value of this note is that the next attempt starts with the four parts rather than with Playwright.
+  - **Correction 2026-08-11, later the same day: there is a fifth part, and it is the one that actually renders a
+    fabricated number.** The note above found the *empty-state* trap and stopped there. Reading the widgets rather
+    than the predicate turns up the bigger one: `statsData` builds every headline tile as
+    `value: stats?.totalBuilders ?? 0`, and `MetricWidgetProps.value` is a non-nullable `number` the component
+    renders with `value.toLocaleString()`. So with the early return gone, the three tiles do not merely risk an
+    empty state — they display **0, 0, 0** as finished numbers for the whole duration of the fetch, in
+    `.text-3xl` type. That is the identical defect the org-admin cards shipped hours earlier, from the identical
+    cause: a type that cannot say "not known yet", so the absence of data becomes a confident value.
+  - **`isVisible` appears exactly once in the registry**, on `first-hunt`. So the third part of the fix is one
+    widget, not a class of them — cheaper than the note implied, and worth knowing before starting.
+  - **The five parts, in dependency order:**
+    1. `MetricWidgetProps.value` becomes `number | null`, and `MetricWidget` renders a skeleton for `null` rather
+       than `0`. This is the load-bearing one, and it has to come first: without it every later part is decoration
+       over a lie. `dashboard-and-navigation.spec.ts` asserts the `.text-3xl` class, so the skeleton needs to keep
+       the tile's shape or that assertion has to move with it.
+    2. `statsData` passes `stats ? stats.totalBuilders : null` instead of `?? 0` — same for `activeThisWeek`.
+       `queries.length` is genuinely known and stays a number.
+    3. `HomeContext` gains `statsLoading`; `widgetContext` passes `loading` into it.
+    4. `first-hunt`'s `isVisible` requires `!ctx.statsLoading`, so the empty-workspace CTA cannot appear before
+       there is evidence the workspace is empty.
+    5. The early return goes, and `data-dashboard-state` becomes `loading ? 'loading' : 'ready'` on the
+       always-rendered root. `waitForDashboardSettled` waits for `[data-dashboard-state="ready"]` to be *attached*,
+       so this keeps meaning what it means — the attribute value changes rather than the element appearing, and
+       `ready` still attaches only once no fetch is left to abort.
+  - **Not attempted here**, deliberately, and now for a sharper reason than "it is large". Part 1 changes a shared
+    widget's public prop type, which is a different blast radius from the page-local change the four-part note
+    described — and the honest sequencing is to land it with its own tests before touching the page at all. The
+    value of this note is that the next attempt starts with `MetricWidget`, knowing that stopping after the page
+    edit would ship three zeros.
 
 ## Wave 2 — Action queue
 
