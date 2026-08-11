@@ -433,11 +433,40 @@ missing — so the only honest version of this widget was an empty one.
     guarantees confirmed by breaking them: paused-not-overdue, the empty-registry refusal, and excluding
     disabled sources from the obligation count.
 
-- [ ] **Build Billing, Abuse, Trust, and User Anomaly admin widgets**
+- [~] **Build Billing, Abuse, Trust, and User Anomaly admin widgets**
   - Files: admin overview adapters, admin dashboard widget components, tests
   - Depends on: bounded discovery projections for billing events, claims/trust queues, and operations from `plans/UI`
   - Do: Show canonical billing alerts, refund/dispute aging, reconciliation/dead-letter status, redacted abuse-risk distribution, trust/removal deadline aging, and entitlement/account anomalies. Keep mutations on canonical detail pages.
   - Verify: raw provider payloads, payment data, abuse evidence, subject/candidate content, tokens, stack traces, and arbitrary mutation endpoints never enter the API or DOM; each row opens an authorized detail destination.
+  - **Three of the four landed 2026-08-11** as the Metrics page's `trust` section, variants `removals`, `abuse`
+    and `billing`. Three separate variants rather than one merged panel because they fail independently: a refund
+    backlog, an abuse spike and a removal deadline are three different people's afternoons, and an operator acting
+    on the loudest number would not think to check the other two.
+  - **User anomalies are deliberately absent, and that is the honest answer.** The projection this task named
+    reads `platform_user_anomalies`, a table that appears in no migration, and nothing else in this codebase
+    detects a suspicious sign-in or impossible travel. A section reporting "0 anomalies" would say the detector
+    found nothing when there is no detector — which is why this stays `[~]` rather than being closed with a
+    fourth variant full of zeros.
+  - **Two bounded aggregates had to be written, and the reason is the same both times.** The obvious version
+    reads an existing list function and takes its length — and both list functions are capped, so past the cap
+    the count stops growing and the page reports "100 signals" or "50 failed" whether there are a hundred or a
+    hundred thousand, calmly. `countAbuseSignalsBySeverity` and `countBillingWebhookEventsByStatus` group by a
+    closed vocabulary, so the result size is decided by the enum rather than by the backlog.
+  - **Billing does not touch `getBillingOperationsMetrics`.** That function walks every organization serially and
+    was removed from every frequent path; a metrics section on a refresh timer is the most frequent path there is.
+  - **The privacy guarantee is structural, not a filter.** `countAbuseSignalsBySeverity` groups by severity and
+    selects nothing else, so there is no `userId`, `organizationId`, `requestId` or `details` to redact. A test
+    serializes the payload and greps for all four rather than trusting the shape.
+  - **A defect this shipped with, caught by running it.** The `removals` variant returned five zeros against the
+    real database because it did not check `PROFILE_REMOVAL_ENABLED`. With the door shut nobody can file a
+    request, so every count is zero *by construction* and "0 pending" renders as a clean queue —
+    the exact lie `/api/admin/metrics` has carried a comment about since it was written, where the whole
+    `removals` block is omitted for this reason. Now `not_enabled`, and it does not query at all.
+  - **Measured against the real database:** 54 abuse signals in 30 days (all medium), 1 pending webhook event, 0
+    dead-lettered, and removals correctly refusing as `not_enabled`.
+  - **Remaining:** a user-anomaly source, and the per-row drill-downs the Verify line asks for — these variants
+    are distributions, so the row-level "each row opens an authorized detail destination" belongs with the action
+    queue task above, which is where rows live.
 
 - [ ] **Build Growth, Conversion, and Public Content admin widgets**
   - Files: admin metrics/content adapters, admin dashboard widget components, tests

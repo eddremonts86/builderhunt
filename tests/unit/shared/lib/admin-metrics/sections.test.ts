@@ -26,6 +26,9 @@ import type { FamilyWindow, ServiceMetricWindow } from '../../../../../src/share
 const envStub: Record<string, string> = {}
 
 const mocks = vi.hoisted(() => ({
+  getRemovalOperationsMetrics: vi.fn(),
+  countAbuseSignalsBySeverity: vi.fn(),
+  countBillingWebhookEventsByStatus: vi.fn(),
   listScheduleRegistry: vi.fn(),
   listLatestJobRuns: vi.fn(),
   listSearchSources: vi.fn(),
@@ -57,6 +60,15 @@ vi.mock('../../../../../src/shared/lib/repositories/search-sources', () => ({
 }))
 vi.mock('../../../../../src/shared/lib/repositories/solution-catalog', () => ({
   listSolutionSources: mocks.listSolutionSources,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/profile-removal', () => ({
+  getRemovalOperationsMetrics: mocks.getRemovalOperationsMetrics,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/abuse-signals', () => ({
+  countAbuseSignalsBySeverity: mocks.countAbuseSignalsBySeverity,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/billing-events', () => ({
+  countBillingWebhookEventsByStatus: mocks.countBillingWebhookEventsByStatus,
 }))
 /**
  * Partial, not wholesale.
@@ -133,6 +145,9 @@ beforeEach(() => {
   mocks.listLatestJobRuns.mockReset()
   mocks.listSearchSources.mockReset()
   mocks.listSolutionSources.mockReset()
+  mocks.getRemovalOperationsMetrics.mockReset()
+  mocks.countAbuseSignalsBySeverity.mockReset()
+  mocks.countBillingWebhookEventsByStatus.mockReset()
 })
 
 describe('traffic', () => {
@@ -837,5 +852,109 @@ describe('operations — integrations', () => {
     mocks.listSolutionSources.mockRejectedValue(new Error('57014: canceling statement'))
     const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'integrations', now: NOW }))
     expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
+  })
+})
+
+describe('trust, abuse and billing operations', () => {
+  /**
+   * Plan 57, Admin track — "Build Billing, Abuse, Trust, and User Anomaly admin widgets".
+   *
+   * The Verify line's list of things that must never reach the API or the DOM — provider payloads, payment data,
+   * abuse evidence, subject content, tokens, stack traces — is guaranteed structurally rather than by filtering:
+   * the aggregates group and count and select nothing else, so there is no identity to drop.
+   */
+  it('says not_enabled for removals rather than five zeros while the door is shut', async () => {
+    /**
+     * The defect the first version of this section shipped with, caught by running it against the real database:
+     * five zeros, which render as a clean queue. With `PROFILE_REMOVAL_ENABLED` off nobody can file a request, so
+     * every count is zero *by construction* — the same reasoning `/api/admin/metrics` has carried since it was
+     * written, where the whole `removals` block is omitted for this exact reason.
+     */
+    envStub.PROFILE_REMOVAL_ENABLED = 'false'
+    const payload = parsed(await buildSection({ section: 'trust', range: '30d', variant: 'removals', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'not_enabled' })
+    // And it did not query, which is what makes a disabled capability free.
+    expect(mocks.getRemovalOperationsMetrics).not.toHaveBeenCalled()
+  })
+
+  it('warns on a single overdue removal, because a missed deadline is not a long queue', async () => {
+    envStub.PROFILE_REMOVAL_ENABLED = 'true'
+    mocks.getRemovalOperationsMetrics.mockResolvedValue({
+      totalRequests: 12,
+      byStatus: { pending: 4, verified: 6, rejected: 1, expired: 1 },
+      bySource: [],
+      otherSourcesCount: 0,
+      pendingAging: { underOneDay: 2, oneToSevenDays: 2, sevenToThirtyDays: 0, overThirtyDays: 0 },
+      overduePendingCount: 1,
+      activeSuppressions: 3,
+      generatedAt: NOW.toISOString(),
+    })
+
+    const payload = parsed(await buildSection({ section: 'trust', range: '30d', variant: 'removals', now: NOW }))
+    expect(valueOf(payload, 'removal_overdue')).toBe(1)
+    const overdue = (payload as { data: { values: { key: string; threshold?: { warn: number } }[] } }).data.values
+      .find((v) => v.key === 'removal_overdue')
+    // Warned at one: the aging here is a commitment already missed, not a backlog getting long.
+    expect(overdue?.threshold?.warn).toBe(1)
+  })
+
+  it('reports the abuse distribution and thresholds only the two severities worth waking up for', async () => {
+    mocks.countAbuseSignalsBySeverity.mockResolvedValue(
+      new Map([['low', 40], ['medium', 12], ['high', 2], ['critical', 1]]),
+    )
+    const payload = parsed(await buildSection({ section: 'trust', range: '24h', variant: 'abuse', now: NOW }))
+    expect(valueOf(payload, 'abuse_signals')).toBe(55)
+    const byKey = new Map(
+      (payload as { data: { values: { key: string; threshold?: unknown }[] } }).data.values.map((v) => [v.key, v]),
+    )
+    expect(byKey.get('abuse_signals_critical')?.threshold).toBeDefined()
+    expect(byKey.get('abuse_signals_high')?.threshold).toBeDefined()
+    // Volume, not health: a busy Tuesday at low severity must not colour the page.
+    expect(byKey.get('abuse_signals_low')?.threshold).toBeUndefined()
+    expect(byKey.get('abuse_signals_medium')?.threshold).toBeUndefined()
+  })
+
+  it('carries no identity, evidence or content from an abuse signal', async () => {
+    // Structural: the aggregate groups by severity and selects nothing else, so there is nothing to redact.
+    mocks.countAbuseSignalsBySeverity.mockResolvedValue(new Map([['high', 3]]))
+    const payload = parsed(await buildSection({ section: 'trust', range: '24h', variant: 'abuse', now: NOW }))
+    const serialized = JSON.stringify(payload)
+    for (const forbidden of ['userId', 'organizationId', 'requestId', 'details', 'evidence']) {
+      expect(serialized, forbidden).not.toContain(forbidden)
+    }
+  })
+
+  it('separates a dead-lettered billing event from one stuck in processing', async () => {
+    /**
+     * Two different failures. `failed` is money or an entitlement that did not apply; `processing` means nothing
+     * has reported an outcome, which is what a crashed worker looks like and never resolves on its own. Both are
+     * warned at one, because a rate would hide the single failure in a busy hour — and that is the one that
+     * matters to whoever paid.
+     */
+    mocks.countBillingWebhookEventsByStatus.mockResolvedValue({
+      pending: 3, processing: 2, processed: 900, failed: 1, ignored: 4,
+    })
+    const payload = parsed(await buildSection({ section: 'trust', range: '24h', variant: 'billing', now: NOW }))
+    expect(valueOf(payload, 'billing_events_failed')).toBe(1)
+    expect(valueOf(payload, 'billing_events_processing')).toBe(2)
+    const byKey = new Map(
+      (payload as { data: { values: { key: string; threshold?: { warn: number } }[] } }).data.values.map((v) => [v.key, v]),
+    )
+    expect(byKey.get('billing_events_failed')?.threshold?.warn).toBe(1)
+    expect(byKey.get('billing_events_processing')?.threshold?.warn).toBe(1)
+    // Volume: a large processed count is the system working.
+    expect(byKey.get('billing_events_processed')?.threshold).toBeUndefined()
+  })
+
+  it('answers `error` rather than a plausible zero when any of the three reads fails', async () => {
+    envStub.PROFILE_REMOVAL_ENABLED = 'true'
+    mocks.getRemovalOperationsMetrics.mockRejectedValue(new Error('57014: canceling statement'))
+    mocks.countAbuseSignalsBySeverity.mockRejectedValue(new Error('53300: too many connections'))
+    mocks.countBillingWebhookEventsByStatus.mockRejectedValue(new Error('boom'))
+
+    for (const variant of ['removals', 'abuse', 'billing']) {
+      const payload = parsed(await buildSection({ section: 'trust', range: '24h', variant, now: NOW }))
+      expect(payload, variant).toMatchObject({ status: 'unavailable', code: 'error' })
+    }
   })
 })

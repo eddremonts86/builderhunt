@@ -110,6 +110,21 @@ const VALUE_LABELS: Record<string, string> = {
   sources_enabled: 'Enabled',
   sources_enabled_without_connector: 'Enabled with no connector',
   sources_enabled_terms_unreviewed: 'Enabled, terms unreviewed',
+  abuse_signals: 'Abuse signals',
+  abuse_signals_critical: 'Critical',
+  abuse_signals_high: 'High',
+  abuse_signals_medium: 'Medium',
+  abuse_signals_low: 'Low',
+  billing_events_pending: 'Webhook events pending',
+  billing_events_processing: 'Stuck in processing',
+  billing_events_failed: 'Dead-lettered',
+  billing_events_processed: 'Processed',
+  billing_events_ignored: 'Ignored',
+  removal_requests: 'Removal requests',
+  removal_pending: 'Pending',
+  removal_overdue: 'Past their deadline',
+  removal_expired: 'Expired',
+  removal_active_suppressions: 'Active suppressions',
 }
 
 function labelFor(key: string): string {

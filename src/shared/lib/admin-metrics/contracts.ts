@@ -61,6 +61,7 @@ export const ADMIN_METRIC_SECTIONS = [
   'conversion',
   'reliability',
   'operations',
+  'trust',
   'runtime',
 ] as const
 export type AdminMetricSection = (typeof ADMIN_METRIC_SECTIONS)[number]
@@ -99,6 +100,14 @@ export const ADMIN_METRIC_VARIANTS_BY_SECTION = {
    * to check the second.
    */
   operations: ['workers', 'integrations'],
+  /**
+   * Three registries that fail independently, so three variants rather than one merged panel.
+   *
+   * A refund backlog, an abuse spike and a removal deadline are three different people's afternoons. Putting
+   * them under one heading means an operator acting on the loudest number does not think to check the other two,
+   * and the plan's own rule keeps mutations on the canonical detail pages either way.
+   */
+  trust: ['removals', 'abuse', 'billing'],
   runtime: ['process', 'freshness'],
 } as const satisfies Record<AdminMetricSection, readonly [string, ...string[]]>
 

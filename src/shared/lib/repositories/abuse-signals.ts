@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, gte, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb } from '../db/worker-db'
 import { abuseSignals } from '../db/schema'
@@ -126,4 +126,43 @@ export async function pageAbuseSignals(
       createdAt: row.createdAt as Date,
     }),
   })
+}
+
+/**
+ * Counts abuse signals per severity inside a window, in one grouped query (plan 57, Admin track).
+ *
+ * ## Why not `listRecentAbuseSignals(limit)` and a length
+ *
+ * That function is capped, which is correct for a table and wrong for a count: past the cap the number stops
+ * growing, so a dashboard reports "100 signals" whether there are a hundred or a hundred thousand — and reports
+ * it without any indication that it is a ceiling. Grouping by severity returns one row per distinct severity, so
+ * the result size is decided by the vocabulary rather than by how much abuse happened.
+ *
+ * ## What deliberately does not come back
+ *
+ * No `userId`, no `organizationId`, no `requestId`, no `details`. A distribution is the whole answer an operator
+ * needs from a summary — "is this an incident or a Tuesday" — and every one of those columns is the identity or
+ * the evidence that the plan's own rule keeps off an operator page. The detail rows live behind
+ * `/admin/abuse`, which is authorized per row.
+ */
+export async function countAbuseSignalsBySeverity(
+  since: Date,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<Map<string, number>> {
+  // unbounded-read-ok: grouped by severity inside a window, so the row count is the severity vocabulary and not
+  // the signal volume. A LIMIT would drop a severity rather than bound anything.
+  const rows = await db
+    .select({ severity: abuseSignals.severity, total: sql<number>`count(*)::int` })
+    .from(abuseSignals)
+    .where(gte(abuseSignals.createdAt, since))
+    .groupBy(abuseSignals.severity)
+
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    // Severity is free text in the column, so it is validated rather than trusted: an arbitrary value reaching a
+    // metric key would put unbounded label cardinality on the page, which is the same failure the route-family
+    // allowlist exists to prevent.
+    if (/^[a-z_]{1,32}$/.test(row.severity)) counts.set(row.severity, Number(row.total ?? 0))
+  }
+  return counts
 }

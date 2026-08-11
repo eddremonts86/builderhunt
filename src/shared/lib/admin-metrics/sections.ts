@@ -9,6 +9,9 @@ import { readServiceMetricFreshness, readServiceMetricWindow } from '../reposito
 import { listLatestJobRuns, listScheduleRegistry } from '../repositories/platform-operations'
 import { listSearchSources } from '../repositories/search-sources'
 import { listSolutionSources } from '../repositories/solution-catalog'
+import { getRemovalOperationsMetrics } from '../repositories/profile-removal'
+import { countAbuseSignalsBySeverity } from '../repositories/abuse-signals'
+import { countBillingWebhookEventsByStatus } from '../repositories/billing-events'
 import type { FamilyWindow } from '../repositories/service-metrics'
 
 /** The `values` array of a ready payload, named so the builders below can push into it. */
@@ -137,6 +140,8 @@ export async function buildSection(input: SectionInput): Promise<AdminMetricSect
       return buildReliability(range, input.variant, now)
     case 'operations':
       return buildOperations(range, input.variant, now)
+    case 'trust':
+      return buildTrust(range, input.variant, now)
     /**
      * Still with no source, and why it is not lumped in with traffic and search.
      *
@@ -844,5 +849,135 @@ async function buildOperations(
     },
   ]
 
+  return { status: 'ready', generatedAt, window, data: { values } }
+}
+
+/**
+ * Trust, abuse and billing operations (plan 57, Admin track — "Build Billing, Abuse, Trust, and User Anomaly
+ * admin widgets").
+ *
+ * ## What is here and what is deliberately not
+ *
+ * Three variants over three bounded aggregates. **User anomalies are absent**, and that is the honest answer
+ * rather than an omission: the projection that task named reads `platform_user_anomalies`, a table that appears
+ * in no migration, and nothing else in this codebase detects a suspicious sign-in or impossible travel. A
+ * section reporting "0 anomalies" would say the detector found nothing when there is no detector.
+ *
+ * ## Every value is a count, and mutations stay on the detail pages
+ *
+ * No provider payload, no payment data, no abuse evidence, no subject or candidate content, no token, no stack
+ * trace. The Verify line asks for exactly that, and the way it is guaranteed is that the aggregates *cannot*
+ * return those columns — `countAbuseSignalsBySeverity` groups by severity and selects nothing else, so there is
+ * no identity to leak rather than a filter that has to remember to drop it.
+ *
+ * ## Why billing does not come from `getBillingOperationsMetrics`
+ *
+ * That function walks every organization serially and was removed from every frequent path. A metrics section on
+ * a refresh timer is the most frequent path there is. `countBillingWebhookEventsByStatus` is one grouped query
+ * over a five-value enum for the part an operator acts on: how much is stuck.
+ */
+async function buildTrust(
+  range: AdminMetricRange,
+  variant: string,
+  now: Date,
+): Promise<AdminMetricSectionPayload> {
+  const window = windowFor(range, now)
+  const generatedAt = now.toISOString()
+  const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
+
+  if (variant === 'abuse') {
+    const counts = await countAbuseSignalsBySeverity(new Date(window.from)).catch(() => null)
+    if (!counts) return unavailable('error')
+
+    /**
+     * A distribution, and the total beside it.
+     *
+     * `critical` and `high` carry thresholds because any of either is worth reading; the lower severities are
+     * volume. The keys come from the severities actually present, and each was validated against a strict
+     * pattern in the repository — so an arbitrary value written into the column cannot become a metric key and
+     * put unbounded label cardinality on the page.
+     */
+    const total = [...counts.values()].reduce((sum, value) => sum + value, 0)
+    const values: AdminMetricValues = [{ key: 'abuse_signals', value: total, ...dbCount }]
+    for (const [severity, value] of [...counts.entries()].sort()) {
+      values.push({
+        key: `abuse_signals_${severity}`,
+        value,
+        ...dbCount,
+        ...(severity === 'critical' || severity === 'high'
+          ? { threshold: { direction: 'higher_is_worse' as const, warn: 1, critical: 10 } }
+          : {}),
+      })
+    }
+    // Nothing recorded in the window is genuinely nothing — the signals are written on every detection, so an
+    // empty window means no detections rather than no detector.
+    return { status: 'ready', generatedAt, window, data: { values: values.slice(0, 24) } }
+  }
+
+  if (variant === 'billing') {
+    const counts = await countBillingWebhookEventsByStatus().catch(() => null)
+    if (!counts) return unavailable('error')
+
+    const values: AdminMetricValues = [
+      { key: 'billing_events_pending', value: counts.pending, ...dbCount },
+      {
+        /**
+         * The dead-letter figure, and the one an operator acts on.
+         *
+         * A failed webhook event is money or an entitlement that did not apply, so any non-zero value is worth
+         * reading — a rate would hide one failure in a busy hour, which is the one that matters to whoever paid.
+         */
+        key: 'billing_events_failed',
+        value: counts.failed,
+        ...dbCount,
+        threshold: { direction: 'higher_is_worse', warn: 1, critical: 10 },
+      },
+      // Stuck in `processing` is distinct from failed: nothing has reported an outcome, which is what a crashed
+      // worker looks like, and it never resolves on its own.
+      {
+        key: 'billing_events_processing',
+        value: counts.processing,
+        ...dbCount,
+        threshold: { direction: 'higher_is_worse', warn: 1, critical: 5 },
+      },
+      { key: 'billing_events_processed', value: counts.processed, ...dbCount },
+      { key: 'billing_events_ignored', value: counts.ignored, ...dbCount },
+    ]
+    return { status: 'ready', generatedAt, window, data: { values } }
+  }
+
+  // `removals`, the default.
+  /**
+   * The door comes before the numbers, and I got this wrong first.
+   *
+   * With `PROFILE_REMOVAL_ENABLED` off nobody can file a removal request, so every count is zero *by
+   * construction* — and "0 pending" renders as an empty queue rather than as a shut door. That is the exact lie
+   * `/api/admin/metrics` has carried a comment about since it was written, which omits its whole `removals` block
+   * for this reason. The first version of this section skipped the check and returned five zeros against the real
+   * database; running it is what caught it, because five zeros look identical to a clean queue.
+   */
+  if (env.PROFILE_REMOVAL_ENABLED !== 'true') return unavailable('not_enabled')
+
+  const removals = await getRemovalOperationsMetrics(now).catch(() => null)
+  if (!removals) return unavailable('error')
+
+  const values: AdminMetricValues = [
+    { key: 'removal_requests', value: removals.totalRequests, ...dbCount },
+    { key: 'removal_pending', value: removals.byStatus.pending, ...dbCount },
+    {
+      /**
+       * Pending requests already past their own deadline — work the scheduled sweep should have cleared.
+       *
+       * This is a legal-deadline breach rather than a backlog, which is why one is warned on: the aging is not a
+       * queue getting long, it is a commitment already missed.
+       */
+      key: 'removal_overdue',
+      value: removals.overduePendingCount,
+      ...dbCount,
+      threshold: { direction: 'higher_is_worse', warn: 1, critical: 5 },
+    },
+    { key: 'removal_expired', value: removals.byStatus.expired, ...dbCount },
+    { key: 'removal_active_suppressions', value: removals.activeSuppressions, ...dbCount },
+  ]
   return { status: 'ready', generatedAt, window, data: { values } }
 }
