@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { ExternalLink, ShieldCheck } from 'lucide-react'
 import { Button, Input, Textarea } from '~/components/ui'
+import { StatusFilterTabs } from '~/modules/admin/StatusFilterTabs'
 
 type ClaimStatus = 'pending' | 'verified' | 'rejected' | 'revoked' | 'expired'
 
@@ -31,7 +32,14 @@ interface ListResponse {
   nextCursor: { createdAt: string; id: string } | null
 }
 
-const STATUS_FILTERS: Array<{ value: ClaimStatus | 'all'; label: string }> = [
+/**
+ * The filter vocabulary, exported so the route can build its validator from the same list.
+ *
+ * One source: a status added here reaches both the strip and the URL allowlist, and there is no second place to
+ * forget. The alternative — the route naming the statuses itself — is how a filter ends up accepting a value the
+ * page cannot render, which looks like an empty result rather than an invalid one.
+ */
+export const CLAIM_STATUS_FILTERS: ReadonlyArray<{ value: ClaimStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
   { value: 'verified', label: 'Verified' },
@@ -48,13 +56,12 @@ const STATUS_COLOR: Record<ClaimStatus, string> = {
   expired: 'bg-bh-warning/15 text-bh-warning',
 }
 
-export function ClaimsPage() {
+export function ClaimsPage({ status: statusFilter }: { status: ClaimStatus | 'all' }) {
   const [rows, setRows] = React.useState<AdminBuilderClaim[]>([])
   const [nextCursor, setNextCursor] = React.useState<{ createdAt: string; id: string } | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [loadingMore, setLoadingMore] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = React.useState<ClaimStatus | 'all'>('all')
   const [sourceFilter, setSourceFilter] = React.useState('')
   const [expandedId, setExpandedId] = React.useState<string | null>(null)
   const [revokeReason, setRevokeReason] = React.useState('')
@@ -161,21 +168,20 @@ export function ClaimsPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by status">
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => setStatusFilter(f.value)}
-            aria-pressed={statusFilter === f.value}
-            data-testid={`admin-claims-filter-${f.value}`}
-            className={`rounded px-2.5 py-1 text-xs font-medium ${
-              statusFilter === f.value ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <StatusFilterTabs
+          to="/admin/claims"
+          current={statusFilter}
+          options={CLAIM_STATUS_FILTERS}
+          testIdPrefix="admin-claims-filter"
+        />
+        {/*
+          The source filter stays local, deliberately.
+
+          It is a free-text box, and putting every keystroke in the URL would add a history entry per character —
+          so Back would walk letter by letter out of a word the operator typed. The status is a closed set of
+          five values and a click apiece, which is what makes it worth sharing and worth navigating.
+        */}
         <Input
           type="text"
           value={sourceFilter}

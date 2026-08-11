@@ -66,6 +66,8 @@ const PAGES = [
   { path: '/admin/operations', testId: 'admin-operations-page' },
   { path: '/admin/integrations', testId: 'admin-integrations-page' },
   { path: '/admin/claims', testId: 'admin-claims-page' },
+  // Added 2026-08-11: this page had no browser coverage at all, on either side of the guard.
+  { path: '/admin/access-requests', testId: 'admin-access-requests' },
   { path: '/admin/solutions-gold-set', testId: 'gold-set-page' },
 ] as const
 
@@ -127,6 +129,41 @@ test.describe('the admin area in the navigation rail', () => {
       await context.close()
     }
   })
+})
+
+test('an admin list page keeps its status filter in the URL, so a narrowed view can be shared', async ({ browser }) => {
+  /**
+   * Plan 57, Admin track — the same URL-state shape as the Admin Metrics sections, applied to a list filter.
+   *
+   * `/admin/access-requests` defaults to `pending`, which makes the failure it fixes sharper than elsewhere: an
+   * operator who widened the list to `all` and pasted the URL used to send everyone else back to the pending
+   * queue, so the reader saw *fewer* rows than the person describing them and had no way to tell.
+   */
+  const context = await browser.newContext({ storageState: admin.storageState! })
+  const tab = await context.newPage()
+  try {
+    await gotoHydrated(tab, `${harness.baseURL}/admin/access-requests`)
+    await dismissOverlays(tab)
+    await expect(tab.getByTestId('admin-access-requests')).toBeVisible({ timeout: 20_000 })
+    // The default is `pending`, and it is marked without the URL having to say it.
+    await expect(tab.getByTestId('access-filter-pending')).toHaveAttribute('data-active', 'true')
+
+    await tab.getByTestId('access-filter-all').click()
+    await expect(tab.getByTestId('access-filter-all')).toHaveAttribute('data-active', 'true')
+    expect(new URL(tab.url()).searchParams.get('status')).toBe('all')
+
+    // A bookmark of that URL restores the widened view rather than the default.
+    await gotoHydrated(tab, `${harness.baseURL}/admin/access-requests?status=all`)
+    await expect(tab.getByTestId('access-filter-all')).toHaveAttribute('data-active', 'true')
+
+    // And an unrecognised status falls back to the default with the URL corrected, so nobody shares a link that
+    // lies about what it shows.
+    await gotoHydrated(tab, `${harness.baseURL}/admin/access-requests?status=nonsense`)
+    await expect(tab.getByTestId('access-filter-pending')).toHaveAttribute('data-active', 'true')
+    await expect.poll(() => new URL(tab.url()).searchParams.get('status'), { timeout: 10_000 }).toBe('pending')
+  } finally {
+    await context.close()
+  }
 })
 
 test.describe('a tenant owner who is not a platform admin', () => {
