@@ -121,12 +121,16 @@ for (const { role, env } of ROLES) {
   if (!migrationUrl) {
     record('migration URL uses the direct port', false, 'DATABASE_MIGRATION_URL is unset')
   } else {
-    let port = null
-    try {
-      port = new URL(migrationUrl).port || '5432'
-    } catch {
-      port = null
-    }
+    // An IIFE rather than a `let` with two assignments: both branches wrote to it, so the initial value
+    // was never read and `no-useless-assignment` said so. Returning from the parse is also the shape that
+    // cannot leave `port` in a third state somebody adds later.
+    const port = (() => {
+      try {
+        return new URL(migrationUrl).port || '5432'
+      } catch {
+        return null
+      }
+    })()
     record(
       'migration URL uses the direct port',
       port === String(DIRECT_PORT),
