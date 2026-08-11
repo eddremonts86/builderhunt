@@ -222,3 +222,16 @@ work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and i
   Once the `-linux` files exist for both, `pnpm test:visual` can join `quality.yml` — which is also the
   remaining half of `plans/UI`'s visual task. Do not wire the step before the baselines land: a gate that is red
   on arrival for a missing file gets disabled rather than satisfied.
+
+## Correction (2026-08-11): the visual gate lives in Advisory, not Quality
+
+Three tasks above name `.github/workflows/quality.yml` as the home for `pnpm test:visual`, and one says
+it "can join `quality.yml`". It did join, and then commit `91755f5ae` (2026-08-09) moved it to
+`.github/workflows/advisory.yml` together with Lighthouse — because a run is only complete when every
+job in it is, and `deploy.yml` triggers on `workflow_run: completed`, so a screenshot diff stood between
+a green build and a deploy.
+
+What exists today: 34 committed baselines per platform for both darwin and linux, `pnpm test:visual` as a
+blocking step in `pnpm ci:local`, an Advisory run on every push to master, and
+`.github/workflows/visual-baselines.yml` for regenerating the linux half on demand. The gate is real; its
+failure marks the commit red rather than stopping the deploy.

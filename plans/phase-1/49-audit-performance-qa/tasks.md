@@ -98,3 +98,25 @@ checker, `<picture>` markup), and three remain genuinely undone — but all thre
 Playwright/Lighthouse/CI-pipeline work that this session's standing constraints put out of reach
 (no new e2e files; CI/CD pipeline edits need explicit user sign-off). That's a real, honest gap,
 not a shortcut — flagging it here rather than declaring the plan complete.
+
+## Correction (2026-08-11): Lighthouse does not gate the deploy
+
+The task above says "Both e2e and Lighthouse are ordinary steps of the `Quality` job, so a failure
+blocks it, and `deploy.yml` already runs only on a successful `Quality` `workflow_run` — a regression
+now stops the deploy". That was true when it was written on 2026-07-27. It is not true now, and the
+change was deliberate.
+
+Commit `91755f5ae` (2026-08-09) created `.github/workflows/advisory.yml` and moved Lighthouse there,
+along with the screenshot diff. Its header states the reason: `continue-on-error` kept those checks out
+of a run's *conclusion* but not out of its *duration*, and `deploy.yml` triggers on
+`workflow_run: completed` — so a five-minute Lighthouse pass still stood between a green build and a
+deploy. Moving them to their own workflow is what actually takes them off that path.
+
+So today: `pnpm test:lighthouse` and `.lighthouserc.cjs` both exist, Lighthouse runs on every push to
+master in **Advisory**, and it runs as a blocking step in `pnpm ci:local`. What it does *not* do is stop
+a deploy. A performance regression leaves a red mark on the commit, which Advisory's header argues is
+the entire point of running these — but somebody reading this plan should not believe the deploy is
+gated on it.
+
+The budgets themselves are unchanged and still enforced where Lighthouse runs: performance ≥ 0.90,
+accessibility ≥ 0.95, LCP ≤ 2500 ms, CLS ≤ 0.10, TBT ≤ 200 ms, transfer ≤ 900 KiB.
