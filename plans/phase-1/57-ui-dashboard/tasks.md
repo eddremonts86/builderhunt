@@ -102,9 +102,21 @@
     `if (loading)` prevents: one slow request blanks the shell, the navigation and the action queue together. With
     per-region loading states, holding any single request leaves the page usable — the Verify line — and both specs
     stop hanging without any change to how they intercept.
-  - **Not attempted here**, deliberately. It is a structural change to a 1,600-line page with 5 browser cases and
-    222 unit cases resting on it, and it deserves room to verify rather than the tail of a long session. The value
-    of this note is that the next attempt does not start by investigating Playwright.
+  - **And removing the early return alone would ship a fabricated zero, which is the trap worth naming.** The
+    headline widgets gate on `isVisible: (ctx) => (!ctx.stats || ctx.stats.totalBuilders === 0) && !ctx.error`, so
+    with the whole-page skeleton gone the page renders the *empty-workspace* state while `stats` is still in flight
+    and then flips to real data. A new organization and a slow request would look identical for a moment — the same
+    lie of implication this plan's Admin track spent itself removing, arriving through the front door.
+  - **So the fix is four parts, not one:** `HomeContext` gains a `statsLoading` flag, `widgetContext` passes
+    `loading` into it, the empty-state widgets require `!ctx.statsLoading`, and `data-dashboard-state` becomes
+    `loading ? 'loading' : 'ready'` on the always-rendered root. That last part is load-bearing:
+    `waitForDashboardSettled` in `auth-and-sessions.spec.ts` waits for `ready` to guarantee **no dashboard fetch is
+    left to abort** before navigating away, so an attribute hardcoded to `ready` would return immediately and bring
+    back the "Dashboard load error" console noise the strict guard catches. The signal has to keep meaning what it
+    means while the shell renders regardless.
+  - **Not attempted here**, deliberately. It is a four-file structural change to a 1,600-line page with 5 browser
+    cases and 222 unit cases resting on it, and it deserves room to verify rather than the tail of a long session.
+    The value of this note is that the next attempt starts with the four parts rather than with Playwright.
 
 ## Wave 2 — Action queue
 
