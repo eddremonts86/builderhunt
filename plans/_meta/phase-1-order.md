@@ -115,7 +115,7 @@ them before new UI is stacked on top.
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
 | 06 | [`design-modernization`](../implemented/06-design-modernization/spec.md) | 0/17 | — | Unfinished dark→warm-light migration; feeds all five audits (`48`–`52`). |
-| 07 | [`responsive-mobile-design`](../phase-1/07-responsive-mobile-design/spec.md) | 0/10 | — | Overlaps `50-audit-visual-system`'s unchecked "dashboard shell" task on the same file. |
+| 07 | [`responsive-mobile-design`](../implemented/07-responsive-mobile-design/spec.md) | 0/10 | — | Overlaps `50-audit-visual-system`'s unchecked "dashboard shell" task on the same file. |
 | 08 | [`onboarding-flow`](../implemented/08-onboarding-flow/spec.md) | 0/13 | — | `implemented`; the one plan whose status has never been in question. |
 
 ## Wave 2 — source connectors (09–20)
@@ -215,9 +215,9 @@ measure.
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
 | 48 | [`audit-accessibility`](../implemented/48-audit-accessibility/spec.md) | 0/14 | — | WCAG 2.2 AA gate. Header says `partially-implemented` with 14/14 done. |
-| 49 | [`audit-performance-qa`](../phase-1/49-audit-performance-qa/spec.md) | 1/9 | 45 | Lighthouse/Playwright harness + CI quality gate. Unblocked 2026-07-27. |
+| 49 | [`audit-performance-qa`](../implemented/49-audit-performance-qa/spec.md) | 1/9 | 45 | Lighthouse/Playwright harness + CI quality gate. Unblocked 2026-07-27. |
 | 50 | [`audit-visual-system`](../implemented/50-audit-visual-system/spec.md) | 2/8 | 48, 49 | Needs new e2e infra and a production check. Unblocked 2026-07-27. |
-| 51 | [`audit-conversion`](../phase-1/51-audit-conversion/spec.md) | 3/13 | 04, 45 | Waiting on ≥14 real days and 1,000 sessions with `CONVERSION_EVENTS_ENABLED=true`, then a rollout decision. |
+| 51 | [`audit-conversion`](../implemented/51-audit-conversion/spec.md) | 3/13 | 04, 45 | Waiting on ≥14 real days and 1,000 sessions with `CONVERSION_EVENTS_ENABLED=true`, then a rollout decision. |
 | 52 | [`audit-trust`](../implemented/52-audit-trust/spec.md) | 2/8 | 04, 31, 36, 49 | Only meaningful once a maintainer turns `PROFILE_REMOVAL_ENABLED` on. |
 | 53 | [`exhaustive-local-e2e-design`](../implemented/53-exhaustive-local-e2e-design/tasks.md) | 10/3 | 01, 27, 30 | Design waves 4+5 of the e2e suite; entirely additive. Only file is `tasks.md` — no `spec.md`/`plan.md`. New Playwright files now belong in `tests/e2e` after the 2026-07-27 test-layout unification. |
 

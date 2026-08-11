@@ -1,6 +1,6 @@
 # Tasks: Evidence-led conversion audit
 
-> **Status**: `partially-implemented` — full instrumentation stack + real UX fixes shipped
+> **Status**: `implemented` — full instrumentation stack + real UX fixes shipped
 > 2026-07-26; real baseline collection and staged rollout explicitly not started (see below).
 > **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md), [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md)
 > **Blocks**: nothing
@@ -193,3 +193,16 @@ on 2026-07-29, deliberately not as a checkbox: the conversion baseline, and real
 deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
 work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
 
+## Closed 2026-08-11
+
+The `partially-implemented` status said "real baseline collection and staged rollout explicitly not
+started". Both were moved to
+[`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md) on
+2026-07-29, with the reason recorded in the note further down: they need at least 14 days of real traffic
+and 1,000 eligible sessions, so keeping them here made the plan permanently unfinishable while the work
+it describes was complete.
+
+All 14 tasks are checked. Verified today: `pnpm test:conversion` exists
+(`tests/regression/test-conversion.mjs`) and runs as a blocking step in both `scripts/ci/local-quality.sh`
+and `.github/workflows/quality.yml`, so the conversion gate this plan built is enforced rather than
+merely present.

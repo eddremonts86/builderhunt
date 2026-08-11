@@ -1,7 +1,7 @@
 # Delivery Plan: Trust, Claims, and Profile Removal Audit
 
 > **Status**: `implemented`
-> **Depends on**: [`audit-performance-qa`](../../phase-1/49-audit-performance-qa/spec.md), [`pricing-and-billing`](../../phase-1/31-pricing-and-billing/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md), [`claimable-profiles`](../36-claimable-profiles/spec.md)
+> **Depends on**: [`audit-performance-qa`](../49-audit-performance-qa/spec.md), [`pricing-and-billing`](../../phase-1/31-pricing-and-billing/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md), [`claimable-profiles`](../36-claimable-profiles/spec.md)
 > **Blocks**: [`waitlist-launch`](../../phase-1/54-waitlist-launch/spec.md)
 > **Reality check**: Trust pages and pricing exist, but public claims drift from
 > `billing-shared.ts`; claim verification proves an arbitrary email, not source ownership; and live

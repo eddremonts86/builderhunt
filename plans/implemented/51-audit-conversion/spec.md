@@ -1,6 +1,6 @@
 # Specification: Evidence-led conversion audit
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md), [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md)
 > **Blocks**: nothing
 > **Reality check**: The home page already renders real desktop/mobile product screenshots from `public/images/search-desktop.png` and `public/images/search-mobile.png`, open signup at `/auth/sign-up`, and guest discovery at `/explore`. `src/modules/landing/components/HomePage.tsx` still hides `/explore` from the hero, shows an unverifiable anonymous quote, and renders a newsletter-like email control without a form handler or persistence; no conversion instrumentation exists.
@@ -148,7 +148,7 @@ Guardrails:
 
 - signup server error rate must not increase by more than 1 percentage point;
 - guest search completion must not fall by more than 5% relative;
-- no performance regression beyond the budgets in `plans/phase-1/49-audit-performance-qa/spec.md`;
+- no performance regression beyond the budgets in `plans/implemented/49-audit-performance-qa/spec.md`;
 - zero new axe critical/serious failures on `/`, `/explore`, and `/auth/sign-up`;
 - analytics consent acceptance is not a conversion KPI and must not be optimized with coercive UI.
 

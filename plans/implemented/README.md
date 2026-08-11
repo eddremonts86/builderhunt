@@ -3,8 +3,10 @@
 Every plan in this directory is **done and tested**. That is the only thing this folder means, and it
 means exactly that — nothing here is aspirational, in progress, or "code-complete pending a review".
 
-Moved here on 2026-08-11: **48 plans** (47 in the first pass, plus `59-personalized-invitations` once
-its closing evidence was written).
+Moved here on 2026-08-11: **51 plans** — 47 in the first pass, then `59-personalized-invitations` once its
+closing evidence was written, then `07-responsive-mobile-design`, `49-audit-performance-qa` and
+`51-audit-conversion` once their remainders turned out to be either already done or already owned by
+phase 5.
 
 ## What a plan had to satisfy to be in here
 
@@ -23,15 +25,12 @@ and why it changed, so the claim is auditable rather than asserted.
 
 ## What is deliberately *not* in here
 
-Eleven plans stayed in `plans/phase-1/`, and the reason differs by plan:
+Eight plans stayed in `plans/phase-1/`, and the reason differs by plan:
 
 | Plan | Status | Why it stayed |
 |---|---|---|
 | `55-load-1000-concurrent-users` | `pending` | 5 open + 2 partial — the cost-bearing certification runs |
 | `57-ui-dashboard` | `pending` | 17 open + 9 partial |
-| `07-responsive-mobile-design` | `partially-implemented` | sprint wizard steps 2-3 need a live check |
-| `49-audit-performance-qa` | `partially-implemented` | Lighthouse and CI-gate tasks never attempted |
-| `51-audit-conversion` | `partially-implemented` | baseline collection and staged rollout not started |
 | `11-sourcehut-integration` | `superseded` | retired 2026-08-04, not built |
 | `16-hashnode-integration` | `superseded` | retired 2026-08-04, not built |
 | `20-indiehackers-integration` | `superseded` | closed and skipped, not built |
@@ -39,7 +38,7 @@ Eleven plans stayed in `plans/phase-1/`, and the reason differs by plan:
 | `39-technical-sandbox` | `superseded` | replaced elsewhere |
 | `54-waitlist-launch` | `blocked` | its own tasks are done; the launch is phase-5 work |
 
-The last six are not implemented and never will be under these numbers, which is why they are not in
+The six `superseded`/`blocked` rows are not implemented and never will be under these numbers, which is why they are not in
 here. They are also not *pending* — filing them with live work is the second-best option, and one worth
 revisiting.
 
@@ -54,10 +53,10 @@ across both directories is now a value the gate can read.
 A plan's two-digit prefix is its position in the canonical build order recorded in
 [`../_meta/phase-1-order.md`](../_meta/phase-1-order.md), and that order is a property of the work
 rather than of where the file is filed. So `01-security-and-multitenancy` is still `01` in here, and
-`plans/phase-1/` still holds `07`, `11`, `16`, `20`, `31`, `39`, `49`, `51`, `54`, `55` and `57`.
+`plans/phase-1/` still holds `11`, `16`, `20`, `31`, `39`, `54`, `55` and `57`.
 
 `scripts/check-plan-order.mjs` therefore reads the **union** of the two directories. Left pointed at
-`plans/phase-1/` alone it would have passed vacuously — eleven directories asked to be numbered 01-11,
+`plans/phase-1/` alone it would have passed vacuously — eight directories asked to be numbered 01-08,
 and every dependency on a moved plan resolving to "not a plan directory". It now reports
 `OK: 59 plans numbered 01-59, every dependency points backward`, which is the same guarantee as before
 the split.

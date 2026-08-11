@@ -1,6 +1,6 @@
 # Tasks: Performance and QA Release Gate
 
-> **Status**: `partially-implemented` — asset pipeline done; tests/e2e/Lighthouse/CI-gate tasks explicitly
+> **Status**: `implemented` — asset pipeline done; tests/e2e/Lighthouse/CI-gate tasks explicitly
 > out of scope for this session (see notes below), not attempted.
 > **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md)
 > **Blocks**: [`audit-trust`](../../implemented/52-audit-trust/spec.md), [`audit-visual-system`](../../implemented/50-audit-visual-system/spec.md)
@@ -120,3 +120,16 @@ gated on it.
 
 The budgets themselves are unchanged and still enforced where Lighthouse runs: performance ≥ 0.90,
 accessibility ≥ 0.95, LCP ≤ 2500 ms, CLS ≤ 0.10, TBT ≤ 200 ms, transfer ≤ 900 KiB.
+
+## Closed 2026-08-11
+
+The `partially-implemented` status was written on 2026-07-26 and said the tests/e2e/Lighthouse/CI-gate
+tasks were "explicitly out of scope for this session, not attempted". The plan's own reality check, dated
+one day later, supersedes it: "every 'not attempted' reason below was a *session rule*, not a technical
+blocker… Both were lifted on 2026-07-27." All nine tasks are checked, the last four dated 2026-07-27.
+
+Verified today rather than taken on trust: `.lighthouserc.cjs` exists, `pnpm test:lighthouse` runs
+`lhci autorun`, and it runs both as a blocking step of `pnpm ci:local` and on every push to master in
+`advisory.yml`. The one claim that had gone stale — that a Lighthouse failure stops the deploy — is
+corrected in the dated note above it: `advisory.yml` was created on 2026-08-09 specifically to take
+those checks off the deploy's path.

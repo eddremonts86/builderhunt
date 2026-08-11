@@ -1,6 +1,6 @@
 # Delivery Plan: Performance and QA Release Gate
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md)
 > **Blocks**: [`audit-trust`](../../implemented/52-audit-trust/spec.md), [`audit-visual-system`](../../implemented/50-audit-visual-system/spec.md)
 > **Reality check**: Explicit image dimensions, eager/lazy hints, font preconnects, Vitest, and

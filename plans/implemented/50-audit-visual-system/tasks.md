@@ -1,7 +1,7 @@
 # Tasks: Visual System Normalization and Regression Gate
 
 > **Status**: `implemented`
-> **Depends on**: [`audit-performance-qa`](../../phase-1/49-audit-performance-qa/spec.md) (not implemented — soft
+> **Depends on**: [`audit-performance-qa`](../49-audit-performance-qa/spec.md) (not implemented — soft
 > blocker, not enforced this session), [`audit-accessibility`](../48-audit-accessibility/spec.md)
 > (implemented this session)
 > **Blocks**: nothing

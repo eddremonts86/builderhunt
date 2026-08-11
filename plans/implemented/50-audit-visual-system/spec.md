@@ -1,7 +1,7 @@
 # Visual System Normalization and Regression Gate
 
 > **Status**: `implemented`
-> **Depends on**: [`audit-performance-qa`](../../phase-1/49-audit-performance-qa/spec.md), [`audit-accessibility`](../48-audit-accessibility/spec.md)
+> **Depends on**: [`audit-performance-qa`](../49-audit-performance-qa/spec.md), [`audit-accessibility`](../48-audit-accessibility/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Tailwind v4 is loaded from `src/shared/styles/globals.css`; there is no
 > `tailwind.config.*`. Semantic colors, `.card`, `.btn-*`, `.input-field`, spacing helpers, and

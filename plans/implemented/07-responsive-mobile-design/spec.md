@@ -1,6 +1,6 @@
 # Responsive Mobile Design
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing (pure frontend layout work; touches shared shell components every other
 > plan's pages render through, so should land before large new UI surfaces are added on top of a
 > broken shell)

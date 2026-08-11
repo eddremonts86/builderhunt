@@ -3,8 +3,8 @@
 > **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing (feeds [`audit-visual-system`](../50-audit-visual-system/spec.md),
-> [`audit-accessibility`](../48-audit-accessibility/spec.md), [`audit-conversion`](../../phase-1/51-audit-conversion/spec.md),
-> [`audit-performance-qa`](../../phase-1/49-audit-performance-qa/spec.md))
+> [`audit-accessibility`](../48-audit-accessibility/spec.md), [`audit-conversion`](../51-audit-conversion/spec.md),
+> [`audit-performance-qa`](../49-audit-performance-qa/spec.md))
 > **Reality check**: converges the existing UI onto the `src/shared/styles/globals.css` token core;
 > removes the dark/neon/glass/gradient migration debt catalogued in [`spec.md`](./spec.md). Visual-only —
 > no behavior, content, or data changes.

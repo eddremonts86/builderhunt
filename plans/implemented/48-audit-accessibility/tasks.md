@@ -118,7 +118,7 @@
       added `role="img"`.
     - `SelectTrigger` for the credit-pack picker (`CreditBalance.tsx`) had no accessible name when
       nothing was yet selected — added `aria-label="Credit pack"`.
-    - `.table-scroll` wrapper (new in this session, `plans/phase-1/07-responsive-mobile-design`) needed
+    - `.table-scroll` wrapper (new in this session, `plans/implemented/07-responsive-mobile-design`) needed
       `tabIndex={0}`/`role="region"`/`aria-label` to be keyboard-reachable
       (`scrollable-region-focusable`).
   - Verify: `pnpm test:a11y` — 0 `button-name`/`aria-prohibited-attr`/`scrollable-region-focusable`

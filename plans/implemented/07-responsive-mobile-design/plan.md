@@ -1,6 +1,6 @@
 # Responsive Mobile Design — Delivery Plan
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Reality check**: see [`spec.md`](./spec.md) for the live-verified audit (iOS Simulator + Browser
 > tool `resize_window`) this plan is based on.

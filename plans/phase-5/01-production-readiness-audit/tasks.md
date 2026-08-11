@@ -23,7 +23,7 @@ parallel deliberately: queued, they add three weeks for no reason.
     than argued about.
   - Operator: needs a deployed release to measure. The numbers must come from production, not from a
     local run, or the baseline is meaningless.
-  - Moved from `plans/phase-1/49-audit-performance-qa` on 2026-07-29 — it waits on production, not on work.
+  - Moved from `plans/implemented/49-audit-performance-qa` on 2026-07-29 — it waits on production, not on work.
 
 - [ ] **Verify production and close the audit**
   - Files: `docs/visual-system.md`
@@ -45,7 +45,7 @@ parallel deliberately: queued, they add three weeks for no reason.
     ≥1,000 over ≥14 days. Anything less is not a baseline and must not be recorded as one.
   - Operator: needs ≥14 days of real production traffic and ≥1,000 eligible sessions. No agent can
     shorten this, and inventing a plausible number is the specific failure §4 exists to prevent.
-  - Moved from `plans/phase-1/51-audit-conversion` on 2026-07-29 — it waits on production, not on work.
+  - Moved from `plans/implemented/51-audit-conversion` on 2026-07-29 — it waits on production, not on work.
 
 - [ ] **Approve and run seven-day canary**
   - Files: `docs/operations/public-enrichment-source-register.md` (the approval and the daily record)
@@ -82,7 +82,7 @@ parallel deliberately: queued, they add three weeks for no reason.
     an explicit decision. A rollout with no recorded decision is an untracked change.
   - Operator: depends on the baseline task above and on real production traffic; the keep-or-revert
     call is the maintainer's.
-  - Moved from `plans/phase-1/51-audit-conversion` on 2026-07-29 — it waits on production, not on work.
+  - Moved from `plans/implemented/51-audit-conversion` on 2026-07-29 — it waits on production, not on work.
 
 - [ ] **Enable manual customer refresh**
   - Files: `.env.production.example` (`ENRICHMENT_ENABLED`), `docs/operations/public-enrichment-source-register.md`

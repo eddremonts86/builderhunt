@@ -173,8 +173,8 @@ seat limits, and audit-event redaction all pass integration tests.
   keeps open signup and does not add an artificial waitlist.
 - Apply all five audits as release gates, not as a one-time cleanup:
   [`audit-accessibility`](implemented/48-audit-accessibility/spec.md),
-  [`audit-conversion`](./phase-1/51-audit-conversion/spec.md),
-  [`audit-performance-qa`](./phase-1/49-audit-performance-qa/spec.md),
+  [`audit-conversion`](implemented/51-audit-conversion/spec.md),
+  [`audit-performance-qa`](implemented/49-audit-performance-qa/spec.md),
   [`audit-trust`](implemented/52-audit-trust/spec.md), and
   [`audit-visual-system`](implemented/50-audit-visual-system/spec.md).
 
@@ -294,11 +294,11 @@ flowchart LR
 
 - [`design-modernization`](implemented/06-design-modernization/spec.md)
 - [`audit-accessibility`](implemented/48-audit-accessibility/spec.md)
-- [`audit-conversion`](./phase-1/51-audit-conversion/spec.md)
-- [`audit-performance-qa`](./phase-1/49-audit-performance-qa/spec.md)
+- [`audit-conversion`](implemented/51-audit-conversion/spec.md)
+- [`audit-performance-qa`](implemented/49-audit-performance-qa/spec.md)
 - [`audit-trust`](implemented/52-audit-trust/spec.md)
 - [`audit-visual-system`](implemented/50-audit-visual-system/spec.md)
-- [`responsive-mobile-design`](./phase-1/07-responsive-mobile-design/spec.md) — overlaps
+- [`responsive-mobile-design`](implemented/07-responsive-mobile-design/spec.md) — overlaps
   `audit-visual-system`'s unchecked "dashboard shell" task; see that plan's spec.md for the
   relationship
 

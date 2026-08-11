@@ -6,8 +6,8 @@
 > cyan shade that had silently drifted from the actual `--color-bh-cyan` token.
 > **Depends on**: nothing
 > **Blocks**: nothing (feeds [`audit-visual-system`](../50-audit-visual-system/spec.md),
-> [`audit-accessibility`](../48-audit-accessibility/spec.md), [`audit-conversion`](../../phase-1/51-audit-conversion/spec.md),
-> [`audit-performance-qa`](../../phase-1/49-audit-performance-qa/spec.md))
+> [`audit-accessibility`](../48-audit-accessibility/spec.md), [`audit-conversion`](../51-audit-conversion/spec.md),
+> [`audit-performance-qa`](../49-audit-performance-qa/spec.md))
 > **Reality check** (updated 2026-07-25): all three waves executed — neon/gradient/dark-navy debt
 > removed, one canonical button/card system, shared `EmptyState`/`LoadingState`/`ErrorState`,
 > hardcoded accent colors routed through tokens, a self-hosted display face for hero numbers,

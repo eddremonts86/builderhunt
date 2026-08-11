@@ -1,6 +1,6 @@
 # Plan: Evidence-led conversion audit
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md), [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Real screenshots, open signup, and guest `/explore` already ship in `src/modules/landing/components/HomePage.tsx`, `src/routes/auth/sign-up.tsx`, and `src/routes/_landing/explore/index.tsx`. The remaining work removes unsupported proof/dead capture UI, preserves guest intent, and adds consent-aware measurement before making an uplift claim.

@@ -1,7 +1,16 @@
 # Responsive QA checklist
 
+> **Automated since 2026-08-11.** `tests/e2e/responsive-device-matrix.spec.ts` executes this document:
+> the same five widths, the same page list, the same pass criterion. What stays manual is judgement —
+> whether a page *reads* well at 375px, which no `scrollWidth` assertion can answer.
+>
+> Two corrections the automation forced. The nav breakpoint below is stated as `md` (768); it is
+> **1280 (`xl`)**, see `src/shared/components/publicNavBreakpoint.ts`, and
+> `tests/e2e/public-nav-responsive.spec.ts` guards it. And the sprint wizard's steps 2-3 remain
+> conditional on a PR that touches that code with a real sprint run — the spec does not fake one.
+
 No automated viewport test suite exists or is planned for layout/responsive regressions (see
-`plans/phase-1/07-responsive-mobile-design/spec.md` non-goals) — this checklist is the verification method by
+`plans/implemented/07-responsive-mobile-design/spec.md` non-goals) — this checklist is the verification method by
 design. Run it whenever a PR touches shared shell components (`DashboardLayout`, `Header`,
 `Footer`, `OrganizationSwitcher`, `UserMenu`), a page's top-level layout, or any table/flex-row
 markup that renders user-generated free text.

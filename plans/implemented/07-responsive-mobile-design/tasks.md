@@ -1,6 +1,6 @@
 # Responsive Mobile Design — Tasks
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Reality check**: see `spec.md` for the live-verified audit this plan is based on. Device matrix
 > (use for every "Verify" step below): 375×667, 390×844, 430×932, 768×1024, 1024×768. Phases 0-3
@@ -17,7 +17,7 @@ this phase touches.
 ## Phase 0 — Decide the mobile nav pattern
 
 - [x] **Confirm the collapsed-nav approach**
-  - Files: `plans/phase-1/07-responsive-mobile-design/spec.md` (update the "Mobile nav decision" section with
+  - Files: `plans/implemented/07-responsive-mobile-design/spec.md` (update the "Mobile nav decision" section with
     the final call)
   - Do: validate the spec's recommended default (hamburger sheet for Search/Sprints/Exports/Alerts,
     `OrganizationSwitcher`/`UserMenu` always visible) against real content — open the sheet mockup
@@ -139,3 +139,33 @@ this phase touches.
     plan's audit from scratch. Explicitly note: no automated viewport test suite exists or is
     planned — this checklist is the verification method by design (see spec.md non-goals).
   - Verify: the doc alone is the deliverable; no code verification needed.
+
+## Closed 2026-08-11: the device matrix is a test now, not a promise
+
+This plan's status said `partially-implemented` because the sweep had been done "primarily at 375×667
+with a 768×1024 spot check, not literally every page at all 5 sizes". That gap is closed by
+`tests/e2e/responsive-device-matrix.spec.ts`, which executes the procedure
+`docs/design/responsive-qa-checklist.md` was written as: the same five widths, the same page list, the
+same pass criterion (`scrollWidth` must not exceed `innerWidth`), over 18 pages — 10 of them
+authenticated — plus the builder profile carrying a 220-character unbroken URL, which is the content
+shape that produced the `min-width: auto` overflow this plan actually found.
+
+A test rather than a human pass, because the bug this plan found arrives with a *content* change, not a
+layout change. A person sweeping 18 pages does it once; this runs on every gate.
+
+**Two things the writing of it exposed.** The checklist says the nav "must flip exactly" at `md` (768).
+That is out of date: `src/shared/components/publicNavBreakpoint.ts` puts the public header's boundary at
+1280 (`xl`), measured — and `tests/e2e/public-nav-responsive.spec.ts` already guards it across eight
+widths straddling 1279/1280. A breakpoint test here would have asserted the wrong number and duplicated
+that guard, so it is delegated rather than written.
+
+And the first version of the new spec reported **10/10 green while five of those tests were measuring
+the sign-in page**: it navigated with relative paths, which Playwright resolves against the config's
+shared server rather than the per-worker one holding the session. The `expectReallyOnPage` guard is what
+caught it, and it stays for that reason.
+
+Still open by design, and not a checkbox: the sprint wizard's steps 2-3. The checklist conditions those
+on "the next time a PR actually changes sprint wizard code, using a real (not synthetic) sprint run" —
+a trigger, not a task.
+
+    pnpm test:e2e --workers=11 tests/e2e/responsive-device-matrix.spec.ts   10 passed

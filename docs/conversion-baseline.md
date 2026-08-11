@@ -1,6 +1,6 @@
 # Conversion baseline — claim inventory and funnel definitions
 
-Plan: `plans/phase-1/51-audit-conversion`. Created 2026-07-26, instrumentation-only phase
+Plan: `plans/implemented/51-audit-conversion`. Created 2026-07-26, instrumentation-only phase
 (Phase A — `baseline` fixed for every session, `CONVERSION_EVENTS_ENABLED=false` by default).
 
 ## 1. Claim inventory
@@ -64,12 +64,12 @@ least 14 full days and 1,000 eligible landing sessions (or four weeks if traffic
 treatment cohort exists yet, since there is nothing to compare against until the flag is turned
 on and a real baseline window has run). Turning on collection, running the baseline window, and
 any subsequent staged treatment rollout (10% → 50% → decision) are explicitly **not done this
-pass** — see `plans/phase-1/51-audit-conversion/tasks.md` for what's deferred and why.
+pass** — see `plans/implemented/51-audit-conversion/tasks.md` for what's deferred and why.
 
 ## 5. Guardrails (to monitor once collection is live)
 
 - Signup server error rate: no more than +1 percentage point vs. baseline.
 - Guest search completion: no more than -5% relative vs. baseline.
 - Zero new axe critical/serious failures on `/`, `/explore`, `/auth/sign-up`.
-- Performance budgets: see `plans/phase-1/49-audit-performance-qa/spec.md` (already has a running
+- Performance budgets: see `plans/implemented/49-audit-performance-qa/spec.md` (already has a running
   budget checker from that plan's own pass this session).
