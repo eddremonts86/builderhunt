@@ -754,7 +754,19 @@ missing — so the only honest version of this widget was an empty one.
     `removals` block is omitted for this reason. Now `not_enabled`, and it does not query at all.
   - **Measured against the real database:** 54 abuse signals in 30 days (all medium), 1 pending webhook event, 0
     dead-lettered, and removals correctly refusing as `not_enabled`.
-  - **Remaining:** a user-anomaly source, and the per-row drill-downs the Verify line asks for — these variants
+  - **Correction 2026-08-11: the user-anomaly source exists, and this note was wrong about it.**
+    `src/shared/lib/abuse/anomalies.ts` detects impossible travel, a mid-session user-agent change, concurrent
+    distinct IPs and seat overuse, and it is wired — `tenant-principal.ts` calls it on authenticated requests, and
+    three API routes call it directly. Eleven signal types reach `abuse_signals`, four of which are exactly the
+    "entitlement/account anomalies" this task names: `impossible_travel`, `ua_change`, `concurrent_sessions`,
+    `seat_overuse`. The table carries `type`, `severity` and `user_id`, and its `type` CHECK constraint enumerates
+    the vocabulary — a closed set, which is what an honest `GROUP BY` needs. The trust section already reads
+    `countAbuseSignalsBySeverity` from it.
+  - **So what is actually missing is a by-type aggregate, which is code.** Today the trust section reports a
+    severity distribution over every signal kind; the task asks for account and entitlement anomalies, which is the
+    same table grouped by `type` and restricted to those four. `countAbuseSignalsByType` over the CHECK
+    constraint's vocabulary, exposed as a variant — not a new capability.
+  - **Remaining beyond that:** the per-row drill-downs the Verify line asks for — these variants
     are distributions, so the row-level "each row opens an authorized detail destination" belongs with the action
     queue task above, which is where rows live.
 
