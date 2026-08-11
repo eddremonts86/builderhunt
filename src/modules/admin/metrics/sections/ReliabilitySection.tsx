@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { CalendarClock } from 'lucide-react'
-import { MetricCard, MetricSectionView } from '../MetricSectionView'
+import { MetricSectionView } from '../MetricSectionView'
 import type { SectionWidgetProps } from '../MetricSectionView'
 
 /**
@@ -8,9 +8,21 @@ import type { SectionWidgetProps } from '../MetricSectionView'
  * first").
  *
  * The task says interview signals first, and the reason is that they are the only per-feature reliability
- * numbers that already exist. Everything else a reliability section would want — per-feature availability
- * samples over a window — has no store, which is why the contract section stays `insufficient_history` rather
- * than showing a 100 % uptime figure derived from nothing.
+ * numbers that exist. A general availability percentage would need per-feature availability samples over a
+ * window and nothing writes those, so the `availability` variant answers `insufficient_history` rather than a
+ * 100 % derived from the absence of evidence.
+ *
+ * ## What this component renders, and what it no longer does
+ *
+ * The **counters** come from the section contract now, with their thresholds and their process scope stated per
+ * value — so they are rendered by the shared `MetricSectionView` and a breach links to Operations like every
+ * other section's.
+ *
+ * What is left here is the **capability grid**, and only because the contract cannot carry it: `metricValueSchema`
+ * accepts a finite number and these are booleans. They are shown individually rather than rolled into one
+ * "interviews: on" because they fail independently — transcription can be off while scheduling is on, and an
+ * operator reading `transcript_reconnects: 0` needs to know which of those two it is. The section itself says
+ * `not_enabled` when *every* door is shut, which is the case where the counters would be zero by construction.
  *
  * ## The two rules this panel obeys, inherited from the counters it renders
  *
@@ -34,50 +46,7 @@ interface InterviewOperations {
     transcription: boolean
     sensitiveAi: boolean
   }
-  counters?: Record<string, number>
 }
-
-const INTERVIEW_COUNTER_GROUPS: Array<{ title: string; keys: Array<[string, string]> }> = [
-  {
-    title: 'Scheduling and intake',
-    keys: [
-      ['bookingConflicts', 'Booking conflicts'],
-      ['staleReservations', 'Stale reservations'],
-      ['schedulesStale', 'Stale schedules'],
-      ['documentBacklog', 'Document backlog'],
-      ['documentFailures', 'Document failures'],
-    ],
-  },
-  {
-    title: 'Capture',
-    keys: [
-      ['captureRemote', 'Remote'],
-      ['captureInPerson', 'In person'],
-      ['captureUnsupported', 'Unsupported'],
-      ['transcriptReconnects', 'Reconnects'],
-      ['segmentsPersisted', 'Segments persisted'],
-      ['segmentRetries', 'Segment retries'],
-    ],
-  },
-  {
-    title: 'AI behaviour',
-    keys: [
-      ['providerErrors', 'Provider errors'],
-      ['aiParseFailures', 'Parse failures'],
-      ['templateFallbacks', 'Template fallbacks'],
-      ['prohibitedOutputRefusals', 'Refusals'],
-    ],
-  },
-  {
-    title: 'Retention and cost',
-    keys: [
-      ['retentionRowsDeleted', 'Rows deleted'],
-      ['retentionObjectsDeleted', 'Objects deleted'],
-      ['retentionObjectFailures', 'Object failures'],
-      ['usageVariances', 'Usage variances'],
-    ],
-  },
-]
 
 const CAPABILITY_LABELS: Array<[keyof InterviewOperations['capabilities'], string]> = [
   ['calendar', 'Calendar'],
@@ -123,18 +92,13 @@ export function InterviewOperationsSection({ interviews }: { interviews: Intervi
     )
   }
 
-  const { capabilities, counters } = interviews
-  // Counters the module reports but no group claims. Rendered rather than dropped: a counter added to
-  // `metrics.ts` reaches the API automatically (`interviewOperatorCounters` derives its keys), so silently
-  // discarding the unknown ones here would reintroduce exactly the gap that derivation closed.
-  const grouped = new Set(INTERVIEW_COUNTER_GROUPS.flatMap((group) => group.keys.map(([key]) => key)))
-  const ungrouped = Object.entries(counters ?? {}).filter(([key]) => !grouped.has(key))
+  const { capabilities } = interviews
 
   return (
     <section className="card p-5 mb-6" data-testid="metrics-interviews">
       <h2 className="font-semibold mb-3 flex items-center gap-2">
         <CalendarClock className="w-4 h-4 text-bh-accent" aria-hidden="true" />
-        Interview operations
+        Interview capabilities
       </h2>
 
       <div className="flex flex-wrap gap-2 mb-4" data-testid="metrics-interviews-capabilities">
@@ -151,32 +115,14 @@ export function InterviewOperationsSection({ interviews }: { interviews: Intervi
         ))}
       </div>
 
-      {counters ? (
-        <div className="space-y-4">
-          {INTERVIEW_COUNTER_GROUPS.map((group) => (
-            <div key={group.title}>
-              <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-2">{group.title}</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {group.keys.map(([key, label]) => (
-                  <MetricCard key={key} label={label} value={counters[key] ?? null} />
-                ))}
-              </div>
-            </div>
-          ))}
-          {ungrouped.length > 0 && (
-            <div data-testid="metrics-interviews-ungrouped">
-              <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-2">Other counters</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {ungrouped.map(([key, value]) => (
-                  <MetricCard key={key} label={key} value={value} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+      {Object.values(capabilities).some(Boolean) ? (
+        <p className="text-sm text-bh-text-muted">
+          The counters above are cumulative since this process started, and a door that is off means its counter
+          cannot move — which is why these flags are shown individually rather than rolled into one.
+        </p>
       ) : (
         <p className="text-sm text-bh-text-muted" data-testid="metrics-interviews-disabled">
-          Every interview capability is disabled, so there is nothing to count. These counters are deliberately
+          Every interview capability is disabled, so there is nothing to count. The counters are deliberately
           absent rather than shown as zeros — a zero here would read as &ldquo;no problems&rdquo; when it means
           &ldquo;no traffic is possible&rdquo;.
         </p>

@@ -649,16 +649,62 @@ missing — so the only honest version of this widget was an empty one.
     unit case asserts the section never emits those keys, so "add them back" has to go through the policy
     decision rather than through a convenient aggregate.
 
-- [ ] **Optimize and render Conversion metrics**
+- [x] **Optimize and render Conversion metrics**
   - Files: `src/routes/api/admin/metrics/conversion.ts`, conversion repository, Admin Metrics conversion components, `tests/unit/routes/admin/metrics.test.tsx`, conversion API/performance tests
   - Depends on: conversion UI work in `plans/UI`
   - Do: Aggregate required event counts in one bounded query/batch; enforce start <= end, maximum 90 days, UTC-day range, valid variant, and consent cohort. Render numerator, denominator, rate, CI95, insufficient-sample state, variant comparison, and exact table without causal language.
   - Verify: query count stays constant as metric definitions grow; six canonical metrics reconcile with repository fixtures; invalid/reversed/oversized ranges fail; insufficient cohorts suppress misleading emphasis.
+  - **Landed 2026-08-11.** `countConversionSessionsByEvent` replaced twelve sequential round trips with one
+    grouped query, and the route now enforces `start <= end` and a ninety-day ceiling.
+  - **The query count is 1 whatever the metric list grows to.** It was two `await`s per definition — six metrics
+    meant twelve sequential round trips, growing by two with each metric added — so adding a funnel step cost an
+    admin page two more queries on every load. The event names are deduplicated first (`landing_view` is the
+    denominator of three of them), counted in one `group by name`, and the rates computed from the map.
+  - **Counted by wrapping the connection, not by timing.** A latency budget passes on a fast machine with a
+    linear query count and only fails once somebody adds the metric that tips it over. The assertion is
+    `statements === 1`, and it was confirmed by reintroducing a per-event loop and watching it fail.
+  - **The ninety-day cap is not arbitrary:** raw events are deleted after thirty (`deleteExpiredConversionEvents`),
+    so a longer window is a scan over a range that provably holds nothing — and it would return a table of zeros
+    that reads as a collapse in conversion rather than as retention having done its job.
+  - **A reversed range is refused, not swapped.** Swapping answers a question the caller did not ask, and a
+    reversed range is far more likely a bug in their tooling than a typo they want silently corrected.
+  - **The per-event helper was deleted, not kept.** With the route batched, `countConversionSessions` was
+    production-dead code kept alive only by its own tests; those cases now go through the batched reader, so
+    every one of them tests the query that actually runs.
 
-- [ ] **Build Feature Reliability metrics with interview signals first**
+- [x] **Build Feature Reliability metrics with interview signals first**
   - Files: Admin Metrics feature-reliability repository/components, `src/shared/lib/metrics.ts`, tests
   - Do: Group booking conflicts, document backlog/failure, transcript reconnect/retry, provider/parse/fallback/refusal, stale schedule/reservation, usage variance, and retention failure into actionable thresholds. Use persisted buckets when available; otherwise label the per-process reset scope.
   - Verify: no candidate/interview IDs or content enter DTO/DOM/logs; each breached threshold links to the correct feature/Operations runbook; unsupported capture is labeled a support signal rather than an error.
+  - **Landed 2026-08-11** as the `reliability` section's `features` variant, built from
+    `interviewOperatorCounters` and the capability flags — derived, not listed, for the reason `metrics.ts`
+    already carries: a counter added later would increment correctly, reset correctly, and silently never reach
+    the page an operator looks at.
+  - **`not_enabled` when every door is shut.** With no capability on, nobody can book, upload or transcribe, so
+    every counter is zero *by construction* — and a grid of zeros reads as "no problems" when it means "no
+    traffic is possible". That is what the contract's `not_enabled` code is for.
+  - **Most of these deliberately carry no threshold, and that is the honest answer.** They are cumulative since
+    boot, so a threshold on an accumulator breaches eventually on any healthy instance that stays up long
+    enough: "provider errors > 5" is a statement about uptime, not about health, and an alert that fires on
+    every long-lived process is one an operator learns to ignore. A line is drawn in exactly two cases — a gauge
+    that drains (the document backlog is work waiting, not work done) and a counter where *any* non-zero value
+    is worth reading regardless of uptime (document failures, retention object failures, prohibited-output
+    refusals, usage variances). The rest are reported with their scope stated and no line, because an honest
+    line needs a rate and a rate needs per-feature buckets that nothing writes.
+  - **Unsupported capture is a support signal.** It counts sessions where the browser could not capture audio —
+    someone on an old browser — so a threshold would turn "three people used an old Safari" into an incident.
+    It and the two capture-mode counters are volume, and a unit case asserts none of the three carries a
+    threshold.
+  - **Nothing but numbers reach the payload.** Every value is a counter and every key is lower_snake_case static
+    text; a case walks the payload asserting both. A candidate's name, filename or transcript line has no path
+    into this section because it never receives one.
+  - **The widget shrank to the capability grid.** The counters moved into the contract, so they render through
+    the shared view with thresholds and the Operations/Incidents drill-down every other section has. The flags
+    stayed behind only because `metricValueSchema` accepts a finite number and these are booleans — and they are
+    shown individually rather than rolled up because they fail independently.
+  - **`availability` stays `insufficient_history`.** A general availability percentage needs per-feature
+    availability samples over a window, and nothing writes those; a 100 % derived from the absence of evidence
+    is the exact fabrication this plan keeps refusing.
 
 - [x] **Demote Runtime diagnostics and add Data Freshness**
   - Files: Admin Metrics runtime/freshness components and contracts, tests

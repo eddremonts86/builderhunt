@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { and, eq, gte, lt, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm'
 import { platformDb, publicDb } from '~/shared/lib/db/client'
 import { workerDb } from '~/shared/lib/db/worker-db'
 import { conversionEvents } from '~/shared/lib/db/schema'
@@ -56,29 +56,57 @@ export interface ConversionCounts {
 }
 
 /**
- * Counts distinct sessions (and raw events) for one `name`/`variant` within
- * `[startDay, endDay]` (inclusive, UTC `serverDay` strings) — the building
- * block `computeConversionRate` (numerator/denominator) is called with.
- * Read-only, `builderhunt_platform`-scoped in production — this is the admin
- * aggregate reporting path, never the app runtime.
+ * Counts distinct sessions for **every** named event in one query (plan 57, Admin track — "Optimize and render
+ * Conversion metrics").
+ *
+ * ## Why one query and not one per event
+ *
+ * The route used to call `countConversionSessions` twice per funnel metric, so six metrics were twelve
+ * sequential round trips — and the number grew with the metric list. That is the shape the task's Verify line
+ * is about: "query count stays constant as metric definitions grow". Adding a seventh metric should not add
+ * two queries to a platform-admin page.
+ *
+ * A `group by name` over the same predicate is one scan of the same index and returns at most as many rows as
+ * there are distinct event names in the window — which is bounded by the allowlist the caller passes, not by
+ * how much data exists.
+ *
+ * ## Why the event list is passed in rather than read from the table
+ *
+ * `select distinct name` would let the *data* decide the result's cardinality, and a bug that wrote arbitrary
+ * names would turn this into an unbounded read. The caller knows which events its metrics reference; anything
+ * else in the table is not part of the answer.
  */
-export async function countConversionSessions(
-  name: string,
+export async function countConversionSessionsByEvent(
+  names: readonly string[],
   variant: 'baseline' | 'treatment',
   startDay: string,
   endDay: string,
   db: PostgresJsDatabase = platformDb,
-): Promise<ConversionCounts> {
-  const [row] = await db.select({
+): Promise<Map<string, ConversionCounts>> {
+  const counts = new Map<string, ConversionCounts>()
+  // Every requested name gets an entry, so a caller never has to distinguish "no sessions" from "not asked
+  // for" — an absent key would be indistinguishable from a zero and the rate would silently vanish.
+  for (const name of names) counts.set(name, { sessions: 0, events: 0 })
+  if (names.length === 0) return counts
+
+  // unbounded-read-ok: grouped by an allowlisted name, so this returns at most `names.length` rows however
+  // many events the window holds. A LIMIT would drop a funnel step rather than bound anything.
+  const rows = await db.select({
+    name: conversionEvents.name,
     sessions: sql<number>`count(distinct ${conversionEvents.sessionId})`,
     events: sql<number>`count(*)`,
   })
     .from(conversionEvents)
     .where(and(
-      eq(conversionEvents.name, name),
+      inArray(conversionEvents.name, [...names]),
       eq(conversionEvents.variant, variant),
       gte(conversionEvents.serverDay, startDay),
       sql`${conversionEvents.serverDay} <= ${endDay}`,
     ))
-  return { sessions: Number(row?.sessions ?? 0), events: Number(row?.events ?? 0) }
+    .groupBy(conversionEvents.name)
+
+  for (const row of rows) {
+    counts.set(row.name, { sessions: Number(row.sessions ?? 0), events: Number(row.events ?? 0) })
+  }
+  return counts
 }

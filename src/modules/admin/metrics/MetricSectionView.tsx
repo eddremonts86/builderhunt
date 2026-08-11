@@ -48,9 +48,13 @@ export interface SectionWidgetProps {
   variant: string
 }
 
+/**
+ * A plain labelled number. Flat for the same reason the value tiles are: every call site already sits inside a
+ * section `card`, so a nested one paints a second border inside the first.
+ */
 export function MetricCard({ label, value, hint }: { label: string; value: number | string | null; hint?: string }) {
   return (
-    <div className="card p-3" data-testid={`metric-card-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+    <div className="rounded-2xl p-3 bg-bh-surface-2" data-testid={`metric-card-${label.toLowerCase().replace(/\s+/g, '-')}`}>
       <p className="text-xs text-bh-text-dim mb-1">{label}</p>
       <p className="text-2xl font-bold text-bh-text">
         {value === null ? '—' : typeof value === 'number' ? value.toLocaleString() : value}
@@ -151,7 +155,21 @@ export function MetricValues({ payload }: { payload: Extract<AdminMetricSectionP
             data-testid={`metric-value-${value.key}`}
             data-scope={value.scope}
             data-breach={breach ?? undefined}
-            className={`card p-3 ${breach === 'critical' ? 'border-bh-danger/50' : breach === 'warn' ? 'border-bh-warning/50' : ''}`}
+            /*
+              No `card` here, deliberately: the section is already one.
+              
+              A `card` inside a `card` paints a second border and shadow inside the first, and a grid of ten of
+              them reads as boxes in a box. The tiles get a flat surface and their separation from the gap — and
+              the *border* becomes signal rather than decoration: the only bordered tile is one whose value has
+              crossed a threshold, which is the tile an operator should be drawn to.
+            */
+            className={`rounded-2xl p-3 bg-bh-surface-2 ${
+              breach === 'critical'
+                ? 'border border-bh-danger/50'
+                : breach === 'warn'
+                  ? 'border border-bh-warning/50'
+                  : ''
+            }`}
           >
             <p className="text-xs text-bh-text-dim mb-1">{labelFor(value.key)}</p>
             <p className={`text-2xl font-bold ${breach === 'critical' ? 'text-bh-danger' : breach === 'warn' ? 'text-bh-warning' : 'text-bh-text'}`}>

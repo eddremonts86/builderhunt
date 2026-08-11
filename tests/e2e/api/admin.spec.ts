@@ -409,6 +409,30 @@ test.describe('a platform admin', () => {
     }
 
     /**
+     * The conversion endpoint's range validation (plan 57, "Optimize and render Conversion metrics").
+     *
+     * Three refusals, each for a stated reason. A reversed range is refused rather than swapped, because
+     * swapping answers a question the caller did not ask and a reversed range is far more likely a bug in their
+     * tooling than a typo they want corrected. An oversized one is refused because raw events are deleted after
+     * thirty days, so a longer window is a scan over a range that provably holds nothing — and it would return
+     * a table of zeros that reads as a collapse in conversion rather than as retention having done its job. A
+     * bad variant is refused because there are exactly two arms.
+     */
+    const validRange = await harness.admin.api!.fetch('/api/admin/metrics/conversion?start=2026-08-01&end=2026-08-10')
+    expect(validRange.status()).toBe(200)
+    expect((await validRange.json()).start).toBe('2026-08-01')
+
+    for (const query of [
+      'start=2026-08-10&end=2026-08-01',
+      'start=2020-01-01&end=2026-08-01',
+      'variant=control',
+      'start=08-01-2026',
+    ]) {
+      const bad = await harness.admin.api!.fetch(`/api/admin/metrics/conversion?${query}`)
+      expect(bad.status(), query).toBe(400)
+    }
+
+    /**
      * The legacy compatibility endpoint's key set, asserted so it cannot quietly re-monolith.
      *
      * `/api/admin/metrics` is what the page read on a fifteen-second timer to render everything at once. Three

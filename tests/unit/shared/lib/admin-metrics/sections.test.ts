@@ -16,6 +16,15 @@ import type { FamilyWindow, ServiceMetricWindow } from '../../../../../src/share
  * contract's cap, and a process counter presented as a platform total.
  */
 
+/**
+ * A mutable stub for `env`, because the real module freezes its parse at import.
+ *
+ * Setting `process.env.SCHEDULING_ENABLED` in a case changes nothing the section can see — `env.ts` parsed the
+ * environment once, before the test ran. The stub is an object the cases mutate, and it is reset per case so one
+ * capability left on cannot make the next case pass for the wrong reason.
+ */
+const envStub: Record<string, string> = {}
+
 const mocks = vi.hoisted(() => ({
   readServiceMetricWindow: vi.fn(),
   readServiceMetricFreshness: vi.fn(),
@@ -35,6 +44,7 @@ vi.mock('../../../../../src/shared/lib/repositories/platform-billing', () => ({
 vi.mock('../../../../../src/shared/lib/repositories/discovery-state', () => ({
   getDiscoveryState: mocks.getDiscoveryState,
 }))
+vi.mock('../../../../../src/shared/lib/env', () => ({ env: envStub }))
 
 const { buildSection } = await import('../../../../../src/shared/lib/admin-metrics/sections')
 
@@ -93,6 +103,7 @@ beforeEach(() => {
   mocks.readServiceMetricFreshness.mockReset()
   mocks.getPlatformAccountMetrics.mockReset()
   mocks.getOnboardingActivationMetrics.mockReset()
+  for (const key of Object.keys(envStub)) delete envStub[key]
 })
 
 describe('traffic', () => {
@@ -244,18 +255,20 @@ describe('search', () => {
   })
 })
 
-describe('the sections that still have no source', () => {
-  it('keeps conversion and reliability at insufficient_history', async () => {
+describe('the section that still has no source', () => {
+  it('keeps conversion at insufficient_history', async () => {
     /**
-     * Not an oversight, and not something to fill with zeroes now that a store exists. Conversion cohorts
-     * need billing events bucketed by signup cohort and reliability needs per-feature availability samples;
-     * neither is a request counter, so neither is answerable from `service_metric_buckets`.
+     * Not an oversight, and not something to fill with zeroes now that a store exists. Conversion cohorts need
+     * billing events bucketed by signup cohort, which is not a request counter, so it is not answerable from
+     * `service_metric_buckets`.
+     *
+     * Reliability was beside it here until the interview counters gave it a real source — see the reliability
+     * block below, where `not_enabled` and `insufficient_history` now mean two different things on the two
+     * variants.
      */
-    for (const section of ['conversion', 'reliability'] as const) {
-      const payload = parsed(await buildSection({ section, range: '24h', variant: 'funnel', now: NOW }))
-      expect(payload, section).toMatchObject({ status: 'unavailable', code: 'insufficient_history' })
-    }
-    // And they did not reach the store at all, which is what makes them free.
+    const payload = parsed(await buildSection({ section: 'conversion', range: '24h', variant: 'funnel', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'insufficient_history' })
+    // And it did not reach the store at all, which is what makes it free.
     expect(mocks.readServiceMetricWindow).not.toHaveBeenCalled()
   })
 })
@@ -492,5 +505,104 @@ describe('activation, and the division that must never happen', () => {
     for (const forbidden of ['total_saved_queries', 'total_builders', 'total_notes']) {
       expect(valueOf(payload, forbidden), forbidden).toBeUndefined()
     }
+  })
+})
+
+describe('feature reliability', () => {
+  /**
+   * Plan 57, Admin track — "Build Feature Reliability metrics with interview signals first".
+   *
+   * The env module is stubbed rather than the process environment, because `env.ts` freezes its parse at module
+   * load: setting `process.env.SCHEDULING_ENABLED` in a test changes nothing the section can see.
+   */
+  it('says not_enabled rather than a grid of zeros while every capability is off', async () => {
+    /**
+     * With every door shut nobody can book, upload or transcribe, so every counter is zero *by construction*.
+     * Rendering them reads as "no problems" when it means "no traffic is possible" — and `not_enabled` is the
+     * contract code that exists for exactly this distinction.
+     */
+    envStub.CALENDAR_ENABLED = 'false'
+    envStub.SCHEDULING_ENABLED = 'false'
+    envStub.CANDIDATE_UPLOADS_ENABLED = 'false'
+    envStub.INTERVIEW_TRANSCRIPTION_ENABLED = 'false'
+    envStub.SENSITIVE_AI_ENABLED = 'false'
+
+    const payload = parsed(await buildSection({ section: 'reliability', range: '24h', variant: 'features', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'not_enabled' })
+  })
+
+  it('reports the counters as process-scoped once any capability is open', async () => {
+    // One open door is enough for the numbers to mean something: they can move.
+    envStub.SCHEDULING_ENABLED = 'true'
+    const payload = parsed(await buildSection({ section: 'reliability', range: '24h', variant: 'features', now: NOW }))
+    expect(payload.status).toBe('ready')
+
+    const values = (payload as { data: { values: { key: string; scope: string; platformTotal?: boolean; processIdentity?: unknown }[] } }).data.values
+    expect(values.length).toBeGreaterThan(0)
+    for (const value of values) {
+      // The per-process reset scope the task asks to be labelled: cumulative since boot, one instance's, and a
+      // deploy zeroes them.
+      expect(value.scope, value.key).toBe('process')
+      expect(value.processIdentity, value.key).toBeDefined()
+      expect(value.platformTotal, value.key).toBeUndefined()
+    }
+  })
+
+  it('thresholds the gauge and the must-be-zero counters, and nothing that only accumulates', async () => {
+    /**
+     * A threshold on an accumulator breaches eventually on any healthy instance that stays up long enough, so
+     * "provider errors > 5" is a statement about uptime rather than about health — and an alert that fires on
+     * every long-lived process is one an operator learns to ignore.
+     *
+     * So: the document backlog (a gauge that drains) and the counters where any non-zero value is worth
+     * reading. The rest are reported with their scope and no line drawn, because an honest line needs a rate.
+     */
+    envStub.SCHEDULING_ENABLED = 'true'
+    const payload = parsed(await buildSection({ section: 'reliability', range: '24h', variant: 'features', now: NOW }))
+    const byKey = new Map(
+      (payload as { data: { values: { key: string; threshold?: unknown }[] } }).data.values.map((v) => [v.key, v]),
+    )
+
+    for (const key of ['document_backlog', 'document_failures', 'retention_object_failures', 'prohibited_output_refusals', 'usage_variances']) {
+      expect(byKey.get(key)?.threshold, key).toBeDefined()
+    }
+    for (const key of ['provider_errors', 'ai_parse_failures', 'template_fallbacks', 'segments_persisted']) {
+      expect(byKey.get(key)?.threshold, key).toBeUndefined()
+    }
+  })
+
+  it('treats unsupported capture as a support signal rather than an error', async () => {
+    /**
+     * It counts sessions where the browser could not capture audio — someone on an old browser. A threshold
+     * would turn "three people used an old Safari" into an incident, and the capture-mode counters beside it
+     * are volume, not health.
+     */
+    envStub.SCHEDULING_ENABLED = 'true'
+    const payload = parsed(await buildSection({ section: 'reliability', range: '24h', variant: 'features', now: NOW }))
+    const byKey = new Map(
+      (payload as { data: { values: { key: string; threshold?: unknown }[] } }).data.values.map((v) => [v.key, v]),
+    )
+    for (const key of ['capture_unsupported', 'capture_remote', 'capture_in_person']) {
+      expect(byKey.get(key), key).toBeDefined()
+      expect(byKey.get(key)?.threshold, key).toBeUndefined()
+    }
+  })
+
+  it('carries no candidate or interview identifier, whatever the counters hold', async () => {
+    // Every value is a counter and every key is static text. That is what makes an interview dashboard safe to
+    // look at: a name, filename or transcript line has no path into this payload because it never receives one.
+    envStub.SENSITIVE_AI_ENABLED = 'true'
+    const payload = parsed(await buildSection({ section: 'reliability', range: '24h', variant: 'features', now: NOW }))
+    const values = (payload as { data: { values: { key: string; value: number }[] } }).data.values
+    for (const value of values) {
+      expect(typeof value.value, value.key).toBe('number')
+      expect(value.key).toMatch(/^[a-z][a-z0-9_]*$/)
+    }
+  })
+
+  it('keeps the availability variant honest, because nothing samples per-feature availability', async () => {
+    envStub.SCHEDULING_ENABLED = 'true'
+    const payload = parsed(await buildSection({ section: 'reliability', range: '24h', variant: 'availability', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'insufficient_history' })
   })
 })

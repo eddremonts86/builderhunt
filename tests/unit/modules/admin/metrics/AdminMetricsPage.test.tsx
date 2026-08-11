@@ -296,18 +296,43 @@ describe('AdminMetricsPage — a process counter says it is not a platform total
     expect(testId('metric-value-users_total')?.textContent).toContain('1')
   })
 
-  it('demotes the process diagnostics to a disclosure instead of a section of its own', async () => {
-    // Node version and heap sizes answer "is this process unhealthy" — real, but not what an operator opens
-    // this page to ask. Nothing was deleted: they are one click away.
+  it('demotes the process diagnostics to a closed disclosure that has not fetched anything yet', async () => {
+    /**
+     * Node version and heap sizes answer "is this process unhealthy" — real, but not what an operator opens
+     * this page to ask. Nothing was deleted; they are one click away.
+     *
+     * And the request is one click away too. They come from `/api/admin/metrics`, the legacy compatibility
+     * endpoint, which also runs two account aggregates and a discovery read to answer — so fetching them on
+     * mount would pay for all of that to render a Node version nobody expanded.
+     */
     vi.stubGlobal('fetch', vi.fn())
     mockFetchRouter({ section: sectionResponse('runtime', RUNTIME_VALUES) })
 
     await render({ section: 'runtime', variant: 'process' })
 
-    const diagnostics = testId('metrics-server-diagnostics')
-    expect(diagnostics?.tagName.toLowerCase()).toBe('details')
-    expect((diagnostics as HTMLDetailsElement).open).toBe(false)
-    expect(diagnostics?.textContent).toContain('Node')
+    const diagnostics = testId('metrics-server-diagnostics') as HTMLDetailsElement
+    expect(diagnostics.tagName.toLowerCase()).toBe('details')
+    expect(diagnostics.open).toBe(false)
+    expect(testId('metrics-server-diagnostics-pending')?.textContent).toContain('Expand to read')
+    expect(urlsFetched().some((url) => url.endsWith('/api/admin/metrics'))).toBe(false)
+  })
+
+  it('reads the diagnostics once the disclosure is opened', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({ section: sectionResponse('runtime', RUNTIME_VALUES) })
+    await render({ section: 'runtime', variant: 'process' })
+
+    const diagnostics = testId('metrics-server-diagnostics') as HTMLDetailsElement
+    await act(async () => {
+      diagnostics.open = true
+      diagnostics.dispatchEvent(new Event('toggle'))
+    })
+    for (let flush = 0; flush < 4; flush += 1) {
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    }
+
+    expect(urlsFetched().some((url) => url.endsWith('/api/admin/metrics'))).toBe(true)
+    expect(diagnostics.textContent).toContain('Node')
   })
 
   it('reports when the server read the numbers, not when the page asked', async () => {

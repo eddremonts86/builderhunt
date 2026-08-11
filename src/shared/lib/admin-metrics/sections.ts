@@ -1,7 +1,8 @@
 import type { AdminMetricRange, AdminMetricSection, AdminMetricSectionPayload } from './contracts'
 import { ADMIN_METRIC_LIMITS } from './contracts'
 import { LATENCY_BOUNDARIES_MS, LATENCY_SLOTS, percentileFrom } from './history'
-import { metrics } from '../metrics'
+import { interviewOperatorCounters, metrics } from '../metrics'
+import { env } from '../env'
 import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '../repositories/platform-billing'
 import { getDiscoveryState } from '../repositories/discovery-state'
 import { readServiceMetricFreshness, readServiceMetricWindow } from '../repositories/service-metrics'
@@ -129,17 +130,20 @@ export async function buildSection(input: SectionInput): Promise<AdminMetricSect
       return buildTraffic(range, input.variant, now, input.compare === true)
     case 'search':
       return buildSearch(range, input.variant, now, input.compare === true)
+    case 'reliability':
+      return buildReliability(range, input.variant, now)
     /**
-     * The two still with no source, and why they are not lumped in with traffic and search any more.
+     * Still with no source, and why it is not lumped in with traffic and search.
      *
      * `insufficient_history` rather than `dependency_unavailable`: the dependency is not missing, the
-     * *history* is. `service_metric_buckets` now persists request and search counts per minute, which is
-     * what turned `traffic` and `search` into real sections — but conversion cohorts need billing events
-     * bucketed by signup cohort, and feature reliability needs per-feature availability samples, and
-     * neither of those is a request counter. They stay honest until something writes them.
+     * *history* is. `service_metric_buckets` persists request and search counts per minute, which is what
+     * turned `traffic` and `search` into real sections — but conversion cohorts need billing events bucketed
+     * by signup cohort, and that is not a request counter. It stays honest until something writes it.
+     *
+     * The landing funnel on `/api/admin/metrics/conversion` is a different and narrower question, answered
+     * honestly: each step's denominator is the previous step's event on the same session.
      */
     case 'conversion':
-    case 'reliability':
       return unavailable('insufficient_history')
   }
 }
@@ -593,4 +597,111 @@ async function buildFreshness(range: AdminMetricRange, now: Date): Promise<Admin
   })
 
   return { status: 'ready', generatedAt: now.toISOString(), window, data: { values } }
+}
+
+/**
+ * Interview reliability counters, thresholded only where a threshold can mean something (plan 57, Admin
+ * track — "Build Feature Reliability metrics with interview signals first").
+ *
+ * ## Why interview signals and not a general availability figure
+ *
+ * They are the only per-feature reliability numbers that exist. A general "feature availability" percentage
+ * would need per-feature availability samples over a window, and nothing writes those — so the `availability`
+ * variant answers `insufficient_history` rather than showing a 100 % derived from the absence of evidence.
+ *
+ * ## Why `not_enabled` rather than a grid of zeros
+ *
+ * With every interview capability off nobody can book, upload or transcribe, so every counter is zero *by
+ * construction*. Rendering them would read as "no problems" when it means "no traffic is possible" — the same
+ * reasoning `/api/admin/metrics` already applies by omitting `counters` entirely.
+ *
+ * ## Why most of these carry no threshold, and that is the honest answer
+ *
+ * These are cumulative since this process started. A threshold on an accumulator breaches eventually on any
+ * healthy instance that stays up long enough, so "provider errors > 5" is a statement about uptime rather than
+ * about health — and an alert that fires on every long-lived process is one an operator learns to ignore.
+ *
+ * So a threshold is attached in exactly two cases: a **gauge** that drains (the document backlog is work
+ * waiting, not work done), and a counter where *any* non-zero value is worth reading regardless of how long
+ * the process has been up. The rest are reported with their scope stated and no line drawn, because the honest
+ * line needs a rate, and a rate needs the persisted per-feature buckets this section does not have.
+ */
+const THRESHOLDED_INTERVIEW_COUNTERS: Record<string, { direction: 'higher_is_worse'; warn: number; critical: number }> = {
+  // A gauge: documents waiting to be scanned or extracted. A backlog that does not drain means the worker is
+  // not being called, and unlike the accumulators this figure comes back down on its own when it is healthy.
+  documentBacklog: { direction: 'higher_is_worse', warn: 25, critical: 100 },
+  // Documents that ended `failed` or `rejected` — distinct from the backlog, because these will never drain.
+  documentFailures: { direction: 'higher_is_worse', warn: 1, critical: 10 },
+  // A row is kept for each object the retention sweep could not delete, so this must return to zero.
+  retentionObjectFailures: { direction: 'higher_is_worse', warn: 1, critical: 5 },
+  // Output refused for prohibited content. Any non-zero value is worth reading — see the post-market
+  // monitoring doc. Not an error rate: one refusal is a thing that happened and somebody should know.
+  prohibitedOutputRefusals: { direction: 'higher_is_worse', warn: 1, critical: 5 },
+  // A provider's figure differing beyond policy is a billing correctness problem, not a load signal.
+  usageVariances: { direction: 'higher_is_worse', warn: 1, critical: 10 },
+}
+
+/**
+ * Counters deliberately left without a threshold *and* worth saying so about.
+ *
+ * `captureUnsupported` is the one that matters: it counts sessions where the browser could not capture audio,
+ * which is a **support signal** — someone on an old browser — and not a failure of this product. A threshold
+ * on it would turn "three people used Safari 14" into an incident.
+ */
+const SUPPORT_SIGNAL_COUNTERS = new Set(['captureUnsupported', 'captureRemote', 'captureInPerson'])
+
+function buildReliability(
+  range: AdminMetricRange,
+  variant: string,
+  now: Date,
+): AdminMetricSectionPayload {
+  if (variant === 'availability') return unavailable('insufficient_history')
+
+  const anyCapability = [
+    env.CALENDAR_ENABLED,
+    env.SCHEDULING_ENABLED,
+    env.CANDIDATE_UPLOADS_ENABLED,
+    env.INTERVIEW_TRANSCRIPTION_ENABLED,
+    env.SENSITIVE_AI_ENABLED,
+  ].some((flag) => flag === 'true')
+  if (!anyCapability) return unavailable('not_enabled')
+
+  const snapshot = metrics.get()
+  const identity = processIdentity()
+  /**
+   * Derived from `interviewOperatorCounters`, not listed by hand.
+   *
+   * `metrics.ts` already carries the note about why: a counter added later would increment correctly, reset
+   * correctly, and silently never reach the page an operator looks at. The same trap applies one layer up, so
+   * the keys come from the same derivation the legacy endpoint uses.
+   *
+   * Every value is `scope: 'process'` with its identity, which is the per-process reset scope the task asks
+   * for — these are cumulative since boot, they are one instance's, and a deploy zeroes them.
+   */
+  const values: AdminMetricValues = Object.entries(interviewOperatorCounters(snapshot)).map(([key, value]) => ({
+    key: toMetricKey(key),
+    value,
+    unit: 'count' as const,
+    scope: 'process' as const,
+    processIdentity: identity,
+    ...(SUPPORT_SIGNAL_COUNTERS.has(key) ? {} : threshold(key)),
+  }))
+
+  return {
+    status: 'ready',
+    generatedAt: now.toISOString(),
+    // From this process's start, because that is when these counters were last zero.
+    window: windowFor(range, now, new Date(identity.startedAt)),
+    data: { values: values.slice(0, 24) },
+  }
+}
+
+function threshold(key: string) {
+  const found = THRESHOLDED_INTERVIEW_COUNTERS[key]
+  return found ? { threshold: found } : {}
+}
+
+/** `documentBacklog` to `document_backlog`: the contract's keys are lower_snake_case and the parser enforces it. */
+function toMetricKey(camel: string): string {
+  return camel.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
 }
