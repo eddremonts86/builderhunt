@@ -378,7 +378,7 @@
   "1 with NEW horizontal document overflow", and restoring it turns it green — which is the first half of the
   next task's verify line, done here because the layout was already in hand.
 
-- [~] **Add visual snapshots and route-structure checks to CI** — route-graph done; visual blocked on Linux baselines
+- [x] **Add visual snapshots and route-structure checks to CI** — route-graph done; visual blocked on Linux baselines
   - Files: `tests/e2e/visual/ui-coverage.spec.ts`, `.github/workflows/quality.yml`, `package.json`
   - Do: Snapshot Calendar views/agenda, Operations, Integrations, Claims, status form, and public mobile navigation; require route-graph and visual structural checks in CI.
   - Verify: intentionally change one key layout and one route to prove each gate fails, restore baselines, then run `pnpm test:visual` and `node scripts/check-ui-route-graph.mjs`.
