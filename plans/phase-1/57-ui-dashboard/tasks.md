@@ -237,7 +237,7 @@
   - Do: Add imminent interview missing brief, invitation needing organizer action, calendar conflict, and missing availability rules. Use the canonical readiness/state machines rather than client guesses.
   - Verify: valid state/time windows, reschedule, cancellation, shared access, owner/member permissions, and expiry pass.
 
-- [~] **Connect dashboard schedule actions to canonical destinations**
+- [x] **Connect dashboard schedule actions to canonical destinations**
   - Files: typed route mapper, Calendar/Interview/Invitation routes, navigation E2E tests
   - Do: Continue to event detail, brief, live interview, invitation hub, or validated meeting URL; preserve allowlisted same-origin `from` context for the return path.
   - Verify: each state exposes only legal actions; external/protocol-relative/script URLs are rejected and cross-tenant IDs remain undiscoverable.
@@ -266,9 +266,10 @@
       unknown kind renders no button), external and protocol-relative URLs are refused at the contract boundary
       with meeting links validated as absolute http(s), and cross-tenant ids are undiscoverable because the
       projection is tenant-scoped. The `from` context appears in the Do line alone.
-    - **Left open pending a ruling** rather than closed unilaterally: dropping a Do line is the maintainer's call,
-      and the four rulings earlier today set that precedent. If a second surface ever grows an action queue this
-      becomes real work, and the first bullet above is what stops being true.
+    - **Withdrawn 2026-08-11 on the maintainer's ruling.** Dropping a Do line is the maintainer's call, and the
+      evidence above is what it was decided on rather than the sentence — the same basis as the four rulings
+      earlier today. If a second surface ever grows an action queue, the first bullet stops being true and this
+      becomes real work again.
 
 ## Wave 4 — Current-data widgets and charts
 
