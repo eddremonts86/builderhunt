@@ -556,6 +556,56 @@ test.describe('the Admin Metrics shell', () => {
     }
   })
 
+  test('the account-anomaly distribution runs against the real table, as the role that reads it', async ({ browser }) => {
+    /**
+     * The half a unit test cannot cover (plan 57, Admin track — "Build Billing, Abuse, Trust, and User Anomaly
+     * admin widgets").
+     *
+     * The task recorded this as blocked on "a user-anomaly source". One has existed since plan 32 — impossible
+     * travel, mid-session user-agent change, concurrent distinct IPs and seat overuse, called from
+     * `tenant-principal.ts` on authenticated requests — and every detection writes `abuse_signals`. The note had
+     * not been re-checked, and the aggregate was the only thing missing.
+     *
+     * `abuse_signals` is worker-role-only with no RLS, and the unit tests inject a fake `db`, so this is what
+     * proves the `GROUP BY … WHERE type IN (…)` actually executes as the identity that serves the request. Three
+     * defects in this repository came from a superuser connection hiding a missing GRANT.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=trust&range=24h&variant=anomalies`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+
+      /**
+       * Five values, and the point is that they are *values* rather than an `unavailable` code.
+       *
+       * A seeded harness has no anomalies in the last 24 hours, so every count is zero — which is exactly the
+       * case worth asserting here: zero has to arrive as a read number, not as a section that gave up. The
+       * distribution keeps all four types so its shape does not change between windows.
+       */
+      const values = tab.locator('[data-testid^="metric-value-"]')
+      await expect(values.first()).toBeVisible({ timeout: 20_000 })
+      await expect(values).toHaveCount(5)
+
+      // And the variant is offered by the section that owns it, so it is reachable without editing the URL.
+      await expect(tab.getByTestId('admin-metrics-variant-anomalies')).toHaveAttribute('data-active', 'true')
+
+      /**
+       * Nothing about *who*. Structural — the query groups and counts and selects no other column — but asserted
+       * on the rendered DOM because that is where a leak would be seen.
+       */
+      const html = await tab.locator('[data-testid="admin-metrics-page"]').innerHTML()
+      for (const forbidden of ['userId', 'organizationId', 'requestId', 'details']) {
+        expect(html, forbidden).not.toContain(forbidden)
+      }
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
   /**
    * The saved landing view (plan 57, Admin track — "Persist isolated platform-admin preferences").
    *

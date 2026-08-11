@@ -11,7 +11,7 @@ import { listLatestJobRuns, listScheduleRegistry } from '../repositories/platfor
 import { listSearchSources } from '../repositories/search-sources'
 import { listSolutionSources } from '../repositories/solution-catalog'
 import { getRemovalOperationsMetrics } from '../repositories/profile-removal'
-import { countAbuseSignalsBySeverity } from '../repositories/abuse-signals'
+import { ACCOUNT_ANOMALY_TYPES, countAbuseSignalsBySeverity, countAbuseSignalsByType } from '../repositories/abuse-signals'
 import { countBillingWebhookEventsByStatus } from '../repositories/billing-events'
 import { countUnresolvedIncidents } from '../repositories/platform-content'
 import type { FamilyWindow } from '../repositories/service-metrics'
@@ -1074,6 +1074,65 @@ async function buildTrust(
     // Nothing recorded in the window is genuinely nothing — the signals are written on every detection, so an
     // empty window means no detections rather than no detector.
     return { status: 'ready', generatedAt, window, data: { values: values.slice(0, 24) } }
+  }
+
+  /**
+   * Account and entitlement anomalies, per type.
+   *
+   * ## Why this is a second variant rather than more keys on `abuse`
+   *
+   * `abuse` answers "how bad" — a severity distribution over every signal kind, which is the right shape for
+   * deciding whether tonight is an incident. This answers "what kind", over the four types that say something is
+   * wrong with an *account* rather than with billing integrity or data egress. Merging them would put fourteen
+   * types and three severities in one list and make both questions harder to read.
+   *
+   * ## Why it exists at all, given the task recorded it as blocked
+   *
+   * The plan said this widget needed "a user-anomaly source". It has had one since plan 32:
+   * `shared/lib/abuse/anomalies.ts` detects impossible travel, a mid-session user-agent change, concurrent
+   * distinct IPs and seat overuse, `tenant-principal.ts` calls it on authenticated requests, and every detection
+   * writes `abuse_signals`. The note had simply not been re-checked. What was missing was this `GROUP BY`.
+   *
+   * ## Why four types and not the constraint's fourteen
+   *
+   * Three of the allowed values have no detector at all, so grouping over the constraint would render permanent
+   * zeros for features that do not exist. See `ACCOUNT_ANOMALY_TYPES` for which and why.
+   */
+  if (variant === 'anomalies') {
+    const counts = await countAbuseSignalsByType(new Date(window.from)).catch(() => null)
+    if (!counts) return unavailable('error')
+
+    /**
+     * Thresholds only where the count is actionable on its own.
+     *
+     * One `impossible_travel` is worth a look — it means one identity appeared in two places faster than travel
+     * allows. One `ua_change` is not: a browser update rewrites the user-agent family mid-session, so the signal
+     * is meaningful in volume and noisy at one. `concurrent_sessions` and `seat_overuse` sit between the two and
+     * carry the same shape as the severity distribution's warn/critical pair, which is the established reading on
+     * this page.
+     */
+    const THRESHOLDS: Record<string, { warn: number; critical: number }> = {
+      impossible_travel: { warn: 1, critical: 5 },
+      concurrent_sessions: { warn: 5, critical: 25 },
+      seat_overuse: { warn: 1, critical: 10 },
+    }
+
+    const total = [...counts.values()].reduce((sum, value) => sum + value, 0)
+    const values: AdminMetricValues = [{ key: 'account_anomalies', value: total, ...dbCount }]
+    // Declaration order, not the map's or a sort's: the four read as a fixed list an operator learns the shape of,
+    // and a count-ordered list would reshuffle itself between two reads of the same window.
+    for (const type of ACCOUNT_ANOMALY_TYPES) {
+      const threshold = THRESHOLDS[type]
+      values.push({
+        key: `account_anomaly_${type}`,
+        value: counts.get(type) ?? 0,
+        ...dbCount,
+        ...(threshold ? { threshold: { direction: 'higher_is_worse' as const, ...threshold } } : {}),
+      })
+    }
+    // Zero across all four is genuinely zero: each type has a detector that writes on every detection, so an
+    // empty window means nothing was detected rather than nothing is watching.
+    return { status: 'ready', generatedAt, window, data: { values } }
   }
 
   if (variant === 'billing') {

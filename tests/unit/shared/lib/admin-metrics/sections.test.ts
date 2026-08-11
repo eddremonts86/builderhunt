@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   countUnresolvedIncidents: vi.fn(),
   getRemovalOperationsMetrics: vi.fn(),
   countAbuseSignalsBySeverity: vi.fn(),
+  countAbuseSignalsByType: vi.fn(),
   countBillingWebhookEventsByStatus: vi.fn(),
   listScheduleRegistry: vi.fn(),
   listLatestJobRuns: vi.fn(),
@@ -65,8 +66,18 @@ vi.mock('../../../../../src/shared/lib/repositories/solution-catalog', () => ({
 vi.mock('../../../../../src/shared/lib/repositories/profile-removal', () => ({
   getRemovalOperationsMetrics: mocks.getRemovalOperationsMetrics,
 }))
+/**
+ * Both counters *and* the type vocabulary.
+ *
+ * A wholesale `vi.mock` replaces every export, so omitting `ACCOUNT_ANOMALY_TYPES` leaves it `undefined` at the
+ * one place it is read — inside the `anomalies` branch. The suite stayed green when it was missing, because no
+ * case reached that branch: a mock is only as complete as the paths the tests walk. The real value is re-declared
+ * here rather than imported so the mock cannot drift silently into agreeing with a changed source.
+ */
 vi.mock('../../../../../src/shared/lib/repositories/abuse-signals', () => ({
   countAbuseSignalsBySeverity: mocks.countAbuseSignalsBySeverity,
+  countAbuseSignalsByType: mocks.countAbuseSignalsByType,
+  ACCOUNT_ANOMALY_TYPES: ['impossible_travel', 'ua_change', 'concurrent_sessions', 'seat_overuse'],
 }))
 vi.mock('../../../../../src/shared/lib/repositories/billing-events', () => ({
   countBillingWebhookEventsByStatus: mocks.countBillingWebhookEventsByStatus,
@@ -151,6 +162,7 @@ beforeEach(() => {
   mocks.listSolutionSources.mockReset()
   mocks.getRemovalOperationsMetrics.mockReset()
   mocks.countAbuseSignalsBySeverity.mockReset()
+  mocks.countAbuseSignalsByType.mockReset()
   mocks.countBillingWebhookEventsByStatus.mockReset()
   mocks.countUnresolvedIncidents.mockReset()
 })
@@ -917,6 +929,83 @@ describe('trust, abuse and billing operations', () => {
     // Volume, not health: a busy Tuesday at low severity must not colour the page.
     expect(byKey.get('abuse_signals_low')?.threshold).toBeUndefined()
     expect(byKey.get('abuse_signals_medium')?.threshold).toBeUndefined()
+  })
+
+  /**
+   * The account-anomaly distribution (plan 57, Admin track — "Build Billing, Abuse, Trust, and User Anomaly admin
+   * widgets").
+   *
+   * The task recorded this as blocked on "a user-anomaly source". One has existed since plan 32:
+   * `abuse/anomalies.ts` detects impossible travel, mid-session user-agent changes, concurrent distinct IPs and
+   * seat overuse, and `tenant-principal.ts` calls it on authenticated requests. The note had not been re-checked.
+   */
+  it('reports account anomalies by type, in a fixed order, thresholded only where one is actionable', async () => {
+    mocks.countAbuseSignalsByType.mockResolvedValue(
+      new Map([
+        ['impossible_travel', 2],
+        ['ua_change', 30],
+        ['concurrent_sessions', 4],
+        ['seat_overuse', 0],
+      ]),
+    )
+    const payload = parsed(await buildSection({ section: 'trust', range: '24h', variant: 'anomalies', now: NOW }))
+    expect(valueOf(payload, 'account_anomalies')).toBe(36)
+
+    const values = (payload as { data: { values: { key: string; threshold?: unknown }[] } }).data.values
+    // Declaration order, so the four read as a list an operator learns rather than one that reshuffles by count.
+    expect(values.map((v) => v.key)).toEqual([
+      'account_anomalies',
+      'account_anomaly_impossible_travel',
+      'account_anomaly_ua_change',
+      'account_anomaly_concurrent_sessions',
+      'account_anomaly_seat_overuse',
+    ])
+
+    const byKey = new Map(values.map((v) => [v.key, v]))
+    expect(byKey.get('account_anomaly_impossible_travel')?.threshold).toBeDefined()
+    /**
+     * `ua_change` carries none, at thirty detections.
+     *
+     * A browser update rewrites the user-agent family mid-session, so this signal is meaningful in volume and
+     * noisy at one — thresholding it would colour the page on an ordinary Chrome release day.
+     */
+    expect(byKey.get('account_anomaly_ua_change')?.threshold).toBeUndefined()
+  })
+
+  it('keeps all four types when nothing was detected, rather than shrinking the list', async () => {
+    /**
+     * A distribution missing its zeros changes shape between reads, so an operator comparing two windows sees a
+     * type *disappear* rather than fall to nothing. Zero here is honest: each of the four has a detector that
+     * writes on every detection, so an empty window means nothing was detected — not that nothing is watching.
+     */
+    mocks.countAbuseSignalsByType.mockResolvedValue(
+      new Map([
+        ['impossible_travel', 0],
+        ['ua_change', 0],
+        ['concurrent_sessions', 0],
+        ['seat_overuse', 0],
+      ]),
+    )
+    const payload = parsed(await buildSection({ section: 'trust', range: '24h', variant: 'anomalies', now: NOW }))
+    expect(valueOf(payload, 'account_anomalies')).toBe(0)
+    const keys = (payload as { data: { values: { key: string }[] } }).data.values.map((v) => v.key)
+    expect(keys).toHaveLength(5)
+  })
+
+  it('says the anomaly read failed rather than reporting no anomalies', async () => {
+    // The distinction the whole section exists for: a failed read is not a quiet workspace.
+    mocks.countAbuseSignalsByType.mockRejectedValue(new Error('down'))
+    const payload = await buildSection({ section: 'trust', range: '24h', variant: 'anomalies', now: NOW })
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
+  })
+
+  it('carries no identity, evidence or content from an account anomaly either', async () => {
+    mocks.countAbuseSignalsByType.mockResolvedValue(new Map([['impossible_travel', 1]]))
+    const payload = parsed(await buildSection({ section: 'trust', range: '24h', variant: 'anomalies', now: NOW }))
+    const serialized = JSON.stringify(payload)
+    for (const forbidden of ['userId', 'organizationId', 'requestId', 'details', 'evidence']) {
+      expect(serialized, forbidden).not.toContain(forbidden)
+    }
   })
 
   it('carries no identity, evidence or content from an abuse signal', async () => {

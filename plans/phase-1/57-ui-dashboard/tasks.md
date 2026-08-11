@@ -734,7 +734,7 @@ missing — so the only honest version of this widget was an empty one.
     guarantees confirmed by breaking them: paused-not-overdue, the empty-registry refusal, and excluding
     disabled sources from the obligation count.
 
-- [~] **Build Billing, Abuse, Trust, and User Anomaly admin widgets**
+- [x] **Build Billing, Abuse, Trust, and User Anomaly admin widgets**
   - Files: admin overview adapters, admin dashboard widget components, tests
   - Depends on: bounded discovery projections for billing events, claims/trust queues, and operations from `plans/UI`
   - Do: Show canonical billing alerts, refund/dispute aging, reconciliation/dead-letter status, redacted abuse-risk distribution, trust/removal deadline aging, and entitlement/account anomalies. Keep mutations on canonical detail pages.
@@ -780,6 +780,28 @@ missing — so the only honest version of this widget was an empty one.
   - **Remaining beyond that:** the per-row drill-downs the Verify line asks for — these variants
     are distributions, so the row-level "each row opens an authorized detail destination" belongs with the action
     queue task above, which is where rows live.
+  - **The anomaly distribution landed 2026-08-11, and it was code rather than a capability.**
+    `countAbuseSignalsByType` groups `abuse_signals` by `type` inside the window, filtered to a closed four-value
+    vocabulary declared in code, exposed as the `anomalies` variant on `trust`.
+    - **Four types, not the constraint's fourteen.** `signup_velocity`, `linked_account` and `reserve_leak` are
+      allowed by `abuse_signals_type_check` and written by *nothing* — reserved in the vocabulary, never built.
+      Grouping over the constraint would render three permanent zeros, and "0 signup velocity anomalies" reads as
+      a clean signal rather than an absent detector. The other seven allowed types are billing integrity and data
+      egress rather than "something is wrong with this account", and stay in the severity distribution.
+    - **Every requested type appears, including its zero.** A distribution missing its zeros changes shape between
+      reads, so an operator comparing two windows would watch a type disappear rather than fall to nothing. Zero is
+      honest here precisely because each of the four has a detector that writes on every detection.
+    - **Thresholds only where one count is actionable.** One `impossible_travel` means an identity appeared in two
+      places faster than travel allows. One `ua_change` means a browser updated: it is meaningful in volume and
+      noisy at one, so thresholding it would colour the page on an ordinary Chrome release day.
+    - **Tests:** 4 section cases, 5 repository cases against an injected `db` (the zero-fill, the vocabulary
+      validation, and the guard against an empty `IN ()`, which is a Postgres syntax error rather than a tidy
+      check), and one browser case that proves the query executes as the role serving the request — the unit tests
+      inject a fake `db`, and three defects here came from a superuser connection hiding a missing GRANT. The
+      section suite's wholesale `vi.mock` of `abuse-signals` had to gain the new exports: it stayed green without
+      `ACCOUNT_ANOMALY_TYPES` because no case walked that branch. All three properties verified by breaking them.
+  - **The per-row drill-downs stay with the action-queue task**, unchanged: these variants are distributions, so
+    "each row opens an authorized detail destination" is a statement about rows, and rows live there.
 
 - [x] **Build Growth, Conversion, and Public Content admin widgets**
   - Files: admin metrics/content adapters, admin dashboard widget components, tests

@@ -108,7 +108,7 @@ export const ADMIN_METRIC_VARIANTS_BY_SECTION = {
    * them under one heading means an operator acting on the loudest number does not think to check the other two,
    * and the plan's own rule keeps mutations on the canonical detail pages either way.
    */
-  trust: ['removals', 'abuse', 'billing'],
+  trust: ['removals', 'abuse', 'anomalies', 'billing'],
   /**
    * One variant, because the task asks for an operational checklist rather than a dashboard.
    *

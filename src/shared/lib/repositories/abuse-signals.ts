@@ -1,4 +1,4 @@
-import { desc, eq, gte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb } from '../db/worker-db'
 import { abuseSignals } from '../db/schema'
@@ -163,6 +163,72 @@ export async function countAbuseSignalsBySeverity(
     // metric key would put unbounded label cardinality on the page, which is the same failure the route-family
     // allowlist exists to prevent.
     if (/^[a-z_]{1,32}$/.test(row.severity)) counts.set(row.severity, Number(row.total ?? 0))
+  }
+  return counts
+}
+
+/**
+ * The account and entitlement anomaly types that a detector actually writes.
+ *
+ * ## Why the list is here and not derived from the CHECK constraint
+ *
+ * `abuse_signals_type_check` allows fourteen values (0043, widened by 0046), and three of them —
+ * `signup_velocity`, `linked_account`, `reserve_leak` — are written by **nothing**: they were reserved in the
+ * vocabulary and no detector was ever built. Grouping over the constraint's full set would render three permanent
+ * zeros, and "0 signup velocity anomalies" reads as a clean signal rather than as an absent detector. That is the
+ * substitution this plan exists to remove, arriving through a `GROUP BY`.
+ *
+ * The remaining seven allowed types are abuse of a different kind — credit farming, pool drain, refund farming,
+ * margin drift, credit spend velocity, export burst, cross-tenant denial. They belong to billing integrity and
+ * data exfiltration, not to "is something wrong with this account", so they stay in the severity distribution
+ * where they already are.
+ *
+ * Each of these four is emitted by a real code path: `checkImpossibleTravelAndEmit` and
+ * `checkMidSessionUaChangeAndEmit` from `tenant-principal.ts` on authenticated requests, and the concurrent-session
+ * and seat-overuse detectors from the same module. A zero here therefore means "no detections", which is the
+ * honest reading and the one an operator wants.
+ */
+export const ACCOUNT_ANOMALY_TYPES = [
+  'impossible_travel',
+  'ua_change',
+  'concurrent_sessions',
+  'seat_overuse',
+] as const
+export type AccountAnomalyType = (typeof ACCOUNT_ANOMALY_TYPES)[number]
+
+/**
+ * Counts account and entitlement anomalies per type inside a window, in one grouped query.
+ *
+ * Every requested type appears in the result, including the ones with no rows — a distribution missing its zeros
+ * is a distribution whose shape changes between reads, and an operator comparing two windows would see a type
+ * disappear rather than see it fall to nothing. The `IN` list is a closed vocabulary from code, so the row count
+ * is bounded by four regardless of how many signals were written.
+ *
+ * Returns nothing about *who*: no `userId`, no `organizationId`, no `details`. Same rule as the severity
+ * distribution beside it — the detail rows are behind `/admin/abuse`, authorized per row.
+ */
+export async function countAbuseSignalsByType(
+  since: Date,
+  types: readonly string[] = ACCOUNT_ANOMALY_TYPES,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<Map<string, number>> {
+  // Defensive rather than decorative: these become metric keys, and an unvalidated value reaching one puts
+  // unbounded label cardinality on an operator page. The callers pass literals; a future one might not.
+  const requested = types.filter((type) => /^[a-z_]{1,32}$/.test(type))
+  // Every type starts at zero so the shape is stable across windows.
+  const counts = new Map<string, number>(requested.map((type) => [type, 0]))
+  if (requested.length === 0) return counts
+
+  // unbounded-read-ok: grouped by type and filtered to a closed four-value vocabulary, so the row count is the
+  // vocabulary and not the signal volume. A LIMIT would drop a type rather than bound anything.
+  const rows = await db
+    .select({ type: abuseSignals.type, total: sql<number>`count(*)::int` })
+    .from(abuseSignals)
+    .where(and(gte(abuseSignals.createdAt, since), inArray(abuseSignals.type, [...requested])))
+    .groupBy(abuseSignals.type)
+
+  for (const row of rows) {
+    if (counts.has(row.type)) counts.set(row.type, Number(row.total ?? 0))
   }
   return counts
 }
