@@ -218,6 +218,17 @@ function urlsFetched(): string[] {
   return vi.mocked(fetch).mock.calls.map(([input]) => String(input))
 }
 
+/**
+ * Whether the legacy endpoint was called, matched on its *path*.
+ *
+ * The three section widgets now request `/api/admin/metrics?fields=…`, so the previous
+ * `url.endsWith('/api/admin/metrics')` stopped being able to match — which broke the positive assertion loudly
+ * and, worse, made the negative one pass vacuously. A check that can never be true is not a check.
+ */
+function fetchedLegacyMetrics(): boolean {
+  return urlsFetched().some((url) => new URL(url, 'http://test.local').pathname === '/api/admin/metrics')
+}
+
 describe('AdminMetricsPage — only the visible section is fetched', () => {
   it('requests the section in the URL and nothing for the other seven', async () => {
     /**
@@ -413,7 +424,7 @@ describe('AdminMetricsPage — a process counter says it is not a platform total
     expect(diagnostics.tagName.toLowerCase()).toBe('details')
     expect(diagnostics.open).toBe(false)
     expect(testId('metrics-server-diagnostics-pending')?.textContent).toContain('Expand to read')
-    expect(urlsFetched().some((url) => url.endsWith('/api/admin/metrics'))).toBe(false)
+    expect(fetchedLegacyMetrics()).toBe(false)
   })
 
   it('reads the diagnostics once the disclosure is opened', async () => {
@@ -430,7 +441,7 @@ describe('AdminMetricsPage — a process counter says it is not a platform total
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
     }
 
-    expect(urlsFetched().some((url) => url.endsWith('/api/admin/metrics'))).toBe(true)
+    expect(fetchedLegacyMetrics()).toBe(true)
     expect(diagnostics.textContent).toContain('Node')
   })
 

@@ -63,7 +63,11 @@ export function ReliabilitySection({ state }: SectionWidgetProps) {
     const controller = new AbortController()
     void (async () => {
       try {
-        const response = await fetch('/api/admin/metrics', { credentials: 'include', signal: controller.signal })
+        const response = /*
+         * `?fields=interviews` — the capability grid is five environment flags plus in-memory counters — no database at all.
+         * The endpoint refuses an unknown name with a 400 rather than dropping it, so a typo here fails loudly.
+         */
+        await fetch('/api/admin/metrics?fields=interviews', { credentials: 'include', signal: controller.signal })
         if (!response.ok) return
         const body = await response.json()
         setInterviews(body.interviews)

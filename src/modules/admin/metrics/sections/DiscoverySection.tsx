@@ -32,7 +32,12 @@ export function DiscoverySection({ state }: SectionWidgetProps) {
     const controller = new AbortController()
     void (async () => {
       try {
-        const response = await fetch('/api/admin/metrics', { credentials: 'include', signal: controller.signal })
+        const response = /*
+         * `?fields=discovery` — this reads `discovery` and nothing else, so the two platform aggregates the full payload computes were pure
+         * waste on this tab.
+         * The endpoint refuses an unknown name with a 400 rather than dropping it, so a typo here fails loudly.
+         */
+        await fetch('/api/admin/metrics?fields=discovery', { credentials: 'include', signal: controller.signal })
         if (!response.ok) return
         // `null` from the API means the worker has never run, which is different from a failed read. The
         // difference is preserved: `undefined` renders as loading, `null` as never-run.

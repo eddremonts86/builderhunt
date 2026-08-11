@@ -80,7 +80,12 @@ function RuntimeDiagnostics() {
     const controller = new AbortController()
     void (async () => {
       try {
-        const response = await fetch('/api/admin/metrics', { credentials: 'include', signal: controller.signal })
+        const response = /*
+         * `?fields=server` — the process diagnostics are `process.*` reads with no database behind them, so asking for the whole payload
+         * ran two platform aggregates and a discovery read to report a Node version.
+         * The endpoint refuses an unknown name with a 400 rather than dropping it, so a typo here fails loudly.
+         */
+        await fetch('/api/admin/metrics?fields=server', { credentials: 'include', signal: controller.signal })
         if (!response.ok) return
         setServer((await response.json()).server ?? null)
       } catch {

@@ -1061,9 +1061,27 @@ missing — so the only honest version of this widget was an empty one.
     than the page's default tab) and 8 browser cases (`tests/e2e/admin-metrics-shell.spec.ts`). Three
     guarantees were confirmed by breaking them: the threshold direction, `unavailable` rendering no numbers,
     and polling ignoring `document.hidden`.
-  - **Still open:** bounding the legacy `/api/admin/metrics` response. Three widgets still read it for
-    interview capabilities, discovery worker state and process diagnostics — each on the tab that needs it, so
-    it is no longer on a timer, but the endpoint itself still returns everything.
+  - **The legacy endpoint is bounded in work as well as in shape, 2026-08-12.** The response key set was already
+    fixed; what every request still did was compute all of it. `?fields=` is an allowlist over a closed
+    vocabulary, and each of the three remaining consumers now names the one field it reads.
+    - **The saving is not marginal.** `server` is four `process.*` reads and `interviews` is five environment
+      flags plus in-memory counters — **neither touches the database**. Opening the Runtime tab's diagnostics
+      disclosure ran two platform aggregates and a discovery-state read to report a Node version.
+    - **An unknown field is a 400**, matching what `sections.ts` does with an unknown section: dropping it
+      silently would answer 200 without the key and leave the caller waiting for something it was never told was
+      refused. An empty `?fields=` is also a 400 — a request for nothing is a caller bug, not an instruction.
+    - **Omitting `fields` still returns everything**, which is the compatibility half of a legacy compatibility
+      endpoint: an external caller and the gate that pins the full key set both keep working unchanged.
+    - **A key is absent rather than `null` when it was not requested.** `db: null` would force a caller to know
+      that null means "not asked for" and not "no accounts" — the same ambiguity `removals` is omitted to avoid.
+    - **Tests:** the key-set gate in `tests/e2e/api/admin.spec.ts` gains four assertions — one field returns two
+      keys, two fields return three, a typo is a 400 naming the unknown field, and empty is a 400. Asserted as the
+      *absence* of the other keys rather than by timing queries: a key that is not there could not have been
+      computed. Verified in both directions by breaking it — ignoring `fields` fails on the extra keys, accepting
+      an unknown field fails on the 400.
+    - **And a unit assertion that would have stopped testing.** Two cases matched
+      `url.endsWith('/api/admin/metrics')`, which a query string makes permanently false — so the positive case
+      failed loudly and the negative one would have passed vacuously. Both compare the pathname now.
 
 - [x] **Build Request Health and bottleneck widgets**
   - Files: Admin Metrics traffic components/repository, tests

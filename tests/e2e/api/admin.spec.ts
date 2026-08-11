@@ -507,6 +507,44 @@ test.describe('a platform admin', () => {
     }
 
     /**
+     * `?fields=` bounds the *work*, not just the shape (plan 57, Admin track).
+     *
+     * The key set above was already fixed; what every request still did was compute all of it — two platform
+     * aggregates, a discovery read, and a removal read when that feature is on. The three section widgets each
+     * read exactly one field, and `server` and `interviews` need no database at all, so opening the Runtime
+     * disclosure ran two platform aggregates to report a Node version.
+     *
+     * Asserted as *absence of the other keys* rather than by timing a query count: the response is the observable
+     * contract, and a key that is not there could not have been computed.
+     */
+    const serverOnly = await harness.admin.api!.fetch('/api/admin/metrics?fields=server')
+    expect(serverOnly.status()).toBe(200)
+    const serverBody = await serverOnly.json()
+    expect(Object.keys(serverBody).sort()).toEqual(['generatedAt', 'server'])
+    // The field it asked for is real, not an empty stub.
+    expect(serverBody.server).toHaveProperty('nodeVersion')
+
+    const twoFields = await harness.admin.api!.fetch('/api/admin/metrics?fields=discovery,interviews')
+    expect(twoFields.status()).toBe(200)
+    expect(Object.keys(await twoFields.json()).sort()).toEqual(['discovery', 'generatedAt', 'interviews'])
+
+    /**
+     * An unknown field is a 400, and a typo is the case that matters.
+     *
+     * Dropping it silently would answer 200 without the key, and the caller would wait for something it was
+     * never told was refused — the same reason `sections.ts` refuses an unknown section rather than defaulting.
+     */
+    const typo = await harness.admin.api!.fetch('/api/admin/metrics?fields=sever')
+    expect(typo.status()).toBe(400)
+    const typoBody = await typo.json()
+    expect(typoBody.error).toBe('invalid_request')
+    expect(typoBody.unknownFields).toEqual(['sever'])
+
+    // Empty is a request for nothing, which is a caller bug rather than an instruction.
+    const empty = await harness.admin.api!.fetch('/api/admin/metrics?fields=')
+    expect(empty.status()).toBe(400)
+
+    /**
      * The comparison, which doubles the section's cost when asked for.
      *
      * `compare` is refused rather than coerced for a reason specific to it: defaulting a typo to "on" doubles
