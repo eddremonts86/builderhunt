@@ -72,7 +72,7 @@
   - Do: Cache by organization, role class, range, and schema version with a bounded TTL; emit duration, cache, and section-status metrics without organization names, candidate identifiers, or content.
   - Verify: cache keys cannot collide across organizations/roles; invalidation/freshness labels agree; logs and metrics pass a sensitive-field snapshot.
 
-- [~] **Refactor the page into core and lazy section queries**
+- [x] **Refactor the page into core and lazy section queries**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, dashboard query hooks, page tests
   - Do: Fetch the core overview once; keep genuinely heavy optional widgets lazy with query keys scoped by session organization and range. Render shell/critical actions independently from lower-section failures.
   - Verify: one failed lazy request leaves the queue/navigation usable; organization switch cancels/invalidates old queries and never flashes prior-tenant content.
@@ -138,11 +138,50 @@
        always-rendered root. `waitForDashboardSettled` waits for `[data-dashboard-state="ready"]` to be *attached*,
        so this keeps meaning what it means — the attribute value changes rather than the element appearing, and
        `ready` still attaches only once no fetch is left to abort.
-  - **Not attempted here**, deliberately, and now for a sharper reason than "it is large". Part 1 changes a shared
-    widget's public prop type, which is a different blast radius from the page-local change the four-part note
-    described — and the honest sequencing is to land it with its own tests before touching the page at all. The
-    value of this note is that the next attempt starts with `MetricWidget`, knowing that stopping after the page
-    edit would ship three zeros.
+  - **Done 2026-08-11, all five parts plus the migration the note treated as separate.** The task is closed because
+    both halves of the Verify line now hold and both are asserted in a browser.
+    - `MetricWidgetProps.value` is `number | null`; `null` renders a skeleton bar plus one `sr-only` "Loading" —
+      not `role="status"`, because three tiles mount together and three live regions talking over each other is
+      worse than one quiet label each.
+    - `HomeContext.statsLoading` became `listsLoading` once the counts stopped sharing that fetch: it now gates
+      only `saved-searches` and `recent-builders`, whose arrays start `[]` and whose empty states were therefore
+      true of a loading page as far as the predicate could tell.
+    - `first-hunt` reads the section state instead of `!ctx.stats`. Three states show the CTA — `empty`, and
+      `ready`/`stale` with `trackedBuilders === 0`; `loading`, `error`, `unavailable` and `forbidden` are not
+      evidence of an empty workspace.
+    - The early return is gone and `data-dashboard-state` carries `loading`/`ready` on the always-rendered root,
+      covering the projection as well as the lists. `waitForDashboardSettled` waits for the attribute to be
+      *attached*, so the guarantee is unchanged — the value flips rather than the element appearing.
+    - **And the headline counts moved onto the projection**, which the note above had filed as a separate Wave 4
+      item. Once the early return was gone there was nothing left blocking it: `summary` carries
+      `trackedBuilders`/`seenActiveInRange`, the windows agree (`DEFAULT_DASHBOARD_RANGE` is `7d`, matching the
+      tile's own hint), and four of `Stats`'s six fields were already dead. One core request now, asserted against
+      the network rather than by reading the component.
+  - **The recorded blocker was wrong in three separate ways, which is worth keeping as a caution about diagnoses
+    that are never re-tested.**
+    1. It read as a Playwright defect. It was the early return holding the whole page, so there was nothing to
+       assert against — the interception had been working the entire time.
+    2. The two specs it said were hanging **are not in this repository**. Nothing in the suite intercepts a
+       dashboard endpoint at all; they went away with the reverted attempt and never came back, so "leaving two
+       specs hanging two minutes each" described a cost that had not existed since 2026-08-06.
+    3. The `page.route`-on-TanStack-Query hazard does not apply to `/api/dashboard/overview`. Measured with a
+       throwaway spec before rewiring anything: the interception fires, the shell renders, the navigation works.
+  - **One bug introduced and caught the same run.** `empty` was treated as an unknown count, so an empty workspace
+    rendered three permanently loading skeletons — worse than the `?? 0` it replaced, because a skeleton promises a
+    number that never arrives. The route defines the summary as empty when `trackedBuilders === 0 && savedSearches
+    === 0`, which is an answer. Found by the settled-state case, not by review.
+  - **Two defects found in passing, both of the same family as the counts.** `MetricWidget` had no tests at all and
+    a comment claiming `.text-3xl` was asserted by `dashboard-and-navigation.spec.ts` — nothing in the suite
+    references that component, class or label, which is how `?? 0` shipped. And the page-level error banner
+    interpolated the thrown message, so a failed read put "Heads up: stats: 500. Some data may be missing." on a
+    tenant's dashboard; it reads from `overview.fatal` now, as one sentence plus a retry, with the reason code left
+    in the console.
+  - **Tests:** `tests/unit/modules/dashboard/ui/home/MetricWidget.test.tsx` (6 cases, including the distinction that
+    forced `null` to exist — zero is an answer and prints as `0`) and `tests/e2e/dashboard-shell.spec.ts` (3 cases:
+    a held request leaves the shell labelled `loading` with no digit in any tile, the first-hunt CTA absent and the
+    navigation working; exactly one core request with the old endpoint never asked; and a settled-state control).
+    Both verified by reintroducing the old behaviour — 3 of 6 unit cases fail, and the browser case fails in 9 s
+    with a clear message rather than the 120 s timeout the note described.
 
 ## Wave 2 — Action queue
 
