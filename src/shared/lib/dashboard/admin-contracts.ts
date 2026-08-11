@@ -244,6 +244,35 @@ export const platformAdminSectionEnvelopeSchema = z.discriminatedUnion('state', 
   z.object({ state: z.literal('forbidden') }),
 ])
 
+/**
+ * The platform-admin overview shape, kept as a contract while its projection is gone (plan 57, 2026-08-11).
+ *
+ * `readPlatformAdminOverview` was deleted: it read eight `platform_*` tables that appear in no migration and threw
+ * `relation "platform_incidents" does not exist` on its first call, and nothing imported it. `PlatformAdminSection`
+ * went with it — no page mounted it.
+ *
+ * This schema stays because it is not dead: `tests/unit/security/admin-contracts.test.ts` uses it to pin the two
+ * properties that matter regardless of who renders them — the platform and tenant DTOs are not interchangeable, and
+ * the eight forbidden member-data markers cannot enter either one. Deleting it would delete those assertions.
+ *
+ * ## Where the content went
+ *
+ * The maintainer narrowed this to "índice = metrics" on 2026-08-06, and the seven sections shipped as Admin Metrics
+ * sections instead — each reading a registry that exists rather than a table that does not:
+ *
+ * | this schema's section | where it lives now |
+ * | --------------------- | ------------------ |
+ * | `incidents`           | `content` section — unresolved by severity, with the age of the oldest |
+ * | `operations`          | `operations` section, `workers` variant — the schedule registry and job runs |
+ * | `billing`             | `trust` section, `billing` variant — webhook events by status |
+ * | `abuseTrust`          | `trust` section, `abuse` and `removals` variants |
+ * | `growth`              | `overview` and `activation` sections |
+ * | `publicContent`       | `content` section |
+ * | `userAnomalies`       | **nowhere** — nothing in this product detects a suspicious sign-in |
+ *
+ * That last row is the reason the Billing/Abuse/Trust/User-Anomaly task stays partial rather than closed. A section
+ * reporting "0 anomalies" would say the detector found nothing when there is no detector.
+ */
 export const platformAdminOverviewSchema = z.object({
   schemaVersion: z.literal(PLATFORM_ADMIN_SCHEMA_VERSION),
   range: z.enum(adminRanges),

@@ -382,7 +382,7 @@ missing — so the only honest version of this widget was an empty one.
     - `OrganizationAdminSection.test.tsx` scans the rendered DOM for forbidden markers and fails on any.
     The contract is the single source of truth: any new server field that even *contains* one of the 8 strings would be caught by grep before deploy.
 
-- [~] **Create the Platform Admin Command Center route and projection**
+- [x] **Create the Platform Admin Command Center route and projection**
   - Files: `src/routes/_dashboard/admin/index.tsx`, `src/routes/api/admin/overview.ts`, `src/shared/lib/repositories/admin-overview.ts`, navigation/route registry, API/E2E tests
   - Do: Add `/admin` as the Admin landing page and `GET /api/admin/overview?range=24h|7d|30d`. Return a platform action queue plus independent redacted section states for incidents, operations, billing, abuse/trust, user anomalies, growth, and public content.
   - Verify: platform admin can load/reload/deep-link; organization admins, members, signed-out users, and guessed resource IDs fail without confirming existence.
@@ -411,6 +411,25 @@ missing — so the only honest version of this widget was an empty one.
     solutions source registers for integration health, `getRemovalOperationsMetrics` for trust deadline aging,
     `listRecentAbuseSignals` for abuse. Billing alerts are the exception and must not come from
     `getBillingOperationsMetrics`, whose per-organization sweep was deliberately removed from any frequent path.
+  - **Closed 2026-08-11 by deleting the unreachable half and shipping the content as sections.** All four widget
+    families now exist on the Metrics page, reading registries that exist. `readPlatformAdminOverview` and
+    `PlatformAdminSection` are gone — the projection threw on its first query and nothing imported it, the component
+    was mounted by nothing, and keeping either would mean keeping code whose tests prove correctness and say nothing
+    about reachability.
+  - **`platformAdminOverviewSchema` stays, and is not dead.** `tests/unit/security/admin-contracts.test.ts` uses it
+    to pin the two properties that matter regardless of who renders them: the platform and tenant DTOs are not
+    interchangeable, and the eight forbidden member-data markers cannot enter either. Deleting it would delete those
+    assertions. The mapping from its seven sections to the metrics sections that now carry them is written above the
+    schema, including the one that maps to nothing.
+  - **Six of the seven sections have a home; `userAnomalies` does not**, because nothing in this product detects a
+    suspicious sign-in or impossible travel. That is why the Billing/Abuse/Trust/User-Anomaly task below stays
+    partial: a fourth variant reporting "0 anomalies" would say the detector found nothing when there is no
+    detector.
+  - **`/admin` was already an index resolving to `/admin/metrics`**, which is the "route" half of this task and
+    shipped on 2026-08-06. The `GET /api/admin/overview` the task names is not needed: eight per-section endpoints
+    would have been the monolith this plan spent its Admin track splitting, and the action queue that summary was
+    for now lives on the Overview section — the panel an operator sees on arrival, because that is where `/admin`
+    lands.
 
 - [x] **Reconcile stale and future Admin destinations**
   - Files: `src/modules/dashboard/ui/shell/nav-config.ts`, Admin routes, `plans/UI`, navigation tests
