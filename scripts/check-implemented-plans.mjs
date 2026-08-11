@@ -190,15 +190,20 @@ for (const { phase, root, dir, archived } of plans) {
  * human", "moved, not done". Every mechanical condition passed. The text said no.
  *
  * Three of those four turned out to be *already built*, with only their titles stale; the fourth had
- * genuinely moved to phase 5. So the rule is not "never admit a gap" — it is **say where the work went**.
- * A `plans/phase-5/` link is the only accepted answer, because phase 5 is where launch, legal, operator
- * and soak work lives and a link there is itself checkable.
+ * genuinely moved to phase 5. So the rule is not "never admit a gap" — it is **say where the work went**,
+ * with a link to the plan that owns it now, because a link is checkable and a promise is not.
  *
- * Deliberately narrow: "deferred to a later pass" with no pointer fails, which is the sentence that lets
- * a gap sit unowned for weeks.
+ * Any `plans/phase-N/` pointer counts, not only phase 5. It was phase-5-only until 2026-08-11, when two of
+ * plan 57's Wave 5 tasks moved to `plans/phase-4/saved-search-health` and
+ * `plans/phase-4/hiring-pipeline-kanban` — the plans that build the capabilities those widgets read. Work
+ * moves to whoever owns the capability, which is not always the launch phase, and a rule that only
+ * recognised phase 5 would have pushed the next such move into a false phase-5 reference to satisfy a lint.
+ *
+ * Deliberately still narrow: "deferred to a later pass" with no pointer fails, which is the sentence that
+ * lets a gap sit unowned for weeks.
  */
 const ADMITS_NOT_DONE = /(not implemented|not attempted|not done|not started|skipped|deferred|not built|not wired|not written)/i
-const NAMES_A_NEW_OWNER = /plans\/phase-5\/|phase-5\/[0-9]{2}-/
+const NAMES_A_NEW_OWNER = /plans\/phase-[1-5]\/|phase-[1-5]\/[0-9]{2}-/
 
 for (const { root, dir } of plans) {
   for (const name of markdownFiles(root, dir)) {

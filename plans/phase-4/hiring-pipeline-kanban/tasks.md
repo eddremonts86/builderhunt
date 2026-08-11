@@ -562,3 +562,19 @@ post-hoc rename of the file + journal tag is needed.
   - Verify: `pnpm lint && pnpm type-check && pnpm test && pnpm test:migration-integrity && pnpm security:boundaries && pnpm security:route-coverage && pnpm test:rls:local && pnpm test:api-isolation:local`
     all green; manual pass: free org gets a working default board with locked customization, pro org
     customizes stages, team org receives a digest.
+
+## Dashboard integration — moved from plan 57 on 2026-08-11
+
+- [ ] **Integrate Pipeline Stage Distribution and aging into the dashboard**
+  - Files: pipeline dashboard adapter, `PipelineSnapshotWidget.tsx`, contract tests
+  - Do: Show canonical stage counts and supported aging/stuck indicators with exact values. Use
+    "distribution"; link to the filtered Kanban this plan builds.
+  - Verify: counts reconcile, missing stage-entry timestamps suppress aging, and no funnel/conversion
+    language exists without transition cohorts.
+  - **Moved from `plans/phase-1/57-ui-dashboard` Wave 5, where it could not be started.** There were no
+    canonical stages, no stage-entry timestamps and no Kanban to link a filtered view to. Aging was the
+    part that could not be approximated at all: the task requires that missing stage-entry timestamps
+    *suppress* aging, and before this plan every timestamp is missing — so the widget's only honest
+    output would have been an empty widget.
+  - Sequencing: after the stages and their entry timestamps exist, and after the board can accept a
+    filtered link. Nothing else in this plan depends on it.

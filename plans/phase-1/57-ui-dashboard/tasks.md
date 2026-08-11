@@ -202,25 +202,21 @@
 
 ## Wave 5 — Dependency-gated widgets
 
-- [ ] **Integrate Saved-Search Health without fabricated history**
-  - **Blocked, verified 2026-08-06: `plans/phase-4/saved-search-health` is 0 of 22 tasks done.** Not
-    deferred by effort — there is no canonical health endpoint to reconcile against, and the task's own
-    verify line requires reconciling with one. Building the widget first would mean inventing the
-    health model in a dashboard adapter, which is the fabricated history the title forbids.
-  - Files: saved-search health dashboard adapter, `SavedSearchHealthWidget.tsx`, contract tests
-  - Depends on: `plans/phase-4/saved-search-health`
-  - Do: Show current healthy/tune/kill/unmonitored/too-new counts and a bounded issue list with tune/inspect/retire continuations. Do not persist dashboard-owned snapshots or draw a trend.
-  - Verify: dashboard totals reconcile with the canonical health endpoint and no trend/time-series UI exists.
+**Saved-Search Health** moved to
+[`plans/phase-4/saved-search-health`](../../phase-4/saved-search-health/tasks.md) on 2026-08-11,
+deliberately not as a checkbox: a box here reads as pending engineering in this plan, and there is none.
+It was blocked on that plan rather than deferred by effort — its Verify line requires reconciling against
+a canonical health endpoint, and that plan is what builds one. Building the widget first would have meant
+inventing the health model inside a dashboard adapter, which is the fabricated history its own title
+forbids. It now sits beside the endpoint, so whoever ships one ships the other while the model is still in
+their head.
 
-- [ ] **Integrate Pipeline Stage Distribution and aging**
-  - **Blocked, verified 2026-08-06: `plans/phase-4/hiring-pipeline-kanban` is 0 of 30 tasks done.**
-    There are no canonical stages, no stage-entry timestamps, and no Kanban to link the filtered view
-    to. Aging in particular cannot be approximated: the task says missing stage-entry timestamps must
-    *suppress* aging, and right now every timestamp is missing.
-  - Files: pipeline dashboard adapter, `PipelineSnapshotWidget.tsx`, contract tests
-  - Depends on: `plans/phase-4/hiring-pipeline-kanban`
-  - Do: Show canonical stage counts and supported aging/stuck indicators with exact values. Use “distribution”; link to the filtered Kanban.
-  - Verify: counts reconcile, missing stage-entry timestamps suppress aging, and no funnel/conversion language exists without transition cohorts.
+**Pipeline Stage Distribution and aging** moved to
+[`plans/phase-4/hiring-pipeline-kanban`](../../phase-4/hiring-pipeline-kanban/tasks.md) on 2026-08-11,
+also as prose rather than a checkbox. There were no canonical stages, no stage-entry timestamps and no
+Kanban to link a filtered view to. Aging was the part that could not be approximated at all: the task
+requires that missing stage-entry timestamps *suppress* aging, and before that plan every timestamp is
+missing — so the only honest version of this widget was an empty one.
 
 - [x] **Integrate Invitation Status Distribution**
   - Files: invitation dashboard adapter, `InvitationStatusWidget.tsx`, tests
