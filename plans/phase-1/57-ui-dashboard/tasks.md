@@ -1407,7 +1407,7 @@ missing — so the only honest version of this widget was an empty one.
     for the console to be missing without an explanation — the opposite of what a release gate is for. The
     underlying intent, that the detail routes do not depend on the summary, holds by construction: every
     `/admin/*` detail route is reachable by URL and none of them imports the metrics shell.
-  - **Still open:** the mobile runtime pass for each persona — the current matrix is desktop, and the a11y gate
+  - **The mobile runtime pass landed 2026-08-11.** The desktop matrix was already there; the a11y gate
     covers 320 px only as the platform admin.
   - **The mobile pass is not the desktop one at a smaller size**, and that is why it is a separate case. It asks two
     questions the refusal matrix cannot: does the *refusal* still happen when the thing that differs is layout — a
