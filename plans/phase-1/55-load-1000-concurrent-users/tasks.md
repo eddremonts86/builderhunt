@@ -17,7 +17,7 @@
   - Verify: `pnpm vitest run tests/unit/scripts/load/config.test.ts` passes and the test pins the
     1,000-user/400–500 req/s contract.
 
-- [ ] **Create disposable load fixtures**
+- [~] **Create disposable load fixtures**
   - Files: `scripts/load/seed.ts`, `scripts/load/cleanup.ts`,
     `tests/unit/scripts/load/seed-safety.test.ts`
   - Do: Create 1,000 deterministic Better Auth users, one organization per user, and bounded
