@@ -31,7 +31,20 @@ const TONE_TEXT: Record<MetricTone, string> = {
 
 export interface MetricWidgetProps {
   label: string
-  value: number
+  /**
+   * The count, or `null` when it is not known yet.
+   *
+   * Nullable deliberately, and the type is the whole point of it. This was `number`, and the page fed it
+   * `stats?.totalBuilders ?? 0` — so a tile with no data yet rendered a confident **0** in 30px type, and there was
+   * no way for it to say anything else. That only stayed invisible because a whole-page skeleton hid the tile
+   * during the fetch; the moment Wave 1 removes that skeleton to make the shell render independently, three zeros
+   * appear on every dashboard load.
+   *
+   * `?? 0` is the shape to distrust here in general: for a count, "none" and "not read yet" are different
+   * sentences, and a coalesce turns the second into the first. The same substitution shipped in the org-admin cards
+   * on the same day from the same instinct.
+   */
+  value: number | null
   hint: string
   icon: React.ComponentType<{ className?: string }>
   tone: MetricTone
@@ -47,12 +60,30 @@ export function MetricWidget({ label, value, hint, icon: Icon, tone, badge }: Me
         <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${TONE_TEXT[tone]}`} aria-hidden="true" />
       </div>
 
-      {/* `.text-3xl` is asserted by e2e/dashboard-and-navigation.spec.ts; tabular
-          figures stop the number jittering as it updates. */}
-      <p className="mt-1.5 flex items-baseline gap-1.5">
-        <span className="text-3xl font-bold tracking-tight tabular-nums text-bh-text font-display">
-          {value.toLocaleString()}
-        </span>
+      {/* Tabular figures stop the number jittering as it updates. (A comment here used to claim
+          `.text-3xl` was asserted by `dashboard-and-navigation.spec.ts`. It is not — nothing in the
+          suite references this component, this class, or these labels, which is how the `?? 0` shipped.) */}
+      <p className="mt-1.5 flex items-baseline gap-1.5" data-metric-state={value === null ? 'loading' : 'ready'}>
+        {value === null ? (
+          /**
+           * A skeleton bar, sized to the line it replaces so the tile does not resize when the number lands.
+           *
+           * `aria-hidden` plus one `sr-only` word rather than `role="status"`: three tiles mount together, and
+           * three live regions announcing themselves is worse for a screen-reader user than one quiet label each.
+           * The bar is decoration; "Loading" is the content.
+           */
+          <>
+            <span
+              aria-hidden="true"
+              className="my-1 block h-7 w-16 animate-pulse rounded bg-bh-surface"
+            />
+            <span className="sr-only">Loading</span>
+          </>
+        ) : (
+          <span className="text-3xl font-bold tracking-tight tabular-nums text-bh-text font-display">
+            {value.toLocaleString()}
+          </span>
+        )}
         {badge && (
           <span className="hidden @min-[18rem]:inline truncate rounded border border-bh-border bg-bh-bg-alt px-1.5 py-0.5 text-[10px] font-medium text-bh-text-dim">
             {badge}

@@ -92,6 +92,14 @@ interface RecentBuilder {
  */
 interface HomeContext {
   stats: Stats | null
+  /**
+   * Whether the headline counts are still in flight.
+   *
+   * `stats === null` cannot answer this, which is why the flag exists: null is both "still loading" and "the
+   * request failed", and the empty-state CTA must appear for neither. Without it, removing the page-level skeleton
+   * makes "Run your first hunt" render over a workspace that has builders in it, for as long as the fetch takes.
+   */
+  statsLoading: boolean
   queries: SavedQuery[]
   recent: RecentBuilder[]
   sprints: SprintListItem[]
@@ -164,8 +172,15 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
     title: 'Run your first hunt',
     span: 'full',
     chrome: 'glow',
-    // The empty-state CTA outranks everything when there is nothing to show.
-    isVisible: (ctx) => (!ctx.stats || ctx.stats.totalBuilders === 0) && !ctx.error,
+    /*
+     * The empty-state CTA outranks everything when there is nothing to show — and `!ctx.statsLoading` is what
+     * makes "nothing to show" a fact rather than a guess.
+     *
+     * `!ctx.stats` is true both before the fetch resolves and after it fails, so without the flag this CTA claims
+     * an empty workspace on the strength of not having asked yet. A recruiter with two hundred tracked builders
+     * would see "Run your first hunt" for the length of the request and then watch it vanish.
+     */
+    isVisible: (ctx) => !ctx.statsLoading && (!ctx.stats || ctx.stats.totalBuilders === 0) && !ctx.error,
     render: () => (
       <div className="p-6 text-center">
         <div className="inline-flex w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-4">
@@ -418,6 +433,18 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
     title: 'Saved searches',
     span: 'twoThirds',
     minSpan: 'half',
+    /*
+     * Withheld until the fetch that fills it has resolved, for the same reason `first-hunt` is.
+     *
+     * `queries` starts as `[]`, so its empty state — "No saved searches yet", with a CTA to create one — was true
+     * of a loading page as far as this predicate could tell. The whole-page skeleton hid that; with the skeleton
+     * gone, a recruiter with twelve saved searches would be told they have none and offered a first one.
+     *
+     * Withheld rather than given a skeleton of its own: an absent tile claims nothing, and this list has no
+     * intrinsic height to hold open — unlike a metric tile, whose single line is worth reserving so the number
+     * does not shove the page when it lands.
+     */
+    isVisible: (ctx) => !ctx.statsLoading,
     isEmpty: (ctx) => ctx.queries.length === 0,
     // The empty state is a short call to action, not a list, so it gives width
     // back. `minSpan` clamps the collapse.
@@ -461,6 +488,9 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
     title: 'Recent builders',
     span: 'third',
     minSpan: 'third',
+    // Same reason as `saved-searches` above: `recent` starts empty, so "No builders tracked yet" would describe a
+    // page that has not asked yet.
+    isVisible: (ctx) => !ctx.statsLoading,
     isEmpty: (ctx) => ctx.recent.length === 0,
     render: (ctx) => (
       <>
@@ -868,9 +898,17 @@ export function DashboardPage() {
      * that person publicly. It is not a count of things they did, and the old copy claimed it was.
      */
     return [
+    /*
+     * `null`, not `?? 0`, for the two counts that come from `/api/dashboard/stats`.
+     *
+     * A coalesce to zero here answers "how many builders are tracked?" with "none" when the truthful answer is
+     * "not read yet", and it does it in the largest type on the page. It was survivable only while a whole-page
+     * skeleton hid these tiles during the fetch — and removing that skeleton is this task's own Do line, so the
+     * substitution had to go first.
+     */
     {
       label: 'Builders tracked',
-      value: stats?.totalBuilders ?? 0,
+      value: stats ? stats.totalBuilders : null,
       icon: Users,
       tone: 'accent' as const,
       hint: 'People saved to your lists',
@@ -878,7 +916,7 @@ export function DashboardPage() {
     },
     {
       label: 'Seen active',
-      value: stats?.activeThisWeek ?? 0,
+      value: stats ? stats.activeThisWeek : null,
       icon: TrendingUp,
       tone: 'success' as const,
       hint: 'Last seen by a source in the past 7 days',
@@ -891,6 +929,7 @@ export function DashboardPage() {
       // which only loads once on mount and otherwise goes stale — e.g. right
       // after deleting a saved search, the list below updates immediately
       // but this count wouldn't until a full page reload.
+      // Not nullable: `queries` is a real list either way, and an empty one honestly means zero saved searches.
       value: queries.length,
       icon: Bookmark,
       tone: 'warning' as const,
@@ -933,6 +972,7 @@ export function DashboardPage() {
   const widgetContext = React.useMemo<HomeContext>(
     () => ({
       stats,
+      statsLoading: loading,
       queries,
       recent,
       sprints,
@@ -943,7 +983,7 @@ export function DashboardPage() {
       currentUserId: currentUserId ?? '',
       overview,
     }),
-    [stats, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
+    [stats, loading, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
   )
 
   /*
@@ -1020,31 +1060,37 @@ export function DashboardPage() {
       .catch(() => setTriggers([]))
   }, [])
 
-  if (loading) {
-    return (
-      <div data-dashboard-state="loading">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 w-48 bg-bh-surface rounded" />
-          <div className="h-4 w-72 bg-bh-surface rounded" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="card h-24 bg-bh-surface/50" />
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+  /*
+   * There is no `if (loading) return <skeleton />` here any more, and its removal is this task's Do line.
+   *
+   * A whole-page early return is the opposite of "render shell/critical actions independently from lower-section
+   * failures": one slow request blanked the header, the navigation and the action queue together, so the page could
+   * not be used until its slowest fetch finished. Each region reports its own state now — the metric tiles show a
+   * skeleton for a `null` count, the projection-backed sections carry their own `WidgetState` — so holding any
+   * single request leaves the rest of the page working, which is the Verify line.
+   *
+   * It also had a second effect worth recording, because it is what made this task look like a Playwright problem
+   * for five days: any spec that held `/api/dashboard/stats` to observe a loading state got a page with an empty
+   * `main` and no navigation, and repointing the counts at another endpoint just moved the same early return onto
+   * that one. Nothing was wrong with the interception.
+   */
   return (
     // `data-dashboard-state` is the settle signal the e2e suite waits on before
-    // navigating away: the three post-mount fetches are done, so nothing is left
-    // to abort. It used to key off `#stats-heading`, an accessibility heading
-    // that the bento rewrite legitimately removed — every dashboard test then
-    // timed out, unnoticed, because CI ran only one spec. An explicit attribute
-    // cannot be refactored away by accident the way incidental markup can.
+    // navigating away: `ready` means the three post-mount fetches are done, so
+    // nothing is left to abort. It used to key off `#stats-heading`, an
+    // accessibility heading that the bento rewrite legitimately removed — every
+    // dashboard test then timed out, unnoticed, because CI ran only one spec. An
+    // explicit attribute cannot be refactored away by accident the way incidental
+    // markup can.
+    //
+    // Now that the shell renders during loading, the attribute carries the state
+    // rather than the element's existence carrying it. `waitForDashboardSettled`
+    // waits for `[data-dashboard-state="ready"]` to be *attached*, so the
+    // guarantee is unchanged: the selector matches only once `loading` is false.
+    // Hardcoding `ready` here would satisfy the wait immediately and bring back
+    // the aborted-fetch console noise the strict browser guard catches.
     <motion.div
-      data-dashboard-state="ready"
+      data-dashboard-state={loading ? 'loading' : 'ready'}
       initial={reduceMotion ? false : fadeInUp.initial}
       animate={fadeInUp.animate}
       transition={fadeInUp.transition}
