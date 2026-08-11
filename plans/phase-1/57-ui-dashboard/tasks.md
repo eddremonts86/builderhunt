@@ -250,7 +250,7 @@
 
 ## Wave 4 — Current-data widgets and charts
 
-- [~] **Build Candidates to Review as a unified projection**
+- [x] **Build Candidates to Review as a unified projection**
   - Files: dashboard review projection/contracts, `CandidatesToReviewWidget.tsx`, tests
   - Do: Combine bounded recommendations, unread alert matches, completed sprint results, and recent tracked builders while preserving provenance and deduplicating identities. Rank with deterministic product rules, not unexplained generated prose.
   - Verify: one candidate is not repeated, the reason/source remains visible, and primary navigation enters the internal builder workspace with safe origin context.
@@ -262,6 +262,17 @@
     deduplicated by `(source, sourceId)` with the more actionable provenance winning. A person can
     still appear once here and once in the recommendations widget; closing that needs recommendations
     to become a cached projection of its own.
+  - **Closed 2026-08-11 on the maintainer's ruling: the overlap is accepted and documented.** The Verify line is
+    "one candidate is not repeated", and inside this widget none is — the projection deduplicates by
+    `(source, sourceId)` with the more actionable provenance winning. What remains is a person appearing here *and*
+    in the recommendations widget, which is an overlap between two surfaces rather than a repeat within one, and it
+    is visible and explainable where a silent duplicate would not be.
+  - **The alternative was considered and declined for now:** turning recommendations into its own cached
+    projection. That is the real fix — it would let the rows be folded in without putting thirteen connectors and
+    their 8 s per-connector budget behind every dashboard load, and it would make the existing recommendations
+    widget cheaper too. It is also the largest remaining item in this plan, and it is a change to how
+    recommendations are computed rather than to how this widget reads them. Recorded here so whoever picks it up
+    starts from the reason rather than from the symptom.
 
 - [x] **Add newly tracked discovery trend**
   - Files: dashboard aggregate repository, `DiscoveryTrendWidget.tsx`, chart tests
@@ -1220,7 +1231,7 @@ missing — so the only honest version of this widget was an empty one.
 
 ### Admin preferences and release gates
 
-- [~] **Persist isolated platform-admin preferences**
+- [x] **Persist isolated platform-admin preferences**
   - Files: admin dashboard preference schema/repository/API, customization UI, security tests
   - Do: Store platform layout/range separately from organization dashboard preferences. Fix required Incident, Security/Abuse, and Billing-risk widgets; allow optional Growth/Content widgets to move/hide through keyboard-accessible controls.
   - Verify: platform and tenant preferences cannot overwrite/read each other; required-widget hiding fails; version migration, stale update, keyboard reorder, reset, and shared-browser account switch pass.
@@ -1283,13 +1294,16 @@ missing — so the only honest version of this widget was an empty one.
     - `url-state.ts` had no tests, the same gap as `MetricWidget`. It has 12 now, including the two whose failure
       is invisible: a variant carried onto a section with no such view, and `?compare=false` rewritten away from an
       operator who typed it deliberately.
-  - **Still open: the hidden-widget half, and it is blocked on a product decision rather than on code.**
+  - **The hidden-widget half is closed as not applicable, 2026-08-11, on the maintainer's ruling.** It is not
     `action_queue` is the only id in the vocabulary, it is required, and hiding it is refused with a 422. No
     optional admin widget exists — the id appears in no component under `src/modules/admin/` — so there is nothing
     to hide. The task names "optional Growth/Content widgets", and after the "índice = metrics" ruling those are
     *sections* reached from a nav, not movable cards. Building a control would mean first inventing an optional
     widget for it to act on. The store already refuses the wrong things correctly; what is missing is something
     worth hiding.
+    The store already refuses the wrong things, proven in both directions; there is simply nothing optional in the
+    admin surface for a hide control to act on. Revisit the day a genuinely optional admin widget ships — the
+    column, the required-widget allowlist and the 422 are all in place waiting for one.
 
 - [~] **Add admin scope, audit, and performance release gates**
   - Files: admin dashboard contract/E2E/accessibility/performance tests, rollout runbook
@@ -1322,10 +1336,15 @@ missing — so the only honest version of this widget was an empty one.
   - **Bounded queries, cross-scope caches and independent flags were already covered** by work earlier in this
     plan: the read-path detector plus the payload caps, the preference-store isolation asserted as 42501 in both
     directions, and `reliability` answering `not_enabled` from the interview capability flags independently.
+  - **The "disabling either admin surface" clause is withdrawn, 2026-08-11, on the maintainer's ruling.** It
+    describes a capability this product does not have: no flag disables the admin surface, and after the
+    "índice = metrics" decision there is one surface rather than two for a flag to act on either side of. Adding a
+    pair of kill switches to satisfy the sentence would create a configuration path nothing uses and a second way
+    for the console to be missing without an explanation — the opposite of what a release gate is for. The
+    underlying intent, that the detail routes do not depend on the summary, holds by construction: every
+    `/admin/*` detail route is reachable by URL and none of them imports the metrics shell.
   - **Still open:** the mobile runtime pass for each persona — the current matrix is desktop, and the a11y gate
-    covers 320 px only as the platform admin. And "disabling either admin surface preserves all existing detailed
-    routes" has nothing to exercise: there is no flag that disables the admin surface, so the sentence describes a
-    capability this product does not have rather than a test that is missing.
+    covers 320 px only as the platform admin.
 
 ## Wave 6 — Personalization
 
@@ -1383,7 +1402,7 @@ missing — so the only honest version of this widget was an empty one.
     tile and the widget, indistinguishable once the dialog strips the context that told them apart;
     `defineWidgetRegistry` now throws on a duplicate title the way it already threw on a duplicate id.
 
-- [~] **Apply persona defaults and safe preference migration**
+- [x] **Apply persona defaults and safe preference migration**
   - Files: widget registry defaults/migration, tests
   - Do: Define deterministic defaults for new user, recruiter/member, owner/admin, verified profile owner, and platform admin. Append newly required widgets and ignore retired IDs without scrambling user order.
   - Verify: golden preference fixtures migrate across versions and organization switches never reuse another organization's layout.
@@ -1407,6 +1426,11 @@ missing — so the only honest version of this widget was an empty one.
     platform-admin defaults are absent because neither persona has shipped widgets on this route to
     have defaults about. Left partial rather than closed: the mechanism to apply a default set exists
     and is unused, and if a real persona difference appears it belongs here.
+  - **Closed 2026-08-11 on the maintainer's ruling: the data-driven version is the answer.** A persona default
+    table would re-encode decisions `roles`, `isVisible` and `whenEmpty` already make, and would do it worse — a
+    widget hidden by persona default stays hidden after the workspace stops being new, which is exactly the bug
+    the data-driven version cannot have. The mechanism to apply a default set stays in place for the day a real
+    persona difference appears; an empty table is the correct content for it today, not an unfinished one.
 
 ## Wave 7 — Shared visualization, quality, and release
 
