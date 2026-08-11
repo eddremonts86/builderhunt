@@ -1232,7 +1232,7 @@ missing — so the only honest version of this widget was an empty one.
     that would let one instance's counter be read as the platform's number cannot be built. An e2e case walks
     every rendered value and asserts both.
 
-- [~] **Add Admin Metrics accessibility, performance, and regression gates**
+- [x] **Add Admin Metrics accessibility, performance, and regression gates**
   - Files: Admin Metrics component/E2E/accessibility/visual/performance tests, CI configuration
   - Do: Cover exact chart tables, summaries, legends, units, thresholds, URL filters, keyboard/touch, 320 px, 400% zoom, forced colors, reduced motion, partial failure, long labels, lazy requests, and query/payload budgets.
   - Verify: Overview p95 <= 400 ms and one cached analytical section p95 <= 750 ms on the representative fixture; no overlapping request, hidden polling, billing sweep, unbounded range, sensitive route label, or chart-only value passes CI.
@@ -1267,11 +1267,31 @@ missing — so the only honest version of this widget was an empty one.
     semantics entirely, which is a real path for this page.
   - **320 px** is asserted as no horizontal scroll on `documentElement` across three sections; wide content is
     allowed to scroll inside its own container, which is why it is not asserted per descendant.
-  - **Still open:** 400 % zoom, forced-colors and reduced-motion emulation, and a long-label fixture. Playwright
-    can emulate `prefers-reduced-motion` and `forced-colors`, so those are reachable; 400 % zoom is a
-    `deviceScaleFactor` plus a narrow viewport and needs a decision about what it should assert beyond overflow,
-    which is the same question as 320 px asked louder. Also open: touch-target sizing, which nothing in this repo
-    measures yet.
+  - **The last five landed 2026-08-11**, and one of them found a real defect that had nothing to do with the thing
+    it was testing.
+    - **400 % zoom** is `deviceScaleFactor: 4` on a 320 px viewport — the CSS layout a zoomed user actually gets,
+      since Playwright has no zoom API. It asserts two properties rather than an appearance: no value's scroll box
+      exceeds its client box, and no two value rectangles intersect.
+    - **Forced colors and reduced motion** are emulated, because a `@media` query that exists and matches nothing
+      is precisely what a source-level check cannot see. Under forced colors the assertion is the same *text*
+      guarantee as the colour case — scope stated in words is what survives an OS palette override.
+    - **Long labels** send the worst the contract allows: `metricValueSchema.key` is `^[a-z][a-z0-9_]{1,62}$`, so 63
+      characters, displayed by `labelFor` with underscores as spaces. A 500-character fixture would be testing a
+      payload the schema refuses.
+    - **Touch targets** are measured for the first time in this repository: every link and button in the console
+      chrome is at least 24 × 24 CSS px (WCAG 2.5.8) at 390 px. It passes — the range links are `text-xs px-2 py-1`,
+      which lands on exactly 24, one Tailwind step from failing. Verified by shrinking them.
+  - **The long-label case immediately found that a seven-digit number was clipped on a phone.** At 320 px a
+    `grid-cols-2` tile has a 93 px content box and `1,234,567` in `text-2xl` needs 117 — measured, not guessed. Six
+    digits fitted, seven did not, so the page rendered a *wrong number* the day any platform count crossed a
+    million. One column until 380 px now. Widened rather than truncated or scaled: "1,234,5…" reads as a
+    hundred-thousand figure, and shrinking the type to fit an unknown magnitude just moves the cliff further out.
+  - **Two mistakes in the fixtures, both caught by the assertions rather than by review.** The reduced-motion
+    detector first flagged a non-zero `transitionDuration` across every `*`, reporting `html`, `head` and `meta` as
+    animating — a global `* { transition }` rule makes every node declare one, and a declared transition nothing
+    triggers is not motion. And the long-label payload omitted `variant` and used one instant for both
+    `window.from` and `window.to`, so it failed its own contract and the section rendered an error state; the
+    "payload has to have been accepted" count assertion is what turns that into a failure instead of a false pass.
 
 ### Admin preferences and release gates
 
@@ -1349,7 +1369,7 @@ missing — so the only honest version of this widget was an empty one.
     admin surface for a hide control to act on. Revisit the day a genuinely optional admin widget ships — the
     column, the required-widget allowlist and the 422 are all in place waiting for one.
 
-- [~] **Add admin scope, audit, and performance release gates**
+- [x] **Add admin scope, audit, and performance release gates**
   - Files: admin dashboard contract/E2E/accessibility/performance tests, rollout runbook
   - Do: Test platform-role and organization-role boundaries, cross-scope caches, redacted telemetry/logs, per-section failures, accessible charts, bounded queries, and independent feature flags. Confirm destructive/outward-facing operations are absent from the Command Center.
   - Verify: authenticated desktop/mobile runtime passes for organization admin, owner, platform admin, and negative personas; disabling either admin surface preserves all existing detailed routes.
@@ -1389,6 +1409,23 @@ missing — so the only honest version of this widget was an empty one.
     `/admin/*` detail route is reachable by URL and none of them imports the metrics shell.
   - **Still open:** the mobile runtime pass for each persona — the current matrix is desktop, and the a11y gate
     covers 320 px only as the platform admin.
+  - **The mobile pass is not the desktop one at a smaller size**, and that is why it is a separate case. It asks two
+    questions the refusal matrix cannot: does the *refusal* still happen when the thing that differs is layout — a
+    shell that paints its chrome before the redirect resolves has already told a tenant the console exists — and is
+    the console *usable* by the person allowed in. The second half is the one a refusal matrix structurally cannot
+    cover, and an admin paged at 02:00 is holding a phone.
+  - 390 × 844 rather than 320: the a11y cases already own the narrowest survivable layout, and this one is about the
+    device an operator really has. Under `expectStrictBrowser`, so a page that only *looks* fine while logging a
+    failed request fails here instead of being found on call.
+  - **Three wrong assertions on the way, all mine, all about which sections have numbers.** A section tab opens its
+    *first* variant: `trust`'s is `removals`, which correctly answers `not_enabled` because
+    `PROFILE_REMOVAL_ENABLED` is false, and `operations`' `workers` renders registry rows rather than
+    `metric-value-` tiles. Both are the honest behaviour those sections were built to have, so asserting tiles
+    against either was asserting against the design. **`runtime` is the only section guaranteed to have values**
+    here — its counters are in-process, so no window makes it unavailable — and that is now written into the case
+    so the next person does not spend the three attempts again.
+  - Verified by removing `requirePlatformAdminPage()` from the route: the organization owner reaches the page on a
+    phone and the case fails naming that persona.
 
 ## Wave 6 — Personalization
 

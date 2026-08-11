@@ -720,6 +720,141 @@ test.describe('the Admin Metrics shell', () => {
     }
   })
 
+  test('every control in the console chrome meets the 24 px touch target', async ({ browser }) => {
+    /**
+     * WCAG 2.5.8 (AA): a target is at least 24 × 24 CSS pixels, or spaced so a 24 px circle centred on it touches
+     * nothing else. Nothing in this repository measured touch targets before this case.
+     *
+     * The console's chrome is where the risk is, and it is not hypothetical: the section tabs are
+     * `text-sm px-3 py-1.5`, the range and variant links are `text-xs px-2 py-1`, and a 12 px line box with 4 px of
+     * vertical padding is exactly 24 — a single Tailwind step from failing. These are the controls an operator uses
+     * one-handed at 02:00, and a target under the minimum is one they hit twice.
+     *
+     * Measured at the phone width, because that is where the row wraps and where a thumb is the pointer. The
+     * assertion reports every offender with its size rather than the first, so one run says what to fix.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState!, viewport: { width: 390, height: 844 } })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=traffic&range=24h&variant=rate&compare=false`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+
+      const small = await tab.evaluate(() => {
+        const page = document.querySelector('[data-testid="admin-metrics-page"]')
+        if (!page) return ['no page']
+        /**
+         * Links and buttons inside the page, excluding anything not rendered.
+         *
+         * Scoped to the metrics page rather than the document so the shell's own navigation — which belongs to a
+         * different plan and a different set of tests — is not measured here.
+         */
+        return [...page.querySelectorAll('a, button, [role="button"]')]
+          .map((node) => ({ node, rect: node.getBoundingClientRect() }))
+          .filter(({ rect }) => rect.width > 0 && rect.height > 0)
+          .filter(({ rect }) => rect.width < 24 || rect.height < 24)
+          .map(({ node, rect }) =>
+            `${node.getAttribute('data-testid') ?? (node.textContent ?? '').trim().slice(0, 24)}: ${Math.round(rect.width)}x${Math.round(rect.height)}`,
+          )
+      })
+      expect(small, 'controls below the 24px minimum touch target').toEqual([])
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
+  test('the same four personas resolve the same way on a phone, and the console is usable there', async ({ browser }) => {
+    /**
+     * The mobile half of the release gate's Verify line — "authenticated desktop/mobile runtime passes for
+     * organization admin, owner, platform admin, and negative personas" (plan 57, Admin track).
+     *
+     * The case above is the desktop pass. This is not a duplicate of it with a smaller viewport: a mobile runtime
+     * pass asks two questions the desktop one cannot.
+     *
+     * **Does the refusal still happen?** A guard that runs in `beforeLoad` is viewport-independent in principle,
+     * and this asserts it in practice — because the thing that differs on a phone is *layout*, and a shell that
+     * renders its chrome before the redirect resolves has told a tenant the console exists. `toHaveCount(0)` on the
+     * page testid is the same assertion at both sizes for exactly that reason.
+     *
+     * **Is the console actually usable by the person who is allowed in?** The desktop case never checks that,
+     * because it is only about refusals. An admin paged at 02:00 is holding a phone, so the positive pass asserts
+     * the three things that make the page worth opening there: a section renders numbers, the section navigation is
+     * reachable and switches, and the page does not scroll sideways.
+     *
+     * 390 × 844 rather than 320: the a11y cases already cover 320 as the narrowest survivable layout, and this one
+     * is about the device an operator really has.
+     */
+    const phone = { width: 390, height: 844 }
+    const orgAdmin = await addMember(harness, 'admin')
+    const orgMember = await addMember(harness, 'member')
+
+    for (const [label, principal] of [
+      ['organization owner', harness.owner],
+      ['organization admin', orgAdmin],
+      ['organization member', orgMember],
+    ] as const) {
+      const context = await browser.newContext({ storageState: principal.storageState!, viewport: phone })
+      const tab = await context.newPage()
+      try {
+        await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=traffic&range=24h&variant=rate&compare=false`)
+        await dismissOverlays(tab)
+        await expect(tab.getByTestId('admin-metrics-page'), `${label} on a phone`).toHaveCount(0)
+      } finally {
+        await context.close()
+      }
+    }
+
+    // Signed out, on a phone: the same nothing.
+    const anonymous = await browser.newContext({ viewport: phone })
+    const anonymousTab = await anonymous.newPage()
+    try {
+      await gotoHydrated(anonymousTab, `${harness.baseURL}/admin/metrics?section=traffic&range=24h&variant=rate&compare=false`)
+      await expect(anonymousTab.getByTestId('admin-metrics-page')).toHaveCount(0)
+    } finally {
+      await anonymous.close()
+    }
+
+    /**
+     * And the platform admin gets a working console, which is the half a refusal matrix cannot prove.
+     *
+     * Under `expectStrictBrowser`, so a layout that only *looks* fine while logging a failed request or a React
+     * warning fails here rather than being discovered by whoever is on call.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState!, viewport: phone })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=overview&range=24h&variant=summary&compare=false`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+
+      /**
+       * The navigation works at this width — a wrapped tab row that overflows its container is unreachable — and it
+       * lands on numbers rather than on an empty shell.
+       *
+       * **`runtime` is the only section guaranteed to have values in this environment**, and getting that wrong cost
+       * three attempts here. A section tab opens its *first* variant: `trust`'s is `removals`, which correctly
+       * answers `not_enabled` because `PROFILE_REMOVAL_ENABLED` is false, and `operations`' `workers` renders
+       * registry rows rather than `metric-value-` tiles. Both are honest behaviours the sections were built to have,
+       * and asserting tiles against either was asserting against the design. Runtime's numbers are in-process
+       * counters, so there is no window in which it is unavailable — the same reason the unit-and-scope case above
+       * uses it.
+       */
+      await tab.getByTestId('admin-metrics-section-runtime').scrollIntoViewIfNeeded()
+      await tab.getByTestId('admin-metrics-section-runtime').click()
+      await expect(tab.getByTestId('admin-metrics-section-runtime')).toHaveAttribute('data-active', 'true')
+      await expect(tab.locator('[data-testid^="metric-value-"]').first()).toBeVisible({ timeout: 20_000 })
+
+      const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow, `the console overflows a 390px phone by ${overflow}px`).toBeLessThanOrEqual(1)
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
   test('a failing section leaves the other seven readable, on the page and not just in the payload', async ({ browser }) => {
     /**
      * "Per-section failures" from the Verify line, asserted where it matters: the monolith could not have this
