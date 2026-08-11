@@ -100,7 +100,7 @@ docs/operations/load-baseline-<date>.md`.
 
 ## Phase 2 — Bounded application pools
 
-- [ ] **Add role-aware pool configuration**
+- [x] **Add role-aware pool configuration**
   - Files: `src/shared/lib/db/pool-options.ts`, `src/shared/lib/env.ts`, `.env.example`,
     `tests/unit/shared/lib/db/pool-options.test.ts`, `tests/unit/shared/lib/env.test.ts`
   - Do: Change the helper to `poolOptions(role)` for `runtime | auth | worker | platform |
@@ -110,8 +110,21 @@ capability`; implement the five max defaults plus 30-second idle and 5-second co
   - Verify: `pnpm vitest run tests/unit/shared/lib/db/pool-options.test.ts
 tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each exact option
     object and E2E behavior.
+  - The caps are 12/4/4/4→3/3 (runtime, auth, worker, platform, capability) and the reason for each
+    size is in the module comment, not a table. `totalPoolMax()` is exported and asserted at 26, so a
+    change that raises one cap has to face the sum it lands in — 26 × 4 processes stays inside the load
+    topology's `max_connections=120` and PgBouncer's `max_db_connections=80`.
+  - `connection.application_name` is per role, because `pg_stat_activity` is otherwise 26 identical
+    rows and no way to know which pool grew.
+  - `connect_timeout: 5` matters more than the caps under load: without it `postgres.js` waits
+    indefinitely for a connection a saturated pooler will never give, so a request that should shed in
+    five seconds holds a handle instead and the failure arrives as a timeout somewhere upstream.
+  - The env tests exercise `parseEnvironment`, not `env`. Unit tests run in happy-dom, so `env.ts`
+    resolves its *browser stub* — asserting on `env` would be asserting on placeholders and would watch
+    a validation rule it never reached.
+  - Result: 17 tests (12 pool + 5 env), `tsc` 0, `check-env-fidelity` 0 gaps.
 
-- [ ] **Consolidate the duplicate platform pool and wire every role**
+- [x] **Consolidate the duplicate platform pool and wire every role**
   - Files: `src/shared/lib/db/client.ts`, `src/shared/lib/db/auth-db.ts`,
     `src/shared/lib/db/worker-db.ts`, `src/shared/lib/db/platform-db.ts`,
     `src/shared/lib/db/capability-db.ts`, `tests/unit/shared/lib/db/pool-singletons.test.ts`
@@ -121,6 +134,21 @@ tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each
   - Verify: `pnpm vitest run tests/unit/shared/lib/db/pool-singletons.test.ts` proves both platform
     imports are object-identical; `rg "postgres\\(" src/shared/lib/db` shows exactly one client
     construction for each of the five roles; `pnpm type-check` passes.
+  - The duplicate was real and silent: `platform-db.ts` constructed a pool at module scope while
+    `client.ts` exported a lazy one from the same URL. Two import paths, two pools, one role — nothing
+    broke, both worked, and the process held twice the platform connections anybody counting from the
+    source would expect. Invisible to types, lint and every functional test, because two working pools
+    behave exactly like one.
+  - The eager construction was also the client-bundle hazard `client.ts` documents: `postgres()` at
+    module scope means importing the file opens a connection, and the chain reaches the browser through
+    TanStack's route tree. `platform-db.ts` now re-exports the lazy proxy and keeps the grant
+    reasoning that is the reason the role is distinct from `worker` at all.
+  - The second assertion is against the source rather than behaviour, deliberately: no runtime
+    observation distinguishes one pool from two. An earlier version of that test checked
+    `typeof platformDb === 'object'`, which is true of any export and would have passed for the bug's
+    whole lifetime.
+  - Result: 4 construction sites for 5 roles (`client.ts` serves runtime and platform through one lazy
+    factory); both platform imports object-identical.
 
 ## Phase 3 — Database-role timeouts
 

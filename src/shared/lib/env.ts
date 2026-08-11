@@ -25,6 +25,22 @@ const zodEnv = z.object({
    * key — it can only refuse one.
    */
   DB_ENV_MARKER: z.enum(['production', 'staging', 'development', 'test']).optional(),
+
+  /**
+   * Per-role connection-pool caps, overridable for a load run (plan 55 phase 2).
+   *
+   * Declared here rather than only read from `process.env` so a production process refuses to start on
+   * a nonsense value. The pool size is the app's share of a finite `max_connections`: a typo that
+   * `postgres.js` reads as unbounded does not fail at startup, it fails hours later as a capacity
+   * incident in whichever request happened to be unlucky, with nothing in the logs pointing at the
+   * configuration. Outside production the same typo warns and falls back to the default — see
+   * `poolOptions` — because it should not stop someone working.
+   */
+  LOAD_POOL_MAX_RUNTIME: z.string().optional(),
+  LOAD_POOL_MAX_AUTH: z.string().optional(),
+  LOAD_POOL_MAX_WORKER: z.string().optional(),
+  LOAD_POOL_MAX_PLATFORM: z.string().optional(),
+  LOAD_POOL_MAX_CAPABILITY: z.string().optional(),
   DATABASE_MIGRATION_URL: z.string().min(1).optional(),
   DATABASE_AUTH_URL: z.string().min(1).optional(),
   DATABASE_WORKER_URL: z.string().min(1).optional(),
@@ -305,6 +321,30 @@ const zodEnv = z.object({
   INTERVIEW_DOCUMENT_RETENTION_DAYS: z.coerce.number().int().positive().max(180).default(180),
   INTERVIEW_CONSENT_RETENTION_MONTHS: z.coerce.number().int().positive().max(24).default(24),
 }).superRefine((data, context) => {
+  /**
+   * A pool cap that is not a usable integer, refused in production and only there.
+   *
+   * The asymmetry is the point. In production an unusable value has to stop the process, because
+   * `postgres.js` treats a `NaN` max as unbounded and the consequence arrives much later as
+   * `too many clients already` in an unrelated request. Locally the same mistake should warn and carry
+   * on, which is what `poolOptions` does — this check is what makes the local warning safe to have.
+   */
+  if (data.NODE_ENV === 'production') {
+    for (const role of ['RUNTIME', 'AUTH', 'WORKER', 'PLATFORM', 'CAPABILITY'] as const) {
+      const key = `LOAD_POOL_MAX_${role}` as const
+      const raw = data[key]
+      if (raw === undefined || raw === '') continue
+      const parsed = Number(raw)
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+        context.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `${key} must be an integer between 1 and 100 — postgres.js reads an unusable value as an unbounded pool`,
+        })
+      }
+    }
+  }
+
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({
       code: 'custom',

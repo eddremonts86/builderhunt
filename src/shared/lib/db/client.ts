@@ -1,7 +1,7 @@
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { env } from '~/shared/lib/env'
-import { poolOptions } from './pool-options'
+import { poolOptions, type PoolRole } from './pool-options'
 
 /**
  * Lazily constructs the real `postgres()` client + drizzle instance on first
@@ -30,11 +30,11 @@ import { poolOptions } from './pool-options'
  * Postgres client construction, since the browser never actually calls the
  * exported query functions.
  */
-function lazyPostgresDb(resolveUrl: () => string): PostgresJsDatabase {
+function lazyPostgresDb(role: PoolRole, resolveUrl: () => string): PostgresJsDatabase {
   let instance: PostgresJsDatabase | null = null
   function resolve(): PostgresJsDatabase {
     if (!instance) {
-      instance = drizzle(postgres(resolveUrl(), poolOptions()))
+      instance = drizzle(postgres(resolveUrl(), poolOptions(role)))
     }
     return instance
   }
@@ -47,13 +47,13 @@ function lazyPostgresDb(resolveUrl: () => string): PostgresJsDatabase {
   })
 }
 
-export const runtimeDb = lazyPostgresDb(() => env.DATABASE_URL)
+export const runtimeDb = lazyPostgresDb('runtime', () => env.DATABASE_URL)
 
 // Public repositories are the only non-tenant product code allowed to use this
 // surface. Private repositories must receive a TenantTransaction instead.
 export const publicDb = runtimeDb
 export type PublicDb = typeof publicDb
-export const platformDb = lazyPostgresDb(() => env.DATABASE_PLATFORM_URL ?? env.DATABASE_URL)
+export const platformDb = lazyPostgresDb('platform', () => env.DATABASE_PLATFORM_URL ?? env.DATABASE_URL)
 export const accountDb = runtimeDb
 
 export type TenantTransaction = Parameters<Parameters<typeof runtimeDb.transaction>[0]>[0]
