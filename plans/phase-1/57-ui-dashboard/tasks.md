@@ -267,7 +267,7 @@ missing — so the only honest version of this widget was an empty one.
   - Do: Register an opt-in widget for verified owners with publication state, privacy-safe aggregate views, and Manage profile continuation. Keep full analytics in `/me`.
   - Verify: non-owner/unverified/minimum-cohort cases reveal no analytics or widget eligibility; no viewer identities enter API or DOM.
 
-- [ ] **Add contextual service degradation only**
+- [x] **Add contextual service degradation only**
   - Files: dashboard shell/status adapter, tests
   - Do: Show a compact notice and Status link when a user-facing dependency is degraded. Keep worker, integration, trust, billing operations, and platform metrics in their dedicated Admin pages.
   - **Built and reverted, 2026-08-06.** The only degradation signal is `GET /api/status`, which
@@ -278,6 +278,35 @@ missing — so the only honest version of this widget was an empty one.
     liveness probe that deliberately touches no dependency, so it cannot serve. The value in the
     meantime is small: `/status` is already in the navigation.
   - Verify: healthy state renders no permanent status widget; degraded copy matches measured checks and never fabricates a healthy/failed component.
+  - **Unblocked and landed 2026-08-11.** The blocker was recorded precisely — "blocked on a 200-answering
+    degradation signal" — and the fix is not to change `/api/status`, whose 503 is correct and must stay: a monitor
+    decides on the status code, and a health endpoint answering 200 while the database is down never pages anyone.
+    Two consumers, two contracts, one computation. `GET /api/status/summary` runs the same checks, always answers
+    200, and puts the state in the body.
+  - **The revert's cause is now a test rather than a note.** A case in `auth-and-sessions.spec.ts` loads
+    `/dashboard` under the strict console collector, asserts the summary request happened, and asserts every
+    response was 200 — so the exact failure that got this reverted (two console errors per page load *during an
+    incident*, which is when an operator is reading the console) fails CI instead of being remembered.
+  - **`/api/health` still cannot serve this**, and the reason is worth keeping: it is a liveness probe that
+    deliberately touches no dependency, so it cannot know whether one is degraded.
+  - **Contextual means there is no widget.** Healthy renders `null`; so does `unknown`, because "we could not
+    tell" is not "something is broken" and a banner on a failed check trains people to ignore banners. The
+    dashboard says nothing about service health until something is wrong, which is what makes the line worth
+    reading when it appears.
+  - **It never fabricates a component.** Only the names the check reported are listed, and nothing is claimed
+    about the rest — no "all other systems operational", which is a claim three checks cannot support. Asserted by
+    a case that greps the rendered copy for `operational` and `all systems`.
+  - **The copy is for a tenant, not an operator.** "Caching is degraded, things may be slow or fail to save"
+    rather than naming Redis — and a test asserts the dependency's own name does not reach the DOM. The response
+    body carries component names and booleans only, never a check's error text, which is written for an operator
+    page.
+  - **Cached thirty seconds and read once per mount.** The endpoint is public and unauthenticated like `/status`,
+    and it touches the database and Redis — so without the cache header a refresh loop becomes a dependency probe
+    loop. One read per mount rather than a timer: an incident outlasts a page view, and navigating remounts the
+    shell.
+  - **Tests:** 8 unit cases and 1 browser case. Worth noting what the browser case is for — the unit cases prove
+    the component's logic against a mocked fetch, and only the browser can prove the console stays clean, which is
+    the property that decided this feature's fate the first time.
 
 ## Admin track — Specialized organization and platform widgets
 

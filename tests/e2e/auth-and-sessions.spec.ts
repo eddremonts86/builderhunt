@@ -813,3 +813,34 @@ test('a signed-out invitation link round-trips through sign-in back to the origi
   }
 })
 
+test('the dashboard reads the degradation summary without putting a console error on the page', async ({ browser }) => {
+  /**
+   * Plan 57, Wave 5 — the property that got this feature reverted on 2026-08-06.
+   *
+   * The first version polled `/api/status`, which answers **503** when a dependency is degraded — correct for a
+   * monitor, and unusable from a browser: every non-2xx subresource is written to the console, so an incident put
+   * two console errors on every page load. The strict collector caught it, the feature was reverted, and the task
+   * was recorded as blocked on "a 200-answering degradation signal".
+   *
+   * `/api/status/summary` is that signal: the same computation, always 200, state in the body. This asserts both
+   * halves — the request happens, and the console stays clean whichever state the dependencies are in.
+   */
+  const context = await browser.newContext({ storageState: harness.owner.storageState! })
+  const tab = await context.newPage()
+  const guard = expectStrictBrowser(tab)
+  const summaryStatuses: number[] = []
+  tab.on('response', (response) => {
+    if (new URL(response.url()).pathname === '/api/status/summary') summaryStatuses.push(response.status())
+  })
+  try {
+    await gotoHydrated(tab, `${harness.baseURL}/dashboard`)
+    await dismissOverlays(tab)
+    await expect.poll(() => summaryStatuses.length, { timeout: 15_000 }).toBeGreaterThan(0)
+    // Always 200, whatever the dependencies are doing. That is the whole reason this endpoint exists.
+    expect(summaryStatuses.every((status) => status === 200)).toBe(true)
+  } finally {
+    // `expectStrictBrowser` throws on dispose if anything reached the console, which is the assertion.
+    guard.dispose()
+    await context.close()
+  }
+})

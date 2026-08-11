@@ -8,6 +8,7 @@ import { AreaRail } from './AreaRail'
 import { BreadcrumbProvider, useCurrentEntityBreadcrumbLabel } from './breadcrumb-context'
 import { resolveBreadcrumbSegments } from './breadcrumbs'
 import { ContextTopbar } from './ContextTopbar'
+import { ServiceDegradationNotice } from './ServiceDegradationNotice'
 import { MobileNavDrawer } from './MobileNavDrawer'
 import { resolveActiveArea, visibleAreas } from './nav-config'
 
@@ -147,6 +148,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           onOpenNav={() => setNavOpen(true)}
         />
         <main className="dashboard-canvas flex-1 px-4 pb-10 pt-6 lg:px-6">
+          {/*
+            Above the page's own content, and absent when nothing is degraded.
+
+            Inside `<main>` rather than in the topbar because it is about the work on this page — "things may be
+            slow or fail to save" — and a topbar banner reads as chrome that has always been there. There is no
+            permanent widget: healthy renders nothing at all, which is what makes it worth reading when it appears.
+          */}
+          <ServiceDegradationNotice />
           {children}
         </main>
       </div>
