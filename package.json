@@ -15,6 +15,7 @@
     "check:env-fidelity": "node scripts/ci/check-env-fidelity.mjs",
     "check:step-parity": "node scripts/ci/check-step-parity.mjs",
     "check:table-surfaces": "node scripts/check-table-surfaces.mjs",
+    "check:admin-metrics": "node scripts/check-admin-metrics-budgets.mjs",
     "check:unbounded": "node scripts/check-unbounded-reads.mjs",
     "ci:local": "bash scripts/ci/local-quality.sh",
     "content:export": "tsx --env-file-if-exists=.env scripts/db/sync-platform-content.ts --export",

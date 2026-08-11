@@ -315,6 +315,7 @@ step security-route-coverage pnpm security:route-coverage
 # Phase 3's two gates, beside the route-coverage step they were modelled on: no list read without a
 # declared bound, and no data grid without a registered capability.
 step check-unbounded pnpm check:unbounded
+step check-admin-metrics pnpm check:admin-metrics
 step check-table-surfaces pnpm check:table-surfaces
 step security-ui-route-graph pnpm security:ui-route-graph
 # Added 2026-07-28 after an exported route helper put the postgres driver in the client bundle and every

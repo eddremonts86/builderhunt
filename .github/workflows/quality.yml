@@ -300,6 +300,9 @@ jobs:
       - run: pnpm plans:check-order
       - run: pnpm plans:check-implemented
       - run: pnpm check:unbounded
+      # Plan 57: no billing sweep on the metrics refresh path, no uncapped payload collection, no lost
+      # request-abort or visibility guard. Static, so it fails on the pull request rather than on the deploy.
+      - run: pnpm check:admin-metrics
       - run: pnpm check:table-surfaces
       - run: pnpm security:ui-route-graph
       - run: pnpm security:route-client-boundary

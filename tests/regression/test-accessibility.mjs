@@ -73,6 +73,28 @@ const AUTH_ROUTES = [
   '/team',
   '/interviews',
   '/solutions',
+  /**
+   * The Admin console, added 2026-08-11 (plan 57, "Add Admin Metrics accessibility, performance, and regression
+   * gates").
+   *
+   * **No `/admin/*` route had ever had an axe pass.** This list held eleven tenant surfaces and nothing behind the
+   * platform-admin guard, so the console — the one screen read under time pressure, by someone who cannot
+   * choose to come back later — was the least audited part of the app. The gate already resolves
+   * `ADMIN_USER_IDS` from the seeded admin (see `local-quality.sh`), so these render rather than redirect.
+   *
+   * Five *renders* of the metrics page rather than one URL, because the sections do not share markup: the
+   * overview carries the action queue and the removal panel, traffic carries a ranked list with proportional
+   * bars, operations and trust carry threshold-coloured tiles, and runtime carries a `<details>` disclosure.
+   * One URL would audit the default tab and claim the page.
+   *
+   * `compare=false` is written out because `validateSearch` normalizes it in and `beforeLoad` would otherwise
+   * redirect — an axe run against a redirect measures the destination and reports it under the wrong name.
+   */
+  '/admin/metrics?section=overview&range=24h&variant=summary&compare=false',
+  '/admin/metrics?section=traffic&range=24h&variant=latency&compare=false',
+  '/admin/metrics?section=operations&range=24h&variant=integrations&compare=false',
+  '/admin/metrics?section=trust&range=30d&variant=abuse&compare=false',
+  '/admin/metrics?section=runtime&range=24h&variant=freshness&compare=false',
 ]
 
 // Every entry needs a reason and a date — this is a debt ledger, not a

@@ -324,6 +324,149 @@ test.describe('the Admin Metrics shell', () => {
     }
   })
 
+  test('meets the response budgets the plan sets, measured as a p95 rather than a single sample', async () => {
+    /**
+     * Plan 57, Admin track — "Overview p95 <= 400 ms and one cached analytical section p95 <= 750 ms".
+     *
+     * A p95 over eleven samples rather than one request, because a single sample on a laptop that just finished a
+     * build measures the laptop. Eleven is the smallest count where the 95th is a real element (index 10) rather
+     * than an interpolation, and the first response is discarded — it pays for the route module's first import,
+     * which every subsequent reader does not.
+     *
+     * The budgets are the plan's, not mine, and they are asserted against the *harness* database. That is a
+     * weaker claim than production and it is the honest one available here: what this catches is a section that
+     * regresses by an order of magnitude, not a ten-millisecond drift.
+     */
+    const p95 = async (path: string) => {
+      const samples: number[] = []
+      // Discarded: the first call compiles and imports the route module.
+      await admin.api!.fetch(path)
+      for (let index = 0; index < 11; index += 1) {
+        const startedAt = Date.now()
+        const response = await admin.api!.fetch(path)
+        expect(response.status(), path).toBe(200)
+        samples.push(Date.now() - startedAt)
+      }
+      return samples.sort((a, b) => a - b)[10]
+    }
+
+    // Overview is the section the page loads first and re-reads on a timer, so it is the one whose cost has to
+    // stay bounded — two indexed aggregate reads plus the action queue's bounded aggregates.
+    expect(await p95('/api/admin/metrics/overview')).toBeLessThanOrEqual(400)
+    // One analytical section, at the wider budget: traffic sums the minute buckets and computes percentiles.
+    expect(await p95('/api/admin/metrics/sections?section=traffic&range=24h&variant=latency&compare=false')).toBeLessThanOrEqual(750)
+  })
+
+  test('keeps every payload collection inside the caps the contract declares', async () => {
+    /**
+     * The Verify line's "query/payload budgets", asserted on the wire.
+     *
+     * The schema caps these at parse time, so a violation cannot reach a client — which means this is really a
+     * check that the caps are the numbers the plan chose, and that a section has not started returning a
+     * collection nobody bounded. `check-admin-metrics-budgets.mjs` catches the *removal* of a cap statically;
+     * this catches a cap that is present and too generous.
+     */
+    for (const query of [
+      'section=overview&variant=summary',
+      'section=traffic&variant=rate',
+      'section=trust&variant=abuse',
+      'section=operations&variant=integrations',
+      'section=runtime&variant=process',
+    ]) {
+      const response = await admin.api!.fetch(`/api/admin/metrics/sections?${query}&range=24h&compare=false`)
+      expect(response.status(), query).toBe(200)
+      const payload = (await response.json()).payload
+      if (payload.status === 'unavailable') continue
+      expect(payload.data.values.length, `${query} values`).toBeLessThanOrEqual(24)
+      expect((payload.data.ranked ?? []).length, `${query} ranked`).toBeLessThanOrEqual(10)
+      expect((payload.data.queue ?? []).length, `${query} queue`).toBeLessThanOrEqual(12)
+      expect((payload.data.series ?? []).length, `${query} series`).toBeLessThanOrEqual(6)
+    }
+  })
+
+  test('renders at 320 px without a horizontally scrolling page', async ({ browser }) => {
+    /**
+     * WCAG 1.4.10, and the viewport where a fixed width or an unwrapped table actually shows up — 390 is
+     * forgiving enough that a layout can be broken and still look fine.
+     *
+     * The page body must never scroll sideways. Wide content is allowed to, inside its own container, which is
+     * why this measures `documentElement` rather than every descendant.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState!, viewport: { width: 320, height: 720 } })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      for (const section of ['overview', 'traffic', 'operations']) {
+        await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=${section}&range=24h&variant=${section === 'traffic' ? 'rate' : section === 'operations' ? 'workers' : 'summary'}&compare=false`)
+        await dismissOverlays(tab)
+        await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+        const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+        expect(overflow, `${section} overflows at 320px by ${overflow}px`).toBeLessThanOrEqual(1)
+      }
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
+  test('conveys every threshold and scope in text, not by colour alone', async ({ browser }) => {
+    /**
+     * WCAG 1.4.1. The specific failure this rules out: a breached tile that is only red, and a per-process
+     * counter that is only styled differently from a platform total.
+     *
+     * A screenshot pasted into an incident channel loses colour semantics entirely, and that is a real path for
+     * this page — which is why the assertion is on text content rather than on a class.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=runtime&range=24h&variant=process&compare=false`)
+      await dismissOverlays(tab)
+      const values = tab.locator('[data-testid^="metric-value-"]')
+      await expect(values.first()).toBeVisible({ timeout: 20_000 })
+      // Every process counter states its scope in words beside itself.
+      const count = await values.count()
+      for (let index = 0; index < count; index += 1) {
+        await expect(values.nth(index)).toContainText('not a platform total')
+      }
+
+      // And a breach, where one exists, names itself rather than only colouring.
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=operations&range=24h&variant=integrations&compare=false`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('metric-values')).toBeVisible({ timeout: 20_000 })
+      const breached = tab.locator('[data-breach]')
+      if ((await breached.count()) > 0) {
+        await expect(tab.getByTestId('metric-section-breach')).toContainText('threshold')
+      }
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
+  test('reaches every section tab by keyboard', async ({ browser }) => {
+    // They are links, so this is largely the browser's job — which is the point: the first version of the nav
+    // used `<button onClick>`, and a filter that is not a link is not reachable, shareable or restorable.
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=overview&range=24h&variant=summary&compare=false`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+
+      const trafficTab = tab.getByTestId('admin-metrics-section-traffic')
+      await trafficTab.focus()
+      await expect(trafficTab).toBeFocused()
+      await tab.keyboard.press('Enter')
+      await expect(tab.getByTestId('admin-metrics-section-traffic')).toHaveAttribute('data-active', 'true')
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
   test('refuses a tenant owner before the console chrome appears', async ({ browser }) => {
     const context = await browser.newContext({ storageState: harness.owner.storageState! })
     const tab = await context.newPage()

@@ -938,10 +938,46 @@ missing — so the only honest version of this widget was an empty one.
     that would let one instance's counter be read as the platform's number cannot be built. An e2e case walks
     every rendered value and asserts both.
 
-- [ ] **Add Admin Metrics accessibility, performance, and regression gates**
+- [~] **Add Admin Metrics accessibility, performance, and regression gates**
   - Files: Admin Metrics component/E2E/accessibility/visual/performance tests, CI configuration
   - Do: Cover exact chart tables, summaries, legends, units, thresholds, URL filters, keyboard/touch, 320 px, 400% zoom, forced colors, reduced motion, partial failure, long labels, lazy requests, and query/payload budgets.
   - Verify: Overview p95 <= 400 ms and one cached analytical section p95 <= 750 ms on the representative fixture; no overlapping request, hidden polling, billing sweep, unbounded range, sensitive route label, or chart-only value passes CI.
+  - **Most of it landed 2026-08-11**, split by what each kind of check can actually decide.
+  - **No `/admin/*` route had ever had an axe pass.** `tests/regression/test-accessibility.mjs` held eleven tenant
+    surfaces and nothing behind the platform-admin guard — so the console, the one screen read under time pressure
+    by someone who cannot choose to come back later, was the least audited part of the app. Five *renders* of the
+    metrics page are in the matrix now rather than one URL, because the sections do not share markup: the overview
+    carries the action queue and the removal panel, traffic carries a ranked list with proportional bars,
+    operations and trust carry threshold-coloured tiles, runtime carries a `<details>` disclosure. `compare=false`
+    is written into each URL because `beforeLoad` would otherwise redirect, and an axe run against a redirect
+    measures the destination under the wrong name.
+  - **The p95 budgets are asserted as a p95**, over eleven samples with the first discarded — one sample on a
+    machine that just finished a build measures the machine, and the first call pays for the route module's import.
+    Eleven is the smallest count where the 95th is a real element rather than an interpolation. Both budgets pass
+    on the harness database; that is a weaker claim than production and the honest one available here, and what it
+    catches is an order-of-magnitude regression rather than a ten-millisecond drift.
+  - **`pnpm check:admin-metrics` is a new static gate** in `ci:local` and in the workflow, covering the four
+    Verify items that are decidable by reading source: no billing sweep on the metrics path, every payload
+    collection still capped, no `RANGE_MS` entry without a matching range in the closed allowlist, and the
+    request-abort and visibility guards still present. Static beats runtime for these — it cannot be flaky, it
+    names the file, and it fails on the pull request rather than on the deploy.
+  - **Two false confidences it had before I broke it.** The first version searched `sections.ts` for
+    `getBillingOperationsMetrics` and failed on the *comment explaining why that function is not used* — a check
+    that punishes writing down the reason is worse than none, since the cheapest way to pass would be deleting the
+    explanation. It strips comments now. And the abort check matched the identifier anywhere, so deleting the
+    supersede abort left the unmount abort and the gate stayed green; it matches the abort *followed by* a fresh
+    controller now, which is the supersede specifically. Both found by deleting the thing and watching nothing
+    happen.
+  - **Colour is never the only carrier.** A browser case walks every runtime value asserting the scope appears in
+    words, and asserts a breach names itself in text — a screenshot pasted into an incident channel loses colour
+    semantics entirely, which is a real path for this page.
+  - **320 px** is asserted as no horizontal scroll on `documentElement` across three sections; wide content is
+    allowed to scroll inside its own container, which is why it is not asserted per descendant.
+  - **Still open:** 400 % zoom, forced-colors and reduced-motion emulation, and a long-label fixture. Playwright
+    can emulate `prefers-reduced-motion` and `forced-colors`, so those are reachable; 400 % zoom is a
+    `deviceScaleFactor` plus a narrow viewport and needs a decision about what it should assert beyond overflow,
+    which is the same question as 320 px asked louder. Also open: touch-target sizing, which nothing in this repo
+    measures yet.
 
 ### Admin preferences and release gates
 
