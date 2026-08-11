@@ -32,12 +32,12 @@ import {
   type orgAdminFeatureAdoptionSchema,
   type orgAdminMembersSchema,
   type orgAdminPrivacyRequestsSchema,
-  type orgAdminSectionEnvelopeSchema,
+  type OrgAdminSectionEnvelope,
   type orgAdminSecurityPostureSchema,
 } from '~/shared/lib/dashboard/admin-contracts'
 
 type OrgAdminOverview = z.infer<typeof orgAdminOverviewSchema>
-type SectionEnvelope = z.infer<typeof orgAdminSectionEnvelopeSchema>
+type SectionEnvelope = OrgAdminSectionEnvelope
 type Action = z.infer<typeof orgAdminActionSchema>
 
 interface Props {
@@ -52,7 +52,9 @@ export function OrganizationAdminSection({ overview }: Props) {
     <section
       aria-labelledby="org-admin-section-heading"
       data-testid="org-admin-section"
-      className="space-y-4"
+      /* `mt-6` because this is a new top-level section following the widget grid, not another card inside it —
+         without it the heading sat flush against the row above and read as a caption for that row. */
+      className="mt-6 space-y-4"
     >
       <header>
         <h2
@@ -61,8 +63,12 @@ export function OrganizationAdminSection({ overview }: Props) {
         >
           Organization administration
         </h2>
+        {/* "Refreshed every 30 minutes" used to follow this sentence. Nothing refreshed it: the overview is
+            fetched once on mount, the route sets no cache header, and there is no interval — so the only true
+            statement about its age is the one the projection already carries in `generatedAt`. A cadence claim
+            that no code implements is the same class of defect as a count with no query behind it. */}
         <p className="text-sm text-bh-text-muted">
-          Aggregated counts for owners and admins. Refreshed every 30 minutes.
+          Aggregated counts for owners and admins. Never per-person detail.
         </p>
       </header>
 
@@ -136,7 +142,12 @@ function SectionCard({ title, envelope, render }: SectionCardProps) {
   return (
     <article className="card-premium-glow bg-bh-surface border border-bh-border/60 rounded-xl p-4">
       <h3 className="text-sm font-bold text-bh-text mb-2">{title}</h3>
-      <EnvelopeView envelope={envelope} render={render} />
+      {/* The body is addressable on its own so a test can assert about the values without the card's title being
+          part of the string. "Members and seats" contains the word "seats", so a check for "no unit word without a
+          number" reads the title as a violation when it is handed the whole card. */}
+      <div data-testid="org-admin-card-body">
+        <EnvelopeView envelope={envelope} render={render} />
+      </div>
     </article>
   )
 }
@@ -166,13 +177,29 @@ function EnvelopeView({
   if (envelope.state === 'unavailable') {
     const label =
       envelope.reason === 'dependency-missing'
-        ? 'A required service is not available right now.'
+        ? /**
+           * Not "a required service is not available right now", which is what this said.
+           *
+           * That sentence describes an outage, and three of these six cards carry this reason permanently — so a
+           * brand-new workspace opened its dashboard to what read as a partial failure of the product. The reason
+           * is a *missing feature*, not a broken one: two of the three have no table in any migration, and the
+           * third would need a privilege the tenant connection is deliberately not granted. Saying "not available
+           * yet" is both true and un-alarming, and it does not send anyone to the status page.
+           */
+          'Not available yet.'
         : envelope.reason === 'rate-limited'
           ? 'Too many requests — try again in a minute.'
           : 'This section could not be loaded.'
     return <p className="text-sm text-bh-text-dim">{label}</p>
   }
-  return <div className="text-sm text-bh-text space-y-3">{render(envelope.data)}</div>
+  return (
+    <div className="text-sm text-bh-text space-y-3">
+      {render(envelope.data)}
+      {/* The link to the page that can act on the number. `ActionsRow` returns null for an empty list, which is
+          what the three unbuilt sections send — there is no page for a feature that does not exist. */}
+      <ActionsRow actions={envelope.actions} />
+    </div>
+  )
 }
 
 function ActionsRow({ actions }: { actions: ReadonlyArray<Action> }) {
@@ -198,17 +225,25 @@ function ActionsRow({ actions }: { actions: ReadonlyArray<Action> }) {
 // Per-section blocks
 // ─────────────────────────────────────────────────────────────────
 
+/**
+ * Members and seats.
+ *
+ * Every value here is rendered only when the projection produced it. The version this replaces read
+ * `data.totalMembers` and `data.activeSeats` — fields the projection stopped emitting on 2026-08-11 — so it drew
+ * the sentence "total members · active seats" with the numbers missing, which is the one thing this plan exists to
+ * prevent. The contract validates the payload now (`orgAdminSectionEnvelope`), so a repeat of that rename fails the
+ * route's `parse()` rather than reaching a card.
+ */
 function MembersBlock({ data }: { data: z.infer<typeof orgAdminMembersSchema> }) {
   return (
     <>
       <p className="tabular-nums">
-        <span className="font-bold text-bh-text">{data.totalMembers}</span> total members
-        {' · '}
-        <span className="font-bold text-bh-text">{data.activeSeats}</span> active seats
-        {data.pendingInvitations > 0 && (
+        <span className="font-bold text-bh-text">{data.total}</span> member{data.total === 1 ? '' : 's'}
+        {/* The cap, only when the plan sets one. `null` is "no entitlement row", which is not a cap of zero. */}
+        {data.seatLimit !== null && (
           <>
-            {' · '}
-            <span className="font-bold text-bh-accent">{data.pendingInvitations}</span> pending invitation{data.pendingInvitations === 1 ? '' : 's'}
+            {' of '}
+            <span className="font-bold text-bh-text">{data.seatLimit}</span> seat{data.seatLimit === 1 ? '' : 's'}
           </>
         )}
       </p>
@@ -223,17 +258,21 @@ function BillingBlock({ data }: { data: z.infer<typeof orgAdminBillingSchema> })
   return (
     <>
       <p className="tabular-nums">
-        Plan: <span className="font-bold text-bh-text capitalize">{data.tier}</span>
-        {data.renewalDaysRemaining !== null && (
-          <>
-            {' · '}
-            <span className="font-bold text-bh-text">{data.renewalDaysRemaining}</span> days to renewal
-          </>
-        )}
+        Plan: <span className="font-bold text-bh-text capitalize">{data.tier.replace('_', ' ')}</span>
+        {' · '}
+        <span className="capitalize">{data.status.replace('_', ' ')}</span>
       </p>
-      {data.approachingCap && (
-        <p className="text-xs text-bh-text-accent">
-          You are approaching the plan cap.
+      {/* Rendered only when there is a scheduled renewal. The previous version tested `!== null` against a field
+          the projection had renamed, so `undefined !== null` was true and it drew "· days to renewal" with no
+          number — the same defect as the members card, from the same cause. */}
+      {data.renewalDays !== null && (
+        <p className="text-xs text-bh-text-muted tabular-nums">
+          Renews in <span className="font-bold text-bh-text">{data.renewalDays}</span> day{data.renewalDays === 1 ? '' : 's'}.
+        </p>
+      )}
+      {data.approachingSeatCap && (
+        <p className="text-xs text-bh-warning">
+          You are approaching the seat limit on this plan.
         </p>
       )}
     </>
@@ -302,10 +341,44 @@ function SecurityPostureBlock({ data }: { data: z.infer<typeof orgAdminSecurityP
   )
 }
 
+/**
+ * Deletion and export requests, per kind and status.
+ *
+ * The kinds are listed in a fixed order rather than in whatever order the payload's keys happen to arrive in, so
+ * the card does not reorder itself between two reads of the same workspace.
+ */
+const PRIVACY_KINDS = [
+  { key: 'deletion', label: 'Deletion' },
+  { key: 'export', label: 'Export' },
+] as const
+
 function PrivacyRequestsBlock({ data }: { data: z.infer<typeof orgAdminPrivacyRequestsSchema> }) {
+  const present = PRIVACY_KINDS.map((kind) => ({
+    ...kind,
+    byStatus: data.byKind[kind.key] ?? {},
+  })).filter((kind) => Object.keys(kind.byStatus).length > 0)
+
+  // The envelope answers `empty` when there is nothing at all, so reaching this with no kinds would mean the
+  // projection said `ready` over an empty group — worth showing as unknown rather than as zero.
+  if (present.length === 0) {
+    return <p className="text-sm text-bh-text-muted">No request counts were returned.</p>
+  }
+
   return (
-    <p className="tabular-nums">
-      <span className="font-bold text-bh-text">{data.pending}</span> pending request{data.pending === 1 ? '' : 's'}
-    </p>
+    <ul className="space-y-1" role="list">
+      {present.map((kind) => (
+        <li key={kind.key} className="text-xs tabular-nums">
+          <span className="text-bh-text-muted">{kind.label}: </span>
+          {Object.entries(kind.byStatus)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([status, count], index) => (
+              <span key={status}>
+                {index > 0 && ' · '}
+                <span className="font-bold text-bh-text">{count}</span> {status.replace('_', ' ')}
+              </span>
+            ))}
+        </li>
+      ))}
+    </ul>
   )
 }

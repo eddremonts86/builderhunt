@@ -121,6 +121,18 @@ const classifications: Classification[] = [
   // organization or the user cascades it away.
   tenant('dashboard_preferences', 'organization_id + user_id (composite primary key)', ['ui-dashboard'], { organizationColumn: true }),
 
+  // `platform_admin_preferences` is the same kind of row with a different subject, and the difference is the
+  // reason it is a second table rather than a nullable column: a platform admin has no organization in the admin
+  // console, so there is no tenant to scope it to and no predicate RLS could express. It is `account-subject`
+  // rather than `tenant-private` for that reason — the owner is a person, keyed on `user_id`, and the row dies
+  // with the account via `ON DELETE CASCADE`.
+  //
+  // It holds no subject data either: three short landing strings and a list of widget ids. What makes it worth a
+  // classification entry at all is the *isolation* claim — `builderhunt_app` has no grant on it, which is what
+  // makes "platform and tenant preferences cannot read each other" a property of the database rather than of a
+  // code review. See drizzle/0170 and tests/e2e/api/preference-store-isolation.spec.ts.
+  account('platform_admin_preferences', 'user_id', ['ui-dashboard'], 'account lifetime; cascade-deleted with the account'),
+
   // Status subscribers (plan 47-status-and-trust, Phase 2). System-operational, no owning subject —
   // same anti-enumeration shape as `feed_capabilities`: the row is keyed by the SHA-256 of a random
   // unsubscribe token, the raw token only ever appears once, in the unsubscribe URL.

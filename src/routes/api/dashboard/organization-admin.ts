@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { can } from '~/shared/lib/authorization/permissions'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { readOrgAdminOverview } from '~/shared/lib/repositories/dashboard-organization-admin'
 import { adminRanges } from '~/shared/lib/dashboard/admin-contracts'
@@ -46,8 +47,13 @@ export const Route = createFileRoute('/api/dashboard/organization-admin')({
            * An empty payload would be indistinguishable from a workspace with nothing in it, so a member would see
            * the same screen as an admin of an empty organization — and neither of them could tell which they were
            * looking at. The refusal is the honest answer, and it never says what they were refused.
+           *
+           * Through `can()` rather than comparing `principal.role` to two literals here, which is what this did
+           * until the boundary gate caught it. The rule exists because a role decision spelled out at a call site
+           * is a decision that has to be found again by grep when the role model changes — and this repository has
+           * one authorization module precisely so that the answer to "who may do this" lives in one file.
            */
-          if (principal.role !== 'owner' && principal.role !== 'admin') {
+          if (!can(principal, 'organization:admin-overview')) {
             return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
 

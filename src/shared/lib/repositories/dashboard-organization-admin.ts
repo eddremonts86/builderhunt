@@ -170,7 +170,16 @@ export async function readOrgAdminOverview(
           : {
               state: 'ready' as const,
               generatedAt,
-              actions: [],
+              /**
+               * One action, to the page that can act on the number.
+               *
+               * Every section shipped `actions: []` until now, which made the contract's whole action vocabulary
+               * and the component's `ActionsRow` dead code — a card that reports a seat count with no way to
+               * change it is a report, and the plan asked for an administration surface. The three sections that
+               * have a real destination get exactly one link each; the three that answer `dependency-missing`
+               * get none, because there is no page for a feature that does not exist.
+               */
+              actions: [{ kind: 'open-team' as const, label: 'Manage team', url: '/settings/team' }],
               data: {
                 total: memberTotal,
                 byRole: {
@@ -186,7 +195,7 @@ export async function readOrgAdminOverview(
         ? {
             state: 'ready' as const,
             generatedAt,
-            actions: [],
+            actions: [{ kind: 'open-billing' as const, label: 'Open billing', url: '/settings/billing' }],
             data: {
               tier: entitlement.tier,
               status: entitlement.status,
@@ -228,7 +237,9 @@ export async function readOrgAdminOverview(
           : {
               state: 'ready' as const,
               generatedAt,
-              actions: [],
+              actions: [
+                { kind: 'open-privacy-requests' as const, label: 'Open privacy', url: '/settings/privacy' },
+              ],
               data: {
                 /**
                  * Counts per kind and status, and nothing else.

@@ -12,6 +12,17 @@ export type PermissionAction =
   | 'organization:update'
   | 'organization:invite'
   | 'organization:manage-members'
+  /**
+   * Read the organization-administration overview on the dashboard (member and seat counts, plan state,
+   * privacy-request counts).
+   *
+   * A distinct action rather than a reuse of an existing one, and both alternatives were wrong:
+   * `organization:read` is true for every member, and this overview is owner/admin-only; `organization:invite` and
+   * `organization:manage-members` happen to return the same answer today, so borrowing one would work — until a
+   * future decision to let members invite colleagues silently widened who can read the workspace's plan state and
+   * privacy-request counts. A read and a mutation that agree by coincidence should not share a name.
+   */
+  | 'organization:admin-overview'
   | 'organization:transfer'
   | 'organization:delete'
   | 'resource:create'
@@ -59,6 +70,7 @@ export function can(
     case 'organization:update':
     case 'organization:invite':
     case 'organization:manage-members':
+    case 'organization:admin-overview':
     case 'resource:export':
       return elevated
     case 'organization:transfer':

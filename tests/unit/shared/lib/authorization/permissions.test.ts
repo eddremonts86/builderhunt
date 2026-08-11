@@ -19,6 +19,7 @@ describe('organization permissions', () => {
     { action: 'organization:update', member: false, admin: true, owner: true },
     { action: 'organization:invite', member: false, admin: true, owner: true },
     { action: 'organization:manage-members', member: false, admin: true, owner: true },
+    { action: 'organization:admin-overview', member: false, admin: true, owner: true },
     { action: 'organization:transfer', member: false, admin: false, owner: true },
     { action: 'organization:delete', member: false, admin: false, owner: true },
     { action: 'billing:availability', member: true, admin: true, owner: true },
