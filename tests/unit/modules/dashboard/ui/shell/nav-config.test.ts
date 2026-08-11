@@ -131,3 +131,50 @@ describe('registry integrity', () => {
     expect(groupedItems(admin).reduce((n, g) => n + g.items.length, 0)).toBe(admin.items.length)
   })
 })
+
+describe('the Admin route registry (plan 57, "one authoritative Admin route registry")', () => {
+  const adminArea = NAV_AREAS.find((area) => area.id === 'admin')!
+
+  it('lists every admin destination exactly once', () => {
+    /**
+     * The registry is a `Record` keyed on the generated route-path union, so a duplicate is impossible in the
+     * source — this asserts the *derivation* preserves that, since `Object.entries` is what turns it into a list
+     * and a bug there could repeat one.
+     */
+    const paths = adminArea.items.map((item) => item.to)
+    expect(new Set(paths).size).toBe(paths.length)
+  })
+
+  it('keeps every entry inside the area it claims', () => {
+    // The area resolves by prefix, so an entry outside `/admin` would light the wrong rail icon and put the
+    // destination in a panel nobody opens to find it.
+    for (const item of adminArea.items) {
+      expect(item.to.startsWith('/admin/'), item.to).toBe(true)
+    }
+  })
+
+  it('gives every entry a label and an icon, which is the part a route file cannot supply', () => {
+    /**
+     * Existence comes from disk and presentation comes from the registry — that split is the whole design. A
+     * derived-from-filename label would render `solutions-gold-set` instead of "Gold set" and `abuse` instead of
+     * "Abuse console", which is why this half is written down.
+     */
+    for (const item of adminArea.items) {
+      expect(item.label.length, item.to).toBeGreaterThan(0)
+      expect(item.icon, item.to).toBeDefined()
+      // And never the raw path segment, which is what a lazy derivation would produce.
+      expect(item.label, item.to).not.toBe(item.to.split('/').pop())
+    }
+  })
+
+  it('does not list `/admin` itself, because the index has no destination of its own', () => {
+    // It resolves to `/admin/metrics`. An entry for it would put two rows in the panel that go to the same page.
+    expect(adminArea.items.some((item) => item.to === '/admin' || item.to === '/admin/')).toBe(false)
+  })
+
+  it('groups every entry, so the panel never renders an ungrouped orphan', () => {
+    for (const item of adminArea.items) {
+      expect(item.group, item.to).toBeTruthy()
+    }
+  })
+})
