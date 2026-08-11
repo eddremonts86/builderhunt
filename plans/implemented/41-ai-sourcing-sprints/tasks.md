@@ -170,7 +170,7 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 
 ## Phase 6 — Security, rollout, and runtime evidence
 
-- [x] **Run isolation, privacy, and abuse tests** — NOT done as a dedicated test task
+- [x] **Run isolation, privacy, and abuse tests** — done, across two files (see the 2026-08-11 note)
   - Files: `tests/unit/security/sprints-cross-organization.test.ts` (new)
   - Do: Seed two organizations with one sprint each, then assert from the second organization's
     principal that it can neither list, read, re-run nor export the first organization's sprint or
@@ -191,6 +191,17 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
   flagged here as the honest remaining gap for anyone hardening this before a wider launch.
   - Verify: `pnpm test sprints` — 37/37 passing (contracts, tasks, results, worker cursor,
     boundary).
+  - **Closed 2026-08-11, and the Do line is satisfied by two files rather than one — deliberately.**
+    `tests/unit/security/sprints-cross-organization.test.ts` exists and passes 5 cases, including one
+    that asserts a query *without* an organization filter returns both organizations. That case looks
+    like a failure and is the opposite: it records that at this layer the **application** is what
+    scopes, so nobody later reads the file as proof of an RLS policy.
+    The rest of the Do line — "through the real routes, not the service layer" plus "one direct-SQL
+    check as the non-owner runtime role" — is in `scripts/db/verify-api-isolation-local.mjs`, which
+    already seeds `orgA`/`orgB` with a sprint each and a sprint result, drives the real routes, and
+    connects as the actual least-privilege roles. That split is not a shortcut: unit tests in this
+    repository connect as a superuser, which bypasses GRANTs and RLS entirely, so an RLS claim made
+    there would be worth nothing. `pnpm test:api-isolation:local` runs as a step of `pnpm ci:local`.
 
 - [x] **Perform staged runtime verification**
   - Files: none

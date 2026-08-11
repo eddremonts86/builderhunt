@@ -157,6 +157,22 @@ them was verified as far as engineering can take it, and each note below says ex
     troubleshooting row all named `pg16` after the cutover had happened, and were corrected 2026-08-05.
   - Moved from `plans/implemented/03-postgres-18-upgrade` Phase 4 on 2026-08-05 — it waits on a clock.
 
+- [ ] **Provision the Product Hunt Developer Token and re-verify the v2 field names**
+  - Files: Coolify environment (`PRODUCTHUNT_TOKEN`), no repository change
+  - Do: Create a Developer Token at `api.producthunt.com/v2/docs` under a real Product Hunt account,
+    set `PRODUCTHUNT_TOKEN` on the app service, then introspect the v2 schema and compare the field
+    names the connector assumes — `topics(query:)`, `posts(topic:, order:)` and the maker fields.
+  - Verify: `pnpm sources:probe` reports producthunt answering; the introspected field names match
+    `src/lib/sources/producthunt.ts`, or the connector is corrected to match them.
+  - Operator: needs a person with a Product Hunt account, which an agent must not create.
+  - Why it matters rather than being a formality: the connector was built from the published v2 docs
+    instead of live introspection, so its field names are honest-but-unverified. A silent rename
+    upstream shows up as an empty result set, not as an error — the source simply stops finding
+    people and nothing says so.
+  - Moved from `plans/implemented/18-producthunt-integration` on 2026-08-11, where it sat as a
+    checked task whose own text said "not done, needs a human". It gates a source going live, not
+    engineering.
+
 - [ ] **Walk the authenticated app against the PG18 production database**
   - Files: none (manual)
   - Do: Sign in and walk dashboard, keyword search, `POST /api/search/semantic`, alerts, exports, and one

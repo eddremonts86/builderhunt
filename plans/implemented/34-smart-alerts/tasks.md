@@ -1,12 +1,20 @@
 # Smart Alerts (tasks)
 
-> **Status**: `implemented` (Phase 3's worker/email.ts integration sub-task skipped — see note)
+> **Status**: `implemented` — every phase closed; the Phase 3 worker/`email.ts` wiring the old header called skipped landed 2026-07-31 (see the 2026-08-11 note)
 > **Depends on**: nothing (Phase 3 depends on [`ai-expansion`](../21-ai-expansion/spec.md))
 > **Blocks**: nothing hard — see spec.md header
-> **Reality check**: (updated 2026-07-29) Phases 0–2 shipped and live-verified. Phase 3's task
-> registration shipped; only the worker/`email.ts` wiring is open. It was skipped because `email.ts`
-> was a reserved file *for one past session* — that restriction was never a property of this plan and
-> does not apply now. The task carries its own Files/Do/Verify. **It is executable.**
+> **Reality check**: (updated 2026-07-29, superseded 2026-08-11) Phases 0–2 shipped and
+> live-verified. Phase 3's task registration shipped; only the worker/`email.ts` wiring is open. It
+> was skipped because `email.ts` was a reserved file *for one past session*.
+>
+> **Superseded 2026-08-11.** That wiring landed on 2026-07-31 and the header was never updated —
+> re-verified today rather than taken on trust: `src/lib/alerts/worker.ts:239` calls
+> `ai('alert-digest-summary', …)` against the id registered at `src/shared/lib/ai/tasks.ts:515`
+> (the hyphen/underscore mismatch that made every call silently no-op is fixed),
+> `sendAlertDigestEmail` takes the optional `summary`, and
+> `tests/unit/lib/alerts/worker.test.ts` passes its 3 cases — plain digest still sends when the AI
+> task throws, `summary` reaches the email when it resolves, and the `AI_DISABLED_TASKS` kill switch
+> is honoured.
 
 ## Phase 0 — Delivered (checked, with pointers)
 

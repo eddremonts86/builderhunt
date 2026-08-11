@@ -8,8 +8,11 @@
 > requests until a real `PRODUCTHUNT_TOKEN` is provisioned by a human (creating a
 > Developer Token requires a real Product Hunt account — not something an agent can do).
 
-- [x] **Provision token and verify the v2 schema** — **not done, needs a human**: creating
-  a Developer Token at api.producthunt.com/v2/docs requires a real Product Hunt account.
+- [x] **Provision token and verify the v2 schema** — moved on 2026-08-11 to
+  [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md),
+  because it gates a source going live rather than engineering. It had sat here as a checked box whose
+  own text said it had not happened, which is the one thing a checked box must never do.
+  Creating a Developer Token at api.producthunt.com/v2/docs requires a real Product Hunt account.
   Left `PRODUCTHUNT_TOKEN` unset; the connector was built directly from the official v2
   API docs' documented shape (`topics(query:)`, `posts(topic:, order:)`, maker fields)
   instead of live introspection, matching the same honest-but-unverified approach this

@@ -97,7 +97,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   domain, and extracts no constraints at all. Those two measure the fallback, not the product, and become
   meaningful the moment interpretation is enabled.
 
-- [x] **Approve the initial source and domain register** — moved, not done
+- [x] **Approve the initial source and domain register** — moved to phase-5, see the pointer below
   - Moved on 2026-08-01 to
     [`plans/phase-5/01-production-readiness-audit/tasks.md`](../../phase-5/01-production-readiness-audit/tasks.md)
     Phase 2–3, next to plan 42's own source-register approval. It needs a human legal/privacy

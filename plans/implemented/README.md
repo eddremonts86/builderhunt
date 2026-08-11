@@ -86,12 +86,18 @@ claims this file makes — plus one more that is easy to forget:
 2. Nothing in `plans/phase-1/` has zero open tasks and `implemented` everywhere. A folder that
    *understates* what is done is as unusable as one that overstates it, because a reader then has to
    check both directories anyway.
-3. Every Status in either directory is one of the five values `check-phase-readiness.mjs` accepts. Eight
+3. No `- [x]` contradicts itself. A checked task whose own text says "not implemented", "not attempted",
+   "skipped" or "deferred" must name the plan that owns the work now, and only a `plans/phase-5/` link
+   counts. This is the rule the others could not see: on 2026-08-11 four checked tasks said the opposite
+   of their own marker while every mechanical condition passed. Three were already built with stale
+   titles; the fourth had genuinely moved to phase 5.
+4. Every Status in either directory is one of the five values `check-phase-readiness.mjs` accepts. Eight
    unreadable values drifted across phase-1 for weeks because nothing looked.
 
-Each of those four rules was verified against deliberate breakage rather than assumed: a partial task
-inside the folder, a `pending` status inside it, an invented status value, and a finished plan left
-outside. All four fail the gate.
+Every rule was verified against deliberate breakage rather than assumed: a partial task inside the
+folder, a `pending` status inside it, an invented status value, a finished plan left outside, and a
+checked task admitting a gap both with and without a pointer. Each fails, and the last one passes once
+the pointer is there.
 
 `pnpm plans:check-order` runs beside it, and guards that a two-digit prefix is still a position in a
 contiguous build order across both directories.

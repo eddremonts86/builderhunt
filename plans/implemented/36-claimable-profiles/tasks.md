@@ -75,7 +75,7 @@
   - Verify: Live-verified — flipped a real claim to `verified`, confirmed `GET /api/builders/$id` reported `isClaimed: true`, called the revoke route, confirmed the very same request immediately reported `isClaimed: false`.
   - Deviation: no admin console UI to browse/list claims (out of scope for this pass — the plan only asked for the API + revocation mechanics, not a browsing surface).
 
-- [x] **Gate and aggregate profile-view analytics** — not implemented this pass
+- [x] **Gate and aggregate profile-view analytics** — done 2026-07-29, wired 2026-08-11
   - Files: `src/shared/lib/db/schema.ts` (`builder_profile_views`, already defined), `src/shared/lib/repositories/builder-profile-views.ts` (new), `src/routes/api/builders/$builderId/views.ts` (new), `tests/unit/security/builder-profile-views-isolation.test.ts` (new)
   - Do: Write one view row per authenticated viewer per profile per day (the table is keyed on `user_id`, so it is a presence record, not a counter). Gate the write behind the viewer's consent — no row for a viewer who has not consented — and never write for anonymous requests. Expose an aggregate endpoint readable only by the verified owner of the claimed profile, returning counts and never viewer identities.
   - Verify: `pnpm vitest run tests/unit/security/builder-profile-views-isolation.test.ts` proves a non-owner receives 403, the owner receives counts with no viewer identity in the payload, and no row is written for an anonymous or non-consenting viewer. Then `pnpm test:rls:local` still passes, since the table is tenant-private.
@@ -96,7 +96,18 @@
       seven cases: POST happy / 401 anon / 451 unconsented / 200
       idempotent; GET 200 owner / 403 non-owner / 401 anon. The owner
       payload is asserted to contain no viewer identity strings.
-    - Did **not** wire into the public profile route
+    - **Closed 2026-08-11.** The one thing this note left open — the call from the public profile —
+      exists at `src/modules/builder-profile/components/BuilderProfilePage.tsx:125`, inside the
+      effect that already loads the public builder and the session in parallel. It is gated on
+      `userId`, so an anonymous visitor produces **no request at all** rather than a request that is
+      refused: the note below was right that a `fetch` surviving an unauthenticated viewer is the
+      anti-pattern, and the guard is what avoids it. Fire-and-forget, never awaited, errors swallowed
+      — a dropped view record must not change what the visitor sees.
+      It lives in the module component and not in the route file because a route file that exports
+      anything besides `Route` stops being code-split and drags the server layer into the browser
+      bundle.
+    - Historical note (2026-07-29), kept because it explains the design: did **not** wire into the
+      public profile route
       (`src/routes/builders/$builderId.tsx`). The plan calls this a
       "net-new feature" and the public page call would need a
       `fetch` that survives an unauthenticated viewer without

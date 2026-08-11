@@ -12,7 +12,7 @@ import { join } from 'node:path'
  * task texts naming the migration a plan *actually created*. Satisfying them would mean rewriting the
  * record of what happened to please a forward-looking lint, which is the wrong direction entirely.
  *
- * So this checks the two claims the folder itself makes, and nothing else:
+ * So this checks the claims the folder itself makes, and nothing else:
  *
  * 1. **Everything in it is done.** No `- [ ]`, no `- [~]`, and `implemented` in every file that carries a
  *    Status header. Both markers count: `- [~]` is the one that hides, because every status report in
@@ -20,6 +20,10 @@ import { join } from 'node:path'
  * 2. **Nothing outside it is done.** A plan with zero open tasks and `implemented` everywhere belongs in
  *    the folder, and leaving it out makes the folder an understatement — which erodes trust in it just as
  *    fast as an overstatement, because a reader then has to check both directories anyway.
+ * 3. **No checked box contradicts itself.** A `- [x]` whose own text says "not implemented" must name the
+ *    plan that owns the work now. This is the rule the first three could not see, and the one that caught
+ *    the most: four checked tasks said the opposite of their marker while every mechanical condition
+ *    passed.
  *
  * It also checks the vocabulary, everywhere: a Status outside the five values
  * `check-phase-readiness.mjs` accepts is a status no gate can read, and that is how eight of them drifted
@@ -136,7 +140,48 @@ for (const dir of planDirectories(LIVE)) {
   }
 }
 
-// ── 4. A plan has one home ───────────────────────────────────────────────────────────────────────
+/**
+ * A checked box that admits it was not done.
+ *
+ * This is the rule the other three could not see, and the one that mattered most. The folder's whole
+ * claim rests on `- [x]`, and on 2026-08-11 four checked tasks carried titles saying the opposite —
+ * "not implemented this pass", "NOT done as a dedicated test task", "not done, needs a human",
+ * "moved, not done". Every mechanical condition passed. The text said no.
+ *
+ * Three of those four turned out to be *already built*, with only their titles stale; the fourth had
+ * genuinely moved to phase 5. So the rule is not "never admit a gap" — it is **say where the work
+ * went**. A task that admits not-done here must name the plan that owns it now, and a
+ * `plans/phase-5/` link is the only accepted answer, because phase 5 is where launch, legal, operator
+ * and soak work lives and a link there is itself checkable.
+ *
+ * Deliberately narrow: "deferred to a later pass" with no pointer fails, which is the sentence that
+ * lets a gap sit unowned for weeks.
+ */
+const ADMITS_NOT_DONE = /(not implemented|not attempted|not done|not started|skipped|deferred|not built|not wired|not written)/i
+const NAMES_A_NEW_OWNER = /plans\/phase-5\/|phase-5\/[0-9]{2}-/
+
+for (const root of [IMPLEMENTED, LIVE]) {
+  for (const dir of planDirectories(root)) {
+    for (const name of markdownFiles(root, dir)) {
+      const lines = readFileSync(join(root, dir, name), 'utf8').split('\n')
+      for (const [index, line] of lines.entries()) {
+        if (!/^\s*[-*]\s*\[x\]/.test(line) || !ADMITS_NOT_DONE.test(line)) continue
+        /**
+         * The pointer may sit on the task's continuation lines rather than its title, which is how
+         * plan 43 already wrote it. Six lines is the whole of a task block in this repository's format.
+         */
+        const block = lines.slice(index, index + 7).join(' ')
+        if (NAMES_A_NEW_OWNER.test(block)) continue
+        fail(
+          `${dir}/${name}:${index + 1} is checked but its own text says it was not done, and names no ` +
+            `owner: "${line.trim().slice(0, 96)}". Either close it, or move it to a plans/phase-5/ plan and link that.`,
+        )
+      }
+    }
+  }
+}
+
+// ── 5. A plan has one home ───────────────────────────────────────────────────────────────────────
 const live = new Set(planDirectories(LIVE))
 for (const dir of implemented) {
   if (live.has(dir)) fail(`${dir} exists under both plans/implemented and plans/phase-1 — a plan has one home`)

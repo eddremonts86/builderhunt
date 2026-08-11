@@ -1,7 +1,8 @@
 # Verified Portfolio Builder — Tasks
 
-> **Status**: `implemented` (core flow) — AI persona / timeline integrations and the e2e task
-> not attempted this pass, see notes below.
+> **Status**: `implemented` — core flow, both integrations, and the e2e task. The "not attempted"
+> wording this header carried was written before the 2026-08-03 pass that closed them, and is
+> corrected in the note below.
 > **Depends on**: [`claimable-profiles`](../36-claimable-profiles/spec.md) (canonical, source-verified claims)
 > **Blocks**: nothing
 > **Reality check**: (2026-07-26) Built on top of the exact `builder_claims`/`builderIdentities` system
@@ -103,6 +104,12 @@
 
   **Done 2026-08-03, exactly as scoped — plus the consumer, which the scoping missed.** The adapters needed no
   change, as predicted.
+
+  **Re-verified 2026-08-11**, because a note saying "done" is not evidence:
+  `src/routes/api/me/builder-claims/$claimId/portfolio.ts` no longer returns the
+  `integrationsAvailable: { aiPersona: false, timeline: false }` literal this note describes — it
+  calls `portfolioIntegrationsAvailable({ aiEnrichment, timelineEvents })` with both reads resolved
+  in parallel and each falling back to empty. The hard-coded signal is gone.
 
   - `findOwnedVerifiedClaimForPortfolio` now carries `builderIdentityId`, on its own `OwnedPortfolioClaimRow` type
     rather than widening the shared `PortfolioClaimRow`. `getPublicPortfolioClaim` feeds a payload that is cached
