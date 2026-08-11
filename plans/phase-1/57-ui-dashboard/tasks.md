@@ -441,7 +441,33 @@
     the metrics they are computed from, on `/api/admin/billing/metrics`, and render in the operations
     console that already fetches it. Adding a cache to `/admin/metrics` later is a separate decision
     that should start from a page that actually displays the value.
-  - **Still open:** the per-section split (`overview.ts` and friends), validated `section`/`range`
+  - **Routes landed 2026-08-11.** `overview.ts` and `sections.ts`, plus
+    `src/shared/lib/admin-metrics/sections.ts` as the builder.
+    - One validated route for the seven analytical sections rather than seven files: they return the same
+      envelope and differ only in which keys they fill, so seven copies of the platform-admin guard would
+      drift silently — a section whose route forgot it looks identical to one that has it until somebody
+      calls. `parseSectionRequest` is the single validator.
+    - `overview.ts` *is* separate, and not for symmetry: it is the sixty-second refresh path, so what it
+      runs has to be readable in one short file. It is two indexed aggregate reads, concurrently, and
+      nothing else — no billing sweep, no conversion query, and no in-process counters, which live in the
+      `runtime` section precisely so a per-instance number is never read beside a platform total.
+    - Sections with no backing store answer `unavailable: 'insufficient_history'` and carry **no data at
+      all**. Four of the eight are in that state until "Add truthful historical service-metric storage or
+      adapter" lands. Zeroes would be a lie of implication — the same reasoning `/api/admin/metrics`
+      already applies to `removals` and the interview counters.
+    - A failure is confined: `buildSection` never throws for a missing source, and an unexpected error
+      becomes `unavailable: 'error'` for the section that asked. A caller mistake is still a 400 — an
+      `unavailable` envelope would tell a typo it was a service outage.
+    - Activation omits its ratio rather than dividing by zero: with no signups in the window the rate is
+      undefined, and `0%` reads as "nobody activated" when the truth is "nobody signed up".
+  - Both routes are registered in `admin.spec.ts`'s authorization table, so they get the real
+    anonymous/tenant/admin probe rather than only the four cases written for them. `sections.ts` is probed
+    with a *valid* section on purpose: an invalid one is a 400 for everybody and would pass the table
+    without ever reaching the guard.
+  - Result: `admin.spec.ts` 229 passed; e2e route coverage 210/211 with 0 missing; `check-api-route-methods`
+    and `check-route-client-boundary` clean.
+  - **Still open:** migrating the page to the new routes and bounding the legacy `/api/admin/metrics`
+    response, which is the other half of this task and belongs with the lazy-shell rebuild below.
     request state, and per-section failure isolation. Blocked on the section contracts task above.
   - **`db.totalBuilders` is not merely deferred.** Making those three counts real needs
     `builderhunt_platform` to hold unscoped SELECT on tenant tables — saved queries and notes being

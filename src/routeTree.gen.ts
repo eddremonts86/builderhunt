@@ -234,6 +234,8 @@ import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadma
 import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
 import { Route as ApiAdminOperationsJobKeyRouteImport } from './routes/api/admin/operations/$jobKey'
 import { Route as ApiAdminMetricsTrustRouteImport } from './routes/api/admin/metrics/trust'
+import { Route as ApiAdminMetricsSectionsRouteImport } from './routes/api/admin/metrics/sections'
+import { Route as ApiAdminMetricsOverviewRouteImport } from './routes/api/admin/metrics/overview'
 import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
 import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
 import { Route as ApiAdminInterviewsRunRetentionRouteImport } from './routes/api/admin/interviews/run-retention'
@@ -1489,6 +1491,16 @@ const ApiAdminMetricsTrustRoute = ApiAdminMetricsTrustRouteImport.update({
   path: '/api/admin/metrics/trust',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminMetricsSectionsRoute = ApiAdminMetricsSectionsRouteImport.update({
+  id: '/api/admin/metrics/sections',
+  path: '/api/admin/metrics/sections',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMetricsOverviewRoute = ApiAdminMetricsOverviewRouteImport.update({
+  id: '/api/admin/metrics/overview',
+  path: '/api/admin/metrics/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminMetricsConversionRoute =
   ApiAdminMetricsConversionRouteImport.update({
     id: '/api/admin/metrics/conversion',
@@ -2044,6 +2056,8 @@ export interface FileRoutesByFullPath {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/metrics/overview': typeof ApiAdminMetricsOverviewRoute
+  '/api/admin/metrics/sections': typeof ApiAdminMetricsSectionsRoute
   '/api/admin/metrics/trust': typeof ApiAdminMetricsTrustRoute
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2332,6 +2346,8 @@ export interface FileRoutesByTo {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/metrics/overview': typeof ApiAdminMetricsOverviewRoute
+  '/api/admin/metrics/sections': typeof ApiAdminMetricsSectionsRoute
   '/api/admin/metrics/trust': typeof ApiAdminMetricsTrustRoute
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2625,6 +2641,8 @@ export interface FileRoutesById {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/metrics/overview': typeof ApiAdminMetricsOverviewRoute
+  '/api/admin/metrics/sections': typeof ApiAdminMetricsSectionsRoute
   '/api/admin/metrics/trust': typeof ApiAdminMetricsTrustRoute
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2917,6 +2935,8 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/metrics/overview'
+    | '/api/admin/metrics/sections'
     | '/api/admin/metrics/trust'
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
@@ -3205,6 +3225,8 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/metrics/overview'
+    | '/api/admin/metrics/sections'
     | '/api/admin/metrics/trust'
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
@@ -3497,6 +3519,8 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/metrics/overview'
+    | '/api/admin/metrics/sections'
     | '/api/admin/metrics/trust'
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
@@ -3728,6 +3752,8 @@ export interface RootRouteChildren {
   ApiAdminInterviewsRunRetentionRoute: typeof ApiAdminInterviewsRunRetentionRoute
   ApiAdminLegalRunWorkerRoute: typeof ApiAdminLegalRunWorkerRoute
   ApiAdminMetricsConversionRoute: typeof ApiAdminMetricsConversionRoute
+  ApiAdminMetricsOverviewRoute: typeof ApiAdminMetricsOverviewRoute
+  ApiAdminMetricsSectionsRoute: typeof ApiAdminMetricsSectionsRoute
   ApiAdminMetricsTrustRoute: typeof ApiAdminMetricsTrustRoute
   ApiAdminOperationsJobKeyRoute: typeof ApiAdminOperationsJobKeyRouteWithChildren
   ApiAdminOperationsSyncSchedulesRoute: typeof ApiAdminOperationsSyncSchedulesRoute
@@ -5385,6 +5411,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminMetricsTrustRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/metrics/sections': {
+      id: '/api/admin/metrics/sections'
+      path: '/api/admin/metrics/sections'
+      fullPath: '/api/admin/metrics/sections'
+      preLoaderRoute: typeof ApiAdminMetricsSectionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/overview': {
+      id: '/api/admin/metrics/overview'
+      path: '/api/admin/metrics/overview'
+      fullPath: '/api/admin/metrics/overview'
+      preLoaderRoute: typeof ApiAdminMetricsOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/metrics/conversion': {
       id: '/api/admin/metrics/conversion'
       path: '/api/admin/metrics/conversion'
@@ -6432,6 +6472,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminInterviewsRunRetentionRoute: ApiAdminInterviewsRunRetentionRoute,
   ApiAdminLegalRunWorkerRoute: ApiAdminLegalRunWorkerRoute,
   ApiAdminMetricsConversionRoute: ApiAdminMetricsConversionRoute,
+  ApiAdminMetricsOverviewRoute: ApiAdminMetricsOverviewRoute,
+  ApiAdminMetricsSectionsRoute: ApiAdminMetricsSectionsRoute,
   ApiAdminMetricsTrustRoute: ApiAdminMetricsTrustRoute,
   ApiAdminOperationsJobKeyRoute: ApiAdminOperationsJobKeyRouteWithChildren,
   ApiAdminOperationsSyncSchedulesRoute: ApiAdminOperationsSyncSchedulesRoute,

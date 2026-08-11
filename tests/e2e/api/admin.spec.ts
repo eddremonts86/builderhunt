@@ -186,6 +186,10 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'legal/run-worker.ts', method: 'POST', path: '/api/admin/legal/run-worker' },
   { file: 'metrics/conversion.ts', method: 'GET', path: '/api/admin/metrics/conversion' },
   { file: 'metrics/index.ts', method: 'GET', path: '/api/admin/metrics' },
+  // The split sections (plan 57). `sections.ts` is probed with a valid section, because an invalid one is
+  // a 400 for *everybody* and would pass this table without ever reaching the authorization guard.
+  { file: 'metrics/overview.ts', method: 'GET', path: '/api/admin/metrics/overview' },
+  { file: 'metrics/sections.ts', method: 'GET', path: '/api/admin/metrics/sections?section=runtime' },
   { file: 'metrics/trust.ts', method: 'GET', path: '/api/admin/metrics/trust' },
   { file: 'operations/$jobKey.ts', method: 'PATCH', path: '/api/admin/operations/absent-job' },
   { file: 'operations/$jobKey/run.ts', method: 'POST', path: '/api/admin/operations/absent-job/run' },
@@ -332,5 +336,69 @@ test.describe('a platform admin', () => {
     const billingBody = await billing.json()
     expect(Array.isArray(billingBody.alerts), 'alerts must be a list, so empty can mean "checked"').toBe(true)
     expect(billingBody).toHaveProperty('organizationsScanned')
+  })
+  test('the split metrics sections answer per section, and refuse a bad request rather than defaulting', async () => {
+    /**
+     * Plan 57, Admin track — the per-section split.
+     *
+     * Four properties, and the first two are the ones the monolith could not have. A section with no
+     * backing store answers `unavailable` with a code instead of zeroes, because "0 pending" reads as an
+     * empty queue rather than a shut door. And a caller mistake is a 400, not an `unavailable` envelope —
+     * telling a typo it was a service outage sends somebody to look at the wrong thing.
+     */
+    const overview = await harness.admin.api!.fetch('/api/admin/metrics/overview')
+    expect(overview.status()).toBe(200)
+    const overviewBody = await overview.json()
+    expect(overviewBody.section).toBe('overview')
+    expect(overviewBody.schemaVersion).toBe(1)
+    expect(overviewBody.payload.status).toBe('ready')
+    // Freshness and a window are mandatory on anything carrying data: an aggregate without a time is a
+    // claim about *now*, and one without a timezone does not say which day "yesterday" was.
+    expect(typeof overviewBody.payload.generatedAt).toBe('string')
+    expect(typeof overviewBody.payload.window.timezone).toBe('string')
+    for (const value of overviewBody.payload.data.values) {
+      expect(value, `${value.key} must carry a unit`).toHaveProperty('unit')
+      expect(value, `${value.key} must carry a scope`).toHaveProperty('scope')
+    }
+
+    /**
+     * The runtime section, and the scope rule the contract exists for.
+     *
+     * `metrics.get()` counters are per-instance and zero at boot. Every value here must say so and must
+     * carry the process it came from — the shape that would let one instance's counter be read as the
+     * platform's number is refused by the schema, and this asserts the wire actually looks like that.
+     */
+    const runtime = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=runtime')
+    expect(runtime.status()).toBe(200)
+    const runtimeBody = await runtime.json()
+    expect(runtimeBody.payload.status).toBe('ready')
+    for (const value of runtimeBody.payload.data.values) {
+      expect(value.scope, `${value.key} is an in-process counter`).toBe('process')
+      expect(value.platformTotal, `${value.key} must not claim the platform`).toBeUndefined()
+      expect(value.processIdentity?.pid, `${value.key} must name its process`).toBeGreaterThan(0)
+    }
+
+    // A section with no history says so, and carries no data at all to be misread.
+    const traffic = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=traffic')
+    expect(traffic.status()).toBe(200)
+    const trafficBody = await traffic.json()
+    expect(trafficBody.payload.status).toBe('unavailable')
+    expect(trafficBody.payload.code).toBe('insufficient_history')
+    expect(trafficBody.payload.data).toBeUndefined()
+
+    // Caller mistakes: unknown section, unknown range, and a variant that belongs to another section.
+    for (const query of ['section=surveillance', 'section=traffic&range=18mo', 'section=search&variant=latency']) {
+      const bad = await harness.admin.api!.fetch(`/api/admin/metrics/sections?${query}`)
+      expect(bad.status(), query).toBe(400)
+      expect((await bad.json()).error, query).toBe('invalid_request')
+    }
+
+    // And the guard is on both routes, which is the failure eight copies of it would have hidden.
+    for (const path of ['/api/admin/metrics/overview', '/api/admin/metrics/sections?section=runtime']) {
+      const asTenant = await harness.tenant.api!.fetch(path)
+      expect([401, 403], `${path} must refuse a tenant`).toContain(asTenant.status())
+      const anonymous = await harness.anonymous.fetch(path)
+      expect([401, 403], `${path} must refuse an anonymous caller`).toContain(anonymous.status())
+    }
   })
 })
