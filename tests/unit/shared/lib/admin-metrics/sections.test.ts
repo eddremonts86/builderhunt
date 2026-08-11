@@ -26,6 +26,10 @@ import type { FamilyWindow, ServiceMetricWindow } from '../../../../../src/share
 const envStub: Record<string, string> = {}
 
 const mocks = vi.hoisted(() => ({
+  listScheduleRegistry: vi.fn(),
+  listLatestJobRuns: vi.fn(),
+  listSearchSources: vi.fn(),
+  listSolutionSources: vi.fn(),
   readServiceMetricWindow: vi.fn(),
   readServiceMetricFreshness: vi.fn(),
   getPlatformAccountMetrics: vi.fn(),
@@ -44,7 +48,28 @@ vi.mock('../../../../../src/shared/lib/repositories/platform-billing', () => ({
 vi.mock('../../../../../src/shared/lib/repositories/discovery-state', () => ({
   getDiscoveryState: mocks.getDiscoveryState,
 }))
-vi.mock('../../../../../src/shared/lib/env', () => ({ env: envStub }))
+vi.mock('../../../../../src/shared/lib/repositories/platform-operations', () => ({
+  listScheduleRegistry: mocks.listScheduleRegistry,
+  listLatestJobRuns: mocks.listLatestJobRuns,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/search-sources', () => ({
+  listSearchSources: mocks.listSearchSources,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/solution-catalog', () => ({
+  listSolutionSources: mocks.listSolutionSources,
+}))
+/**
+ * Partial, not wholesale.
+ *
+ * Replacing the whole module broke the moment this file's import graph grew: the operations section reads the
+ * source registers, those reach `site-url.ts`, and that imports `ensureProtocol` from here — which a
+ * `{ env }`-only mock does not provide, so the suite failed to load rather than failing an assertion. Spreading
+ * the original keeps every other export real and overrides exactly the one thing a case needs to control.
+ */
+vi.mock('../../../../../src/shared/lib/env', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../src/shared/lib/env')>()),
+  env: envStub,
+}))
 
 const { buildSection } = await import('../../../../../src/shared/lib/admin-metrics/sections')
 
@@ -104,6 +129,10 @@ beforeEach(() => {
   mocks.getPlatformAccountMetrics.mockReset()
   mocks.getOnboardingActivationMetrics.mockReset()
   for (const key of Object.keys(envStub)) delete envStub[key]
+  mocks.listScheduleRegistry.mockReset()
+  mocks.listLatestJobRuns.mockReset()
+  mocks.listSearchSources.mockReset()
+  mocks.listSolutionSources.mockReset()
 })
 
 describe('traffic', () => {
@@ -604,5 +633,209 @@ describe('feature reliability', () => {
     envStub.SCHEDULING_ENABLED = 'true'
     const payload = parsed(await buildSection({ section: 'reliability', range: '24h', variant: 'availability', now: NOW }))
     expect(payload).toMatchObject({ status: 'unavailable', code: 'insufficient_history' })
+  })
+})
+
+describe('operations — workers', () => {
+  /**
+   * Plan 57, Admin track — "Build Worker and Integration Health admin widgets".
+   *
+   * Read from the registries `/admin/operations` and `/admin/integrations` already use, so this section cannot
+   * disagree with the pages it summarises. That is not a convenience: the projection the Command Center task
+   * named reads eight `platform_*` tables that appear in no migration, and `/admin/integrations` once showed two
+   * retired sources as ACTIVE because it was assembled from a compile-time registry nobody updated.
+   */
+  const schedule = (overrides: Partial<{ jobKey: string; enabled: boolean; nextRunAt: Date | null }> = {}) => ({
+    id: 'sched',
+    jobKey: 'discovery',
+    cronExpression: '0 * * * *',
+    timezone: 'UTC',
+    scope: 'platform',
+    enabled: true,
+    nextRunAt: new Date(NOW.getTime() + 3_600_000),
+    version: 1,
+    ...overrides,
+  })
+  const run = (overrides: Partial<{ jobKey: string; state: string; failedCount: number }> = {}) => ({
+    id: 'run',
+    jobKey: 'discovery',
+    scheduledFor: NOW,
+    startedAt: NOW,
+    finishedAt: NOW,
+    state: 'succeeded',
+    processedCount: 10,
+    failedCount: 0,
+    durationMs: 100,
+    errorCode: null,
+    ...overrides,
+  })
+
+  it('says dependency_unavailable for an empty registry rather than "0 overdue"', async () => {
+    /**
+     * The registry is migration-managed and synced from a code-owned list, so no rows means the sync has never
+     * run — not that this platform has no jobs. "0 overdue" over an empty registry reads as healthy, which is
+     * the strongest possible form of the lie this plan is about.
+     */
+    mocks.listScheduleRegistry.mockResolvedValue([])
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'workers', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'dependency_unavailable' })
+    // And it did not go on to read the runs, which is what makes the empty case free.
+    expect(mocks.listLatestJobRuns).not.toHaveBeenCalled()
+  })
+
+  it('counts a paused schedule as paused and never as overdue', async () => {
+    /**
+     * A paused schedule has no next run *by design*. Counting it as overdue would make pausing a job — a
+     * deliberate operator action — look like a failure, and the operator who paused it would be the one paged.
+     */
+    /**
+     * The paused schedule keeps a `nextRunAt` in the *past*, and that detail is the whole test.
+     *
+     * `advanceScheduleAfterRun` clears the next run when a schedule is disabled, so a paused job usually has
+     * `null` — and with `null` this case passes whether or not the filter respects `enabled`, because the null
+     * check excludes it either way. A schedule disabled *between* runs keeps its stale timestamp until the next
+     * advance, which is the only shape that can tell the two implementations apart. Written with `null` first,
+     * and a deliberate break proved it asserted nothing.
+     */
+    mocks.listScheduleRegistry.mockResolvedValue([
+      schedule({ jobKey: 'paused-job', enabled: false, nextRunAt: new Date(NOW.getTime() - 86_400_000) }),
+      schedule({ jobKey: 'healthy' }),
+    ])
+    mocks.listLatestJobRuns.mockResolvedValue(new Map([['healthy', run({ jobKey: 'healthy' })]]))
+
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'workers', now: NOW }))
+    expect(valueOf(payload, 'jobs_registered')).toBe(2)
+    expect(valueOf(payload, 'jobs_paused')).toBe(1)
+    expect(valueOf(payload, 'jobs_overdue')).toBe(0)
+  })
+
+  it('counts an enabled schedule whose next run is in the past as overdue', async () => {
+    mocks.listScheduleRegistry.mockResolvedValue([
+      schedule({ jobKey: 'late', nextRunAt: new Date(NOW.getTime() - 60_000) }),
+      schedule({ jobKey: 'healthy' }),
+    ])
+    mocks.listLatestJobRuns.mockResolvedValue(new Map())
+
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'workers', now: NOW }))
+    expect(valueOf(payload, 'jobs_overdue')).toBe(1)
+    // Both are enabled with no run on record, which is dormant rather than failed.
+    expect(valueOf(payload, 'jobs_never_ran')).toBe(2)
+    expect(valueOf(payload, 'jobs_failed_last_run')).toBe(0)
+  })
+
+  it('separates a failed run from a run that finished leaving items behind', async () => {
+    /**
+     * Two different failures, and the second is the one nobody notices: a run can report `succeeded` while
+     * leaving rows unprocessed, so a dashboard that only counts failed *runs* shows green while a backlog
+     * accumulates.
+     */
+    mocks.listScheduleRegistry.mockResolvedValue([schedule({ jobKey: 'a' }), schedule({ jobKey: 'b' })])
+    mocks.listLatestJobRuns.mockResolvedValue(
+      new Map([
+        ['a', run({ jobKey: 'a', state: 'failed' })],
+        ['b', run({ jobKey: 'b', state: 'succeeded', failedCount: 7 })],
+      ]),
+    )
+
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'workers', now: NOW }))
+    expect(valueOf(payload, 'jobs_failed_last_run')).toBe(1)
+    expect(valueOf(payload, 'job_items_failed_last_run')).toBe(7)
+  })
+
+  it('leaves the dormant count unthresholded, because a first occurrence has not arrived yet', async () => {
+    // Normal right after a deploy, and a problem only if it persists — which needs a rate this section does not
+    // have. Reported without a line drawn rather than alarming on a healthy release.
+    mocks.listScheduleRegistry.mockResolvedValue([schedule()])
+    mocks.listLatestJobRuns.mockResolvedValue(new Map())
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'workers', now: NOW }))
+    const byKey = new Map(
+      (payload as { data: { values: { key: string; threshold?: unknown }[] } }).data.values.map((v) => [v.key, v]),
+    )
+    expect(byKey.get('jobs_never_ran')?.threshold).toBeUndefined()
+    expect(byKey.get('jobs_overdue')?.threshold).toBeDefined()
+  })
+
+  it('answers `error` rather than a plausible zero when the registry read fails', async () => {
+    mocks.listScheduleRegistry.mockRejectedValue(new Error('53300: too many connections'))
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'workers', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
+  })
+})
+
+describe('operations — integrations', () => {
+  const searchSource = (overrides: Partial<{ key: string; enabled: boolean; connectorImplemented: boolean; termsReviewedAt: Date | null }> = {}) => ({
+    key: 'github',
+    kind: 'official_api',
+    label: 'GitHub',
+    homepageUrl: 'https://github.com',
+    enabled: true,
+    connectorImplemented: true,
+    allowedHosts: ['github.com'],
+    storesPersonalData: false,
+    geography: null,
+    rateLimitPerHour: null,
+    retentionDays: null,
+    termsReviewedAt: NOW,
+    termsReviewedBy: null,
+    registerNotes: null,
+    updatedAt: NOW,
+    ...overrides,
+  })
+  const solutionSource = (overrides: Partial<{ key: string; enabled: boolean; termsReviewedAt: Date | null }> = {}) => ({
+    key: 'huggingface',
+    enabled: true,
+    termsReviewedAt: NOW,
+    ...overrides,
+  })
+
+  it('counts an enabled source with no connector, which looks identical to a healthy one on the register page', async () => {
+    /**
+     * The number this variant exists for. `enabled` means "the next search will contact it";
+     * `connectorImplemented` means there is code to contact it *with*. A row with the first and not the second
+     * is a source an operator believes is live and which will never reach anything — and any non-zero value is
+     * worth reading, which is why the threshold starts at 1 rather than at a rate.
+     */
+    mocks.listSearchSources.mockResolvedValue([
+      searchSource({ key: 'live' }),
+      searchSource({ key: 'switched-on-but-dead', connectorImplemented: false }),
+      // Disabled with no connector is fine: nothing will contact it either way.
+      searchSource({ key: 'off', enabled: false, connectorImplemented: false }),
+    ])
+    mocks.listSolutionSources.mockResolvedValue([])
+
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'integrations', now: NOW }))
+    expect(valueOf(payload, 'sources_registered')).toBe(3)
+    expect(valueOf(payload, 'sources_enabled')).toBe(2)
+    expect(valueOf(payload, 'sources_enabled_without_connector')).toBe(1)
+
+    const breach = (payload as { data: { values: { key: string; threshold?: { warn: number } }[] } }).data.values
+      .find((v) => v.key === 'sources_enabled_without_connector')
+    expect(breach?.threshold?.warn).toBe(1)
+  })
+
+  it('counts unreviewed terms across both registers, and only for enabled sources', async () => {
+    /**
+     * Not paperwork: two of the job feeds say outright that they will suspend API access if a link-back is
+     * missing, so an unreviewed enabled source is an obligation taken on without being read. A *disabled* one
+     * carries no obligation, which is why it is excluded.
+     */
+    mocks.listSearchSources.mockResolvedValue([
+      searchSource({ key: 'reviewed' }),
+      searchSource({ key: 'unreviewed', termsReviewedAt: null }),
+      searchSource({ key: 'unreviewed-but-off', enabled: false, termsReviewedAt: null }),
+    ])
+    mocks.listSolutionSources.mockResolvedValue([solutionSource({ key: 'sol-unreviewed', termsReviewedAt: null })])
+
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'integrations', now: NOW }))
+    expect(valueOf(payload, 'sources_enabled_terms_unreviewed')).toBe(2)
+  })
+
+  it('answers `error` when either register cannot be read, rather than counting only the half that answered', async () => {
+    // Half a register is a wrong total, not a partial one: "13 sources enabled" computed from one of two
+    // registers is a number an operator would act on.
+    mocks.listSearchSources.mockResolvedValue([searchSource()])
+    mocks.listSolutionSources.mockRejectedValue(new Error('57014: canceling statement'))
+    const payload = parsed(await buildSection({ section: 'operations', range: '24h', variant: 'integrations', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
   })
 })

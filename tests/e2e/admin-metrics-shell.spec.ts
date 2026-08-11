@@ -229,6 +229,64 @@ test.describe('the Admin Metrics shell', () => {
     }
   })
 
+  test('worker and source health read the registries the operations pages read', async ({ browser }) => {
+    /**
+     * Plan 57, Admin track — "Build Worker and Integration Health admin widgets".
+     *
+     * Asserted in a browser against the harness's own database rather than against mocks, because the thing worth
+     * proving is that the section reads registries that *exist*. The projection the Command Center task named
+     * reads eight `platform_*` tables that appear in no migration and throws
+     * `relation "platform_incidents" does not exist` on its first call — this one answers.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=operations&range=24h&variant=integrations`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+
+      // The source registers are migration-managed, so they are never empty in a migrated database.
+      await expect(tab.getByTestId('metric-value-sources_registered')).toBeVisible({ timeout: 20_000 })
+      await expect(tab.getByTestId('metric-value-sources_enabled_without_connector')).toBeVisible()
+
+      /**
+       * The workers variant is allowed to answer either way, and both answers are correct.
+       *
+       * An empty schedule registry means the sync has never run in this database — which is `dependency_unavailable`
+       * and deliberately not "0 overdue", because zeros over an empty registry read as healthy. What must never
+       * happen is numbers appearing without a registry behind them.
+       */
+      await tab.getByTestId('admin-metrics-variant-workers').click()
+      await expect(tab.getByTestId('admin-metrics-variant-workers')).toHaveAttribute('data-active', 'true')
+
+      /**
+       * Polled until one of the two settles, rather than counting immediately.
+       *
+       * Changing variant remounts the section host — that is deliberate, so one section's numbers can never
+       * appear under another's heading — which means there is a loading window after the click. The first
+       * version of this case read the DOM straight after asserting the tab was active, saw neither state, and
+       * reported a product failure for a race in the test. The API answers
+       * `unavailable: dependency_unavailable` here; asserting that only after the section has settled is what
+       * makes the case mean what it says.
+       */
+      const settled = await Promise.race([
+        tab.getByTestId('metric-section-unavailable-dependency_unavailable').waitFor({ timeout: 20_000 }).then(() => 'unavailable' as const),
+        tab.getByTestId('metric-value-jobs_registered').waitFor({ timeout: 20_000 }).then(() => 'ready' as const),
+      ])
+      if (settled === 'ready') {
+        await expect(tab.getByTestId('metric-value-jobs_overdue')).toBeVisible()
+      } else {
+        // An empty registry means the sync has never run in this database. Zeros here would read as healthy,
+        // which is the strongest form of the lie this section exists to avoid.
+        await expect(tab.getByTestId('metric-values')).toHaveCount(0)
+      }
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
   test('refuses a tenant owner before the console chrome appears', async ({ browser }) => {
     const context = await browser.newContext({ storageState: harness.owner.storageState! })
     const tab = await context.newPage()

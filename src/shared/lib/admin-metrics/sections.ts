@@ -6,6 +6,9 @@ import { env } from '../env'
 import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '../repositories/platform-billing'
 import { getDiscoveryState } from '../repositories/discovery-state'
 import { readServiceMetricFreshness, readServiceMetricWindow } from '../repositories/service-metrics'
+import { listLatestJobRuns, listScheduleRegistry } from '../repositories/platform-operations'
+import { listSearchSources } from '../repositories/search-sources'
+import { listSolutionSources } from '../repositories/solution-catalog'
 import type { FamilyWindow } from '../repositories/service-metrics'
 
 /** The `values` array of a ready payload, named so the builders below can push into it. */
@@ -132,6 +135,8 @@ export async function buildSection(input: SectionInput): Promise<AdminMetricSect
       return buildSearch(range, input.variant, now, input.compare === true)
     case 'reliability':
       return buildReliability(range, input.variant, now)
+    case 'operations':
+      return buildOperations(range, input.variant, now)
     /**
      * Still with no source, and why it is not lumped in with traffic and search.
      *
@@ -704,4 +709,140 @@ function threshold(key: string) {
 /** `documentBacklog` to `document_backlog`: the contract's keys are lower_snake_case and the parser enforces it. */
 function toMetricKey(camel: string): string {
   return camel.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+}
+
+/**
+ * Worker and integration health (plan 57, Admin track — "Build Worker and Integration Health admin widgets").
+ *
+ * ## Why this reads the registries rather than a rollup table
+ *
+ * The projection the Command Center task named reads eight `platform_*` tables that appear in no migration, so
+ * it has never executed. These two registries are real and are the source `/admin/operations` and
+ * `/admin/integrations` already read — which also means this section cannot disagree with those pages, and a
+ * summary that disagrees with the page it summarises is the failure this plan has a receipt for:
+ * `/admin/integrations` once showed two retired sources as ACTIVE because it was assembled from a compile-time
+ * registry nobody updated.
+ *
+ * ## Why it links to Operations and Integrations and never to a worker route
+ *
+ * The task says so, and the reason is that a metrics page is read under time pressure. A drill-down that POSTs
+ * to `run-worker` is a button that *does* something next to a number that says something is wrong, and the two
+ * get confused. The breach drill-down in `MetricSectionView` goes to the screens that show state.
+ */
+async function buildOperations(
+  range: AdminMetricRange,
+  variant: string,
+  now: Date,
+): Promise<AdminMetricSectionPayload> {
+  const window = windowFor(range, now)
+  const generatedAt = now.toISOString()
+  const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
+
+  if (variant === 'integrations') {
+    const registers = await Promise.all([
+      listSearchSources().catch(() => null),
+      listSolutionSources().catch(() => null),
+    ])
+    if (registers.some((register) => register === null)) return unavailable('error')
+    const [searchSources, solutionSources] = registers as [
+      Awaited<ReturnType<typeof listSearchSources>>,
+      Awaited<ReturnType<typeof listSolutionSources>>,
+    ]
+
+    const enabledSearch = searchSources.filter((source) => source.enabled)
+    const enabledSolutions = solutionSources.filter((source) => source.enabled)
+
+    /**
+     * The one number on this page that catches a source which is switched on and cannot work.
+     *
+     * `enabled` means "the next search will contact it"; `connectorImplemented` means there is code to contact
+     * it *with*. A row with the first and not the second is a source an operator believes is live and which
+     * will never reach anything — and it looks identical to a healthy one on the register page. Any non-zero
+     * value here is worth reading, which is why the threshold starts at 1 rather than at a rate.
+     */
+    const enabledWithoutConnector = enabledSearch.filter((source) => !source.connectorImplemented).length
+
+    /**
+     * An enabled source whose terms nobody has reviewed.
+     *
+     * Two of the job feeds say outright that they will suspend API access if a link-back is missing, so this is
+     * not paperwork: it is an obligation taken on at the moment the source was switched on. Also warned at 1.
+     */
+    const enabledUnreviewed = [...enabledSearch, ...enabledSolutions].filter(
+      (source) => source.termsReviewedAt === null,
+    ).length
+
+    const values: AdminMetricValues = [
+      { key: 'sources_registered', value: searchSources.length + solutionSources.length, ...dbCount },
+      { key: 'sources_enabled', value: enabledSearch.length + enabledSolutions.length, ...dbCount },
+      {
+        key: 'sources_enabled_without_connector',
+        value: enabledWithoutConnector,
+        ...dbCount,
+        threshold: { direction: 'higher_is_worse', warn: 1, critical: 3 },
+      },
+      {
+        key: 'sources_enabled_terms_unreviewed',
+        value: enabledUnreviewed,
+        ...dbCount,
+        threshold: { direction: 'higher_is_worse', warn: 1, critical: 5 },
+      },
+    ]
+    return { status: 'ready', generatedAt, window, data: { values } }
+  }
+
+  // `workers`, the default.
+  const schedules = await listScheduleRegistry().catch(() => null)
+  if (!schedules) return unavailable('error')
+  /**
+   * An empty registry is `dependency_unavailable`, not a row of zeros.
+   *
+   * The registry is migration-managed and synced from a code-owned list, so "no schedules" means the sync has
+   * never run — not that this platform has no jobs. "0 overdue" over an empty registry reads as healthy and is
+   * the strongest possible version of the lie this plan is about.
+   */
+  if (schedules.length === 0) return unavailable('dependency_unavailable')
+
+  const runs = await listLatestJobRuns(schedules.map((schedule) => schedule.jobKey)).catch(() => null)
+  if (!runs) return unavailable('error')
+
+  const enabled = schedules.filter((schedule) => schedule.enabled)
+  // Overdue is only meaningful for an enabled schedule: a paused one has no next run by design, and counting it
+  // would make pausing a job look like a failure.
+  const overdue = enabled.filter(
+    (schedule) => schedule.nextRunAt !== null && schedule.nextRunAt.getTime() < now.getTime(),
+  ).length
+  const failed = enabled.filter((schedule) => runs.get(schedule.jobKey)?.state === 'failed').length
+  const neverRan = enabled.filter((schedule) => !runs.get(schedule.jobKey)).length
+  const failedItems = [...runs.values()].reduce((sum, run) => sum + (run.failedCount ?? 0), 0)
+
+  const values: AdminMetricValues = [
+    { key: 'jobs_registered', value: schedules.length, ...dbCount },
+    { key: 'jobs_paused', value: schedules.length - enabled.length, ...dbCount },
+    {
+      key: 'jobs_overdue',
+      value: overdue,
+      ...dbCount,
+      threshold: { direction: 'higher_is_worse', warn: 1, critical: 3 },
+    },
+    {
+      key: 'jobs_failed_last_run',
+      value: failed,
+      ...dbCount,
+      threshold: { direction: 'higher_is_worse', warn: 1, critical: 3 },
+    },
+    // Dormant, not failed: an enabled schedule with no run yet is waiting for its first occurrence, which is
+    // normal right after a deploy and a problem only if it persists. Reported without a line drawn.
+    { key: 'jobs_never_ran', value: neverRan, ...dbCount },
+    // Items the last run could not process, summed. Distinct from a failed *run*: a run can finish while
+    // leaving rows behind, and that is the shape nobody notices.
+    {
+      key: 'job_items_failed_last_run',
+      value: failedItems,
+      ...dbCount,
+      threshold: { direction: 'higher_is_worse', warn: 1, critical: 25 },
+    },
+  ]
+
+  return { status: 'ready', generatedAt, window, data: { values } }
 }

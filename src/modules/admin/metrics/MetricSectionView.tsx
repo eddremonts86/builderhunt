@@ -100,6 +100,16 @@ const VALUE_LABELS: Record<string, string> = {
   metric_lag_seconds: 'Metric lag',
   history_span_seconds: 'History available',
   reporting_instances: 'Instances reporting now',
+  jobs_registered: 'Scheduled jobs',
+  jobs_paused: 'Paused',
+  jobs_overdue: 'Overdue',
+  jobs_failed_last_run: 'Failed on last run',
+  jobs_never_ran: 'Never run yet',
+  job_items_failed_last_run: 'Items left unprocessed',
+  sources_registered: 'Sources registered',
+  sources_enabled: 'Enabled',
+  sources_enabled_without_connector: 'Enabled with no connector',
+  sources_enabled_terms_unreviewed: 'Enabled, terms unreviewed',
 }
 
 function labelFor(key: string): string {

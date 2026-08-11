@@ -390,11 +390,48 @@ missing — so the only honest version of this widget was an empty one.
   - Do: Prioritize critical incidents/security/abuse, money/entitlement failures, user-impacting failed workers, policy deadlines, configuration anomalies, then non-critical product signals. Render measured status and incident aging with one safe drill-down per item.
   - Verify: severity/age ordering, expiry/deduplication, degraded status, partial failure, unknown destination, long incident copy, keyboard, screen reader, and mobile fixtures pass.
 
-- [ ] **Build Worker and Integration Health admin widgets**
+- [x] **Build Worker and Integration Health admin widgets**
   - Files: admin overview adapter, `WorkerHealthWidget.tsx`, `IntegrationHealthWidget.tsx`, tests
   - Depends on: Operations and Integrations projections from `plans/UI`
   - Do: Show registered schedule state, last/next run, overdue/failed/paused conditions, bounded duration/error changes, quota/backlog where measured, and credential-present boolean only when authorized. Link to Operations/Integrations, never directly to worker API routes.
   - Verify: failed/overdue/running/paused/healthy/dormant states, incomparable history, unknown job keys, redaction, and source-registry completeness pass.
+  - **Landed 2026-08-11** as the Metrics page's `operations` section, variants `workers` and `integrations` —
+    following the maintainer's "índice = metrics" decision rather than a Command Center route.
+  - **It reads the registries `/admin/operations` and `/admin/integrations` already read**, so it cannot disagree
+    with the pages it summarises. That is the point, not a shortcut: this repository's receipt for a summary
+    diverging from its source is `/admin/integrations` showing two retired sources as ACTIVE because it was
+    assembled from a compile-time registry nobody updated. `listScheduleRegistry` + `listLatestJobRuns` for
+    workers; the search and solutions source registers for integrations.
+  - **An empty schedule registry is `dependency_unavailable`, not "0 overdue".** The registry is synced from a
+    code-owned list, so no rows means the sync has never run — and zeros over an empty registry read as healthy,
+    which is the strongest form of the lie this plan is about. Measured: that is exactly what the local and
+    harness databases return today.
+  - **A paused schedule is never overdue.** It has no next run by design, and counting it would make pausing a
+    job — a deliberate operator action — look like a failure, paging the person who paused it. The test for this
+    was written with `nextRunAt: null` first, and a deliberate break proved it asserted nothing: the null check
+    excluded the row either way. It now uses a paused schedule that *keeps* a stale past timestamp, which is
+    what a schedule disabled between runs actually looks like.
+  - **A failed run and a run that left items behind are separate numbers.** A run can report `succeeded` while
+    leaving rows unprocessed, so a dashboard counting only failed *runs* shows green while a backlog grows.
+  - **`sources_enabled_without_connector` is the number this variant exists for.** `enabled` means the next
+    search will contact the source; `connectorImplemented` means there is code to contact it *with*. A row with
+    the first and not the second is a source an operator believes is live and which will never reach anything,
+    and on the register page it looks identical to a healthy one. Warned at 1, because any non-zero value is
+    worth reading.
+  - **`sources_enabled_terms_unreviewed` is not paperwork.** Two of the job feeds say outright that they will
+    suspend API access if a link-back is missing, so an unreviewed enabled source is an obligation taken on
+    without being read. Disabled sources are excluded — no obligation. **Measured against the real local
+    database: 12 of the 13 enabled sources have unreviewed terms**, so this ships already breaching, which is
+    the honest reading rather than a threshold tuned to be quiet.
+  - **Nothing links to a worker route.** The breach drill-down goes to Operations and Incidents, screens that
+    show state, because a button that *runs* something beside a number that says something is wrong gets
+    confused for the fix under time pressure.
+  - **Adding `operations` to `ADMIN_METRIC_SECTIONS` is deliberately not a schema-version bump.** A client only
+    requests sections it knows, so an older one cannot misread an existing payload — it simply never asks for
+    the new tab. The version exists for changes that make an old client read a *wrong* value.
+  - **Tests:** 9 unit cases plus a browser case that asserts against the harness's own database. Three
+    guarantees confirmed by breaking them: paused-not-overdue, the empty-registry refusal, and excluding
+    disabled sources from the obligation count.
 
 - [ ] **Build Billing, Abuse, Trust, and User Anomaly admin widgets**
   - Files: admin overview adapters, admin dashboard widget components, tests

@@ -44,7 +44,14 @@ import { z } from 'zod'
  */
 export const ADMIN_METRICS_SCHEMA_VERSION = 1
 
-/** The eight sections. Each loads on its own request, so this is also the routing vocabulary. */
+/**
+ * The sections. Each loads on its own request, so this is also the routing vocabulary.
+ *
+ * `operations` was added 2026-08-11 for the Command Center's worker and integration health, and adding a member
+ * here is deliberately **not** a `ADMIN_METRICS_SCHEMA_VERSION` bump: a client only requests sections it knows
+ * about, so an older one cannot misread an existing payload — it simply never asks for the new tab. The version
+ * exists for changes that make an old client read a *wrong* value, and this is not one.
+ */
 export const ADMIN_METRIC_SECTIONS = [
   'overview',
   'traffic',
@@ -53,6 +60,7 @@ export const ADMIN_METRIC_SECTIONS = [
   'activation',
   'conversion',
   'reliability',
+  'operations',
   'runtime',
 ] as const
 export type AdminMetricSection = (typeof ADMIN_METRIC_SECTIONS)[number]
@@ -82,6 +90,15 @@ export const ADMIN_METRIC_VARIANTS_BY_SECTION = {
   activation: ['funnel', 'cohort'],
   conversion: ['funnel', 'revenue'],
   reliability: ['availability', 'features'],
+  /**
+   * Two registries, two variants, and they are not the same question.
+   *
+   * `workers` asks whether the scheduled jobs are running; `integrations` asks whether the source registers
+   * describe something that can actually be contacted. Merging them would put "three jobs overdue" beside "two
+   * sources enabled with no connector" under one heading, and an operator acting on the first would not think
+   * to check the second.
+   */
+  operations: ['workers', 'integrations'],
   runtime: ['process', 'freshness'],
 } as const satisfies Record<AdminMetricSection, readonly [string, ...string[]]>
 

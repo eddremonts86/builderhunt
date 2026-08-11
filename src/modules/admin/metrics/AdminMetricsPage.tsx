@@ -43,6 +43,7 @@ const SECTION_TITLES: Record<AdminMetricSection, string> = {
   activation: 'Activation',
   conversion: 'Conversion',
   reliability: 'Reliability',
+  operations: 'Workers & sources',
   runtime: 'Runtime',
 }
 
