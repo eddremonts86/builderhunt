@@ -1,10 +1,10 @@
 # Team Synergy — Candidate-vs-Team Fit Analysis (tasks)
 
-> **Status**: `partially-implemented` (Phases 1–4 shipped; Phase 5 is open and executable as of
+> **Status**: `implemented` (Phases 1–4 shipped; Phase 5 is open and executable as of
 > 2026-07-29 — the `team-accounts` blocker it waited on shipped 2026-07-22)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard — complete), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft — v1 heuristic only, v2 hasn't landed), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md) (soft — complete), [`team-accounts`](../27-team-accounts/spec.md) (soft — complete)
 > **Blocks**: nothing
-> **Reality check (corrected 2026-07-25)**: builds on `src/shared/lib/tracked-builders.ts` (thin
+> **Reality check**: (corrected 2026-07-25) builds on `src/shared/lib/tracked-builders.ts` (thin
 > wrapper — the real row-listing function is `listOrganizationBuildersForTeamAggregate`, added by
 > this plan), `src/shared/lib/code-style.ts` (`generateFingerprint` fallback — always used today,
 > since v2 fingerprints don't exist yet), and read-only access to
@@ -12,6 +12,20 @@
 > `builders.metadata` as the original spec/reality-check line said; that legacy table stopped
 > being the live write path back in security-and-multitenancy (see `enrichment.ts`'s own doc
 > comment). No new tables; one new repository function added to `organization-builders.ts`.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `partially-implemented` on the grounds that "Phase 5 is open". Phase 5's task is checked; the header predates it.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Phase 1 — Pure synergy lib
 

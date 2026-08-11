@@ -1,6 +1,6 @@
 # UI Coverage and Navigation Completion — Delivery Plan
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: the implemented portions of [`shared-resources`](../phase-1/28-shared-resources/spec.md), [`activity-feed`](../phase-1/29-activity-feed/spec.md), [`status-and-trust`](../phase-1/47-status-and-trust/spec.md), [`calendar-scheduling-interview-intelligence`](../phase-1/44-calendar-scheduling-interview-intelligence/spec.md), and [`stealth-scraping`](../phase-1/42-stealth-scraping/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Routes and most feature components already exist. Delivery starts with route integrity and core-journey connections, then completes missing user surfaces, and only then adds operator consoles.

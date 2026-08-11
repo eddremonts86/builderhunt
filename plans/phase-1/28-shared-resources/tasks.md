@@ -1,15 +1,29 @@
 # Tasks: Shared Searches and Builder Lists
 
-> **Status**: `done` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
+> **Status**: `implemented` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md), [`team-accounts`](../27-team-accounts/tasks.md)
 > **Blocks**: [`activity-feed`](../29-activity-feed/tasks.md)
-> **Reality check (verified 2026-07-29 — the hold is lifted)**: this said "do not implement until
+> **Reality check**: (verified 2026-07-29 — the hold is lifted) this said "do not implement until
 > canonical tenant context, global builder identity, organization tracking, entitlements, RLS, and
 > Team organization-keyed cache are verified". All six were checked and hold: `withTenantContext`
 > (`src/shared/lib/db/tenant-context.ts`), the `builder_identities` and `organization_builders`
 > tables, `src/shared/lib/repositories/entitlements.ts`, RLS forced on 64 tables, and the
 > organization-keyed dashboard cache. `01` and `27` are closed apart from `01`'s legacy-column drop,
 > which touches nothing here. **Start at task 1.**
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `done`, a synonym no gate can read. Unblocked and delivered 2026-07-29.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 - [x] **Define shared-resource contracts and characterization tests**
   - Files: `src/shared/lib/shared-resources/contracts.ts`, `tests/unit/shared/lib/shared-resources/contracts.test.ts`, `tests/unit/security/shared-resources-characterization.test.ts`

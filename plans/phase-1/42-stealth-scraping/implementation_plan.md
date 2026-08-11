@@ -1,6 +1,6 @@
 # Public Profile Enrichment — Implementation Plan
 
-> **Status:** `code-complete-dark` — Phases 0-6 implemented and verified locally (real
+> **Status**: `implemented` — Phases 0-6 implemented and verified locally (real
 > migrations against Postgres, 508/508 project tests, type-check/lint/build all green).
 > Phase 7 is partial: static/local gates ran clean; the runtime adversarial matrix, RLS
 > fixture tests, dark-deploy smoke, 7-day canary, and legal/source-register sign-off have

@@ -1,6 +1,6 @@
 # PostgreSQL 18 Upgrade (plan)
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing — but see [`spec.md`](./spec.md) §1, "The sequencing rule": no PG18-only SQL may merge until Phase 4 is done and observed.
 > **Blocks**: nothing today; Phase 4 is the dependency any future plan cites before using `uuidv7()`, `RETURNING old/new`, skip-scan-dependent index changes or `NOT NULL NOT VALID`.
 > **Reality check** (re-verified 2026-07-27): Changes `docker-compose.yml:8`, `.github/workflows/quality.yml:16`, `docs/operations/deploy-runbook.md` (Coolify Postgres resource at `:87`, the env table at `:121-125`, + the new cutover runbook), `docs/operations/database-migrations.md` (pgvector section at `:30-41`, expand-step guidance), `docs/runbook.md` (cron table §3, backup targets §2), `scripts/deploy/orchestrate.mjs` (version gate, Phase 6). Phase 5 touches `src/shared/lib/db/schema.ts` (four `DEFAULT` swaps), `src/shared/lib/repositories/public-builder-embeddings.ts` + `src/lib/semantic/index-writer.ts` (`RETURNING old/new`), and conditionally drops one `conversion_events` index. Production topology (Coolify resources, Hetzner VPS cron) is operator work, not code. **Every image this plan touches must be a `pgvector/pgvector:*` image** — see [`spec.md`](./spec.md) "Hard requirement".

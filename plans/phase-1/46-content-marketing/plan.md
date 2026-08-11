@@ -1,6 +1,6 @@
 # Plan: Content Marketing
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md)
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Blog engine delivered (`content/posts/`, `src/shared/lib/blog.ts` +

@@ -1,6 +1,6 @@
 # Abuse and Usage Integrity — Tasks
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
 > [`team-accounts`](../27-team-accounts/spec.md),
 > [`stripe-billing-platform`](../30-stripe-billing-platform/spec.md)
@@ -10,6 +10,20 @@
 > seat logic, and `db/schema.ts` (`auth_sessions`, `organization_entitlements`). Tables/RLS landed as
 > `0043`/`0044` (concurrent work had already carried the migration counter well past the `0030` this
 > plan assumed when written — always check `drizzle/meta/_journal.json` for the real next number).
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `pending` with all 33 tasks checked — the header was simply never updated.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 Execute top-to-bottom. Each phase leaves the app green and shippable. Nothing enforces until
 Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe`).

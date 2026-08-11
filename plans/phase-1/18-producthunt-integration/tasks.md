@@ -1,6 +1,6 @@
 # Tasks: Product Hunt Integration
 
-> **Status**: `implemented — wired but dormant until a token is provisioned`
+> **Status**: `implemented` — wired but dormant until a token is provisioned
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector, UI, and scoring all built and live-verified 2026-07-25.

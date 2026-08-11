@@ -1,6 +1,6 @@
 # Plan: Accessibility release gate
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` — quality gate green; VoiceOver/staging smoke need a human
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: `src/routes/-root-components.tsx`, `src/shared/styles/globals.css`, and `src/modules/landing/components/FAQSection.tsx` already provide a skip link, visible focus style, and native FAQ semantics. This plan preserves those pieces and closes the missing universal target, modal focus, measured contrast/target-size, and CI coverage.

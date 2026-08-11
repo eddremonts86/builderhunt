@@ -1,6 +1,6 @@
 # Verified Portfolio Builder — Specification
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`claimable-profiles`](../36-claimable-profiles/spec.md) (canonical, source-verified claims)
 > **Blocks**: nothing
 > **Reality check**: No portfolio route, component, settings, or schema exists. Public builder profiles already render at `src/routes/builders/$builderId.tsx`; builder data is a per-user cache in `src/shared/lib/db/schema.ts`, so username lookup is not globally unique. Optional inputs are planned by [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md) in `builders.metadata.aiEnrichment` and [`unified-timeline`](../33-unified-timeline/spec.md); neither is required to publish a portfolio.

@@ -1,9 +1,23 @@
 # Tasks: Exhaustive Local E2E — Organizations, Admin, API Security, Billing, Webhooks, Workers, Concurrency
 
-> **Status**: `pending` (scope: design wave 4+5; auth/sessions/onboarding/search/dashboard/alerts/sprints/exports/responsive is owned by sibling tasks per `docs/superpowers/specs/2026-07-53-exhaustive-local-e2e-design.md` Delivery order §2, §3, §6)
+> **Status**: `implemented` (scope: design wave 4+5; auth/sessions/onboarding/search/dashboard/alerts/sprints/exports/responsive is owned by sibling tasks per `docs/superpowers/specs/2026-07-53-exhaustive-local-e2e-design.md` Delivery order §2, §3, §6)
 > **Depends on**: [`team-accounts`](../27-team-accounts/tasks.md), [`stripe-billing-platform`](../30-stripe-billing-platform/tasks.md) (for the implemented webhook receipt, event handlers, claim/lease worker, replay, fake provider, checkout/portal/subscription/credits surface), [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md)
 > **Blocks**: the speed-gate "two consecutive clean runs" criterion in spec §Verification gates; CI's `quality.yml` job.
 > **Reality check**: every route named below already exists in `src/routes/api/...` and is wired to real Postgres (not mocks) via the foundation files cited in each task. The existing `tests/e2e/team-accounts.spec.ts` (10 scenarios, real browser) covers the happy-path organization matrix but stops short of API-contract, tenant-isolation, idempotency, and replay coverage; `tests/unit/security/team-api-isolation.test.ts` and `tests/unit/security/billing-tenant-isolation.test.ts` cover route-layer input validation and RLS-migration invariants but never exercise routes over real HTTP. The deterministic `FakeBillingProvider` (`src/shared/lib/billing/fake-provider.ts`) already supports `success|decline|timeout|delayed|sca_required|out_of_order` scenarios plus idempotent creation by `idempotencyKey` — every billing task below uses it, never real Stripe. `receiveStripeWebhook` (`src/shared/lib/billing/webhook-inbox.ts`) already accepts a `signingSecrets` override so the harness can sign with a fixture secret independent of the process's real env; `runBillingWorker` and `replayBillingWebhookEvent` both accept a `retriever` override so the harness can inject a deterministic event list. The harness for these tasks is the **execution substrate**, not a new product surface — it lives under `tests/e2e/harness/` (gitignored-namespace) and owns a per-test disposable database, an in-process fake provider, an in-process email outbox, and a `crypto` fixture for signing real Stripe webhooks.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `pending` with all 17 tasks checked.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Conventions for every task below
 
@@ -17,7 +31,7 @@
 
 ---
 
-> **Reality check (2026-07-27)**: this plan was written as though the harness did not exist. It
+> **Reality check**: (2026-07-27) this plan was written as though the harness did not exist. It
 > exists at **`tests/e2e/harness/`**, and has for some time, with 83 tests
 > covering the harness itself. Contrasting task 1's shopping list against the actual exports, every
 > item but one is already built:

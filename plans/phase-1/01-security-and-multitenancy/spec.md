@@ -1,6 +1,6 @@
 # Security, Normalization, and Multi-Tenancy Foundation
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../27-team-accounts/spec.md), [`shared-resources`](../28-shared-resources/spec.md), [`activity-feed`](../29-activity-feed/spec.md), [`ai-expansion`](../21-ai-expansion/spec.md), [`semantic-search`](../22-semantic-search/spec.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/spec.md), [`production-infrastructure`](../02-production-infrastructure/spec.md)
 > **Reality check**: the additive organization, tenant-key, entitlement, normalized-builder,

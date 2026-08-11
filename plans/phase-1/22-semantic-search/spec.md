@@ -1,6 +1,6 @@
 # Semantic Search (spec)
 
-> **Status**: `complete`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md) (global-public identity/index classification and tenant-private query isolation); [`ai-expansion`](../21-ai-expansion/spec.md) (AI Platform — embedding adapter, `query-translate` task, budgets). Enhanced by [`proactive-discovery`](../23-proactive-discovery/spec.md) (populates baseline embeddings; semantic search must work without it).
 > **Blocks**: [`proactive-discovery`](../23-proactive-discovery/spec.md) (hard — its worker writes through this plan's global index helper)
 > **Reality check**: Federated keyword search exists (`src/lib/search.ts`, 12 sources, Redis+memory cached, `POST /api/search/builders`). `builders` is a **per-user** tracked cache (`unique(userId, source, sourceId)` in `src/shared/lib/db/schema.ts`) — NOT a global index. No pgvector, no embeddings, no AI code. "Semantic search" is already promised under Pro in `PLAN_PRICING` (`src/shared/lib/billing-shared.ts`).

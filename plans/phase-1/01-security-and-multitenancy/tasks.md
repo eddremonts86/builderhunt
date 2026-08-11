@@ -1,6 +1,6 @@
 # Tasks: Security, Normalization, and Multi-Tenancy Foundation
 
-> **Status**: `in_progress`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../27-team-accounts/tasks.md), [`shared-resources`](../28-shared-resources/tasks.md), [`activity-feed`](../29-activity-feed/tasks.md), [`ai-expansion`](../21-ai-expansion/tasks.md), [`semantic-search`](../22-semantic-search/tasks.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../02-production-infrastructure/tasks.md)
 > **Reality check** (reconciled 2026-07-23): 18 of 19 tasks below are checked off with re-verified
@@ -119,6 +119,20 @@
 > `pnpm type-check`/`pnpm lint` (0 errors)/`security:boundaries`/`security:route-coverage` all clean,
 > full test suite 638/638. Four for four now — every previously-unexercised code path this session
 > actually touched had a real, silent bug.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: all 19 tasks checked with re-verified evidence. The header said `in_progress` and its note said "18 of 19"; the nineteenth closed later and neither was updated.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.

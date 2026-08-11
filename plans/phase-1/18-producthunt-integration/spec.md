@@ -1,6 +1,6 @@
 # Feature: Product Hunt Integration
 
-> **Status**: `implemented — wired but dormant until a token is provisioned`
+> **Status**: `implemented` — wired but dormant until a token is provisioned
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: `src/lib/sources/producthunt.ts` implemented 2026-07-25, token-gated

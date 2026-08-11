@@ -1,9 +1,9 @@
 # Project Hygiene — Real GitHub Signals (plan)
 
-> **Status**: `implemented` (all phases below are delivered; kept as the record)
+> **Status**: `implemented` — GitHub fetch path needs a real GITHUB_TOKEN to verify at scale (all phases below are delivered; kept as the record)
 > **Depends on**: nothing (no AI; uses existing `GITHUB_TOKEN` env)
 > **Blocks**: nothing
-> **Reality check (verified 2026-07-28)**: the three deliverables this plan scoped all exist — the
+> **Reality check**: (verified 2026-07-28) the three deliverables this plan scoped all exist — the
 > fetch module (`src/lib/github/repo-signals.ts`), the endpoint
 > (`src/routes/api/builders/$builderId/hygiene.ts`), and the card upgrade
 > (`src/shared/components/HygieneCard.tsx`, which renders real signals when GitHub answers and an

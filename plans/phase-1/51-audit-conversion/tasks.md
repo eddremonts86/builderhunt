@@ -4,7 +4,7 @@
 > 2026-07-26; real baseline collection and staged rollout explicitly not started (see below).
 > **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md)
 > **Blocks**: nothing
-> **Reality check (2026-07-26)**: The anonymous quote/inert email/aggregateRating items were
+> **Reality check**: (2026-07-26) The anonymous quote/inert email/aggregateRating items were
 > already removed by `audit-trust` earlier this session (commit `bdf77f1`) — re-verified absent,
 > not re-done. What was actually still true of this plan's reality check: no analytics
 > implementation existed, the hero omitted guest exploration, signup silently dropped the guest

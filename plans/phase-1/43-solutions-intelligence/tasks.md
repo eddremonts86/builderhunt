@@ -1,12 +1,26 @@
 # Tasks: Solutions Intelligence
 
-> **Status**: `engineering-complete` — the one remaining gate needs real provider pricing and human gold
+> **Status**: `implemented` — the one remaining gate needs real provider pricing and human gold
 > judgments, and moved to [`plans/phase-5/02-legal-and-commercial-approvals`](../../phase-5/02-legal-and-commercial-approvals/tasks.md)
 > **Implementation authorized**: yes — maintainer decision, 2026-08-01. Supersedes the earlier
 > "no; checklist for a future implementation task" header.
 > **Depends on**: [`spec.md`](./spec.md) and [`plan.md`](./plan.md)
 >
 > **Phase-1 scope closed 2026-08-05.** Every remaining item moved to `plans/phase-5/` on Edd's instruction — the product launches when phase-5 finishes, so a task that waits on a signature, a clock, a live deployment or a launch is not build-phase work. Prose pointers below name the phase-5 plan that owns each one; they are deliberately not checkboxes, because a box reads as pending engineering.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `engineering-complete`, a value no gate can read. The remaining gate needs real provider pricing and human gold judgments, and lives in phase-5.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one changes what
 "done" means below — read them before closing any task:

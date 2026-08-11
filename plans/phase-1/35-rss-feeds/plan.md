@@ -1,6 +1,6 @@
 # Plan: RSS Feeds per Saved Search
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Endpoint (`src/routes/api/feeds/$searchId.ts`), HTML fallback, rate

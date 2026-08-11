@@ -1,6 +1,6 @@
 # AI Platform — Shared AI Layer (plan)
 
-> **Status**: `complete` (all 5 phases landed 2026-07-20; see tasks.md)
+> **Status**: `implemented` (all 5 phases landed 2026-07-20; see tasks.md)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/plan.md) (tenant-scoped budgets, caches, artifacts, logs, and organization entitlements)
 > **Blocks**: [`semantic-search`](../22-semantic-search/spec.md), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md), [`outreach-generator`](../26-outreach-generator/spec.md), [`code-fingerprinting`](../25-code-fingerprinting/spec.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/spec.md), [`team-synergy`](../40-team-synergy/spec.md), [`work-sample`](../38-work-sample/spec.md), [`proactive-discovery`](../23-proactive-discovery/spec.md)
 > **Reality check**: No AI code exists. Builds on `src/shared/lib/redis.ts`, `rate-limit.ts`, `billing.ts`/`billing-shared.ts`, `env.ts`, and the auth/admin patterns in `src/routes/api/admin/alerts/run-worker.ts`.

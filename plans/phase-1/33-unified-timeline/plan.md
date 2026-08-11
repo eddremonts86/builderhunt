@@ -1,6 +1,6 @@
 # Unified Builder Timeline (plan)
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing hard; [`ai-expansion`](../21-ai-expansion/spec.md) only for Phase 4
 > **Blocks**: nothing — future consumers noted in spec.md header
 > **Reality check**: No timeline code exists. Profile view to extend:

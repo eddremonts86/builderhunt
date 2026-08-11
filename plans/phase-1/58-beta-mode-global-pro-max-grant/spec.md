@@ -1,12 +1,13 @@
 # Beta Mode — Global Pro Max Access and Credits (spec)
 
-> **Status**: `pending — implementation-ready`
+> **Status**: `implemented`
 > **Depends on**: [`01-security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
 > [`30-stripe-billing-platform`](../30-stripe-billing-platform/spec.md)
+> **Blocks**: nothing
 > **Implementation order note**: phase 1 plan 55 currently reserves migration `0163`; generate this
 > plan's migration from the journal head that exists when implementation starts. Never edit or
 > reuse an applied migration.
-> **Reality check (verified at HEAD 2026-08-09)**: effective product access currently comes from
+> **Reality check**: (verified at HEAD 2026-08-09) effective product access currently comes from
 > direct callers of `getOrganizationEntitlement` plus `checkEntitlement` in
 > `src/shared/lib/billing/feature-authorization.ts`. The latter requires an active Stripe
 > subscription. Credits are real rows in `billing_credit_grants` and append-only

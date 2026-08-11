@@ -1,6 +1,6 @@
 # Calendar, Scheduling, and Interview Intelligence
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md) for
 > completed canonical tenant cutover/RLS, [`ai-expansion`](../21-ai-expansion/spec.md) for the
 > existing AI task registry, budgets, kill switches, and structured-output validation, and

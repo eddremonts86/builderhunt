@@ -1,6 +1,6 @@
 # Work-Sample Analysis (spec)
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard — task registry, `minimaxChat`, cache, budgets), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft — reuses the `src/lib/github/content.ts` fetch helpers; whichever plan ships first introduces that module)
 > **Blocks**: nothing. **Supersedes**: [`technical-sandbox`](../39-technical-sandbox/spec.md) (merged into this plan — see its status header for rationale; its surviving kernel is this task's `suggestedInterviewQuestions` output).
 > **Reality check**: "Work-sample analysis" is sold under Team in `PLAN_PRICING` (`src/shared/lib/billing-shared.ts`) but zero code exists — no `work_samples`/`work_sample_analyses` tables, no Monaco, no `/challenges` routes. The old spec designed an interactive coding-assessment _simulator_ (Monaco editor, AI teammate chat, timed submissions) — that product is **cut**: it's a candidate-facing assessment platform, not a sourcing feature, and it contradicts the app's recruiter-side reality and the AI platform's no-streaming v1. This rewrite matches the actual pricing promise: AI **analysis** of a candidate's existing public work.

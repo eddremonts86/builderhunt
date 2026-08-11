@@ -1,13 +1,27 @@
 # Tasks: Tenant Activity Feed
 
-> **Status**: `done` — unblocked 2026-07-29. It still runs *after* `28-shared-resources`, whose
+> **Status**: `implemented` — unblocked 2026-07-29. It still runs *after* `28-shared-resources`, whose
 > mutations it records, but that plan is executable now, so this is sequencing rather than a hold
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md), [`team-accounts`](../27-team-accounts/tasks.md), [`shared-resources`](../28-shared-resources/tasks.md)
 > **Blocks**: nothing
-> **Reality check (verified 2026-07-29)**: the prerequisites it listed — canonical tenant
+> **Reality check**: (verified 2026-07-29) the prerequisites it listed — canonical tenant
 > transactions, activity/security-audit separation, non-owner roles, RLS, and the tenant A/B harness —
 > all exist. The one still to come is `28-shared-resources`'s services, whose mutations this plan
 > records, so run it after that plan and not before. That is an order, not a blocker.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `done`, a synonym no gate can read.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 - [x] **Define versioned event and redaction registry**
   - Files: `src/shared/lib/activity/contracts.ts`, `tests/unit/shared/lib/activity/contracts.test.ts`, `docs/architecture/activity-events.md`

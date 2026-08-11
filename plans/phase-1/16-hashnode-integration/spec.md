@@ -1,6 +1,6 @@
 # Feature: Hashnode Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `retired`
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector exists at `src/lib/sources/hashnode.ts` and is fully wired

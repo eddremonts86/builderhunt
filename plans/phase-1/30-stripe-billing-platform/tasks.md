@@ -1,6 +1,6 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (29/~40 tasks — §0-§7 complete: dependency contracts pinned, launch
+> **Status**: `implemented` (29/~40 tasks — §0-§7 complete: dependency contracts pinned, launch
 > register recorded, Stripe SDK/client/catalog/fake-provider built, all 14 billing/credit tables
 > added in an additive migration with RLS/runtime-role grants applied and verified live,
 > backup/restore/rollback safety proven with checksum evidence, tenant-safe billing repositories/DTOs
@@ -51,6 +51,20 @@
 > catalog. Organization entitlement, tenant context, RLS foundations, manual plan records, pricing, and
 > billing settings already exist and must be migrated rather than duplicated. Migration `0019` is an
 > unrelated in-progress change; generate the next available migration instead of editing it.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: all 51 tasks checked. The header said `in_progress` and its note said "29/~40"; both predate the remaining sections landing.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## 0. Lock dependencies and commercial configuration
 

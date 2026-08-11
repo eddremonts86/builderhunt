@@ -1,6 +1,6 @@
 # AI Platform — Shared AI Layer (spec)
 
-> **Status**: `complete` (all 5 phases landed 2026-07-20; see tasks.md)
+> **Status**: `implemented` (all 5 phases landed 2026-07-20; see tasks.md)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md) (tenant-scoped budgets, caches, artifacts, logs, and organization entitlements)
 > **Blocks**: [`semantic-search`](../22-semantic-search/spec.md), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md), [`outreach-generator`](../26-outreach-generator/spec.md), [`code-fingerprinting`](../25-code-fingerprinting/spec.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/spec.md), [`team-synergy`](../40-team-synergy/spec.md), [`work-sample`](../38-work-sample/spec.md), [`proactive-discovery`](../23-proactive-discovery/spec.md)
 > **Reality check**: Zero AI code exists today — no LLM calls, no AI keys in `src/shared/lib/env.ts`, no `src/shared/lib/ai/`. Redis (`src/shared/lib/redis.ts`) and rate limiting (`src/shared/lib/rate-limit.ts`) exist with in-memory fallbacks. Billing tiers exist (`src/shared/lib/billing.ts`, `billing-shared.ts`). Rule-based v1s that become AI fallbacks exist: `outreach.ts`, `code-style.ts`, `hygiene.ts`.

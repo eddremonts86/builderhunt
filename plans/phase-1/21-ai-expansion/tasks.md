@@ -1,11 +1,25 @@
 # AI Platform — Shared AI Layer (tasks)
 
-> **Status**: `complete` (all 5 phases landed 2026-07-20 — config, task registry, MiniMax client,
+> **Status**: `implemented` (all 5 phases landed 2026-07-20 — config, task registry, MiniMax client,
 > API routes, client tier, download UX, and kill-switch verification. Feature plans register
 > tasks in `tasks.ts` and call `ai(taskId, input)`.)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md) (tenant-scoped budgets, caches, artifacts, logs, and organization entitlements)
 > **Blocks**: [`semantic-search`](../22-semantic-search/spec.md), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md), [`outreach-generator`](../26-outreach-generator/spec.md), [`code-fingerprinting`](../25-code-fingerprinting/spec.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/spec.md), [`team-synergy`](../40-team-synergy/spec.md), [`work-sample`](../38-work-sample/spec.md), [`proactive-discovery`](../23-proactive-discovery/spec.md)
 > **Reality check**: No AI code exists. Reuses `src/shared/lib/redis.ts`, `rate-limit.ts`, `billing.ts`, `env.ts`, and the admin-auth pattern from `src/routes/api/admin/alerts/run-worker.ts`.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `complete`, a synonym no gate can read. All five phases landed 2026-07-20.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 Ordered so the codebase builds, lints, and passes tests after every checkbox.
 

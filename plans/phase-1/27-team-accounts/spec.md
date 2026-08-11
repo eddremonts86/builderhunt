@@ -4,7 +4,7 @@
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md)
 > **Blocks**: [`shared-resources`](../28-shared-resources/spec.md), [`activity-feed`](../29-activity-feed/spec.md),
 > [`stripe-billing-platform`](../30-stripe-billing-platform/spec.md)
-> **Reality check (verified 2026-07-28)**: the Team UI and organization runtime this plan scoped are
+> **Reality check**: (verified 2026-07-28) the Team UI and organization runtime this plan scoped are
 > live. `src/modules/dashboard/components/OrganizationSwitcher.tsx` (rendered by the shell's
 > `ContextTopbar.tsx`), Team settings at `src/routes/_dashboard/settings/team.tsx`, and the
 > organization API surface under `src/routes/api/organizations/` — `invitations/`, `members/`,

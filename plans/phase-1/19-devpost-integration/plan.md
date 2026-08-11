@@ -1,6 +1,6 @@
 # Plan: Devpost Integration
 
-> **Status**: `implemented — dark by default`
+> **Status**: `implemented` — dark by default
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Option (b) chosen 2026-07-25 — see `tasks.md` for the full

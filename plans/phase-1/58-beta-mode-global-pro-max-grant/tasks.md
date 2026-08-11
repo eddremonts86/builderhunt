@@ -1,10 +1,34 @@
 # Beta Mode — Global Pro Max Access and Credits Tasks
 
-> **Status**: `pending — implementation-ready`
+> **Status**: `implemented`
+> **Depends on**: [`01-security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
+> [`30-stripe-billing-platform`](../30-stripe-billing-platform/spec.md)
+> **Blocks**: nothing
 > **Spec**: [`spec.md`](./spec.md)
 > **Plan**: [`plan.md`](./plan.md)
 > **Execution rule**: work top to bottom. Keep a task open until its focused red/green cycle and
 > Verify command pass. Do not close the plan from source inspection alone.
+> **Reality check**: beta mode is a single-row `platform_beta_mode` table read through one seam,
+> `getBetaModeState`, and applied by `applyBetaModeEntitlement`, which raises only `tier` and
+> `paidActionsAllowed` and leaves seats, status and `paymentBlocked` untouched. Grants are minted
+> only when `rateCard.maxUnits > 0`, carry a `beta-mode:` source reference, and are excluded from
+> every balance unless the caller passes the active reference — `coalesce` on that comparison is
+> load-bearing, because `NULL LIKE 'beta-mode:%'` is NULL and a legacy grant with a null
+> reference would otherwise vanish from every balance.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `pending — implementation-ready` with all 10 tasks checked and closed on a green gate.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Phase 0 — Global state and administration
 

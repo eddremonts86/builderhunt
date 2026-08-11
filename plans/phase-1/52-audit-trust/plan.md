@@ -1,6 +1,6 @@
 # Delivery Plan: Trust, Claims, and Profile Removal Audit
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`audit-performance-qa`](../49-audit-performance-qa/spec.md), [`pricing-and-billing`](../31-pricing-and-billing/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md), [`claimable-profiles`](../36-claimable-profiles/spec.md)
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Trust pages and pricing exist, but public claims drift from

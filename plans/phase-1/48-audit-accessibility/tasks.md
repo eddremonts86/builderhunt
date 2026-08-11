@@ -1,6 +1,6 @@
 # Tasks: Accessibility release gate
 
-> **Status**: `implemented — quality gate green; VoiceOver/staging smoke need a human`
+> **Status**: `implemented` — quality gate green; VoiceOver/staging smoke need a human
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: The native FAQ, root skip link, global focus ring, dashboard target, and search live region already exist at the paths cited below. All checklist tasks closed 2026-07-25.

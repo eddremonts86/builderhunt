@@ -1,6 +1,6 @@
 # Smart Alerts (spec)
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing (Phase AI is optional and depends on [`ai-expansion`](../21-ai-expansion/spec.md))
 > **Blocks**: nothing hard — [`activity-feed`](../29-activity-feed/spec.md) instruments
 > `recordTrigger` in `src/shared/lib/alerts.ts` when it lands; the future "real event

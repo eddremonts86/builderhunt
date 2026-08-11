@@ -1,6 +1,6 @@
 # Content Marketing (Blog + Cross-Posting)
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md) (blog SEO plumbing: OG endpoint + sitemap entries)
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Blog infrastructure is live: file-based posts in `content/posts/`

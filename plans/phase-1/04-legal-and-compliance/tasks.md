@@ -1,6 +1,6 @@
 # Tasks: Legal & Compliance
 
-> **Status**: `complete`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: All three phases done as of 2026-07-21. The deletion purge worker
@@ -12,6 +12,20 @@
 > the daily VPS cron to the already-live `POST /api/admin/legal/run-worker` endpoint
 > (tracked in `production-infrastructure`), and the residual FK-restrict edge case noted
 > inline below (rare, already fails safe).
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `complete`, a synonym `check-phase-readiness.mjs` cannot read. Non-code follow-ups remain (wiring the daily VPS cron to the already-live purge route); those are operational, not build work.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Phase 0 — Delivered (audited against src, 2026-07-19)
 

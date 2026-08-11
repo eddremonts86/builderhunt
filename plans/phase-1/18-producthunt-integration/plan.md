@@ -1,6 +1,6 @@
 # Plan: Product Hunt Integration
 
-> **Status**: `pending`
+> **Status**: `implemented` — wired but dormant until a token is provisioned
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Greenfield connector. Closest in-repo analogs: token-gated GraphQL

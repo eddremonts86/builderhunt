@@ -1,6 +1,6 @@
 # Policy-Compliant Public Profile Enrichment — Product and Technical Specification
 
-> **Status:** `code-complete-dark` (Phases 0-6 implemented 2026-07-20; production activation,
+> **Status**: `implemented` (Phases 0-6 implemented 2026-07-20; production activation,
 > the 7-day canary, RLS fixture tests, and legal-copy sign-off are explicitly NOT done —
 > `ENRICHMENT_ENABLED=false` everywhere. See plans/phase-1/42-stealth-scraping/task.md for exact gaps.)
 > **Legacy directory name:** the `stealth-scraping` suffix is retained only to preserve existing

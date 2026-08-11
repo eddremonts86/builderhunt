@@ -1,6 +1,6 @@
 # Legal & Compliance (TOS, Privacy, GDPR)
 
-> **Status**: `complete`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Legal surface is largely live: `/legal/{terms,privacy,cookies,imprint}`

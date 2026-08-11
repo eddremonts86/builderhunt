@@ -1,6 +1,6 @@
 # Design Modernization
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing (it feeds the release audits — [`audit-visual-system`](../50-audit-visual-system/spec.md),
 > [`audit-accessibility`](../48-audit-accessibility/spec.md), [`audit-conversion`](../51-audit-conversion/spec.md),

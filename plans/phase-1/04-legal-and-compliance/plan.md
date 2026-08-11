@@ -1,6 +1,6 @@
 # Plan: Legal & Compliance
 
-> **Status**: `complete`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Docs, consent, export, and deletion-request flows are delivered (see

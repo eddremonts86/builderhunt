@@ -1,10 +1,10 @@
 # Team Synergy — Candidate-vs-Team Fit Analysis (plan)
 
-> **Status**: `partially-implemented` (Phases 1–5 shipped per `tasks.md`; this header and spec.md's
+> **Status**: `implemented` (Phases 1–5 shipped per `tasks.md`; this header and spec.md's
 > were never updated to match — corrected 2026-07-31)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md) (soft), [`team-accounts`](../27-team-accounts/spec.md) (soft)
 > **Blocks**: nothing
-> **Reality check (2026-07-31)**: `src/routes/api/builders/$builderId/synergy.ts` is real and shipped, including Phase 5's org-list team source. Reads (never writes) `builders.metadata.codeStyleFingerprint` and `.aiEnrichment`; falls back to `generateFingerprint` from `src/shared/lib/code-style.ts` for members without stored artifacts. Ephemeral by design — no schema changes anywhere in this plan.
+> **Reality check**: (2026-07-31) `src/routes/api/builders/$builderId/synergy.ts` is real and shipped, including Phase 5's org-list team source. Reads (never writes) `builders.metadata.codeStyleFingerprint` and `.aiEnrichment`; falls back to `generateFingerprint` from `src/shared/lib/code-style.ts` for members without stored artifacts. Ephemeral by design — no schema changes anywhere in this plan.
 
 ## Scope decision (recorded)
 

@@ -1,6 +1,6 @@
 # Tasks: Status Page & Trust Signals
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Status/incidents/changelog/roadmap delivered (checked below). Phase 1 (uptime
@@ -8,6 +8,20 @@
 > optional per its own task text ("build only on demonstrated need") — deliberately not built,
 > also blocked from ever being auto-built by touching `src/shared/lib/email.ts` (reserved file).
 > Nothing else actionable remains in this plan.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `partially-implemented`. Its own note ends "Nothing else actionable remains in this plan" — the open item is Phase 2, which its task text marks optional and which is deliberately not built.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Phase 0 — Delivered (audited against src, 2026-07-19)
 

@@ -1,10 +1,10 @@
 # Project Hygiene — Real GitHub Signals (spec)
 
-> **Status**: `implemented` (v2 real repo signals shipped; the `GITHUB_TOKEN` degrade path is what
+> **Status**: `implemented` — GitHub fetch path needs a real GITHUB_TOKEN to verify at scale (v2 real repo signals shipped; the `GITHUB_TOKEN` degrade path is what
 > was live-verified locally — see `tasks.md`)
 > **Depends on**: nothing (deliberately **no AI** — this is GitHub REST API work; see "Why no AI" below)
 > **Blocks**: nothing
-> **Reality check (verified 2026-07-28)**: the fabrication this plan existed to remove is gone.
+> **Reality check**: (verified 2026-07-28) the fabrication this plan existed to remove is gone.
 > `src/shared/lib/hygiene.ts` keeps the pure `computeHygiene(repos)` scoring (issue close rate 30% /
 > resolution 30% / docs 20% / CI 20%), `hygieneGrade`, and `estimateRepoSignalsFromBuilder` — but the
 > estimator is now seeded by a stable `djb2` hash, so the same builder always yields the same numbers;

@@ -1,10 +1,10 @@
 # Team Synergy — Candidate-vs-Team Fit Analysis (spec)
 
-> **Status**: `partially-implemented` (Phases 1–5 shipped per `tasks.md`; corrected 2026-07-31 — this
+> **Status**: `implemented` (Phases 1–5 shipped per `tasks.md`; corrected 2026-07-31 — this
 > header and plan.md's said `pending` long after the feature was real)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard — task registry, `minimaxChat`, cache, budgets), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft — works with v1 heuristic fingerprints; v2 AI fingerprints sharpen it), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md) (soft — enrichment enriches inputs when present), [`team-accounts`](../27-team-accounts/spec.md) (soft — v1 uses the individual recruiter's tracked builders as "the team"; org-shared lists plug in later)
 > **Blocks**: nothing
-> **Reality check (2026-07-31)**: The synergy route is real and shipped: `src/routes/api/builders/$builderId/synergy.ts`, with the org-shared-list team source from Phase 5 also live (`{ teamSource: { orgListId } }`). Tracked builders per organization (`organization_builders`), heuristic fingerprints (`src/shared/lib/code-style.ts` — `generateFingerprint`, `similarity`), optional persisted artifacts in `builders.metadata` (`aiEnrichment`, `codeStyleFingerprint` — owned by other plans, read-only here). The Team tier ($99, `billing-shared.ts`) needed differentiated value; this is one of its anchor features.
+> **Reality check**: (2026-07-31) The synergy route is real and shipped: `src/routes/api/builders/$builderId/synergy.ts`, with the org-shared-list team source from Phase 5 also live (`{ teamSource: { orgListId } }`). Tracked builders per organization (`organization_builders`), heuristic fingerprints (`src/shared/lib/code-style.ts` — `generateFingerprint`, `similarity`), optional persisted artifacts in `builders.metadata` (`aiEnrichment`, `codeStyleFingerprint` — owned by other plans, read-only here). The Team tier ($99, `billing-shared.ts`) needed differentiated value; this is one of its anchor features.
 
 ## Problem
 

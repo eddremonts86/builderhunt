@@ -1,6 +1,6 @@
 # Feature: RSS Feeds per Saved Search
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: The public feed route exists at `src/routes/api/feeds/$searchId.ts`

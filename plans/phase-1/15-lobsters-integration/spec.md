@@ -4,7 +4,7 @@
 > spec originally floated is a closed non-goal, not pending work)
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check (verified 2026-07-28)**: every scoped task is real in `src/`. Connector
+> **Reality check**: (verified 2026-07-28) every scoped task is real in `src/`. Connector
 > `src/lib/sources/lobsters.ts`; registered in the federated pipeline (`src/lib/search.ts`) and in
 > `SOURCE_NAMES` (`src/lib/sources/types.ts`); follower-free scoring branch in `src/lib/score.ts`;
 > `LobstersIcon` in `src/modules/landing/components/BrandIcons.tsx` and used by

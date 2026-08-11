@@ -5,7 +5,7 @@
 > pending SSH access this session doesn't have; setting a real `MINIMAX_API_KEY` needs a human)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md) for database-role, RLS, restore, and tenant-aware production enforcement; existing non-database operations may proceed independently
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md), [`ai-expansion`](../21-ai-expansion/spec.md), [`semantic-search`](../22-semantic-search/spec.md)
-> **Reality check (2026-07-25)**: Deploy pipeline and observability v1 delivered. Restore
+> **Reality check**: (2026-07-25) Deploy pipeline and observability v1 delivered. Restore
 > script built and live-verified against a real backup/restore rehearsal. Runbook written.
 > Sentry cleanup done. pgvector already applied in production (confirmed via Coolify API, no
 > action needed). Log rotation and the backup cron are documented, not executed (no

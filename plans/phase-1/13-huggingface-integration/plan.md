@@ -1,6 +1,6 @@
 # Plan: Hugging Face Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: The original "defer until AI/ML demand" decision is obsolete — the

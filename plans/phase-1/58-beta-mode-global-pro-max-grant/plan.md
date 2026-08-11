@@ -1,5 +1,18 @@
 # Beta Mode — Global Pro Max Access and Credits Implementation Plan
 
+> **Status**: `implemented`
+> **Depends on**: [`01-security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
+> [`30-stripe-billing-platform`](../30-stripe-billing-platform/spec.md)
+> **Blocks**: nothing
+> **Reality check**: beta mode is a single-row `platform_beta_mode` table read through one seam,
+> `getBetaModeState`, and applied by `applyBetaModeEntitlement`, which raises only `tier` and
+> `paidActionsAllowed` and leaves seats, status and `paymentBlocked` untouched. Grants are minted
+> only when `rateCard.maxUnits > 0`, carry a `beta-mode:` source reference, and are excluded from
+> every balance unless the caller passes the active reference — `coalesce` on that comparison is
+> load-bearing, because `NULL LIKE 'beta-mode:%'` is NULL and a legacy grant with a null
+> reference would otherwise vanish from every balance.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use `executing-plans` to implement
 > [`tasks.md`](./tasks.md) task-by-task. Use subagents only when the active repository instructions
 > explicitly allow delegation. Every task ends with a focused test and review gate.

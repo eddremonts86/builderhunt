@@ -1,9 +1,23 @@
 # UI Coverage and Navigation Completion — Tasks
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: the implemented portions of [`shared-resources`](../phase-1/28-shared-resources/spec.md), [`activity-feed`](../phase-1/29-activity-feed/spec.md), [`status-and-trust`](../phase-1/47-status-and-trust/spec.md), [`calendar-scheduling-interview-intelligence`](../phase-1/44-calendar-scheduling-interview-intelligence/spec.md), and [`stealth-scraping`](../phase-1/42-stealth-scraping/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Existing routes and APIs are retained. Tasks are ordered route integrity → core journey → missing user UI → operator UI → public navigation → release gates.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `pending` with all 53 tasks checked.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Wave 0 — Verification foundation
 

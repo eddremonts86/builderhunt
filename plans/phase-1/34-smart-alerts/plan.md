@@ -1,6 +1,6 @@
 # Smart Alerts (plan)
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing (Phase 3 is optional and depends on [`ai-expansion`](../21-ai-expansion/spec.md))
 > **Blocks**: nothing hard — see spec.md header
 > **Reality check**: Core shipped (schema, `src/shared/lib/alerts.ts`,

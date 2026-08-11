@@ -1,6 +1,6 @@
 # Tasks: Calendar, Scheduling, and Interview Intelligence
 
-> **Status**: `engineering-complete` (77 of 81 tasks; the four that remain are a DPIA, a finance sign-off,
+> **Status**: `implemented` (77 of 81 tasks; the four that remain are a DPIA, a finance sign-off,
 > a staged production rollout and dated evidence from live use — all moved to `plans/phase-5/`)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
 > [`ai-expansion`](../21-ai-expansion/spec.md), and
@@ -13,6 +13,20 @@
 > unrelated pending migrations.
 >
 > **Phase-1 scope closed 2026-08-05.** Every remaining item moved to `plans/phase-5/` on Edd's instruction — the product launches when phase-5 finishes, so a task that waits on a signature, a clock, a live deployment or a launch is not build-phase work. Prose pointers below name the phase-5 plan that owns each one; they are deliberately not checkboxes, because a box reads as pending engineering.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `engineering-complete`, a value no gate can read. 80/80 tasks; the DPIA, finance sign-off, staged rollout and dated live evidence moved to phase-5.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Phase 0 — Prerequisites and configuration
 

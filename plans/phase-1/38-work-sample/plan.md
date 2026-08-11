@@ -1,6 +1,6 @@
 # Work-Sample Analysis (plan)
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft — shared `src/lib/github/content.ts`; whichever ships first introduces it)
 > **Blocks**: nothing. **Supersedes**: [`technical-sandbox`](../39-technical-sandbox/plan.md).
 > **Reality check**: zero work-sample code exists despite the `PLAN_PRICING.team` promise. The old plan (Monaco simulator, AI teammate, `work_samples`/`work_sample_submissions` tables) is discarded — see the scope decision below. One new table, one task, two endpoints, one panel.

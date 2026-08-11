@@ -1,6 +1,6 @@
 # Plan: Bluesky Integration
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Greenfield connector following the existing pattern exactly; closest

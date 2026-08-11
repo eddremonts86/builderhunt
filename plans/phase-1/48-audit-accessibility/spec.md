@@ -1,6 +1,6 @@
 # Specification: Accessibility release gate
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` — quality gate green; VoiceOver/staging smoke need a human
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Native FAQ disclosure is already implemented in `src/modules/landing/components/FAQSection.tsx`; the global focus style and skip link exist in `src/shared/styles/globals.css` and `src/routes/-root-components.tsx`. The skip target is inconsistent outside the home and dashboard surfaces, and `src/components/ui/dialog.tsx` plus `src/shared/components/TosModal.tsx` do not trap, restore, or deliberately place focus.

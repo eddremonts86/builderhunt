@@ -1,6 +1,6 @@
 # Plan: Status Page & Trust Signals
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Status page, incidents, changelog, roadmap+votes, admin CMS all

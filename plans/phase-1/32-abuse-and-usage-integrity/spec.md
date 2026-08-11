@@ -1,6 +1,6 @@
 # Abuse and Usage Integrity
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
 > [`team-accounts`](../27-team-accounts/spec.md),
 > [`stripe-billing-platform`](../30-stripe-billing-platform/spec.md)

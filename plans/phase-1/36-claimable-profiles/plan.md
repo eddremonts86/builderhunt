@@ -1,6 +1,6 @@
 # Claimable Builder Profiles — Delivery Plan
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`portfolio-builder`](../37-portfolio-builder/spec.md)
 > **Reality check**: `src/shared/lib/db/schema.ts`, `src/routes/api/builders/$builderId/claim.ts`, `src/routes/api/builders/claim/verify.ts`, `src/routes/builders/$builderId.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`, and `src/routes/_dashboard/me/index.tsx` deliver a working but row-scoped email claim flow. The email is requester-supplied and therefore cannot justify the current verified badge.

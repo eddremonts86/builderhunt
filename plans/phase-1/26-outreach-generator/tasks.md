@@ -1,9 +1,23 @@
 # Outreach Generator v2 — AI Upgrade (tasks)
 
-> **Status**: `complete` (v1 + AI upgrade both shipped, 2026-07-20)
+> **Status**: `implemented` (v1 + AI upgrade both shipped, 2026-07-20)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (client ladder `ai()`, `/api/ai/complete`, `useAICapabilities`, `AIDownloadPrompt` all implemented)
 > **Blocks**: nothing
 > **Reality check**: v1 shipped — `src/shared/lib/outreach.ts`, `tests/unit/shared/lib/outreach.test.ts`, `src/modules/builder-profile/components/OutreachCopilot.tsx`. Do not modify `outreach.ts` logic; it is the frozen fallback rung.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `complete`, a synonym no gate can read. v1 and the AI upgrade both shipped 2026-07-20.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 Ordered so the panel keeps working after every checkbox.
 

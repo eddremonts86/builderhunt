@@ -1,6 +1,6 @@
 # Code-Style Fingerprinting — v2 AI Upgrade (spec)
 
-> **Status**: `partially-implemented` (v1 heuristic fingerprint shipped; v2 AI analysis of real repo code is pending)
+> **Status**: `implemented` (v1 heuristic fingerprint shipped; v2 AI analysis of real repo code is pending)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (AI Platform — `minimaxChat`, task registry, cache, budgets)
 > **Blocks**: [`team-synergy`](../40-team-synergy/spec.md) (soft — synergy works with v1 heuristic fingerprints but improves with v2), [`work-sample`](../38-work-sample/spec.md) (soft — shares the GitHub content-fetch helpers introduced here)
 > **Reality check**: v1 exists and stays: `src/shared/lib/code-style.ts` (pure heuristic `generateFingerprint` from language/topics/followers, `similarity()` 0-100 comparison, tested in `code-style.test.ts`) rendered by `src/shared/components/CodeStyleCard.tsx` inside `BuilderProfilePage.tsx`. **v1 is computed client-side on every render and never persisted** — nothing is stored in `builders.metadata` today. "Code fingerprinting" is already sold as a Pro feature in `PLAN_PRICING` (`src/shared/lib/billing-shared.ts`). This plan **owns the `builders.metadata.codeStyleFingerprint` key** (namespaced-key convention; `ai-profile-enrichment` owns `aiEnrichment`, `project-hygiene` owns `projectHygiene`).

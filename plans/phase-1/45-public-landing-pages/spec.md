@@ -1,6 +1,6 @@
 # Public Landing Pages (SEO)
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md), [`content-marketing`](../46-content-marketing/spec.md)
 > **Reality check**: The public SEO surface is largely live: redesigned landing

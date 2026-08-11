@@ -1,6 +1,6 @@
 # Project Hygiene — Real GitHub Signals (tasks)
 
-> **Status**: `implemented — GitHub fetch path needs a real GITHUB_TOKEN to verify at scale`
+> **Status**: `implemented` — GitHub fetch path needs a real GITHUB_TOKEN to verify at scale
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: All 4 phases built and verified 2026-07-25. `GITHUB_TOKEN` is unset in

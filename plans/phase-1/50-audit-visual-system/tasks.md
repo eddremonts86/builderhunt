@@ -1,6 +1,6 @@
 # Tasks: Visual System Normalization and Regression Gate
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`audit-performance-qa`](../49-audit-performance-qa/spec.md) (not implemented — soft
 > blocker, not enforced this session), [`audit-accessibility`](../48-audit-accessibility/spec.md)
 > (implemented this session)
@@ -12,7 +12,7 @@
 > not attempted this session. `docs/visual-system.md` documents the current token contract as an
 > interim substitute for the automated `check-visual-contract.mjs` this plan also names.
 
-> **Reality check (2026-07-27)**: confirmed genuinely not started — no `toHaveScreenshot` anywhere
+> **Reality check**: (2026-07-27) confirmed genuinely not started — no `toHaveScreenshot` anywhere
 > in the repository and no `-snapshots` directory, so there is no baseline to regress against, and
 > `scripts/check-visual-contract.mjs` does not exist. What has changed since this plan was written
 > is the ground it builds on: Playwright specs now live in `tests/e2e/`, the harness at
@@ -21,6 +21,20 @@
 > production preview for the accessibility gate. Freezing time and waiting for hydration — two of
 > the hardest parts of a stable screenshot baseline — are therefore already solved. The dependency
 > note above is stale too: `audit-performance-qa`'s harness tasks are closed.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `partially-implemented` because the Playwright visual baseline and its CI wiring were missing. Both landed: 34 baselines per platform for darwin and linux, plus `.github/workflows/visual-baselines.yml`.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 - [x] **Capture a deterministic visual inventory and baseline** — done (2026-07-27)
   - Files: `tests/e2e/visual/public-surfaces.spec.ts`, `tests/e2e/visual/*-snapshots/`,

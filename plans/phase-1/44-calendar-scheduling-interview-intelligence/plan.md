@@ -1,6 +1,6 @@
 # Plan: Calendar, Scheduling, and Interview Intelligence
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
 > [`ai-expansion`](../21-ai-expansion/spec.md), and
 > [`stripe-billing-platform`](../30-stripe-billing-platform/spec.md)

@@ -1,6 +1,6 @@
 # Production Infrastructure (Self-Hosted, Lean)
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md) for database-role, RLS, restore, and tenant-aware production enforcement; existing non-database operations may proceed independently
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md), [`ai-expansion`](../21-ai-expansion/spec.md), [`semantic-search`](../22-semantic-search/spec.md)
 > **Reality check**: Production is live: multi-stage `Dockerfile` + `server.prod.mjs` +

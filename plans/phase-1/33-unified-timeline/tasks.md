@@ -4,7 +4,7 @@
 > Phase 4 AI summary (`ai-expansion` was already complete).
 > **Depends on**: nothing hard; Phase 4 depends on [`ai-expansion`](../21-ai-expansion/spec.md) (complete)
 > **Blocks**: nothing — see spec.md header
-> **Reality check (2026-07-26)**: The plan's own header ("Zero timeline code exists")
+> **Reality check**: (2026-07-26) The plan's own header ("Zero timeline code exists")
 > was still accurate at the start of this pass. Built against the real current auth
 > model rather than the plan text's `builders.userId`-scoped assumption: ownership is
 > checked via `findOrganizationBuilderByIdentity` (tenant/org-scoped), the same pattern

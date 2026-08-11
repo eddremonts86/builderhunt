@@ -4,7 +4,7 @@
 > not attempted this pass, see notes below.
 > **Depends on**: [`claimable-profiles`](../36-claimable-profiles/spec.md) (canonical, source-verified claims)
 > **Blocks**: nothing
-> **Reality check (2026-07-26)**: Built on top of the exact `builder_claims`/`builderIdentities` system
+> **Reality check**: (2026-07-26) Built on top of the exact `builder_claims`/`builderIdentities` system
 > `claimable-profiles` shipped earlier this session (not the plan text's original assumption of a
 > not-yet-existing canonical claims table). `builder_claims` had no `metadata` column at all —
 > added it via an additive migration (0060), same namespaced read-modify-write convention as

@@ -3,7 +3,7 @@
 > **Status**: `implemented` (2026-07-22) — all 9 tasks complete and merged to `master`; re-verified
 > against `src/` on 2026-07-28. (`done` is not one of the statuses `_meta/conventions.md` defines.)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md)
-> **Blocks (now unblocked)**: [`shared-resources`](../28-shared-resources/tasks.md), [`activity-feed`](../29-activity-feed/tasks.md),
+> **Blocks**: (now unblocked) [`shared-resources`](../28-shared-resources/tasks.md), [`activity-feed`](../29-activity-feed/tasks.md),
 > [`stripe-billing-platform`](../30-stripe-billing-platform/tasks.md)
 > **Known follow-up (not part of this plan)**: a hook-ordering race can leave a fresh sign-up's
 > session with `active_organization_id: null` — see task 9's evidence and the spawned background task.

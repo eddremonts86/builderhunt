@@ -1,6 +1,6 @@
 # Semantic Search (plan)
 
-> **Status**: `complete`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/plan.md) (global-public identity/index classification and tenant-private query isolation); [`ai-expansion`](../21-ai-expansion/spec.md) (must be implemented through Phase 3 — `embedTexts`, task registry, budgets). Enhanced by [`proactive-discovery`](../23-proactive-discovery/spec.md) (cold-start seeding; not required).
 > **Blocks**: [`proactive-discovery`](../23-proactive-discovery/spec.md) (hard)
 > **Reality check**: Builds on `src/lib/search.ts` (federated search), `src/routes/api/search/builders.ts` (annotation pattern), `src/shared/lib/tracked-builders.ts`, `docker-compose.yml` (postgres:16-alpine today). `builders` stays untouched — the new global `builder_embeddings` table carries all vector state.

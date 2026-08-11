@@ -1,6 +1,6 @@
 # Feature: Hugging Face Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector exists at `src/lib/sources/huggingface.ts` and is fully

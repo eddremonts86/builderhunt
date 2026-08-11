@@ -1,6 +1,6 @@
 # Claimable Builder Profiles — Specification
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`portfolio-builder`](../37-portfolio-builder/spec.md)
 > **Reality check**: Claim columns and request/view tables exist in `src/shared/lib/db/schema.ts` and `drizzle/0000_tranquil_hemingway.sql`; public profile, claim, verification, email, and owner-edit surfaces exist in `src/routes/builders/$builderId.tsx`, `src/routes/api/builders/`, `src/shared/lib/email.ts`, and `src/routes/_dashboard/me/index.tsx`. The current email flow accepts an arbitrary address and then sets `isVerified = true`, so it proves mailbox access but not ownership of the indexed source identity. `builders` is also a per-user cache, so one external identity may have several rows with inconsistent claim state.

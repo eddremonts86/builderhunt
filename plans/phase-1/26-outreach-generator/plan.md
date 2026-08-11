@@ -1,6 +1,6 @@
 # Outreach Generator v2 — AI Upgrade (plan)
 
-> **Status**: `complete` (v1 + AI upgrade both shipped, 2026-07-20)
+> **Status**: `implemented` (v1 + AI upgrade both shipped, 2026-07-20)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (full platform: client ladder, `/api/ai/complete`, `useAICapabilities`, `AIDownloadPrompt`)
 > **Blocks**: nothing
 > **Reality check**: v1 is live and frozen as the fallback: `src/shared/lib/outreach.ts` (+ `outreach.test.ts`) and `src/modules/builder-profile/components/OutreachCopilot.tsx`. This plan modifies the component and adds one task to the registry — no routes, no schema, no migrations of its own.

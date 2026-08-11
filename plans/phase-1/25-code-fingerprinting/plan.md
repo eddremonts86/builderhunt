@@ -1,6 +1,6 @@
 # Code-Style Fingerprinting — v2 AI Upgrade (plan)
 
-> **Status**: `partially-implemented` (v1 heuristic shipped; phases below are the v2 work)
+> **Status**: `implemented` (v1 heuristic shipped; phases below are the v2 work)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md)
 > **Blocks**: [`team-synergy`](../40-team-synergy/spec.md) (soft), [`work-sample`](../38-work-sample/spec.md) (soft — shared `src/lib/github/content.ts`)
 > **Reality check**: `src/shared/lib/code-style.ts` + `code-style.test.ts` + `src/shared/components/CodeStyleCard.tsx` are live (client-side heuristic, nothing persisted). The AI platform (`src/shared/lib/ai/*`, `/api/ai/*`) must exist through its Phase 3 before Phase 2 here.

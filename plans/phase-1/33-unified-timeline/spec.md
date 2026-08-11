@@ -1,6 +1,6 @@
 # Unified Builder Timeline (spec)
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing hard. Soft: [`ai-expansion`](../21-ai-expansion/spec.md) (only for
 > the optional `timeline-summary` task — the timeline itself has zero AI); Redis
 > (`src/shared/lib/redis.ts`) recommended for the cache, in-memory fallback works.

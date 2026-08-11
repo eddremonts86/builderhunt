@@ -1,6 +1,6 @@
 # Verified Portfolio Builder — Delivery Plan
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`claimable-profiles`](../36-claimable-profiles/spec.md) (canonical, source-verified claims)
 > **Blocks**: nothing
 > **Reality check**: Portfolio code does not exist. Reuse the public builder presentation in `src/modules/builder-profile/components/BuilderProfilePage.tsx` and the existing claimed-owner screen in `src/routes/_dashboard/me/index.tsx`; do not assume `builders.username` or a builder row is globally unique. AI enrichment and unified timeline are optional adapters, not delivery blockers.

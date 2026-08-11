@@ -4,7 +4,7 @@
 > out of scope for this session (see notes below), not attempted.
 > **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md)
 > **Blocks**: [`audit-trust`](../52-audit-trust/spec.md), [`audit-visual-system`](../50-audit-visual-system/spec.md)
-> **Reality check (2026-07-26)**: Re-verified before starting: `pnpm type-check` and
+> **Reality check**: (2026-07-26) Re-verified before starting: `pnpm type-check` and
 > `pnpm exec eslint . --quiet` were both already clean (0 errors) — the 11 `PLAN_PRICING` errors
 > and unused-`url` lint error described below were already fixed by the time this plan was picked
 > up (by `pricing-optimization`/related work). Fonts were also already self-hosted (`@font-face`
@@ -36,7 +36,7 @@
 - [x] **Self-host the existing fonts** — already done on arrival (2026-07-26)
   - Verify: `rg fonts.googleapis fonts.gstatic src/routes/__root.tsx src/shared/styles/globals.css` — no matches. `globals.css` already has self-hosted `@font-face` blocks for Inter and JetBrains Mono with `font-display: swap`.
 
-> **Reality check (2026-07-27)**: every "not attempted" reason below was a *session rule*, not a
+> **Reality check**: (2026-07-27) every "not attempted" reason below was a *session rule*, not a
 > technical blocker — `playwright.config.ts` being a reserved file, and CI/CD edits needing the
 > maintainer's confirmation. Both were lifted on 2026-07-27. Contrasting the remaining tasks
 > against the repository also found that most of the infrastructure they describe already exists:

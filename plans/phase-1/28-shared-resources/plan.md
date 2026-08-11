@@ -1,6 +1,6 @@
 # Delivery Plan: Shared Searches and Builder Lists
 
-> **Status**: `pending` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
+> **Status**: `implemented` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/plan.md), [`team-accounts`](../27-team-accounts/plan.md)
 > **Blocks**: [`activity-feed`](../29-activity-feed/plan.md)
 > **Reality check**: current resources are user-scoped and the prior shared design predated canonical

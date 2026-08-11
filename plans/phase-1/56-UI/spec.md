@@ -1,6 +1,6 @@
 # UI Coverage and Navigation Completion
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: the implemented portions of [`shared-resources`](../phase-1/28-shared-resources/spec.md), [`activity-feed`](../phase-1/29-activity-feed/spec.md), [`status-and-trust`](../phase-1/47-status-and-trust/spec.md), [`calendar-scheduling-interview-intelligence`](../phase-1/44-calendar-scheduling-interview-intelligence/spec.md), and [`stealth-scraping`](../phase-1/42-stealth-scraping/spec.md)
 > **Blocks**: nothing
 > **Reality check**: BuilderHunt has 66 user-facing routes, 181 API routes, and 29 registered dashboard destinations. Most Phase 1 features have UI, but several shipped routes are absent from navigation, several APIs have no usable surface, and the calendar UI implements only a small subset of its checked Phase 1 task. The canonical navigation is `src/modules/dashboard/ui/shell/nav-config.ts`.

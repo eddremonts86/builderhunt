@@ -1,6 +1,6 @@
 # Delivery Plan: Stripe Billing Platform
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/plan.md),
 > [`team-accounts`](../27-team-accounts/plan.md)
 > **Blocks**: [`calendar-scheduling-interview-intelligence`](../44-calendar-scheduling-interview-intelligence/plan.md)

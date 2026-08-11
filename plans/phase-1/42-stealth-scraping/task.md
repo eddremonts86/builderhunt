@@ -1,6 +1,6 @@
 # Public Profile Enrichment — Implementation Tasks
 
-> **Status:** `engineering-complete, shipped dark` — every checkbox below is real (verified, not
+> **Status**: `implemented` — every checkbox below is real (verified, not
 > assumed), including the runtime adversarial matrix, which closed 2026-08-05 at 20/20 and found five
 > defects on the way. The two items that remain are a signed legal review and a production deploy; both
 > moved to `plans/phase-5/` on 2026-08-05, because the product launches when phase-5 finishes and legal
@@ -13,6 +13,20 @@
 > Check a task only after its listed verification passes. Preserve the user's existing
 > uncommitted migration/worktree changes; generate the migration from the then-current
 > schema rather than assuming a migration number.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `engineering-complete, shipped dark`, a value no gate can read. Phase-1 scope closed 2026-08-05 at 31/31; the legal review and production deploy moved to phase-5. It ships dark (`ENRICHMENT_ENABLED=false`), which is a deployment decision, not missing work.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
 
 ## Phase 0 — Policy freeze
 
