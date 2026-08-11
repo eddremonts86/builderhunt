@@ -359,7 +359,7 @@ missing — so the only honest version of this widget was an empty one.
     `listRecentAbuseSignals` for abuse. Billing alerts are the exception and must not come from
     `getBillingOperationsMetrics`, whose per-organization sweep was deliberately removed from any frequent path.
 
-- [~] **Reconcile stale and future Admin destinations**
+- [x] **Reconcile stale and future Admin destinations**
   - Files: `src/modules/dashboard/ui/shell/nav-config.ts`, Admin routes, `plans/UI`, navigation tests
   - Do: Remove or redirect retired Plan requests instead of creating a widget for it; register Command Center, Operations, Integrations, Claims/Trust, and other destinations only when their canonical projections/pages ship. Keep one authoritative Admin route registry.
   - Verify: every visible Admin destination resolves for a platform admin, no retired/dependency-disabled item appears, direct unauthorized access fails, and route coverage reports no orphan Command Center continuation.
@@ -382,8 +382,34 @@ missing — so the only honest version of this widget was an empty one.
   - **Verified by breaking it.** The check passes today, so passing proves nothing on its own. Dropping
     `/admin/abuse` from the link set made it report exactly that route and exit 1; restoring it
     returned to green.
-  - **Still open:** the one authoritative registry the task also asks for. `nav-config.ts` and the
-    route files agree today and the gate now keeps them agreeing, but they remain two lists.
+  - **The registry landed 2026-08-11, and it is one list now — enforced by the compiler.**
+    `ADMIN_DESTINATIONS` in `nav-config.ts` is typed `Record<AdminFullPath, Omit<NavItem, 'to'>>`, where
+    `AdminFullPath` is extracted from `FileRouteTypes['fullPaths']` in the generated route tree. The set of admin
+    pages comes from disk; the labels and icons are written down once; the nav items are derived from that record
+    rather than restated.
+  - **What that changes over the gate.** `check-ui-route-graph.mjs` catches both directions and still runs — worth
+    keeping for the reverse case and for every non-admin area — but it runs after the fact. Adding
+    `src/routes/_dashboard/admin/foo.tsx` now fails `tsc` naming the missing entry, so "what is this called and
+    where does it belong" gets decided when the page is created rather than when CI reminds you.
+  - **Proved by creating a route.** A throwaway `zz-probe.tsx` made `tsc` report
+    `Property '"/admin/zz-probe"' is missing in type … Record<AdminFullPath, …>`; deleting it returned to green.
+  - **Something the type caught that a comment had been claiming.** `/admin/${string}` matches the index's own
+    full path `'/admin/'`, because `${string}` can be empty — so the compiler demanded a nav entry for a route
+    that only redirects to `/admin/metrics`. It is excluded explicitly now, which states the fact instead of
+    asserting it in prose. Presentation genuinely cannot be derived from a filename either:
+    `solutions-gold-set` is "Gold set" and `abuse` is "Abuse console", which is why the labels stay hand-written
+    and only the paths are generated.
+  - **And the refactor broke the gate, which is worth recording rather than just fixing.** The check scans for
+    `to:` literals, so moving the paths to object keys made five perfectly-navigable pages report as orphans. It
+    was right about what it could see. The pattern that reads a path-shaped key is scoped to `nav-config.ts` alone
+    rather than added to the shared list: `'/sign-up/email'` in `better-auth.ts` is an API path, and matching keys
+    everywhere trades five false orphans for a different false positive.
+  - **Both halves confirmed by dropping `/admin/changelog`** — the gate reported it and `tsc` failed on it. The
+    first attempt used `/admin/abuse` and proved nothing, because the action queue shipped earlier today links
+    there too.
+  - **Tests:** 5 unit cases pinning what the record cannot express — no duplicate destination, every entry inside
+    `/admin/`, every entry carrying a label that is not just its path segment, no entry for the index, and no
+    ungrouped orphan.
 
 - [x] **Build the Platform Action Queue and service-health widgets**
   - Files: `src/modules/admin/dashboard/AdminDashboardPage.tsx`, `PlatformActionQueue.tsx`, `ServiceHealthWidget.tsx`, tests
