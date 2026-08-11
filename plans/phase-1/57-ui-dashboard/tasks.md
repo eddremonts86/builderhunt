@@ -420,6 +420,47 @@ missing — so the only honest version of this widget was an empty one.
   - **Tests:** two route cases in `dashboard-api.spec.ts` — an owner gets 200 with three sections honestly reporting
     `dependency-missing`, an unknown range is refused rather than defaulted — plus the five projection cases that run
     as the app role. The dashboard's own 5 browser cases and 222 unit cases still pass with the section mounted.
+  - **A third bug, found the same day by looking at the failing visual baseline instead of regenerating it.** The
+    cards rendered their labels without their numbers: "total members · active seats", and "Plan: Pro · days to
+    renewal". Every value was `undefined`.
+    - The cause is one word. `orgAdminSectionEnvelopeSchema`'s ready branch declared `data: z.unknown()`, so the
+      six per-section schemas in `admin-contracts.ts` were exported, documented, and **applied to nothing**. The
+      projection's rewrite renamed four fields; the component still read the old names; `parse()` accepted the
+      payload because `unknown` accepts everything; and `tsc` accepted the component because it reaches its fields
+      through `data as z.infer<typeof orgAdminMembersSchema>` — a cast from `unknown` asserts a shape rather than
+      checking it. Three layers that each looked like a boundary, and none of them was one.
+    - `orgAdminSectionEnvelope(payload)` is a factory now, so each section's payload is parsed against the schema
+      the client is about to read, `.strict()` — matching the decision the file already made for actions, and for
+      the stronger reason: a plain `z.object()` *strips* an unknown key, so a projection that started emitting
+      `memberEmail` would keep the leak off the wire and look correct forever.
+    - Two latent bugs surfaced the moment the schemas were applied. `tier` was `z.enum(['free','pro','team'])` —
+      the vocabulary migration `0004` created and `0029` replaced — so beta mode's global `pro_max` grant would
+      have thrown on the common case. And `orgAdminMembersSchema` still required `pendingInvitations`, which needs
+      `organization_invitations`; that table is granted to `builderhunt_auth` only, so the field could never have
+      been anything but a fabricated zero.
+    - **The test fixture agreed with the test rather than with the projection**, which is why five green assertions
+      did not notice. `/5 total members/` matched because the fixture also used `totalMembers`. Replaced with the
+      property: in a ready card body, no unit word appears without a digit in front of it — which fails on the
+      exact shape that shipped whatever the field is called next time, and was verified by reintroducing it. Same
+      correction in the surveillance suite, which asserted `success === true` for a smuggled `memberEmail` and
+      explained in a comment that the real parse happened elsewhere. It did not.
+  - **Two copy defects in the same section, both of the kind this plan exists to remove.**
+    - `dependency-missing` read "A required service is not available right now." Three of the six cards carry that
+      reason *permanently* — two features have no table in any migration, and the third would need a privilege the
+      tenant connection is deliberately not granted — so a brand-new workspace opened its dashboard to what looked
+      like a partial outage, and the honest response to that sentence is to check the status page. Now "Not
+      available yet."
+    - The header said "Refreshed every 30 minutes." Nothing refreshed it: one fetch on mount, no cache header on
+      the route, no interval anywhere. A cadence claim that no code implements is the same class of defect as a
+      count with no query behind it.
+  - **`ActionsRow` was dead code**, because every section shipped `actions: []` — so the contract's whole action
+    vocabulary rendered nowhere and the section was a report rather than an administration surface. The three
+    sections with a real destination now carry one link each (`/settings/team`, `/settings/billing`,
+    `/settings/privacy`); the three that answer `dependency-missing` carry none, because there is no page for a
+    feature that does not exist.
+  - **Still worth a decision, not a defect:** "Workspace usage" already shows "Seats used 1/3" a row above
+    "Members and seats: 1 member of 3 seats". Two true statements of the same fact on one screen. Deduplicating
+    them is a layout question for whoever owns the widget registry, not something to settle inside this task.
 
 - [x] **Prevent organization-admin surveillance metrics**
   - Files: organization-admin repository/contracts, analytics schema, security tests
