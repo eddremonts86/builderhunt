@@ -420,7 +420,7 @@ missing — so the only honest version of this widget was an empty one.
       and a cross-section variant that resolved would render a plausible wrong view under a shareable URL.
   - Result: 27 tests, one per rejection the Verify line names, plus the defaults. `tsc` 0, `eslint` 0.
 
-- [~] **Split the monolithic Admin Metrics API and remove frequent billing scans**
+- [x] **Split the monolithic Admin Metrics API and remove frequent billing scans**
   - Files: `src/routes/api/admin/metrics/index.ts`, `src/routes/api/admin/metrics/overview.ts`, section routes/repository, API/performance tests
   - Do: Make Overview lightweight; load analytical sections only by validated request. Remove `getBillingOperationsMetrics` from the frequent Metrics path and consume only a cached Admin-overview billing alert summary. Preserve detailed billing computation under `/api/admin/billing/metrics`. Migrate the UI/regression consumers, then retain only a bounded documented legacy compatibility response until removal.
   - Verify: initial Overview, 60-second refresh, and legacy compatibility request perform no organization billing sweep or conversion query; one section failure returns its state without failing ready sections; current route regression coverage is migrated; platform role remains required everywhere.
@@ -462,9 +462,21 @@ missing — so the only honest version of this widget was an empty one.
     without ever reaching the guard.
   - Result: `admin.spec.ts` 229 passed; e2e route coverage 210/211 with 0 missing; `check-api-route-methods`
     and `check-route-client-boundary` clean.
-  - **Still open:** migrating the page to the new routes and bounding the legacy `/api/admin/metrics`
-    response, which is the other half of this task and belongs with the lazy-shell rebuild below —
-    together with the per-section request state and failure isolation the rebuild needs.
+  - **The page migrated 2026-08-11**, with the lazy-shell rebuild below.
+  - **The legacy response is bounded and documented, and a gate now holds it that way.** Three widgets still
+    read `/api/admin/metrics`, each on the one tab that needs it: the interview capability grid, the discovery
+    worker's current-run state, and the process diagnostics — and the diagnostics only when their disclosure is
+    actually opened, because answering that request also runs two account aggregates and a discovery read.
+  - **Why those three are still here rather than in the contract.** `metricValueSchema` accepts a finite
+    `number` and nothing else; these are booleans and strings. The capability flags could collapse into
+    `unavailable: 'not_enabled'` — that is what the code is for — but that loses *which* door is shut, and they
+    are reported individually precisely because they fail independently: transcription can be off while
+    scheduling is on, and an operator reading `transcriptReconnects: 0` needs to know which. The alternative is
+    a schema-version bump for a capability grid, a worker cursor and a Node version. The removal condition is
+    written at the top of `index.ts` rather than left implied.
+  - **The gate is a key-set assertion, not a comment.** `admin.spec.ts` pins the endpoint's top-level keys and
+    asserts none of them is a row collection, so a fourth thing added here instead of to a section fails CI.
+    Confirmed by adding one and watching it fail — the endpoint's whole original problem was that it grew.
   - **`db.totalBuilders` is not merely deferred.** Making those three counts real needs
     `builderhunt_platform` to hold unscoped SELECT on tenant tables — saved queries and notes being
     private workflow content — which is the surveillance the Admin track's own rule forbids. If a
@@ -614,10 +626,28 @@ missing — so the only honest version of this widget was an empty one.
   - **Nothing links to a worker API.** The breach drill-down goes to Operations and Incidents — screens that
     show what the workers are doing — rather than to a POST that runs one.
 
-- [ ] **Build cohort-correct Acquisition and Activation widgets**
+- [x] **Build cohort-correct Acquisition and Activation widgets**
   - Files: Admin Metrics activation repository/components, tests
   - Do: Compute new accounts, eligible signups, onboarding completed/skipped, and activation from one documented cohort/window. Remove null total Saved queries/Builders/Notes cards unless real aggregates with a decision are added.
   - Verify: cohort boundaries, zero denominator, consent exclusion, delayed onboarding, UTC days, and comparison-period fixtures pass; lifetime totals are never divided by recent signups.
+  - **Landed 2026-08-11** as the `activation` section, rendered by the shared contract renderer.
+  - **One documented cohort: seven days, whatever range was asked for.** A `1h` request does not silently
+    produce a one-hour activation rate — an hour-old cohort has barely had time to onboard and the number would
+    collapse for a reason that is not the product getting worse. The key is `activation_rate_7d`, so the label
+    cannot drift from the arithmetic, and a unit case asserts the repository is called with a seven-day bound
+    even for `range=1h`.
+  - **The prohibition, asserted rather than assumed.** `onboardingCompleted` is a lifetime count and
+    `newUsersLast7d` is a week; a rate from those two can exceed 1 and still render as a percentage. The test
+    that pins the correct denominator was confirmed by substituting the lifetime total and watching it fail.
+  - **A zero denominator omits the rate and marks the section `partial`.** No signups in the window means the
+    rate is undefined, not `0` — `0%` reads as "nobody activated" when the truth is "nobody signed up" — and
+    the contract has no way to say "null but present", so the value is absent with a reason beside it. The
+    counts it does have are still reported: a missing ratio is not a missing section.
+  - **The three null tiles are gone and stay gone.** Saved queries, Builders and Notes were hardcoded `null`
+    and rendered permanent em-dashes. Making them real means `builderhunt_platform` holding unscoped SELECT on
+    tenant tables — private workflow content — which is the surveillance the Admin track's own rule forbids. A
+    unit case asserts the section never emits those keys, so "add them back" has to go through the policy
+    decision rather than through a convenient aggregate.
 
 - [ ] **Optimize and render Conversion metrics**
   - Files: `src/routes/api/admin/metrics/conversion.ts`, conversion repository, Admin Metrics conversion components, `tests/unit/routes/admin/metrics.test.tsx`, conversion API/performance tests

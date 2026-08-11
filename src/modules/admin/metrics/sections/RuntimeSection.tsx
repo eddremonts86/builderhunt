@@ -65,8 +65,18 @@ function formatBytes(n: number): string {
  */
 function RuntimeDiagnostics() {
   const [server, setServer] = React.useState<ServerDiagnostics | null>(null)
+  const [opened, setOpened] = React.useState(false)
 
+  /**
+   * Fetched when the disclosure is opened, not when the tab is.
+   *
+   * These four figures come from `/api/admin/metrics`, the bounded legacy compatibility endpoint — which also
+   * runs two account aggregates and a discovery read to answer. Paying for those to render a Node version
+   * nobody expanded is the small version of exactly what the section split removed. Opening the disclosure is
+   * the operator saying they want it.
+   */
   React.useEffect(() => {
+    if (!opened || server) return
     const controller = new AbortController()
     void (async () => {
       try {
@@ -74,15 +84,15 @@ function RuntimeDiagnostics() {
         if (!response.ok) return
         setServer((await response.json()).server ?? null)
       } catch {
-        // Left null: the disclosure simply says the diagnostics could not be read, rather than showing zeroes
-        // for a heap that was never measured.
+        // Left null: the disclosure says the diagnostics could not be read, rather than showing zeroes for a
+        // heap that was never measured.
       }
     })()
     return () => controller.abort()
-  }, [])
+  }, [opened, server])
 
   return (
-    <details className="mt-4" data-testid="metrics-server-diagnostics">
+    <details className="mt-4" data-testid="metrics-server-diagnostics" onToggle={(event) => setOpened(event.currentTarget.open)}>
       <summary className="text-sm text-bh-text-muted cursor-pointer flex items-center gap-2">
         <Cpu className="w-4 h-4 text-bh-accent" aria-hidden="true" />
         Process diagnostics
@@ -115,7 +125,9 @@ function RuntimeDiagnostics() {
           </div>
         </div>
       ) : (
-        <p className="text-sm text-bh-text-muted mt-3">Diagnostics could not be read.</p>
+        <p className="text-sm text-bh-text-muted mt-3" data-testid="metrics-server-diagnostics-pending">
+          {opened ? 'Reading process diagnostics…' : 'Expand to read process diagnostics.'}
+        </p>
       )}
     </details>
   )

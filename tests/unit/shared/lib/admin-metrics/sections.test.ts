@@ -91,6 +91,8 @@ function parsed(payload: unknown) {
 beforeEach(() => {
   mocks.readServiceMetricWindow.mockReset()
   mocks.readServiceMetricFreshness.mockReset()
+  mocks.getPlatformAccountMetrics.mockReset()
+  mocks.getOnboardingActivationMetrics.mockReset()
 })
 
 describe('traffic', () => {
@@ -409,5 +411,86 @@ describe('data freshness', () => {
     mocks.readServiceMetricFreshness.mockRejectedValue(new Error('boom'))
     const payload = parsed(await buildSection({ section: 'runtime', range: '24h', variant: 'freshness', now: NOW }))
     expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
+  })
+})
+
+describe('activation, and the division that must never happen', () => {
+  /**
+   * Plan 57, Admin track — "Build cohort-correct Acquisition and Activation widgets".
+   *
+   * The Verify line names five fixtures and one prohibition, and the prohibition is the one worth stating
+   * plainly: **a lifetime total is never divided by recent signups.** `onboardingCompleted` counts everyone who
+   * has ever finished onboarding, including accounts from before the window; `newUsersLast7d` counts a week. A
+   * rate built from those two is a number that can exceed 1 and reads as a percentage.
+   */
+  const accounts = (overrides: Partial<{ totalUsers: number; newUsersLast24h: number; newUsersLast7d: number }> = {}) => ({
+    totalUsers: 5_000,
+    newUsersLast24h: 4,
+    newUsersLast7d: 40,
+    ...overrides,
+  })
+  const onboarding = (overrides: Partial<{ onboardingCompleted: number; onboardingSkipped: number; onboardingCompletedLast7d: number }> = {}) => ({
+    onboardingCompleted: 4_800,
+    onboardingSkipped: 120,
+    onboardingCompletedLast7d: 10,
+    ...overrides,
+  })
+
+  it('divides the window cohort by the window cohort, not by the lifetime total', async () => {
+    mocks.getPlatformAccountMetrics.mockResolvedValue(accounts())
+    mocks.getOnboardingActivationMetrics.mockResolvedValue(onboarding())
+
+    const payload = parsed(await buildSection({ section: 'activation', range: '7d', variant: 'funnel', now: NOW }))
+    // 10 of the 40 accounts created in the window finished onboarding.
+    expect(valueOf(payload, 'activation_rate_7d')).toBeCloseTo(0.25)
+    // And emphatically not 4800/40, which is 120.
+    expect(valueOf(payload, 'activation_rate_7d')).toBeLessThanOrEqual(1)
+  })
+
+  it('omits the rate rather than dividing by an empty cohort', async () => {
+    /**
+     * With no signups in the window the rate is undefined, not `0`. `0%` reads as "nobody activated" when the
+     * truth is "nobody signed up" — and the contract has no way to say "null but present", so the value is
+     * absent and the section is `partial` with a reason.
+     */
+    mocks.getPlatformAccountMetrics.mockResolvedValue(accounts({ newUsersLast7d: 0 }))
+    mocks.getOnboardingActivationMetrics.mockResolvedValue(onboarding({ onboardingCompletedLast7d: 0 }))
+
+    const payload = parsed(await buildSection({ section: 'activation', range: '7d', variant: 'funnel', now: NOW }))
+    expect(payload).toMatchObject({ status: 'partial', code: 'insufficient_history' })
+    expect(valueOf(payload, 'activation_rate_7d')).toBeUndefined()
+    // The counts it does have are still reported: a missing ratio is not a missing section.
+    expect(valueOf(payload, 'users_new_7d')).toBe(0)
+  })
+
+  it('reads the seven-day cohort whatever range was asked for, and says so in the window', async () => {
+    /**
+     * The cohort is documented as seven days, so a `1h` request must not silently produce a one-hour
+     * activation rate labelled the same way — an hour-old cohort has barely had time to onboard, and the
+     * number would collapse for a reason that is not the product getting worse.
+     */
+    mocks.getPlatformAccountMetrics.mockResolvedValue(accounts())
+    mocks.getOnboardingActivationMetrics.mockResolvedValue(onboarding())
+
+    await buildSection({ section: 'activation', range: '1h', variant: 'funnel', now: NOW })
+    const [, weekAgo] = mocks.getPlatformAccountMetrics.mock.calls[0]
+    expect(NOW.getTime() - weekAgo.getTime()).toBe(7 * 24 * 60 * 60 * 1000)
+    // The key names the cohort it describes, so the label cannot drift from the arithmetic.
+    const payload = parsed(await buildSection({ section: 'activation', range: '1h', variant: 'funnel', now: NOW }))
+    expect(valueOf(payload, 'activation_rate_7d')).toBeDefined()
+  })
+
+  it('never reports a count the platform is not allowed to compute', async () => {
+    /**
+     * Saved queries, Builders and Notes were three tiles the API hardcoded to `null`, rendering permanent
+     * em-dashes. Making them real means giving `builderhunt_platform` unscoped SELECT on tenant tables — saved
+     * queries and notes being private workflow content — which is the surveillance the Admin track forbids.
+     */
+    mocks.getPlatformAccountMetrics.mockResolvedValue(accounts())
+    mocks.getOnboardingActivationMetrics.mockResolvedValue(onboarding())
+    const payload = parsed(await buildSection({ section: 'activation', range: '7d', variant: 'funnel', now: NOW }))
+    for (const forbidden of ['total_saved_queries', 'total_builders', 'total_notes']) {
+      expect(valueOf(payload, forbidden), forbidden).toBeUndefined()
+    }
   })
 })

@@ -409,6 +409,29 @@ test.describe('a platform admin', () => {
     }
 
     /**
+     * The legacy compatibility endpoint's key set, asserted so it cannot quietly re-monolith.
+     *
+     * `/api/admin/metrics` is what the page read on a fifteen-second timer to render everything at once. Three
+     * widgets still read it — the interview capability grid, the discovery worker's current-run state, and the
+     * process diagnostics — because those are booleans and strings the numeric section contract cannot carry.
+     * What must not happen is a fourth thing being added here instead of to a section: the endpoint's whole
+     * problem was that it grew. Pinning the top-level keys makes an addition fail a gate.
+     */
+    const legacy = await harness.admin.api!.fetch('/api/admin/metrics')
+    expect(legacy.status()).toBe(200)
+    const legacyBody = await legacy.json()
+    expect(Object.keys(legacyBody).sort()).toEqual(
+      // `removals` is conditional on `PROFILE_REMOVAL_ENABLED`, so it is allowed to be absent but not extra.
+      Object.keys(legacyBody).includes('removals')
+        ? ['db', 'discovery', 'generatedAt', 'interviews', 'inProcess', 'removals', 'server'].sort()
+        : ['db', 'discovery', 'generatedAt', 'interviews', 'inProcess', 'server'].sort(),
+    )
+    // And nothing in it is a collection whose length is decided by how much data exists.
+    for (const [key, value] of Object.entries(legacyBody)) {
+      expect(Array.isArray(value), `${key} must not be a row collection`).toBe(false)
+    }
+
+    /**
      * The comparison, which doubles the section's cost when asked for.
      *
      * `compare` is refused rather than coerced for a reason specific to it: defaulting a typo to "on" doubles

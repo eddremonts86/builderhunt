@@ -8,10 +8,37 @@ import { env } from '~/shared/lib/env'
 import { getRemovalRequestMetrics } from '~/shared/lib/repositories/profile-removal'
 
 /**
- * Platform metrics for `/admin/metrics` (plans/ui-dashboard, Admin track "`/admin/metrics`
- * optimization").
+ * The bounded legacy compatibility response for `/admin/metrics` (plan 57, Admin track — "Split the
+ * monolithic Admin Metrics API").
  *
- * ## What this endpoint deliberately does not return
+ * ## This endpoint is legacy, and these are its three remaining consumers
+ *
+ * The page no longer reads it on a timer, and no longer reads it at all to render numbers. The eight sections
+ * come from `sections.ts` and `overview.ts`, which return a versioned contract. What still comes from here is
+ * exactly three things, each on the one tab that needs it:
+ *
+ * - `interviews.capabilities` — the Reliability tab's per-flag grid.
+ * - `discovery` — the Discovery tab's current-run state disclosure.
+ * - `server` — the Runtime tab's process diagnostics, fetched only when that disclosure is opened.
+ *
+ * ## What has to be true before it can be deleted
+ *
+ * All three are facts the section contract cannot currently carry: `metricValueSchema` accepts a finite
+ * `number` and nothing else, and these are booleans and strings. Two ways out, and neither is free:
+ *
+ * - The capability flags could collapse into `unavailable: 'not_enabled'`, which is what that code is for —
+ *   but that loses *which* door is shut, and the flags are reported individually precisely because they fail
+ *   independently. Transcription can be off while scheduling is on, and an operator reading
+ *   `transcriptReconnects: 0` needs to know which of those two it is.
+ * - The contract could grow a non-numeric field, which is a schema-version bump for a capability grid, a
+ *   worker cursor and a Node version.
+ *
+ * Until one of those is decided, this stays. What is *not* acceptable is it growing: the response is a fixed
+ * set of keys over scalars and small aggregates, with no collection whose length is decided by how much data
+ * exists. `tests/e2e/api/admin.spec.ts` asserts that key set, so adding one here fails a gate rather than
+ * quietly re-monolithing the endpoint.
+ *
+ * ## What it deliberately does not return, and still will not
  *
  * It used to include a `billing` block from `getBillingOperationsMetrics`, which walks **every
  * organization serially** — one transaction and nine queries each, plus one more per active credit
