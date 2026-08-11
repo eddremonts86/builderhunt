@@ -245,8 +245,30 @@
     unknown one (no button, rather than a guess). Meeting links are validated as absolute http(s) at
     the contract boundary and opened with `noopener noreferrer`. Two destinations were corrected
     against the router while writing it: `/calendar/availability` does not exist (the editor is on
-    `/calendar`), and invitations are rows on one hub rather than routes. **Not done:** the
-    allowlisted same-origin `from` context for the return path.
+    `/calendar`), and invitations are rows on one hub rather than routes.
+  - **The allowlisted same-origin `from` context: investigated 2026-08-11 and not built, on this evidence.**
+    - **It could only ever carry one value.** The action queue renders on exactly one surface —
+      `ActionQueueWidget` is imported by `DashboardPage` and nothing else — so every `from` a queue click could
+      produce is `dashboard`. A parameter with a single possible value is not context; it is a constant threaded
+      through nine destinations.
+    - **Its one plausible consumer already hardcodes that destination.** The only queue target that acts and then
+      navigates onward is the membership invitation: `OrganizationInvitationPage` sends an accepted invite to
+      `/dashboard` with `replace: true` — or to `/onboarding/search` when there is a suggested query, which is a
+      better destination than where the user came from and should not be overridden by a return path. So
+      `from=dashboard` would produce the navigation it already performs.
+    - **Every other destination is served by the browser.** `replace: true` keeps the acting page out of history,
+      and for the read-only targets — `/sprints/$id`, `/interviews/$id`, `/alerts`, `/calendar`,
+      `/settings/billing` — back returns the operator to the dashboard *with their scroll position*, which a
+      "Back to dashboard" link cannot.
+    - **And the cost is not small.** Six of the nine destinations declare `validateSearch`, so each would need a
+      new optional field, and the three that do not would need one added.
+    - **What the Verify line asks for is done**, and it asks for none of this: only legal actions are exposed (an
+      unknown kind renders no button), external and protocol-relative URLs are refused at the contract boundary
+      with meeting links validated as absolute http(s), and cross-tenant ids are undiscoverable because the
+      projection is tenant-scoped. The `from` context appears in the Do line alone.
+    - **Left open pending a ruling** rather than closed unilaterally: dropping a Do line is the maintainer's call,
+      and the four rulings earlier today set that precedent. If a second surface ever grows an action queue this
+      becomes real work, and the first bullet above is what stops being true.
 
 ## Wave 4 — Current-data widgets and charts
 
