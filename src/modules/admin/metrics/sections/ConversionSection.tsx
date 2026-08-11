@@ -1,3 +1,7 @@
+// table-surface-bounded: six named funnel steps, each an aggregate over the requested window — one row per
+// step from a fixed `METRIC_DEFINITIONS` list, so the row count is decided by code and not by how much data
+// exists. The marker moved here with the table when the metrics page split into sections; it used to sit at the
+// top of `AdminMetricsPage.tsx`, and `check-table-surfaces` caught the omission on the move.
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, ExternalLink, Filter } from 'lucide-react'
