@@ -287,6 +287,43 @@ test.describe('the Admin Metrics shell', () => {
     }
   })
 
+  test('the action queue is what Overview shows first, and it only appears when it has a row', async ({ browser }) => {
+    /**
+     * Plan 57, Admin track — "Build the Platform Action Queue and service-health widgets".
+     *
+     * Asserted against the harness's own database rather than a fixture, because the property worth proving is
+     * that the queue is assembled from sources that exist. In a migrated database the source register is
+     * populated and its enabled rows have unreviewed terms, so there is at least one honest row to find; if a
+     * future seed changes that, the empty case is equally valid and the assertion covers both.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=overview&range=24h&variant=summary`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('metric-values')).toBeVisible({ timeout: 20_000 })
+
+      const queue = tab.getByTestId('admin-action-queue')
+      if ((await queue.count()) > 0) {
+        // Above the numbers, because that is where an operator's eye lands at 02:00.
+        const rows = tab.locator('[data-testid^="admin-action-queue-row-"]')
+        await expect(rows.first()).toBeVisible()
+        // Severity as a word, and a destination that is an in-app path — never an absolute URL.
+        const severity = await rows.first().getAttribute('data-severity')
+        expect(['critical', 'high', 'medium', 'low']).toContain(severity)
+        const href = await rows.first().getAttribute('href')
+        expect(href).toMatch(/^\/[a-z0-9/_-]+$/)
+        // And it goes somewhere that resolves for this admin rather than a guessed path.
+        await rows.first().click()
+        await expect(tab).toHaveURL(new RegExp(`${href}$`))
+      }
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
   test('refuses a tenant owner before the console chrome appears', async ({ browser }) => {
     const context = await browser.newContext({ storageState: harness.owner.storageState! })
     const tab = await context.newPage()

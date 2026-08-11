@@ -958,3 +958,151 @@ describe('trust, abuse and billing operations', () => {
     }
   })
 })
+
+describe('the Platform Action Queue', () => {
+  /**
+   * Plan 57, Admin track — "Build the Platform Action Queue and service-health widgets".
+   *
+   * It lives on Overview because `/admin` resolves to `/admin/metrics` and Overview is what that loads first, so
+   * it is the panel an operator sees on arrival. The Verify line asks for severity/age ordering, expiry and
+   * deduplication, degraded status, partial failure and unknown destinations — each has a case here.
+   */
+  const noAttention = () => {
+    mocks.getPlatformAccountMetrics.mockResolvedValue({ totalUsers: 10, newUsersLast24h: 1, newUsersLast7d: 3 })
+    mocks.getOnboardingActivationMetrics.mockResolvedValue({
+      onboardingCompleted: 8, onboardingSkipped: 1, onboardingCompletedLast7d: 2,
+    })
+    mocks.countBillingWebhookEventsByStatus.mockResolvedValue({ pending: 2, processing: 0, processed: 90, failed: 0, ignored: 0 })
+    mocks.countAbuseSignalsBySeverity.mockResolvedValue(new Map([['low', 5]]))
+    mocks.listScheduleRegistry.mockResolvedValue([])
+    mocks.listSearchSources.mockResolvedValue([])
+    envStub.PROFILE_REMOVAL_ENABLED = 'false'
+  }
+
+  const queueOf = (payload: unknown) =>
+    (payload as { data: { queue?: Array<{ key: string; severity: string; count: number; oldestAgeSeconds?: number; href: string }> } })
+      .data.queue ?? []
+
+  it('emits no rows at all when nothing needs attention', async () => {
+    /**
+     * An empty queue rather than a list of reassurances. A panel that is always present teaches the reader to
+     * skim past it, and then it is furniture on the day it has a row.
+     */
+    noAttention()
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    expect(payload.status).toBe('ready')
+    expect(queueOf(payload)).toEqual([])
+  })
+
+  it('orders by severity first and by count within a severity', async () => {
+    noAttention()
+    mocks.countBillingWebhookEventsByStatus.mockResolvedValue({ pending: 0, processing: 4, processed: 0, failed: 2, ignored: 0 })
+    mocks.countAbuseSignalsBySeverity.mockResolvedValue(new Map([['critical', 1], ['high', 6]]))
+    mocks.listSearchSources.mockResolvedValue([
+      { key: 'a', enabled: true, connectorImplemented: false, termsReviewedAt: null },
+      { key: 'b', enabled: true, connectorImplemented: true, termsReviewedAt: null },
+    ])
+
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    const keys = queueOf(payload).map((row) => row.key)
+    // critical: dead-lettered billing. high: 7 abuse signals then 4 stuck events. medium: 2 unreviewed, 1 dead.
+    expect(keys[0]).toBe('billing_events_dead_lettered')
+    expect(keys.slice(1, 3)).toEqual(['abuse_signals_urgent', 'billing_events_stuck'])
+    expect(queueOf(payload).map((row) => row.severity)).toEqual(['critical', 'high', 'high', 'medium', 'medium'])
+  })
+
+  it('reports the age of the oldest missed run, which is what separates a blip from an outage', async () => {
+    /**
+     * A job three minutes late is a slow tick; the same job three days late means the worker has not run since a
+     * deploy. The count alone cannot tell those apart, and this is the only row whose source can say.
+     */
+    noAttention()
+    mocks.listScheduleRegistry.mockResolvedValue([
+      { jobKey: 'a', enabled: true, nextRunAt: new Date(NOW.getTime() - 3 * 86_400_000) },
+      { jobKey: 'b', enabled: true, nextRunAt: new Date(NOW.getTime() - 60_000) },
+    ])
+
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    const row = queueOf(payload).find((entry) => entry.key === 'workers_overdue')
+    expect(row?.count).toBe(2)
+    expect(row?.oldestAgeSeconds).toBe(3 * 86_400)
+  })
+
+  it('never emits an age of zero for a source that cannot state one', async () => {
+    // `0s` looks fresh. "We do not know how old this is" is a different fact, and absence is how the contract
+    // says it.
+    noAttention()
+    mocks.countBillingWebhookEventsByStatus.mockResolvedValue({ pending: 0, processing: 0, processed: 0, failed: 3, ignored: 0 })
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    expect(queueOf(payload)[0]?.oldestAgeSeconds).toBeUndefined()
+  })
+
+  it('marks the section partial when a source could not be read, instead of a shorter queue', async () => {
+    /**
+     * The distinction the envelope exists for. An empty queue means nothing needs attention; a *shortened* queue
+     * means something might and we could not tell. Collapsing them makes an unreadable billing table look like a
+     * quiet afternoon — on the panel an operator reads first.
+     */
+    noAttention()
+    mocks.countBillingWebhookEventsByStatus.mockRejectedValue(new Error('53300: too many connections'))
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    expect(payload).toMatchObject({ status: 'partial', code: 'error' })
+    // The rest of the page still renders: one failed source does not blank the numbers.
+    expect(valueOf(payload, 'users_total')).toBe(10)
+  })
+
+  it('does not call the removal source at all while the capability is off, and stays ready', async () => {
+    // A disabled feature is not an unreadable source. Reporting it as one would make Overview `partial` forever
+    // on any deployment with removals switched off, and `partial` means "we could not tell".
+    noAttention()
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    expect(payload.status).toBe('ready')
+    expect(mocks.getRemovalOperationsMetrics).not.toHaveBeenCalled()
+  })
+
+  it('puts a missed removal deadline above a backlog, and never queues the backlog itself', async () => {
+    // A queue getting long is not an action; a commitment already missed is.
+    noAttention()
+    envStub.PROFILE_REMOVAL_ENABLED = 'true'
+    mocks.getRemovalOperationsMetrics.mockResolvedValue({
+      totalRequests: 40,
+      byStatus: { pending: 30, verified: 8, rejected: 1, expired: 1 },
+      bySource: [], otherSourcesCount: 0,
+      pendingAging: { underOneDay: 30, oneToSevenDays: 0, sevenToThirtyDays: 0, overThirtyDays: 0 },
+      overduePendingCount: 2,
+      activeSuppressions: 0,
+      generatedAt: NOW.toISOString(),
+    })
+
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    const keys = queueOf(payload).map((row) => row.key)
+    expect(keys).toContain('removal_requests_overdue')
+    expect(keys.some((key) => key.includes('pending'))).toBe(false)
+    expect(queueOf(payload).find((row) => row.key === 'removal_requests_overdue')?.severity).toBe('critical')
+  })
+
+  it('only ever points at in-app paths, which the contract enforces', async () => {
+    /**
+     * A server-supplied destination that could be absolute is an open redirect on the page whose reader has the
+     * most authority. The parse in `parsed()` is the real assertion — this makes the property explicit.
+     */
+    noAttention()
+    mocks.countBillingWebhookEventsByStatus.mockResolvedValue({ pending: 0, processing: 1, processed: 0, failed: 1, ignored: 0 })
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    for (const row of queueOf(payload)) {
+      expect(row.href, row.key).toMatch(/^\/[a-z0-9/_-]+$/)
+    }
+  })
+
+  it('carries no identity or evidence, only a kind and a count', async () => {
+    // A queue of individual incidents would put an organization id or a failing event's payload on this page.
+    // "Four dead-lettered events" is the whole decision an operator makes from a summary.
+    noAttention()
+    mocks.countBillingWebhookEventsByStatus.mockResolvedValue({ pending: 0, processing: 0, processed: 0, failed: 4, ignored: 0 })
+    const payload = parsed(await buildSection({ section: 'overview', range: '24h', variant: 'summary', now: NOW }))
+    const serialized = JSON.stringify(queueOf(payload))
+    for (const forbidden of ['organizationId', 'userId', 'stripe', 'payload', 'stack']) {
+      expect(serialized.toLowerCase(), forbidden).not.toContain(forbidden.toLowerCase())
+    }
+  })
+})

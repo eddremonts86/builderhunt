@@ -238,6 +238,78 @@ export function MetricValues({ payload }: { payload: Extract<AdminMetricSectionP
   )
 }
 
+const QUEUE_LABELS: Record<string, string> = {
+  billing_events_dead_lettered: 'Billing events dead-lettered',
+  billing_events_stuck: 'Billing events stuck in processing',
+  removal_requests_overdue: 'Removal requests past their deadline',
+  abuse_signals_urgent: 'Abuse signals at high or critical severity',
+  workers_overdue: 'Scheduled jobs overdue',
+  sources_enabled_without_connector: 'Sources enabled with no connector',
+  sources_terms_unreviewed: 'Enabled sources with unreviewed terms',
+}
+
+const SEVERITY_STYLES: Record<string, string> = {
+  critical: 'border-bh-danger/50 text-bh-danger',
+  high: 'border-bh-warning/50 text-bh-warning',
+  medium: 'border-bh-border text-bh-text',
+  low: 'border-bh-border text-bh-text-muted',
+}
+
+function formatAge(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h`
+  return `${Math.floor(seconds / 86_400)} d`
+}
+
+/**
+ * The Platform Action Queue — first in the section, above the numbers.
+ *
+ * ## Why it is above everything else, and why it disappears
+ *
+ * It is what an operator reads at 02:00, so it goes where their eye lands. And it is **absent** when nothing
+ * needs attention rather than showing "all clear": a panel that is always present teaches the reader to skim
+ * past it, and then it is furniture on the day it has a row. A queue that only exists when it has something to
+ * say is a queue you look at.
+ *
+ * ## Severity is a word, not only a colour
+ *
+ * Each row prints its severity as text. Colour alone fails forced-colors mode, colour-blind readers, and a
+ * printed screenshot pasted into an incident channel — which is a real path for this page.
+ */
+function ActionQueue({ payload }: { payload: Extract<AdminMetricSectionPayload, { data: unknown }> }) {
+  const queue = payload.data.queue
+  if (!queue || queue.length === 0) return null
+  return (
+    <ul className="mb-4 space-y-2" data-testid="admin-action-queue">
+      {queue.map((row) => (
+        <li key={row.key}>
+          {/*
+            The whole row is the link, and its destination came from the server through a regex that rejects
+            anything but an in-app path. A server-supplied absolute URL here would be an open redirect on the
+            page whose reader has the most authority.
+          */}
+          <Link
+            to={row.href}
+            className={`flex flex-wrap items-baseline gap-2 rounded-2xl border p-3 hover:underline ${SEVERITY_STYLES[row.severity] ?? SEVERITY_STYLES.low}`}
+            data-testid={`admin-action-queue-row-${row.key}`}
+            data-severity={row.severity}
+          >
+            <span className="text-xs uppercase tracking-wider">{row.severity}</span>
+            <span className="font-semibold tabular-nums">{row.count.toLocaleString()}</span>
+            <span className="text-sm">{QUEUE_LABELS[row.key] ?? row.key.replace(/_/g, ' ')}</span>
+            {row.oldestAgeSeconds !== undefined && (
+              <span className="text-xs text-bh-text-dim" data-testid={`admin-action-queue-age-${row.key}`}>
+                oldest {formatAge(row.oldestAgeSeconds)}
+              </span>
+            )}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** A bounded ranking of route families. Labels come from a closed set, so no identifier can appear. */
 export function MetricRanked({ payload }: { payload: Extract<AdminMetricSectionPayload, { data: unknown }> }) {
   const ranked = payload.data.ranked
@@ -376,6 +448,7 @@ export function MetricSectionView({
         </p>
       )}
 
+      <ActionQueue payload={payload} />
       <MetricValues payload={payload} />
       <MetricRanked payload={payload} />
       <BreachDrillDown payload={payload} />

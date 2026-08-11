@@ -242,6 +242,77 @@ describe('AdminMetricsPage — only the visible section is fetched', () => {
   })
 })
 
+describe('AdminMetricsPage — the action queue', () => {
+  const withQueue = (queue: unknown[]) =>
+    sectionResponse('overview', OVERVIEW_VALUES, { queue })
+
+  it('renders nothing at all when the queue is empty', async () => {
+    /**
+     * A panel that is always present teaches the reader to skim past it, and then it is furniture on the day it
+     * has a row. A queue that only exists when it has something to say is a queue you look at.
+     */
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({ section: withQueue([]) })
+    await render({ section: 'overview' })
+    expect(testId('admin-action-queue')).toBeNull()
+  })
+
+  it('prints the severity as a word, not only as a colour', async () => {
+    /**
+     * Colour alone fails forced-colors mode, colour-blind readers, and a printed screenshot pasted into an
+     * incident channel — which is a real path for this page.
+     */
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({
+      section: withQueue([
+        { key: 'billing_events_dead_lettered', severity: 'critical', count: 4, href: '/admin/billing' },
+      ]),
+    })
+    await render({ section: 'overview' })
+
+    const row = testId('admin-action-queue-row-billing_events_dead_lettered')
+    expect(row?.textContent).toContain('critical')
+    expect(row?.textContent).toContain('4')
+    expect(row?.textContent).toContain('Billing events dead-lettered')
+    expect(row?.getAttribute('data-severity')).toBe('critical')
+  })
+
+  it('links each row to the in-app path the server named', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({
+      section: withQueue([{ key: 'workers_overdue', severity: 'high', count: 2, oldestAgeSeconds: 259_200, href: '/admin/operations' }]),
+    })
+    await render({ section: 'overview' })
+
+    const row = testId('admin-action-queue-row-workers_overdue')
+    expect(row?.getAttribute('href')).toBe('/admin/operations')
+    // The age, formatted — three days, not 259200.
+    expect(testId('admin-action-queue-age-workers_overdue')?.textContent).toContain('3 d')
+  })
+
+  it('renders no age at all for a row that carries none', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({
+      section: withQueue([{ key: 'sources_terms_unreviewed', severity: 'medium', count: 12, href: '/admin/sources' }]),
+    })
+    await render({ section: 'overview' })
+    expect(testId('admin-action-queue-age-sources_terms_unreviewed')).toBeNull()
+  })
+
+  it('shows the queue above the numbers, because it is what gets read first', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter({
+      section: withQueue([{ key: 'abuse_signals_urgent', severity: 'high', count: 3, href: '/admin/abuse' }]),
+    })
+    await render({ section: 'overview' })
+
+    const queue = testId('admin-action-queue')!
+    const values = testId('metric-values')!
+    // `DOCUMENT_POSITION_FOLLOWING` on the queue's comparison means the values come after it.
+    expect(queue.compareDocumentPosition(values) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
 describe('AdminMetricsPage — a missing source is never a zero', () => {
   it('explains an unavailable section instead of rendering numbers', async () => {
     /**

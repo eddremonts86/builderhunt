@@ -385,10 +385,47 @@ missing — so the only honest version of this widget was an empty one.
   - **Still open:** the one authoritative registry the task also asks for. `nav-config.ts` and the
     route files agree today and the gate now keeps them agreeing, but they remain two lists.
 
-- [ ] **Build the Platform Action Queue and service-health widgets**
+- [x] **Build the Platform Action Queue and service-health widgets**
   - Files: `src/modules/admin/dashboard/AdminDashboardPage.tsx`, `PlatformActionQueue.tsx`, `ServiceHealthWidget.tsx`, tests
   - Do: Prioritize critical incidents/security/abuse, money/entitlement failures, user-impacting failed workers, policy deadlines, configuration anomalies, then non-critical product signals. Render measured status and incident aging with one safe drill-down per item.
   - Verify: severity/age ordering, expiry/deduplication, degraded status, partial failure, unknown destination, long incident copy, keyboard, screen reader, and mobile fixtures pass.
+  - **Landed 2026-08-11 on the Overview section**, not on a new page. `/admin` resolves to `/admin/metrics` and
+    Overview is what that loads first, so this is the panel an operator sees on arrival — which is also the only
+    placement that works: a queue on a page nobody opens first is a queue nobody reads.
+  - **The contract grew a bounded `queue` shape**, capped at `ADMIN_METRIC_LIMITS.queueRows = 12`. The cap is a
+    design claim rather than a payload limit: a queue longer than a screen is a list, and a list is something you
+    skim. Adding an optional field is deliberately not a schema-version bump — a client that does not know it
+    reads every existing section exactly as before.
+  - **Counts and an age, never the rows.** A queue of individual incidents would carry an organization id or a
+    failing event's payload onto the page whose reader has the most authority, and this plan's rule keeps that on
+    the authorized detail pages. "Four dead-lettered events, oldest six hours" is the whole decision an operator
+    makes from a summary: whether to open the page. A test greps the serialized queue for `organizationId`,
+    `userId`, `stripe`, `payload` and `stack`.
+  - **`href` is regex-validated to an in-app path**, same as `admin-contracts.ts` does for its action URLs: a
+    server-supplied destination that could be absolute is an open redirect on this page of all pages. No query
+    string, no scheme, no host — and the browser case clicks the first row and asserts it lands.
+  - **A row only exists when its count is above zero**, so the panel is absent when nothing needs attention rather
+    than showing "all clear". A panel that is always there teaches the reader to skim past it, and then it is
+    furniture on the day it has a row.
+  - **An unreadable source makes the section `partial`, not the queue shorter.** This is the distinction the
+    envelope exists for: an empty queue means nothing needs attention, a *shortened* one means something might and
+    we could not tell — and collapsing them makes an unreadable billing table look like a quiet afternoon. A
+    *disabled* capability is skipped instead, because otherwise Overview would be `partial` forever on any
+    deployment with removals off, and `partial` means "we could not tell".
+  - **Ordering is severity then count**, with the severity rank read from `ACTION_QUEUE_SEVERITIES.indexOf` so the
+    order the server sorts in and the order a client renders in are the same list. Age is reported only where the
+    source can state it — the oldest missed run, which is what separates a three-minute slow tick from a worker
+    that has not run since a deploy. Never `0s`, because that looks fresh.
+  - **A missed removal deadline is `critical` and the pending backlog is not queued at all.** A queue getting long
+    is not an action; a commitment already missed is.
+  - **Severity prints as a word, not only a colour** — forced-colors mode, colour-blind readers, and a screenshot
+    pasted into an incident channel are all real paths for this page.
+  - **Measured against the real database:** exactly one row, `sources_terms_unreviewed` at medium with a count of
+    12, pointing at `/admin/sources`. Billing has nothing dead-lettered, the 54 abuse signals are all medium, the
+    schedule registry is empty and removals are disabled — so the queue says one true thing rather than seven
+    hedged ones.
+  - **Tests:** 9 unit cases on the builder, 5 on the renderer, 1 browser case. Three guarantees confirmed by
+    breaking them: the severity sort, the `partial` on an unreadable source, and emitting zero-count rows.
 
 - [x] **Build Worker and Integration Health admin widgets**
   - Files: admin overview adapter, `WorkerHealthWidget.tsx`, `IntegrationHealthWidget.tsx`, tests

@@ -154,6 +154,16 @@ export const ADMIN_METRIC_LIMITS = {
    * is how one bad deploy turns a metrics page into a 40 000-row response.
    */
   rankedRows: 10,
+  /**
+   * 12 action-queue rows, and the cap is a design claim rather than a payload limit.
+   *
+   * The queue is what an operator reads first at 02:00. A queue longer than a screen is a list, and a list is
+   * something you skim — so the number of *kinds* of attention this platform can ask for has to stay small
+   * enough to read in one look. Twelve is the count of sources that can currently produce a row plus room;
+   * exceeding it is a signal that the queue has become a log, which is a design conversation and not a
+   * serialization problem.
+   */
+  queueRows: 12,
 } as const
 
 const generatedAt = z.string().datetime({ offset: true })
@@ -299,6 +309,47 @@ export const rankedRouteRowsSchema = z
   .max(ADMIN_METRIC_LIMITS.rankedRows)
 
 /**
+ * How badly something needs attention. Ordered worst-first, and the order is the schema's, not a convention a
+ * client has to know: `ACTION_QUEUE_SEVERITIES.indexOf` is how the builder sorts.
+ */
+export const ACTION_QUEUE_SEVERITIES = ['critical', 'high', 'medium', 'low'] as const
+export type ActionQueueSeverity = (typeof ACTION_QUEUE_SEVERITIES)[number]
+
+/**
+ * One thing that needs an operator's attention, and where to go about it.
+ *
+ * ## Why a count and an age rather than the rows themselves
+ *
+ * A queue of individual incidents would carry identity onto an operator page — an organization id, a subject, a
+ * failing event's payload — and this plan's own rule keeps all of that on the authorized detail pages. "Four
+ * dead-lettered billing events, oldest 6 hours" is the whole decision an operator makes from a summary: whether
+ * to open the page. The page is where the rows are, behind its own authorization.
+ *
+ * ## Why `href` is a regex and not a string
+ *
+ * The same reason `admin-contracts.ts` validates its action URLs: a server-supplied destination that could be
+ * absolute is an open redirect on the one page whose reader has the most authority. In-app paths only, no query
+ * string, no scheme, no host.
+ */
+export const actionQueueRowsSchema = z
+  .array(
+    z.object({
+      /** Stable identifier for the *kind* of attention, so a client can style or dismiss by kind. */
+      key: z.string().regex(/^[a-z][a-z0-9_]{1,62}$/, 'queue keys are lower_snake_case'),
+      severity: z.enum(ACTION_QUEUE_SEVERITIES),
+      /** How many. Never zero: a row that is not asking for anything is not a queue entry. */
+      count: z.number().int().positive(),
+      /**
+       * Age of the oldest item, when the source can say. Absent rather than zero when it cannot — a queue whose
+       * age reads `0s` looks fresh, and "we do not know how old this is" is a different fact.
+       */
+      oldestAgeSeconds: z.number().int().nonnegative().optional(),
+      href: z.string().regex(/^\/[a-z0-9/_-]+$/, 'in-app paths only'),
+    }),
+  )
+  .max(ADMIN_METRIC_LIMITS.queueRows)
+
+/**
  * A section envelope. Mirrors `sectionEnvelope` in the dashboard contracts, with one addition:
  * `partial`.
  *
@@ -325,6 +376,14 @@ const metricsBody = z.object({
   values: z.array(metricValueSchema).max(24),
   series: z.array(metricSeriesSchema).max(6).optional(),
   ranked: rankedRouteRowsSchema.optional(),
+  /**
+   * Optional, and adding it is not a `ADMIN_METRICS_SCHEMA_VERSION` bump.
+   *
+   * The version exists for changes that make an older client read a *wrong* value — a removed field, a narrowed
+   * enum, a changed unit. An added optional field is invisible to a client that does not know it: the sections
+   * it already reads mean exactly what they meant.
+   */
+  queue: actionQueueRowsSchema.optional(),
 })
 
 /** Every section shares one body shape. The difference between them is which keys they fill, not the type. */

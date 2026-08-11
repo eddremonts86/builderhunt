@@ -1,5 +1,6 @@
 import type { AdminMetricRange, AdminMetricSection, AdminMetricSectionPayload } from './contracts'
-import { ADMIN_METRIC_LIMITS } from './contracts'
+import { ACTION_QUEUE_SEVERITIES, ADMIN_METRIC_LIMITS } from './contracts'
+import type { ActionQueueSeverity } from './contracts'
 import { LATENCY_BOUNDARIES_MS, LATENCY_SLOTS, percentileFrom } from './history'
 import { interviewOperatorCounters, metrics } from '../metrics'
 import { env } from '../env'
@@ -372,25 +373,183 @@ async function buildOverview(range: AdminMetricRange, now: Date): Promise<AdminM
   const since = new Date(window.from)
   const weekAgo = new Date(now.getTime() - RANGE_MS['7d'])
 
-  const [accounts, onboarding] = await Promise.all([
+  const [accounts, onboarding, queue] = await Promise.all([
     getPlatformAccountMetrics(since, weekAgo),
     getOnboardingActivationMetrics(weekAgo),
+    buildActionQueue(now),
   ])
 
-  return {
-    status: 'ready',
-    generatedAt: now.toISOString(),
-    window,
-    data: {
-      values: [
-        { key: 'users_total', value: accounts.totalUsers, unit: 'count', scope: 'database', platformTotal: true },
-        { key: 'users_new_24h', value: accounts.newUsersLast24h, unit: 'count', scope: 'database', platformTotal: true },
-        { key: 'users_new_7d', value: accounts.newUsersLast7d, unit: 'count', scope: 'database', platformTotal: true },
-        { key: 'onboarding_completed', value: onboarding.onboardingCompleted, unit: 'count', scope: 'database', platformTotal: true },
-        { key: 'onboarding_skipped', value: onboarding.onboardingSkipped, unit: 'count', scope: 'database', platformTotal: true },
-      ],
-    },
+  /**
+   * A source that could not be read leaves the section `partial` rather than silently shortening the queue.
+   *
+   * This is the distinction the whole envelope exists for: an empty queue means nothing needs attention, and a
+   * *shortened* queue means something might and we could not tell. Collapsing the two would make an unreadable
+   * billing table look like a quiet afternoon — on the panel an operator reads first.
+   */
+  const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
+  const body = {
+    values: [
+      { key: 'users_total', value: accounts.totalUsers, ...dbCount },
+      { key: 'users_new_24h', value: accounts.newUsersLast24h, ...dbCount },
+      { key: 'users_new_7d', value: accounts.newUsersLast7d, ...dbCount },
+      { key: 'onboarding_completed', value: onboarding.onboardingCompleted, ...dbCount },
+      { key: 'onboarding_skipped', value: onboarding.onboardingSkipped, ...dbCount },
+    ],
+    queue: queue.rows,
   }
+
+  if (queue.unreadableSources.length > 0) {
+    return { status: 'partial', generatedAt: now.toISOString(), window, code: 'error', data: body }
+  }
+  return { status: 'ready', generatedAt: now.toISOString(), window, data: body }
+}
+
+/**
+ * The Platform Action Queue (plan 57, Admin track — "Build the Platform Action Queue and service-health
+ * widgets").
+ *
+ * ## Why it lives on Overview
+ *
+ * Because `/admin` resolves to `/admin/metrics` and Overview is what that loads first, so this is the panel an
+ * operator sees on arrival. The maintainer's "índice = metrics" note is the reason there is no separate landing
+ * page to put it on — and it is the better placement anyway: a queue on a page nobody opens first is a queue.
+ *
+ * ## The ordering, and why counts rather than rows
+ *
+ * Severity first, from the schema's own ordered list, then count. Each row is a *kind* of attention with a count
+ * and an age, never the individual items: a queue of incidents would carry an organization id or a failing
+ * event's payload onto the page with the most authority behind it, and this plan's rule keeps that on the
+ * authorized detail pages. "Four dead-lettered events, oldest six hours" is the whole decision — whether to open
+ * the page.
+ *
+ * ## Every row has to earn its place
+ *
+ * A row is emitted only when its count is above zero, so the queue is never a list of reassurances. An empty
+ * queue is a real answer and a short one is not: a source that failed to read is reported through
+ * `unreadableSources`, which makes the section `partial` instead of quietly dropping a row.
+ */
+interface ActionQueueRow {
+  key: string
+  severity: ActionQueueSeverity
+  count: number
+  oldestAgeSeconds?: number
+  href: string
+}
+
+async function buildActionQueue(now: Date): Promise<{ rows: ActionQueueRow[]; unreadableSources: string[] }> {
+  const unreadableSources: string[] = []
+  const rows: ActionQueueRow[] = []
+
+  const [billing, abuse, schedules, searchSources, removals] = await Promise.all([
+    countBillingWebhookEventsByStatus().catch(() => {
+      unreadableSources.push('billing')
+      return null
+    }),
+    countAbuseSignalsBySeverity(new Date(now.getTime() - RANGE_MS['24h'])).catch(() => {
+      unreadableSources.push('abuse')
+      return null
+    }),
+    listScheduleRegistry().catch(() => {
+      unreadableSources.push('schedules')
+      return null
+    }),
+    listSearchSources().catch(() => {
+      unreadableSources.push('sources')
+      return null
+    }),
+    /**
+     * Skipped entirely, not attempted and discarded, while the capability is off.
+     *
+     * A disabled feature is not an unreadable source: reporting it in `unreadableSources` would make the section
+     * `partial` forever on any deployment with removals switched off, and `partial` means "we could not tell".
+     */
+    env.PROFILE_REMOVAL_ENABLED === 'true'
+      ? getRemovalOperationsMetrics(now).catch(() => {
+          unreadableSources.push('removals')
+          return null
+        })
+      : Promise.resolve(null),
+  ])
+
+  // Money first: a dead-lettered webhook is an entitlement or a payment that did not apply, and it does not
+  // resolve on its own.
+  if (billing && billing.failed > 0) {
+    rows.push({ key: 'billing_events_dead_lettered', severity: 'critical', count: billing.failed, href: '/admin/billing' })
+  }
+  if (billing && billing.processing > 0) {
+    // Nothing has reported an outcome, which is what a crashed worker looks like.
+    rows.push({ key: 'billing_events_stuck', severity: 'high', count: billing.processing, href: '/admin/billing' })
+  }
+
+  // A missed legal deadline outranks a backlog, which is why this is critical and the pending count is not here
+  // at all — a queue getting long is not an action.
+  if (removals && removals.overduePendingCount > 0) {
+    rows.push({
+      key: 'removal_requests_overdue',
+      severity: 'critical',
+      count: removals.overduePendingCount,
+      // There is no dedicated removals page; Operations is where the sweep that should have cleared them runs.
+      href: '/admin/operations',
+    })
+  }
+
+  if (abuse) {
+    const urgent = (abuse.get('critical') ?? 0) + (abuse.get('high') ?? 0)
+    if (urgent > 0) {
+      rows.push({ key: 'abuse_signals_urgent', severity: 'high', count: urgent, href: '/admin/abuse' })
+    }
+  }
+
+  if (schedules) {
+    const enabled = schedules.filter((schedule) => schedule.enabled)
+    const overdue = enabled.filter(
+      (schedule) => schedule.nextRunAt !== null && schedule.nextRunAt.getTime() < now.getTime(),
+    )
+    if (overdue.length > 0) {
+      /**
+       * The age of the *oldest* missed run, which is the number that separates a blip from an outage.
+       *
+       * A job three minutes late is a slow tick; the same job three days late means the worker has not run since
+       * a deploy. The count alone cannot tell those apart.
+       */
+      const oldest = Math.max(...overdue.map((schedule) => now.getTime() - schedule.nextRunAt!.getTime()))
+      rows.push({
+        key: 'workers_overdue',
+        severity: 'high',
+        count: overdue.length,
+        oldestAgeSeconds: Math.floor(oldest / 1000),
+        href: '/admin/operations',
+      })
+    }
+  }
+
+  if (searchSources) {
+    const enabled = searchSources.filter((source) => source.enabled)
+    const dead = enabled.filter((source) => !source.connectorImplemented).length
+    if (dead > 0) {
+      // A source switched on with no code to contact it: believed live, will never reach anything.
+      rows.push({ key: 'sources_enabled_without_connector', severity: 'medium', count: dead, href: '/admin/sources' })
+    }
+    const unreviewed = enabled.filter((source) => source.termsReviewedAt === null).length
+    if (unreviewed > 0) {
+      rows.push({ key: 'sources_terms_unreviewed', severity: 'medium', count: unreviewed, href: '/admin/sources' })
+    }
+  }
+
+  /**
+   * Sorted by severity then count, and truncated at the contract's cap.
+   *
+   * The sort key comes from `ACTION_QUEUE_SEVERITIES.indexOf` rather than a local map, so the order a client
+   * renders in and the order the server sorts in are the same list. Slicing is a formality at today's source
+   * count — there are eight possible rows and the cap is twelve — but it is applied rather than assumed, because
+   * "we will never exceed it" is how a bound stops being one.
+   */
+  rows.sort((a, b) => {
+    const bySeverity = ACTION_QUEUE_SEVERITIES.indexOf(a.severity) - ACTION_QUEUE_SEVERITIES.indexOf(b.severity)
+    return bySeverity !== 0 ? bySeverity : b.count - a.count
+  })
+
+  return { rows: rows.slice(0, ADMIN_METRIC_LIMITS.queueRows), unreadableSources }
 }
 
 /**
