@@ -43,8 +43,9 @@
  * reason: there is no sign-in timestamp to compute it from, and a map of zeros would say every admin signed in
  * today.
  */
-import type { Sql } from 'postgres'
+import { sql } from 'drizzle-orm'
 import type { z } from 'zod'
+import type { TenantTransaction } from '~/shared/lib/db/client'
 import { orgAdminOverviewSchema } from '~/shared/lib/dashboard/admin-contracts'
 
 export type OrgAdminOverview = z.infer<typeof orgAdminOverviewSchema>
@@ -72,8 +73,16 @@ const dependencyMissing = { state: 'unavailable' as const, reason: 'dependency-m
  */
 const SEAT_CAP_WARNING_RATIO = 0.8
 
+/**
+ * Takes the tenant transaction, not a raw connection.
+ *
+ * The first version's signature was postgres.js's `Sql`, and that is a second reason it was never wired: the app's
+ * own `withTenantContext` hands out a drizzle transaction, so calling it required a cast — and a cast is what let
+ * the mismatch reach a running route as a 500 instead of a compile error. Every other repository in this codebase
+ * takes the transaction.
+ */
 export async function readOrgAdminOverview(
-  sql: Sql,
+  tx: TenantTransaction,
   input: OrgAdminProjectionInput,
 ): Promise<OrgAdminOverview> {
   const { organizationId, range, now } = input
@@ -100,7 +109,7 @@ export async function readOrgAdminOverview(
    * error — a shape this repository has already shipped once, in a load monitor that reported a peak of zero while
    * every sample threw.
    */
-  const [memberRow] = await sql<{ total: number; owners: number; admins: number; members: number }[]>`
+  const memberRows = (await tx.execute(sql`
     SELECT
       count(*)::int AS total,
       (count(*) FILTER (WHERE m.role = 'owner'))::int AS owners,
@@ -108,17 +117,17 @@ export async function readOrgAdminOverview(
       (count(*) FILTER (WHERE m.role = 'member'))::int AS members
     FROM organization_members m
     WHERE m.organization_id = ${organizationId}
-  `
+  `)) as unknown as Array<{ total: number; owners: number; admins: number; members: number }>
+  const memberRow = memberRows[0]
 
   /** The plan row. Absent is a real state: an organization with no entitlement row has never been provisioned. */
-  const [entitlement] = await sql<
-    { tier: string; status: string; seat_limit: number | null; current_period_end: Date | null }[]
-  >`
+  const entitlementRows = (await tx.execute(sql`
     SELECT tier::text, status::text, seat_limit, current_period_end
     FROM organization_entitlements
     WHERE organization_id = ${organizationId}
     LIMIT 1
-  `
+  `)) as unknown as Array<{ tier: string; status: string; seat_limit: number | null; current_period_end: string | Date | null }>
+  const entitlement = entitlementRows[0]
 
   /**
    * Privacy requests — counts per status across both request kinds, joined through membership.
@@ -128,17 +137,17 @@ export async function readOrgAdminOverview(
    * The alternative — recording an organization on the request — is a schema change, and for a *deletion* request
    * it is arguably the wrong one: the request belongs to the person, not to a workspace they happened to be in.
    */
-  const privacyRows = await sql<{ kind: string; status: string; total: number }[]>`
-    SELECT 'deletion' AS kind, d.status::text, count(*)::int AS total
+  const privacyRows = (await tx.execute(sql`
+    SELECT 'deletion' AS kind, d.status::text AS status, count(*)::int AS total
     FROM deletion_requests d
     WHERE d.user_id IN (SELECT user_id FROM organization_members WHERE organization_id = ${organizationId})
     GROUP BY d.status
     UNION ALL
-    SELECT 'export' AS kind, e.status::text, count(*)::int AS total
+    SELECT 'export' AS kind, e.status::text AS status, count(*)::int AS total
     FROM data_export_requests e
     WHERE e.user_id IN (SELECT user_id FROM organization_members WHERE organization_id = ${organizationId})
     GROUP BY e.status
-  `
+  `)) as unknown as Array<{ kind: string; status: string; total: number }>
 
   const memberTotal = Number(memberRow?.total ?? 0)
   const seatLimit = entitlement?.seat_limit ?? null

@@ -1,5 +1,7 @@
 import { test, expect } from 'playwright/test'
 import postgres, { type Sql } from 'postgres'
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import { sql as raw } from 'drizzle-orm'
 import { loadHarnessEnv } from '../harness/load-env'
 
 loadHarnessEnv()
@@ -37,6 +39,14 @@ let workerIndex: number
 /** The app role — what a tenant dashboard request runs as, and the identity under test. */
 let sql: Sql
 /**
+ * The same connection through drizzle, because that is what the projection takes.
+ *
+ * Its signature was postgres.js's `Sql` when it was written, and calling it from the app's own `withTenantContext`
+ * — which hands out a drizzle transaction — needed a cast. That cast let the mismatch reach a running route as a
+ * 500 rather than a compile error, which is how this spec found it. The projection takes the transaction now.
+ */
+let db: PostgresJsDatabase
+/**
  * A privileged connection, used **only to seed**.
  *
  * `builderhunt_app` cannot insert into `organizations` either — Better Auth owns them under `builderhunt_auth`,
@@ -55,6 +65,7 @@ test.beforeAll(async () => {
   database = await acquireWorkerDatabase(workerIndex)
   // The app role, which is what a tenant dashboard request runs as.
   sql = postgres(database.urls.DATABASE_URL, { max: 2, prepare: false })
+  db = drizzle(sql)
   // Same database, owner credentials. Derived from the app URL so the database name cannot drift apart.
   seed = postgres(database.urls.DATABASE_URL.replace(/\/\/[^:]+:[^@]+@/, '//postgres:postgres@'), {
     max: 1,
@@ -70,16 +81,26 @@ test.afterAll(async () => {
 
 const ABSENT_ORGANIZATION = '00000000-0000-4000-8000-000000000000'
 
+/**
+ * Reads as the app role, inside a transaction with the tenant context set — which is what the route does.
+ *
+ * The context is not optional: `organization_members` is under RLS scoped to `app.organization_id`, so without it
+ * the member count comes back `empty` with rows seeded. `set_config(..., true)` is transaction-local, so it cannot
+ * leak to the next query on a pooled connection — the same reason `withTenantContext` uses a transaction.
+ */
+function readForOrganization(organizationId: string) {
+  return db.transaction(async (tx) => {
+    await tx.execute(raw`SELECT set_config('app.organization_id', ${organizationId}, true)`)
+    return readOrgAdminOverview(tx, { organizationId, range: '24h', now: new Date() })
+  })
+}
+
 test('every query executes as the app role, which is the whole point', async () => {
   /**
    * The assertion the previous version could not pass. Not "the numbers are right" — "the statements run at all",
    * as the role that would run them.
    */
-  const overview = await readOrgAdminOverview(sql, {
-    organizationId: ABSENT_ORGANIZATION,
-    range: '24h',
-    now: new Date(),
-  })
+  const overview = await readForOrganization(ABSENT_ORGANIZATION)
   expect(overview.schemaVersion).toBe(1)
   expect(Object.keys(overview.sections)).toHaveLength(6)
 })
@@ -93,11 +114,7 @@ test('the three sections with no source say `dependency-missing`, not zero', asy
    * `empty` would be wrong for all three. Empty means "nothing to show", which a reader takes as "no blocked
    * workflows" — a healthy workspace. `dependency-missing` says the feature is not there.
    */
-  const overview = await readOrgAdminOverview(sql, {
-    organizationId: ABSENT_ORGANIZATION,
-    range: '24h',
-    now: new Date(),
-  })
+  const overview = await readForOrganization(ABSENT_ORGANIZATION)
   for (const name of ['blockedWorkflows', 'featureAdoption', 'securityPosture'] as const) {
     const section = overview.sections[name]
     expect(section.state, name).toBe('unavailable')
@@ -108,11 +125,7 @@ test('the three sections with no source say `dependency-missing`, not zero', asy
 test('an organization with no rows is `empty`, which is a different sentence from `unavailable`', async () => {
   // The distinction the envelope exists for, and it is the one this plan is about: a workspace with no members is
   // not a workspace whose member count could not be read.
-  const overview = await readOrgAdminOverview(sql, {
-    organizationId: ABSENT_ORGANIZATION,
-    range: '24h',
-    now: new Date(),
-  })
+  const overview = await readForOrganization(ABSENT_ORGANIZATION)
   expect(overview.sections.members.state).toBe('empty')
   expect(overview.sections.billing.state).toBe('empty')
   expect(overview.sections.privacyRequests.state).toBe('empty')
@@ -171,10 +184,7 @@ test('reads real counts and a seat cap when there is something to read', async (
    * `set_config(..., true)` is transaction-local, so the context cannot leak to the next query on this pooled
    * connection — which is the same reason `withTenantContext` uses a transaction rather than a session variable.
    */
-  const overview = await sql.begin(async (tx) => {
-    await tx`SELECT set_config('app.organization_id', ${organizationId}, true)`
-    return readOrgAdminOverview(tx as unknown as Sql, { organizationId, range: '24h', now: new Date() })
-  })
+  const overview = await readForOrganization(organizationId)
 
   const members = overview.sections.members
   expect(members.state).toBe('ready')
@@ -198,10 +208,7 @@ test('carries none of the eight forbidden markers, whatever it read', async () =
    * counts, so there is no identity column to leak.
    */
   const organizationId = '11111111-1111-4111-8111-111111111111'
-  const overview = await sql.begin(async (tx) => {
-    await tx`SELECT set_config('app.organization_id', ${organizationId}, true)`
-    return readOrgAdminOverview(tx as unknown as Sql, { organizationId, range: '24h', now: new Date() })
-  })
+  const overview = await readForOrganization(organizationId)
   const serialized = JSON.stringify(overview)
   for (const marker of [
     'memberEmail',

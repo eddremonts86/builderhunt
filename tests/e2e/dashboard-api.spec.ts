@@ -124,6 +124,50 @@ test.describe('dashboard API routes', () => {
     }
   })
 
+  test('/api/dashboard/organization-admin answers an owner and refuses the signed-out caller', async () => {
+    /**
+     * Plan 57, Admin track — the route that made the org-admin projection and its section reachable.
+     *
+     * Both halves were written on 2026-08-07 and marked done with nothing between them: the projection read four
+     * tables that do not exist and needed privileges the app role lacks, and no page mounted the component. This is
+     * the assertion that the middle exists.
+     */
+    const refused = await anonymous.get('/api/dashboard/organization-admin')
+    expect(refused.status(), await refused.text()).toBe(401)
+
+    const response = await fx.activeRecruiter.api!.get('/api/dashboard/organization-admin')
+    expect(response.status(), await response.text()).toBe(200)
+    const body = await response.json() as {
+      organizationId: string
+      sections: Record<string, { state: string; reason?: string }>
+    }
+    expect(body.organizationId).toBe(fx.recruiterOrg.organizationId)
+
+    /**
+     * Six sections, and three of them say `dependency-missing` — which is the point rather than a shortfall.
+     *
+     * `blocked_workflows` and `feature_adoption` exist in no form, and `securityPosture` needs `auth_users`, which
+     * `builderhunt_app` is deliberately not granted. Reporting zeros for any of the three would render as a healthy
+     * workspace, and this route runs as the role that cannot read the account table — so it says so instead.
+     */
+    expect(Object.keys(body.sections)).toHaveLength(6)
+    for (const name of ['blockedWorkflows', 'featureAdoption', 'securityPosture']) {
+      expect(body.sections[name], name).toMatchObject({ state: 'unavailable', reason: 'dependency-missing' })
+    }
+
+    // And the members section read real rows through the tenant context — the count is not `empty`, which is what
+    // it returns when `app.organization_id` is not set and RLS hides everything.
+    expect(body.sections.members.state).toBe('ready')
+  })
+
+  test('/api/dashboard/organization-admin refuses an unknown range rather than falling back', async () => {
+    const refused = await fx.activeRecruiter.api!.get('/api/dashboard/organization-admin?range=90d')
+    expect(refused.status(), await refused.text()).toBe(400)
+    const accepted = await fx.activeRecruiter.api!.get('/api/dashboard/organization-admin?range=30d')
+    expect(accepted.status()).toBe(200)
+    expect((await accepted.json() as { range: string }).range).toBe('30d')
+  })
+
   test('/api/dashboard/stats answers GET, refuses the signed-out caller, and answers 405 elsewhere', async () => {
     const refused = await anonymous.get('/api/dashboard/stats')
     expect(refused.status(), await refused.text()).toBe(401)

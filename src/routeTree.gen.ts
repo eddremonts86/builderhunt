@@ -103,6 +103,7 @@ import { Route as ApiE2eBillingProviderRouteImport } from './routes/api/e2e/bill
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
 import { Route as ApiDashboardPreferencesRouteImport } from './routes/api/dashboard/preferences'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
+import { Route as ApiDashboardOrganizationAdminRouteImport } from './routes/api/dashboard/organization-admin'
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiCalendarNotificationsRouteImport } from './routes/api/calendar/notifications'
 import { Route as ApiCalendarFeedRouteImport } from './routes/api/calendar/feed'
@@ -780,6 +781,12 @@ const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   path: '/api/dashboard/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDashboardOrganizationAdminRoute =
+  ApiDashboardOrganizationAdminRouteImport.update({
+    id: '/api/dashboard/organization-admin',
+    path: '/api/dashboard/organization-admin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiChangelogSlugRoute = ApiChangelogSlugRouteImport.update({
   id: '/api/changelog/$slug',
   path: '/api/changelog/$slug',
@@ -1984,6 +1991,7 @@ export interface FileRoutesByFullPath {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -2277,6 +2285,7 @@ export interface FileRoutesByTo {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -2575,6 +2584,7 @@ export interface FileRoutesById {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -2872,6 +2882,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
@@ -3165,6 +3176,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
@@ -3462,6 +3474,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
@@ -3713,6 +3726,7 @@ export interface RootRouteChildren {
   ApiCalendarFeedRoute: typeof ApiCalendarFeedRoute
   ApiCalendarNotificationsRoute: typeof ApiCalendarNotificationsRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
+  ApiDashboardOrganizationAdminRoute: typeof ApiDashboardOrganizationAdminRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
   ApiDashboardPreferencesRoute: typeof ApiDashboardPreferencesRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
@@ -4532,6 +4546,13 @@ declare module '@tanstack/react-router' {
       path: '/api/dashboard/overview'
       fullPath: '/api/dashboard/overview'
       preLoaderRoute: typeof ApiDashboardOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/organization-admin': {
+      id: '/api/dashboard/organization-admin'
+      path: '/api/dashboard/organization-admin'
+      fullPath: '/api/dashboard/organization-admin'
+      preLoaderRoute: typeof ApiDashboardOrganizationAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/changelog/$slug': {
@@ -6455,6 +6476,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCalendarFeedRoute: ApiCalendarFeedRoute,
   ApiCalendarNotificationsRoute: ApiCalendarNotificationsRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
+  ApiDashboardOrganizationAdminRoute: ApiDashboardOrganizationAdminRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
   ApiDashboardPreferencesRoute: ApiDashboardPreferencesRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,

@@ -35,6 +35,8 @@ import { SprintsWidget, type SprintListItem } from '~/modules/dashboard/ui/home/
 import { AlertsWidget, type AlertTrigger } from '~/modules/dashboard/ui/home/AlertsWidget'
 import { SavedQueryVisibilityBadge, type SavedQueryVisibility } from '~/modules/dashboard/components/SavedQueryVisibilityBadge'
 import { SourceMixWidget } from '~/modules/dashboard/ui/home/SourceMixWidget'
+import { OrganizationAdminSection } from '~/modules/dashboard/components/admin/OrganizationAdminSection'
+import type { OrgAdminOverview } from '~/shared/lib/repositories/dashboard-organization-admin'
 
 interface Stats {
   totalBuilders: number
@@ -705,6 +707,45 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
   },
 ])
 
+/**
+ * Loads the organization-admin overview and renders the section, or nothing (plan 57, Admin track).
+ *
+ * ## Why the role is not checked here
+ *
+ * `/api/dashboard/organization-admin` answers 403 for a plain member, so this component asks and finds out. The
+ * alternative — reading the viewer's role client-side and skipping the request — puts the authorization decision in
+ * two places, and the copy of it in the browser is the one an attacker edits. Asking is also how a role change
+ * mid-session resolves correctly.
+ *
+ * A 403 is silent: no error, no empty section. The section not existing *is* the answer for someone who is not an
+ * admin, and telling them "you are not allowed to see the administration panel" describes a panel they did not
+ * know about.
+ */
+function OrganizationAdminOverview() {
+  const [overview, setOverview] = React.useState<OrgAdminOverview | null>(null)
+
+  React.useEffect(() => {
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        const response = await fetch('/api/dashboard/organization-admin', {
+          credentials: 'include',
+          signal: controller.signal,
+        })
+        // 403 for a member, 401 signed out — both mean "no section", which is the same as a failed read here.
+        if (!response.ok) return
+        setOverview(await response.json())
+      } catch {
+        // Silent by design. A workspace-administration panel that could not load must not put an error on a
+        // dashboard that is otherwise working, and it must not report one to somebody who is not an admin.
+      }
+    })()
+    return () => controller.abort()
+  }, [])
+
+  return <OrganizationAdminSection overview={overview} />
+}
+
 export function DashboardPage() {
   const reduceMotion = useReducedMotion()
   const { preferences, setDensity, toggleHidden, togglePinned, setOrder, resetPreferences } = useDashboardPreferences()
@@ -1075,6 +1116,16 @@ export function DashboardPage() {
         ctx={widgetContext}
         density={density}
       />
+
+      {/*
+        After the normal workflow sections, which is what the task asks for and the right order anyway.
+
+        An owner or admin opens this page to do their work; the administration of the workspace is a second
+        question. It renders `null` for anyone else — and for them the fetch never happens either, because
+        `/api/dashboard/organization-admin` answers 403 for a plain member. The component's `null` is a rendering
+        detail, not the boundary.
+      */}
+      <OrganizationAdminOverview />
 
       {error && (
         <div className="mt-6 p-4 rounded-lg border border-bh-danger/30 bg-bh-danger/10 text-sm text-bh-danger font-light">
