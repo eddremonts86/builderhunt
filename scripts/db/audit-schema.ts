@@ -370,6 +370,14 @@ const classifications: Classification[] = [
   // RLS-exception rationale as `status_checks` and `access_requests` above.
   operational('platform_beta_mode', 'updated_by (platform operator id, no FK so history survives account deletion)', ['beta-mode-global-pro-max-grant']),
 
+  // Per-minute service metrics (plan 57). No tenant column and no personal data: the only free-text values
+  // are a route *family* from a fourteen-value allowlist, an instance name and a deployment id, so there is
+  // no predicate an RLS policy could express. Same RLS exception as `status_checks` and `platform_beta_mode`.
+  // The reason the family is an allowlist rather than a path is itself a privacy decision —
+  // `/api/sprints/<id>` names a real sprint, and a path column would put tenant identifiers in an operator
+  // table and in every export of it.
+  operational('service_metric_buckets', 'route_family (allowlisted, never a path), instance, deployment', ['ui-dashboard']),
+
   operational('profile_removal_requests', 'source + source_id (hashed challenge, no PII)', ['audit-trust']),
   operational('profile_suppressions', 'source + source_id (revoked/active, audited admin action)', ['audit-trust']),
 

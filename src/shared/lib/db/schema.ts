@@ -4333,6 +4333,67 @@ export const securityAuditEvents = pgTable(
  * else's decision. `updatedBy` has no foreign key on purpose: the record of who enabled beta mode has
  * to survive that operator's account being deleted.
  */
+/**
+ * Per-minute service metrics, persisted as **deltas** rather than read from cumulative counters
+ * (plan 57, Admin track — "Add truthful historical service-metric storage or adapter").
+ *
+ * ## Why deltas, which is the whole point of the table
+ *
+ * `metrics.get()` is cumulative-since-boot and per-instance. Deriving history from it by subtracting
+ * consecutive reads breaks in the two cases that matter most: a deploy resets the counter, so the next
+ * subtraction is negative and reads as a huge negative rate or gets clamped to zero and silently loses a
+ * window; and with two instances the two series interleave, so a subtraction crosses instances and
+ * produces a number that describes neither. Each row here is "what this instance saw during this minute",
+ * which sums across instances and survives a restart because a restart just starts a new row.
+ *
+ * ## Why a fixed-boundary histogram and not a mean
+ *
+ * A p95 cannot be recovered from stored means — averaging averages loses the distribution, and averaging
+ * percentiles is not a percentile of anything. Raw samples would be unbounded. So each row carries counts
+ * against one code-owned boundary list (`LATENCY_BOUNDARIES_MS`), which makes p50/p95/p99 a matter of
+ * summing the arrays elementwise across whichever rows the window covers — across instances and across
+ * restarts alike, which is exactly what this task's Verify line asks to reconcile.
+ *
+ * ## Why `route_family` and not a path
+ *
+ * `/api/sprints/<id>` names a real sprint. A path column would publish tenant identifiers into an
+ * operator table and let traffic rather than design decide its cardinality; the family comes from the
+ * closed allowlist in `admin-metrics/contracts.ts` and anything unrecognised becomes `other`.
+ *
+ * No tenant column, no RLS: there is no predicate a policy could express. Access is GRANT-only —
+ * `builderhunt_app` writes its own minutes, `builderhunt_platform` reads, and `builderhunt_worker` is the
+ * only role that may delete. The app's write is an *additive* upsert (`requests + excluded.requests`),
+ * because a flush lands mid-minute: no code path sets a past value, it only adds what just happened to the
+ * minute it happened in.
+ */
+export const serviceMetricBuckets = pgTable(
+  'service_metric_buckets',
+  {
+    /** Truncated to the minute, UTC. One row per (minute, family, instance). */
+    bucketStart: timestamp('bucket_start', { withTimezone: true }).notNull(),
+    /** From the closed allowlist; never a raw path. */
+    routeFamily: text('route_family').notNull(),
+    /** Which process produced this minute, so two instances are summed rather than confused. */
+    instance: text('instance').notNull(),
+    /** Which release, so a rate change can be attributed to a deploy rather than to traffic. */
+    deployment: text('deployment').notNull(),
+    requests: integer('requests').notNull().default(0),
+    errors: integer('errors').notNull().default(0),
+    searches: integer('searches').notNull().default(0),
+    searchCacheHits: integer('search_cache_hits').notNull().default(0),
+    /** Counts aligned to `LATENCY_BOUNDARIES_MS`, plus one overflow slot. Summable across rows. */
+    latencyBuckets: jsonb('latency_buckets').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.bucketStart, table.routeFamily, table.instance] }),
+    /** The read shape: a window, then everything in it. Retention deletes by the same leading column. */
+    index('service_metric_buckets_window_idx').on(table.bucketStart),
+    check('service_metric_buckets_requests_check', sql`${table.requests} >= 0 and ${table.errors} >= 0`),
+    check('service_metric_buckets_searches_check', sql`${table.searches} >= 0 and ${table.searchCacheHits} >= 0`),
+  ],
+)
+
 export const platformBetaMode = pgTable(
   'platform_beta_mode',
   {

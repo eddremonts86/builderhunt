@@ -676,6 +676,10 @@
     "0168_role_timeouts": {
       "sql": "031601abb37397b4d69d82bc7adf52e65a076eb8bf98c8c78f0b1e7587b10aa7",
       "snapshot": "be2fcc998f988b23aab0665603c887ecb2665154cd5b19a238670b67d987bf11"
+    },
+    "0169_service_metric_buckets": {
+      "sql": "87eb094a4ad0bf4ee00686275c3f406c01e3eb9578610798079856156288eda8",
+      "snapshot": "7d67c749f21b4118049dbd82eaa2254c93c059b3e201a224dcec7b3f844cf3ca"
     }
   }
 }
