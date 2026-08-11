@@ -680,6 +680,10 @@
     "0169_service_metric_buckets": {
       "sql": "87eb094a4ad0bf4ee00686275c3f406c01e3eb9578610798079856156288eda8",
       "snapshot": "7d67c749f21b4118049dbd82eaa2254c93c059b3e201a224dcec7b3f844cf3ca"
+    },
+    "0170_platform_admin_preferences": {
+      "sql": "7d23933a5f8fbc1b0a5e128c15eb1d645673c428c9039eb2a3b96f774f7a7b4a",
+      "snapshot": "4220c498ccd04dda96bc315915154a306029dae05d7070e8a5b302316421b429"
     }
   }
 }

@@ -662,6 +662,32 @@ export const builderClaims = pgTable(
   ],
 )
 
+/**
+ * Platform-admin console preferences (plan 57, Admin track).
+ *
+ * Deliberately *not* a column on `dashboard_preferences`. That table is keyed `(organization_id, user_id)` with
+ * RLS scoping every row to `app.organization_id`, which is right for a tenant preference and wrong for a platform
+ * one: a platform admin has no organization in the admin console, and the same human is also a member of
+ * organizations. Sharing the table would need either a nullable `organization_id` the RLS predicate silently
+ * drops — so the preference would never load — or a sentinel organization row any tenant policy bug would expose.
+ *
+ * Two tables, two roles. `builderhunt_app` has no grant here at all, which is what makes "platform and tenant
+ * preferences cannot read each other" a property of the database rather than of a review. Grants and the reasoning
+ * live in `drizzle/0170_platform_admin_preferences.sql`, not here — drizzle-kit does not manage either.
+ */
+export const platformAdminPreferences = pgTable('platform_admin_preferences', {
+  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+  /** Where the console opens. Validated against the contracts' allowlists in the application, never here. */
+  landingSection: text('landing_section').notNull().default('overview'),
+  landingRange: text('landing_range').notNull().default('24h'),
+  landingVariant: text('landing_variant').notNull().default('summary'),
+  /** Widget ids this admin hid. Ids only; the application refuses to hide a required one. */
+  hiddenWidgetIds: jsonb('hidden_widget_ids').$type<string[]>().notNull().default([]),
+  /** Bumped when a stored shape stops being readable. A future version is ignored, never migrated in place. */
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const publishedBuilderProfiles = pgTable('published_builder_profiles', {
   builderIdentityId: text('builder_identity_id').primaryKey().references(() => builderIdentities.id, { onDelete: 'cascade' }),
   publishedByUserId: text('published_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),

@@ -123,6 +123,7 @@ import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
 import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
 import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
 import { Route as ApiAdminSearchSourcesRouteImport } from './routes/api/admin/search-sources'
+import { Route as ApiAdminPreferencesRouteImport } from './routes/api/admin/preferences'
 import { Route as LandingPrivacyRemoveRouteImport } from './routes/_landing/privacy/remove'
 import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
 import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
@@ -878,6 +879,11 @@ const ApiAiCompleteRoute = ApiAiCompleteRouteImport.update({
 const ApiAdminSearchSourcesRoute = ApiAdminSearchSourcesRouteImport.update({
   id: '/api/admin/search-sources',
   path: '/api/admin/search-sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminPreferencesRoute = ApiAdminPreferencesRouteImport.update({
+  id: '/api/admin/preferences',
+  path: '/api/admin/preferences',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LandingPrivacyRemoveRoute = LandingPrivacyRemoveRouteImport.update({
@@ -1957,6 +1963,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
   '/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/preferences': typeof ApiAdminPreferencesRoute
   '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
@@ -2249,6 +2256,7 @@ export interface FileRoutesByTo {
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
   '/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/preferences': typeof ApiAdminPreferencesRoute
   '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
@@ -2546,6 +2554,7 @@ export interface FileRoutesById {
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
   '/_landing/legal/terms': typeof LandingLegalTermsRoute
   '/_landing/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/preferences': typeof ApiAdminPreferencesRoute
   '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
@@ -2842,6 +2851,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/privacy/remove'
+    | '/api/admin/preferences'
     | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
@@ -3134,6 +3144,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/privacy/remove'
+    | '/api/admin/preferences'
     | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
@@ -3430,6 +3441,7 @@ export interface FileRouteTypes {
     | '/_landing/legal/privacy'
     | '/_landing/legal/terms'
     | '/_landing/privacy/remove'
+    | '/api/admin/preferences'
     | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
@@ -3680,6 +3692,7 @@ export interface RootRouteChildren {
   PortfolioClaimIdRoute: typeof PortfolioClaimIdRoute
   RSlugRoute: typeof RSlugRoute
   ScheduleInvitationIdRoute: typeof ScheduleInvitationIdRoute
+  ApiAdminPreferencesRoute: typeof ApiAdminPreferencesRoute
   ApiAdminSearchSourcesRoute: typeof ApiAdminSearchSourcesRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
@@ -4659,6 +4672,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/search-sources'
       fullPath: '/api/admin/search-sources'
       preLoaderRoute: typeof ApiAdminSearchSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/preferences': {
+      id: '/api/admin/preferences'
+      path: '/api/admin/preferences'
+      fullPath: '/api/admin/preferences'
+      preLoaderRoute: typeof ApiAdminPreferencesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_landing/privacy/remove': {
@@ -6414,6 +6434,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortfolioClaimIdRoute: PortfolioClaimIdRoute,
   RSlugRoute: RSlugRoute,
   ScheduleInvitationIdRoute: ScheduleInvitationIdRoute,
+  ApiAdminPreferencesRoute: ApiAdminPreferencesRoute,
   ApiAdminSearchSourcesRoute: ApiAdminSearchSourcesRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,

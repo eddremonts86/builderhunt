@@ -1010,10 +1010,50 @@ missing — so the only honest version of this widget was an empty one.
 
 ### Admin preferences and release gates
 
-- [ ] **Persist isolated platform-admin preferences**
+- [~] **Persist isolated platform-admin preferences**
   - Files: admin dashboard preference schema/repository/API, customization UI, security tests
   - Do: Store platform layout/range separately from organization dashboard preferences. Fix required Incident, Security/Abuse, and Billing-risk widgets; allow optional Growth/Content widgets to move/hide through keyboard-accessible controls.
   - Verify: platform and tenant preferences cannot overwrite/read each other; required-widget hiding fails; version migration, stale update, keyboard reorder, reset, and shared-browser account switch pass.
+  - **Store, repository and route landed 2026-08-11.** `drizzle/0170_platform_admin_preferences.sql`,
+    `repositories/platform-admin-preferences.ts`, `GET|PUT /api/admin/preferences`.
+  - **"Cannot read each other" is a missing grant, not a `WHERE` clause.** `platform_admin_preferences` is granted
+    to `builderhunt_platform` and `builderhunt_readonly`; `builderhunt_app` has no grant at all. Measured against
+    the real database in both directions: the app role gets `permission denied for table
+    platform_admin_preferences`, and the platform role gets the same on `dashboard_preferences`. A missing
+    privilege refuses the statement, where a policy filters rows and can be defeated by a forgotten
+    `withTenantContext`.
+  - **Why a separate table.** `dashboard_preferences` is keyed `(organization_id, user_id)` under RLS scoping every
+    row to `app.organization_id`. A platform admin has no organization in the admin console, and the same human is
+    also a member of organizations — so sharing the table would need either a nullable `organization_id` the
+    predicate silently drops (the preference would never load) or a sentinel organization row any tenant policy bug
+    would expose.
+  - **Five e2e cases connect as the roles themselves**, including a control asserting the platform role *can* use
+    its own store — without it, every refusal above would also pass on a platform role misconfigured into having no
+    privileges, and the isolation would look perfect while the feature was broken.
+  - **The required widget is the action queue, and hiding it is refused with a 422.** It is the panel that says a
+    webhook is dead-lettered or a removal request is past its legal date, and it is *already* absent whenever it
+    has nothing to say — so a control to hide it would only ever be used on a day it had a row. The refusal is a
+    named error rather than a silent filter: dropping the id quietly would report success and then not honour it,
+    and the next read would disagree with what the control showed. It is also filtered on *read*, so a row written
+    by an older build cannot hide it either.
+  - **A future version reads as the defaults.** Reading a shape you have never seen means guessing, and the failure
+    is silent — the console would open somewhere the admin did not choose with nothing to notice. Defaults are
+    visibly wrong, which is better.
+  - **An unknown section falls back rather than 400ing**, because a preference naming a section a later build
+    removed is expected; but an unknown *body key* is a 400 (`.strict()`), because that is a client bug and
+    silently ignoring `landingSection` would look like a save that did nothing.
+  - **Nothing is stored client-side, and that is the shared-browser answer.** A layout in `localStorage` survives a
+    sign-out, so on a shared machine the next admin opens the previous admin's console — and on a tenant's machine
+    it would be a platform preference sitting in a browser that should hold no trace of the admin console. There is
+    also no `userId` parameter on the route in either direction: the id comes from the principal, so one admin
+    cannot read or overwrite another's console.
+  - **No DELETE grant**, matching `dashboard_preferences`: "reset my layout" is an update to the defaults, and a
+    case asserts the delete is refused.
+  - **Still open:** the UI half. There is no control yet that sets the landing view or hides an optional widget, so
+    "keyboard reorder" and "reset" have no surface to exercise — and the optional Growth/Content widgets the task
+    names are sections rather than movable cards after the "índice = metrics" decision, which makes "move/hide"
+    a question about what those controls should even do. The store refuses the wrong things correctly; nothing
+    calls it from the page yet.
 
 - [ ] **Add admin scope, audit, and performance release gates**
   - Files: admin dashboard contract/E2E/accessibility/performance tests, rollout runbook

@@ -189,6 +189,8 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   // The split sections (plan 57). `sections.ts` is probed with a valid section, because an invalid one is
   // a 400 for *everybody* and would pass this table without ever reaching the authorization guard.
   { file: 'metrics/overview.ts', method: 'GET', path: '/api/admin/metrics/overview' },
+  { file: 'preferences.ts', method: 'GET', path: '/api/admin/preferences' },
+  { file: 'preferences.ts', method: 'PUT', path: '/api/admin/preferences' },
   { file: 'metrics/run-retention.ts', method: 'POST', path: '/api/admin/metrics/run-retention' },
   { file: 'metrics/sections.ts', method: 'GET', path: '/api/admin/metrics/sections?section=runtime' },
   { file: 'metrics/trust.ts', method: 'GET', path: '/api/admin/metrics/trust' },
@@ -431,6 +433,55 @@ test.describe('a platform admin', () => {
       const bad = await harness.admin.api!.fetch(`/api/admin/metrics/conversion?${query}`)
       expect(bad.status(), query).toBe(400)
     }
+
+    /**
+     * Platform-admin console preferences (plan 57, "Persist isolated platform-admin preferences").
+     *
+     * Four properties, and the isolation is the one that needs a real database rather than a unit test.
+     */
+    const prefsBefore = await harness.admin.api!.fetch('/api/admin/preferences')
+    expect(prefsBefore.status()).toBe(200)
+    expect((await prefsBefore.json()).landing.section).toBe('overview')
+
+    const saved = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { section: 'traffic', range: '7d', variant: 'latency' },
+    })
+    expect(saved.status()).toBe(200)
+    expect((await saved.json()).landing).toMatchObject({ section: 'traffic', range: '7d', variant: 'latency' })
+    // Persisted, not echoed: a fresh read returns it.
+    expect((await (await harness.admin.api!.fetch('/api/admin/preferences')).json()).landing.section).toBe('traffic')
+
+    /**
+     * A required widget cannot be hidden, and the refusal is a 422 rather than a silent filter.
+     *
+     * The action queue is the panel that says a webhook is dead-lettered or a removal request is past its legal
+     * date, and it is *already* absent whenever it has nothing to say — so a control to hide it would only ever be
+     * used on a day it had a row. Silently dropping the id would report success and then not honour it, and the
+     * next read would disagree with what the control showed.
+     */
+    const refused = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { hiddenWidgetIds: ['action_queue'] },
+    })
+    expect(refused.status()).toBe(422)
+    expect((await refused.json()).error).toBe('required_widget_hidden')
+
+    // An unknown section falls back rather than 400ing: a preference naming a section a later build removed is
+    // expected, not exceptional.
+    const normalized = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { section: 'surveillance' },
+    })
+    expect(normalized.status()).toBe(200)
+    expect((await normalized.json()).landing.section).toBe('overview')
+
+    // A body with an unknown key is refused outright — `.strict()`, so a typo is not silently ignored.
+    const strict = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { landingSection: 'traffic' },
+    })
+    expect(strict.status()).toBe(400)
 
     /**
      * The legacy compatibility endpoint's key set, asserted so it cannot quietly re-monolith.

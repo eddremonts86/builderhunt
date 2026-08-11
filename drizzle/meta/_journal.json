@@ -1191,6 +1191,13 @@
       "when": 1786458696819,
       "tag": "0169_service_metric_buckets",
       "breakpoints": true
+    },
+    {
+      "idx": 170,
+      "version": "7",
+      "when": 1786470544836,
+      "tag": "0170_platform_admin_preferences",
+      "breakpoints": true
     }
   ]
 }
