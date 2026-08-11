@@ -287,17 +287,37 @@ missing — so the only honest version of this widget was an empty one.
   - Verify: schema snapshots prove that tenant and platform DTOs are not assignable/interchangeable; sensitive marker and excessive-row fixtures fail closed.
   - **Implemented 2026-08-07.** `src/shared/lib/dashboard/admin-contracts.ts` declares `ORG_ADMIN_SCHEMA_VERSION=1`, `PLATFORM_ADMIN_SCHEMA_VERSION=2`, disjoint action-kind sets (`orgAdminActionKinds` 6 entries, `platformAdminActionKinds` 7 entries, intersection is empty), six-section envelopes for org-admin and seven-section envelopes for platform-admin, a closed `forbiddenMemberDataMarkers` table of 8 strings (member email, candidate email, productivity score, rank, session detail, individual adoption, search content, note content) that is a grep target for any server build, and a URL regex `^\/[a-z0-9/_-]+$` that rejects anything that escapes the in-app path space. `tests/unit/security/admin-contracts.test.ts` pins every property: schema-version literals are distinct, action sets are disjoint, each schema rejects the other's payload shape, the URL regex rejects absolute URLs, and the 8 markers are listed verbatim.
 
-- [x] **Build the organization-admin overview projection**
+- [~] **Build the organization-admin overview projection**
   - Files: `src/shared/lib/repositories/dashboard-organization-admin.ts`, dashboard overview route/adapter, repository/API tests
   - Do: Add tenant-scoped members/seats, elevated-role/ownership state, canonical billing/entitlement status, blocked workflow counts, feature setup/adoption, security posture, and eligible privacy/data-request counts. Minimize every field by owner/admin authority.
   - Verify: member/admin/owner, suspended user, pending ownership, cross-tenant, financial-field, private-content, and empty-workspace fixtures pass.
   - **Implemented 2026-08-07.** `src/shared/lib/repositories/dashboard-organization-admin.ts` exports `readOrgAdminOverview(sql, input)` which composes the six org-admin sections from real organization data: members/seats (counts + role breakdown only), billing/entitlement (tier + approachingCap boolean + renewal days), blocked workflows (counts per kind, no row identity), feature adoption (org-aggregated fractions only), security posture (unverified admin count + per-admin stale-days map, admin-only), and privacy requests (public statuses only). The projection parses through `orgAdminOverviewSchema.parse(...)` before returning, so any schema drift fails closed at the boundary. The route handler `GET /api/dashboard/organization-admin` is the next write-up — current state is the projection function + contract, which are independently usable.
+  - **Reopened 2026-08-11: "independently usable" was not true, and this was marked `[x]`.** Called against the
+    real local database, `readOrgAdminOverview` throws `column "email_verified" does not exist`. Four of the six
+    tables it reads — `blocked_workflows`, `data_privacy_requests`, `entitlements`, `feature_adoption` — appear
+    in no migration at all; only `organization_members` and `organization_invitations` are real. Nothing in
+    `src/` or `tests/` imports the function, which is why nothing ever ran it: it type-checks, it parses its own
+    contract, and it has never executed a single query successfully.
+  - **How it passed as done.** The write-up above is accurate about the *code* and silent about whether the code
+    runs — and with no caller there was no test to disagree. Same failure mode as the `apiRequests` counter that
+    read zero for its whole existence: everything present, nothing wired, and no signal distinguishing "works"
+    from "never invoked".
+  - **Remaining:** either the four tables and the corrected column, or a projection rewritten against the schema
+    that exists. That is a scope decision rather than a fix — the maintainer already narrowed the equivalent
+    platform-side question to "índice = metrics" in the Command Center task below.
 
-- [x] **Build the Organization Admin widget section**
+- [~] **Build the Organization Admin widget section**
   - Files: `src/modules/dashboard/components/admin/OrganizationAdminSection.tsx`, widget registry, component/E2E tests
   - Do: Register Members and seats, Roles/access review, Billing and entitlements, Team coordination, Workspace adoption, Security posture, and eligible Data/privacy widgets after the normal workflow sections. Promote critical issues into the shared queue and link to canonical settings/workflows.
   - Verify: ordinary members see no section or capability hints; admins see only allowed status; owners receive owner-only finance/actions; keyboard/mobile order remains aligned.
   - **Implemented 2026-08-07.** `src/modules/dashboard/components/admin/OrganizationAdminSection.tsx` renders the six org-admin sections inside a 1/2/3-column responsive grid (`md:grid-cols-2 lg:grid-cols-3`), handles every envelope state (`forbidden`, `loading`, `empty`, `unavailable`, `ready`) with copy that never reveals capability details or config strings, and renders server-controlled actions with the relative-in-app-path URL only. The component is null when the viewer is not an owner/admin — there is no per-role fallback that exposes anything. `tests/unit/modules/dashboard/components/admin/OrganizationAdminSection.test.tsx` ships 6 assertions: hides for null overview, renders 6 cards for admins, every envelope state renders its matching copy, ready-state content includes the typed data, and a privacy-marker scan that fails if any of the 8 forbidden strings enters the DOM.
+  - **Reopened 2026-08-11: no page mounts it.** `grep -rn OrganizationAdminSection src` finds the component and
+    nothing else — no route, no dashboard page, no widget registry entry. The six assertions pass because they
+    render the component directly with hand-built fixtures, so they prove it is *correct* and prove nothing about
+    it being *reachable*. Its data source cannot run either; see the projection task above.
+  - **The registry the task asks for does not exist.** "Register Members and seats, Roles/access review, … after
+    the normal workflow sections" is the missing half: there is a component that would render them and nothing
+    that decides where they go.
 
 - [x] **Prevent organization-admin surveillance metrics**
   - Files: organization-admin repository/contracts, analytics schema, security tests
@@ -322,6 +342,22 @@ missing — so the only honest version of this widget was an empty one.
     repository has the receipt — `/admin/integrations` showed two retired sources as ACTIVE because
     it was assembled from a compile-time registry nobody updated. Remaining work is therefore
     `GET /api/admin/overview` and the sections, folded into the Metrics rebuild below.
+  - **Measured 2026-08-11, and the starting point is worse than "remaining work".** The projection this task
+    names already exists — `readPlatformAdminOverview` in `repositories/dashboard-platform-admin.ts`, all seven
+    sections written and parsed through `platformAdminOverviewSchema`. Called against the real local database it
+    throws `relation "platform_incidents" does not exist`, and **all eight** tables it reads appear in no
+    migration and no schema file: `platform_incidents`, `platform_ops_metrics`, `platform_billing_rollup`,
+    `platform_abuse_reports`, `platform_user_anomalies`, `platform_signups`, `public_content_queue`,
+    `public_builder_profile_claims`. Nothing imports it.
+  - **`PlatformAdminSection.tsx` is rendered by nothing**, the same as its org-admin counterpart. So the Command
+    Center exists at both ends and has no middle: a tested contract, a tested component, a projection that
+    cannot execute, and no route between them.
+  - **This makes the four widget-family tasks below a build, not a wiring job** — and it sharpens the
+    "índice = metrics" decision, because the four families have real sources today that the projection's
+    invented tables do not: `listScheduleRegistry` + `listLatestJobRuns` for worker health, the search and
+    solutions source registers for integration health, `getRemovalOperationsMetrics` for trust deadline aging,
+    `listRecentAbuseSignals` for abuse. Billing alerts are the exception and must not come from
+    `getBillingOperationsMetrics`, whose per-organization sweep was deliberately removed from any frequent path.
 
 - [~] **Reconcile stale and future Admin destinations**
   - Files: `src/modules/dashboard/ui/shell/nav-config.ts`, Admin routes, `plans/UI`, navigation tests
