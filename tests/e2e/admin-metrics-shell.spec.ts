@@ -409,6 +409,215 @@ test.describe('the Admin Metrics shell', () => {
     }
   })
 
+  test('survives 400 % zoom without clipping a number or overlapping a label', async ({ browser }) => {
+    /**
+     * WCAG 1.4.4 at its real threshold: 400 % of a 1280 px viewport is a 320 px CSS layout, which the case above
+     * already covers for *overflow*. What it does not cover is what zoom does that a narrow viewport does not —
+     * every glyph is four times larger, so text that fitted at 320 px can now be clipped by a fixed-height box or
+     * collide with the label beside it.
+     *
+     * Emulated as `deviceScaleFactor: 4` on a 320 px viewport rather than by a browser zoom command, because
+     * Playwright has no zoom API and this is the combination that reproduces the CSS-pixel layout a zoomed user
+     * gets.
+     *
+     * Two assertions, and neither is "does it look right":
+     *   - **Nothing is clipped.** A value's `scrollWidth`/`scrollHeight` exceeding its client box means the number
+     *     is cut off — the specific failure a `text-3xl` inside a fixed-height tile produces, and the one an
+     *     operator reads as a smaller number than it is.
+     *   - **Nothing overlaps.** Two metric values whose rectangles intersect are unreadable regardless of what
+     *     either says.
+     */
+    const context = await browser.newContext({
+      storageState: admin.storageState!,
+      viewport: { width: 320, height: 720 },
+      deviceScaleFactor: 4,
+    })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      for (const section of ['overview', 'trust', 'runtime']) {
+        const variant = section === 'trust' ? 'anomalies' : section === 'runtime' ? 'process' : 'summary'
+        await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=${section}&range=24h&variant=${variant}&compare=false`)
+        await dismissOverlays(tab)
+        await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+        await expect(tab.locator('[data-testid^="metric-value-"]').first()).toBeVisible({ timeout: 20_000 })
+
+        const problems = await tab.evaluate(() => {
+          const nodes = [...document.querySelectorAll('[data-testid^="metric-value-"]')]
+          const clipped = nodes
+            .filter((node) => node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1)
+            .map((node) => `clipped:${node.getAttribute('data-testid')}`)
+          const boxes = nodes.map((node) => ({ id: node.getAttribute('data-testid'), rect: node.getBoundingClientRect() }))
+          const overlapping: string[] = []
+          for (let a = 0; a < boxes.length; a += 1) {
+            for (let b = a + 1; b < boxes.length; b += 1) {
+              const one = boxes[a]!.rect
+              const two = boxes[b]!.rect
+              const intersects =
+                one.left < two.right - 1 && two.left < one.right - 1 && one.top < two.bottom - 1 && two.top < one.bottom - 1
+              if (intersects) overlapping.push(`overlap:${boxes[a]!.id}+${boxes[b]!.id}`)
+            }
+          }
+          return [...clipped, ...overlapping]
+        })
+        expect(problems, `${section} at 400% zoom`).toEqual([])
+      }
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
+  test('lays out the longest label the contract allows, at 320 px and at 400 % zoom', async ({ browser }) => {
+    /**
+     * The long-label case from the Verify line, and the contract is what makes it a bounded one.
+     *
+     * `metricValueSchema.key` is `^[a-z][a-z0-9_]{1,62}$` — 63 characters at most, lower_snake_case — and the
+     * client displays an unknown key by replacing its underscores with spaces (`labelFor`). So the worst label
+     * this page can ever render is 63 characters of prose, which is what this fixture sends. A test that invented
+     * a 500-character label would be testing a payload the schema refuses.
+     *
+     * Intercepted rather than seeded, because no real metric key is anywhere near the limit and the point is the
+     * limit. The interception is on a `useEffect` fetch, which is the one `page.route` can hold here — the same
+     * note the failing-section case carries.
+     */
+    const LONGEST_KEY = `a_${'label_'.repeat(10)}end` // 63 chars: 2 + 60 + 3 minus the trailing underscore
+    const key = LONGEST_KEY.slice(0, 63).replace(/_$/, 'z')
+
+    const context = await browser.newContext({
+      storageState: admin.storageState!,
+      viewport: { width: 320, height: 720 },
+      deviceScaleFactor: 4,
+    })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await tab.route('**/api/admin/metrics/sections?section=operations*', async (route) => {
+        const now = new Date('2026-08-11T12:00:00.000Z').toISOString()
+        // A day earlier, because `metricWindowSchema` refines `from < to`. The first version of this fixture used
+        // `now` for both, the payload failed its own contract, and the section rendered an error state — which the
+        // "payload has to have been accepted" assertion below now catches instead of passing silently.
+        const dayBefore = new Date('2026-08-10T12:00:00.000Z').toISOString()
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            schemaVersion: 1,
+            section: 'operations',
+            // Required by `adminMetricSectionResponseSchema`, and omitting it is why the first version of this
+            // fixture rendered nothing: the parse threw, the section fell back to an error state, and the two
+            // layout assertions below would have passed against an empty section.
+            variant: 'workers',
+            generatedAt: now,
+            payload: {
+              status: 'ready',
+              generatedAt: now,
+              window: { range: '24h', from: dayBefore, to: now, timezone: 'UTC' },
+              data: {
+                values: [
+                  { key, value: 1234567, unit: 'count', scope: 'database', platformTotal: true },
+                  { key: `${key.slice(0, 60)}two`, value: 987654, unit: 'count', scope: 'database', platformTotal: true },
+                ],
+              },
+            },
+          }),
+        })
+      })
+
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=operations&range=24h&variant=workers&compare=false`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+
+      /**
+       * The payload has to have been accepted, or this case proves nothing.
+       *
+       * Without it, a fixture the contract rejected would render `unavailable`, the two assertions below would
+       * pass against an empty section, and the long label would never have been laid out at all.
+       */
+      const values = tab.locator('[data-testid^="metric-value-"]')
+      await expect(values.first()).toBeVisible({ timeout: 20_000 })
+      await expect(values).toHaveCount(2)
+      await expect(values.first()).toContainText('label')
+
+      const overflow = await tab.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow, `a 63-character label overflows the page by ${overflow}px`).toBeLessThanOrEqual(1)
+
+      // And the number itself is not pushed out of its tile by the label above it.
+      const clipped = await tab.evaluate(() =>
+        [...document.querySelectorAll('[data-testid^="metric-value-"]')]
+          .filter((node) => node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1)
+          .map((node) => node.getAttribute('data-testid')),
+      )
+      expect(clipped, 'clipped by a maximum-length label').toEqual([])
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
+  test('respects reduced motion and forced colors', async ({ browser }) => {
+    /**
+     * WCAG 2.3.3 and 1.4.1's harder half, both emulated rather than asserted from a stylesheet — a `@media` query
+     * that exists and does not match anything is the failure mode a source-level check cannot see.
+     *
+     * **Reduced motion:** no element may report a running animation or a non-zero transition. The page has a
+     * refresh timer and a lazy-loading section, so a spinner or a fade left unguarded is the likely offender.
+     *
+     * **Forced colors:** the assertion is that the numbers are still *there* and still say what they mean. In
+     * forced-colors mode the OS replaces every colour, so anything carrying meaning by colour alone becomes
+     * indistinguishable — which is why this asserts the same text guarantees as the colour case above rather than
+     * comparing pixels.
+     */
+    const context = await browser.newContext({
+      storageState: admin.storageState!,
+      reducedMotion: 'reduce',
+      forcedColors: 'active',
+    })
+    const tab = await context.newPage()
+    const guard = expectStrictBrowser(tab)
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=runtime&range=24h&variant=process&compare=false`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+      const values = tab.locator('[data-testid^="metric-value-"]')
+      await expect(values.first()).toBeVisible({ timeout: 20_000 })
+
+      /**
+       * No *running animation* on a rendered element.
+       *
+       * Narrower than it first looks, and the first version was wrong in both directions. It walked every
+       * `*` and also flagged a non-zero `transitionDuration`, which reported `html`, `head`, `meta` and `link`
+       * as animating: a global `* { transition: … }` rule makes every node in the document declare one, including
+       * nodes that have no box and can never change. A declared transition that nothing triggers is not motion.
+       *
+       * So this asks the checkable question instead — is a keyframe animation actually running on something the
+       * user can see — and scopes it to `body` descendants with a layout box.
+       */
+      const moving = await tab.evaluate(() =>
+        [...document.body.querySelectorAll('*')]
+          .filter((node) => {
+            const rect = node.getBoundingClientRect()
+            if (rect.width === 0 && rect.height === 0) return false
+            const style = getComputedStyle(node)
+            if (style.visibility === 'hidden' || style.display === 'none') return false
+            return style.animationName !== 'none' && parseFloat(style.animationDuration) > 0
+          })
+          .slice(0, 5)
+          .map((node) => `${node.tagName.toLowerCase()}.${node.className}`.slice(0, 80)),
+      )
+      expect(moving, 'animating under prefers-reduced-motion').toEqual([])
+
+      // And the scope is still stated in words, which is what survives an OS colour override.
+      const count = await values.count()
+      for (let index = 0; index < count; index += 1) {
+        await expect(values.nth(index)).toContainText('not a platform total')
+      }
+    } finally {
+      guard.dispose()
+      await context.close()
+    }
+  })
+
   test('conveys every threshold and scope in text, not by colour alone', async ({ browser }) => {
     /**
      * WCAG 1.4.1. The specific failure this rules out: a breached tile that is only red, and a per-process

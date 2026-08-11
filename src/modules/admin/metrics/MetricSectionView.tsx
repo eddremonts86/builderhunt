@@ -176,9 +176,22 @@ function breachOf(value: number, threshold?: { direction: string; warn: number; 
   return null
 }
 
+/*
+ * One column until 380 px, then two, then three.
+ *
+ * It was `grid-cols-2` from 320 px up, and a seven-digit number did not fit: at 320 px a two-column tile has a
+ * 93 px content box and `1,234,567` in `text-2xl` needs 117 px, so the value was clipped — measured, not guessed.
+ * Six digits fitted, seven did not, which means the page renders a *wrong number* the day any platform count
+ * crosses a million. Request totals reach that in a week.
+ *
+ * Widening the tile rather than shrinking the type or truncating: a truncated number is a different number
+ * ("1,234,5…" reads as a hundred-thousand figure), and scaling the font down to fit an unknown magnitude just moves
+ * the same cliff further out. A single column at the narrowest width has room for any value the contract allows, and
+ * costs one extra scroll on a phone.
+ */
 export function MetricValues({ payload }: { payload: Extract<AdminMetricSectionPayload, { data: unknown }> }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="metric-values">
+    <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 gap-3" data-testid="metric-values">
       {payload.data.values.map((value) => {
         const breach = breachOf(value.value, value.threshold)
         return (
