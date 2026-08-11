@@ -89,6 +89,22 @@
     needs a source once the fetch that sets it is gone — `overview.fatal` is the obvious one.
     Neither is a five-minute change, and leaving two specs hanging two minutes each is worse than
     leaving one endpoint in place.
+  - **Diagnosis corrected 2026-08-11: it is not about TanStack Query, and the real cause names the fix.**
+    `DashboardPage` has a whole-page early return — `if (loading) return <div data-dashboard-state="loading">` —
+    and `loading` is set false only by the `useEffect` chain that fetches `stats`, `queries`, `recent` and the
+    session. Holding `/api/dashboard/stats` therefore keeps the page in the skeleton branch, which is exactly what
+    the spec observing the skeleton wants. Repointing the headline counts at `/api/dashboard/overview` moves that
+    gate onto the overview, so holding *it* renders the same whole-page skeleton — no navigation, no `main` content,
+    nothing for the helper to settle on. "It hangs for 120 s with `main` empty" is that early return, not the
+    interception.
+  - **Which means the blocker is the early return itself, and removing it is this task's own Do line.** "Render
+    shell/critical actions independently from lower-section failures" is precisely what a whole-page
+    `if (loading)` prevents: one slow request blanks the shell, the navigation and the action queue together. With
+    per-region loading states, holding any single request leaves the page usable — the Verify line — and both specs
+    stop hanging without any change to how they intercept.
+  - **Not attempted here**, deliberately. It is a structural change to a 1,600-line page with 5 browser cases and
+    222 unit cases resting on it, and it deserves room to verify rather than the tail of a long session. The value
+    of this note is that the next attempt does not start by investigating Playwright.
 
 ## Wave 2 — Action queue
 
