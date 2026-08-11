@@ -38,20 +38,25 @@ import { SourceMixWidget } from '~/modules/dashboard/ui/home/SourceMixWidget'
 import { OrganizationAdminSection } from '~/modules/dashboard/components/admin/OrganizationAdminSection'
 import type { OrgAdminOverview } from '~/shared/lib/repositories/dashboard-organization-admin'
 
-interface Stats {
-  totalBuilders: number
-  /**
-   * Tracked builders whose identity was last observed by a connector inside the window — a recency
-   * fact, not a count of things they did. The dashboard copy says "Seen active" for exactly that
-   * reason; it used to say "Shipped something in the last 7 days", which this column cannot support.
-   */
-  activeThisWeek: number
-  savedQueries: number
-  totalNotes: number
-  /** Renamed from `dailyActivity`: it is one bucket per tracked builder by last-seen day. */
-  lastSeenByDay?: Array<{ date: string; label: string; count: number }>
-  generatedAt?: string
-}
+/*
+ * The local `Stats` interface is gone, and with it the page's second core endpoint.
+ *
+ * Wave 1's Do line is "fetch the core overview once", and the page was fetching it twice: the recency chart and
+ * source coverage read `/api/dashboard/overview` while the three headline counts still read
+ * `/api/dashboard/stats` — the same columns, the same predicates, two round trips and two loading models. The
+ * counts now come from the projection's `summary` section, which arrives with a `WidgetState` instead of a bare
+ * object, so "still loading", "failed" and "this workspace has none" stop being the same `null`.
+ *
+ * Four of `Stats`'s six fields were already dead when this landed: `savedQueries` is deliberately unused (the tile
+ * derives from the live `queries` list so it does not go stale after a delete), `lastSeenByDay` moved to the
+ * projection with the recency chart, and `totalNotes` and `generatedAt` were referenced by nothing at all. Only
+ * `totalBuilders` and `activeThisWeek` were live, and the projection has both as `trackedBuilders` and
+ * `seenActiveInRange`.
+ *
+ * The windows agree, which is what made this a safe swap rather than a change of meaning: the page requests the
+ * default range and `DEFAULT_DASHBOARD_RANGE` is `'7d'`, matching the tile's "past 7 days" hint exactly. A range
+ * control on this page would break that agreement, and the hint would have to move with it.
+ */
 
 interface SavedQuery {
   id: string
@@ -91,15 +96,18 @@ interface RecentBuilder {
  * both densities and can be tested without a network.
  */
 interface HomeContext {
-  stats: Stats | null
   /**
-   * Whether the headline counts are still in flight.
+   * Whether the two list fetches — saved searches and recent builders — are still in flight.
    *
-   * `stats === null` cannot answer this, which is why the flag exists: null is both "still loading" and "the
-   * request failed", and the empty-state CTA must appear for neither. Without it, removing the page-level skeleton
-   * makes "Run your first hunt" render over a workspace that has builders in it, for as long as the fetch takes.
+   * Named for what it gates. It was `statsLoading` while the headline counts came from
+   * `/api/dashboard/stats`, and that fetch shared this flag with the lists; the counts read their own section
+   * state now, so the only thing left behind this boolean is the pair of lists whose widgets must not claim to be
+   * empty before they have loaded.
+   *
+   * A boolean rather than absence-of-data because `[]` cannot answer it: an empty list is both "still loading" and
+   * "you have none", and the empty-state CTA must appear for only the second.
    */
-  statsLoading: boolean
+  listsLoading: boolean
   queries: SavedQuery[]
   recent: RecentBuilder[]
   sprints: SprintListItem[]
@@ -173,14 +181,25 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
     span: 'full',
     chrome: 'glow',
     /*
-     * The empty-state CTA outranks everything when there is nothing to show — and `!ctx.statsLoading` is what
+     * The empty-state CTA outranks everything when there is nothing to show — and the section's own state is what
      * makes "nothing to show" a fact rather than a guess.
      *
-     * `!ctx.stats` is true both before the fetch resolves and after it fails, so without the flag this CTA claims
-     * an empty workspace on the strength of not having asked yet. A recruiter with two hundred tracked builders
-     * would see "Run your first hunt" for the length of the request and then watch it vanish.
+     * This used to read `!ctx.stats || ctx.stats.totalBuilders === 0`, and `!ctx.stats` was true both before the
+     * fetch resolved and after it failed. So a recruiter with two hundred tracked builders was told to run their
+     * first hunt for the length of the request — hidden only by a whole-page skeleton, which Wave 1 removes.
+     *
+     * Three states show the CTA and the rest do not, deliberately:
+     *   - `empty`             the projection says this workspace tracks nobody. The real case.
+     *   - `ready` / `stale`   a count it stands behind, and that count is zero.
+     * `loading` has not asked yet, and `error`, `unavailable` and `forbidden` mean the count could not be read —
+     * none of which is evidence of an empty workspace.
      */
-    isVisible: (ctx) => !ctx.statsLoading && (!ctx.stats || ctx.stats.totalBuilders === 0) && !ctx.error,
+    isVisible: (ctx) => {
+      if (ctx.error) return false
+      const summary = ctx.overview.section('summary')
+      if (summary.kind === 'empty') return true
+      return (summary.kind === 'ready' || summary.kind === 'stale') && summary.data.trackedBuilders === 0
+    },
     render: () => (
       <div className="p-6 text-center">
         <div className="inline-flex w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-4">
@@ -444,7 +463,7 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
      * intrinsic height to hold open — unlike a metric tile, whose single line is worth reserving so the number
      * does not shove the page when it lands.
      */
-    isVisible: (ctx) => !ctx.statsLoading,
+    isVisible: (ctx) => !ctx.listsLoading,
     isEmpty: (ctx) => ctx.queries.length === 0,
     // The empty state is a short call to action, not a list, so it gives width
     // back. `minSpan` clamps the collapse.
@@ -490,7 +509,7 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
     minSpan: 'third',
     // Same reason as `saved-searches` above: `recent` starts empty, so "No builders tracked yet" would describe a
     // page that has not asked yet.
-    isVisible: (ctx) => !ctx.statsLoading,
+    isVisible: (ctx) => !ctx.listsLoading,
     isEmpty: (ctx) => ctx.recent.length === 0,
     render: (ctx) => (
       <>
@@ -790,16 +809,26 @@ export function DashboardPage() {
    */
   const customizeTriggerRef = React.useRef<HTMLButtonElement>(null)
   const closeCustomize = React.useCallback(() => setCustomizeOpen(false), [])
-  // The versioned core projection. Sections it owns (recency, source coverage) read their state
-  // from here; the remaining endpoints migrate in Wave 4.
+  // The versioned core projection, and the only core fetch now: the headline counts read its `summary` section
+  // rather than a second endpoint over the same columns.
   const overview = useDashboardOverview()
-  const [stats, setStats] = React.useState<Stats | null>(null)
   const [queries, setQueries] = React.useState<SavedQuery[]>([])
   const [recent, setRecent] = React.useState<RecentBuilder[]>([])
   const [sprints, setSprints] = React.useState<SprintListItem[]>([])
   const [triggers, setTriggers] = React.useState<AlertTrigger[]>([])
   const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
+  /**
+   * The page-level failure, derived from the projection rather than held in state.
+   *
+   * It was a `useState<string | null>` set from the stats fetch's thrown message. That fetch is gone, so nothing
+   * ever called `setError` again and the banner became unreachable — a dead branch that still *looked* like error
+   * handling, which is worse than none. The projection's `fatal` is the honest source: it is set when the whole
+   * response could not be read, which is exactly the case where the page cannot stand behind any of its numbers.
+   *
+   * A sentence rather than the reason code. `version`, `schema` and `network` distinguish a stale client from a
+   * failed request, which belongs in the console and not on a tenant's screen.
+   */
+  const error = overview.fatal ? 'The workspace summary could not be loaded.' : null
   // The principal's id is what gates the visibility-flip action on a
   // saved query: only the creator can flip private <-> organization.
   // The dashboard fetches it once alongside the other top-level
@@ -827,19 +856,16 @@ export function DashboardPage() {
     const controller = new AbortController()
     const { signal } = controller
 
+    /*
+     * `/api/dashboard/stats` is gone from this list. The headline counts read the projection's `summary`
+     * section, so the page makes one core request instead of two over the same columns — which is Wave 1's
+     * "fetch the core overview once", and it also means the counts arrive with a state instead of as a
+     * bare object that could be `null` for three different reasons.
+     *
+     * What remains here are the three reads the projection does not own: the saved-search list, the recent-builder
+     * list, and the session (for `currentUserId`, which gates the visibility flip on a saved query).
+     */
     Promise.all([
-      /*
-       * `/api/dashboard/stats` still supplies the three headline counts and the saved-search badge.
-       * The recency chart and source coverage have moved to `useDashboardOverview` below, which is
-       * where the section states, the freshness stamps and the whole-workspace coverage figure come
-       * from (plans/ui-dashboard Wave 1). The remaining counts move with Wave 4; the two endpoints
-       * read the same columns with the same predicates, and the overview's `summary` section is
-       * asserted against these numbers in `dashboard-and-navigation.spec.ts`.
-       */
-      fetch('/api/dashboard/stats', { credentials: 'include', signal }).then(async (r) => {
-        if (!r.ok) throw new Error(`stats: ${r.status}`)
-        return r.json()
-      }),
       fetch('/api/queries', { credentials: 'include', signal }).then(async (r) => {
         if (!r.ok) return []
         return r.json()
@@ -853,20 +879,24 @@ export function DashboardPage() {
         return r.json()
       }).catch(() => null),
     ])
-      .then(([s, q, r, sess]) => {
+      .then(([q, r, sess]) => {
         if (signal.aborted) return
-        setStats(s)
         setQueries(Array.isArray(q) ? q : [])
         setRecent(Array.isArray(r) ? r : [])
         setCurrentUserId(sess?.user?.id ?? null)
         setLoading(false)
       })
       .catch((err) => {
-        // The component is gone; there is nobody to show an error to and
-        // nothing failed.
+        /*
+         * Reached only by something unexpected now.
+         *
+         * All three remaining fetches swallow their own failure into `[]` or `null`, and the one that used to
+         * `throw` — the stats read — has moved to the projection, whose failure surfaces as `overview.fatal`. The
+         * `setLoading(false)` matters more than the message: without it an unexpected throw would leave the two
+         * list widgets withheld forever.
+         */
         if (signal.aborted || (err instanceof Error && err.name === 'AbortError')) return
         console.error('Dashboard load error:', err)
-        setError(err.message ?? 'Failed to load dashboard')
         setLoading(false)
       })
 
@@ -881,8 +911,32 @@ export function DashboardPage() {
     const latestQuery = [...queries].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )[0]
-    const activeSharePct = stats && stats.totalBuilders > 0
-      ? Math.round((stats.activeThisWeek / stats.totalBuilders) * 100)
+    /*
+     * The counts come from the projection's `summary` section, and which states carry a number is the whole
+     * decision here.
+     *
+     * `ready` and `stale` both have data — stale means the value is older than twice the server's cache TTL, worth
+     * captioning elsewhere but still a real number rather than a reason to blank the tile.
+     *
+     * **`empty` is a known zero, not an unknown.** The route defines it as `trackedBuilders === 0 && savedSearches
+     * === 0`, so the projection has read the workspace and found nothing — which is exactly the answer the tile
+     * should print. Treating it as `null` was this migration's first bug: an empty workspace showed three
+     * permanently loading skeletons, which is worse than the `?? 0` it replaced, because a skeleton promises a
+     * number that is never coming. Caught by the settled-state case in `dashboard-shell.spec.ts` on the first run.
+     *
+     * Everything left — `loading`, `error`, `unavailable`, `forbidden` — genuinely has no count, and `null` is how
+     * the tile says so.
+     */
+    const summary = overview.section('summary')
+    const counts =
+      summary.kind === 'ready' || summary.kind === 'stale'
+        ? summary.data
+        : summary.kind === 'empty'
+          ? { trackedBuilders: 0, seenActiveInRange: 0, newlyTrackedInRange: 0, savedSearches: 0 }
+          : null
+
+    const activeSharePct = counts && counts.trackedBuilders > 0
+      ? Math.round((counts.seenActiveInRange / counts.trackedBuilders) * 100)
       : null
 
     /*
@@ -899,16 +953,15 @@ export function DashboardPage() {
      */
     return [
     /*
-     * `null`, not `?? 0`, for the two counts that come from `/api/dashboard/stats`.
+     * `null`, not `?? 0`.
      *
-     * A coalesce to zero here answers "how many builders are tracked?" with "none" when the truthful answer is
-     * "not read yet", and it does it in the largest type on the page. It was survivable only while a whole-page
-     * skeleton hid these tiles during the fetch — and removing that skeleton is this task's own Do line, so the
-     * substitution had to go first.
+     * A coalesce to zero answers "how many builders are tracked?" with "none" when the truthful answer is "not read
+     * yet", and it does it in the largest type on the page. It was survivable only while a whole-page skeleton hid
+     * these tiles during the fetch, and removing that skeleton is this task's own Do line.
      */
     {
       label: 'Builders tracked',
-      value: stats ? stats.totalBuilders : null,
+      value: counts ? counts.trackedBuilders : null,
       icon: Users,
       tone: 'accent' as const,
       hint: 'People saved to your lists',
@@ -916,16 +969,16 @@ export function DashboardPage() {
     },
     {
       label: 'Seen active',
-      value: stats ? stats.activeThisWeek : null,
+      value: counts ? counts.seenActiveInRange : null,
       icon: TrendingUp,
       tone: 'success' as const,
       hint: 'Last seen by a source in the past 7 days',
-      badge: stats && stats.totalBuilders > 0 ? `of ${stats.totalBuilders} tracked` : undefined,
+      badge: counts && counts.trackedBuilders > 0 ? `of ${counts.trackedBuilders} tracked` : undefined,
     },
     {
       label: 'Saved searches',
       // Derived from the live `queries` list (already refetched after
-      // create/delete) rather than the separate `stats.savedQueries` count,
+      // create/delete) rather than the projection's own `savedSearches` count,
       // which only loads once on mount and otherwise goes stale — e.g. right
       // after deleting a saved search, the list below updates immediately
       // but this count wouldn't until a full page reload.
@@ -937,7 +990,7 @@ export function DashboardPage() {
       badge: latestQuery ? `Latest: ${truncate(latestQuery.name, 16)}` : undefined,
     },
     ]
-  }, [stats, queries])
+  }, [overview, queries])
 
   /*
    * Role eligibility, dependency gates and the user's hidden list, resolved in one pass before the
@@ -971,8 +1024,7 @@ export function DashboardPage() {
   // `BentoRegion`'s layout memo doesn't recompute on every parent render.
   const widgetContext = React.useMemo<HomeContext>(
     () => ({
-      stats,
-      statsLoading: loading,
+      listsLoading: loading,
       queries,
       recent,
       sprints,
@@ -983,8 +1035,18 @@ export function DashboardPage() {
       currentUserId: currentUserId ?? '',
       overview,
     }),
-    [stats, loading, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
+    [loading, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
   )
+
+  /**
+   * The "seen active" count for the page subtitle, taken from the tile rather than re-derived.
+   *
+   * Reading `statsData` means the subtitle cannot disagree with the tile beside it: one resolution of the section
+   * state feeds both. Re-deriving it from `overview.section('summary')` here would work today and drift the first
+   * time one of the two grows a rule the other does not — which is how a page ends up saying "3 seen active" above
+   * a tile reading 4.
+   */
+  const seenActive = statsData[1]?.value ?? null
 
   /*
    * What the Customize dialog may list: everything rendered, plus everything the *user* hid.
@@ -1090,7 +1152,10 @@ export function DashboardPage() {
     // Hardcoding `ready` here would satisfy the wait immediately and bring back
     // the aborted-fetch console noise the strict browser guard catches.
     <motion.div
-      data-dashboard-state={loading ? 'loading' : 'ready'}
+      // Both, not just the lists. The projection is the core fetch now, so a `ready` that ignored it would let a
+      // spec navigate away while the overview request was still open — which is the exact console noise this
+      // attribute exists to prevent.
+      data-dashboard-state={loading || overview.isLoading ? 'loading' : 'ready'}
       initial={reduceMotion ? false : fadeInUp.initial}
       animate={fadeInUp.animate}
       transition={fadeInUp.transition}
@@ -1103,10 +1168,13 @@ export function DashboardPage() {
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1 text-bh-text">
               Overview
             </h1>
+            {/* The second sentence appears only when there is a count to put in it, which the `statsData` tile
+                already resolved from the projection's `summary` section — so the subtitle and the tile can never
+                disagree about the same number, and neither says anything while it is loading. */}
             <p className="text-bh-text-muted text-sm font-light">
               Here's what your hunts turned up.
-              {stats?.activeThisWeek
-                ? ` ${stats.activeThisWeek} tracked builder${stats.activeThisWeek === 1 ? ' was' : 's were'} seen active in the last 7 days.`
+              {typeof seenActive === 'number' && seenActive > 0
+                ? ` ${seenActive} tracked builder${seenActive === 1 ? ' was' : 's were'} seen active in the last 7 days.`
                 : ''}
             </p>
           </div>
@@ -1173,9 +1241,26 @@ export function DashboardPage() {
       */}
       <OrganizationAdminOverview />
 
+      {/*
+        * The page-level banner, now sourced from the projection and phrased for the person reading it.
+        *
+        * It used to interpolate the thrown message from the stats fetch, so a failed request put
+        * "Heads up: stats: 500. Some data may be missing." on a tenant's dashboard — an internal endpoint name and
+        * an HTTP status, which tells them nothing they can act on and names a part of the system they have no
+        * business knowing. `overview.fatal` distinguishes `network` from `version`/`schema`, and that distinction
+        * is for the log rather than for this banner: from here both mean "the summary did not load, try again",
+        * and the retry is the actionable half.
+        */}
       {error && (
-        <div className="mt-6 p-4 rounded-lg border border-bh-danger/30 bg-bh-danger/10 text-sm text-bh-danger font-light">
-          <strong>Heads up:</strong> {error}. Some data may be missing.
+        <div
+          role="alert"
+          data-testid="dashboard-overview-error"
+          className="mt-6 flex flex-wrap items-center gap-3 p-4 rounded-lg border border-bh-danger/30 bg-bh-danger/10 text-sm text-bh-danger font-light"
+        >
+          <span><strong>Heads up:</strong> {error}</span>
+          <Button variant="secondary" size="sm" onClick={overview.refetch} className="text-xs py-1">
+            Try again
+          </Button>
         </div>
       )}
     </motion.div>

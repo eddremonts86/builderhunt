@@ -17,11 +17,17 @@
  * The early return is gone, so the property the Verify line asks for is now observable: **one slow request leaves
  * the queue and the navigation usable.** That is what this file tests.
  *
- * ## Why the interception is on `/api/dashboard/stats` specifically
+ * ## Why the interception is on `/api/dashboard/overview`
  *
- * It is a plain `useEffect` fetch. A `page.route` against a TanStack Query endpoint hangs in this repository — the
- * reason `admin-metrics-shell.spec.ts` says the same thing — so the endpoint under test here is the one whose
- * request Playwright can actually hold.
+ * Because that is the core fetch: the headline counts read its `summary` section, so `/api/dashboard/stats` is no
+ * longer requested by this page at all.
+ *
+ * Worth recording, because the repository holds a note in the other direction: a `page.route` against a TanStack
+ * Query endpoint was found to hang, and `/api/dashboard/overview` is a `useQuery`. It does not hang — measured with
+ * a throwaway spec before this one was written, which reported the interception firing, the shell visible and the
+ * navigation usable. That is consistent with the corrected diagnosis above: the hang attributed to TanStack Query
+ * was the early return holding the page, and the endpoint had nothing to do with it. The note still stands for
+ * whichever endpoint produced it; it does not generalise to this one.
  */
 import { expect, test } from 'playwright/test'
 
@@ -59,7 +65,7 @@ test.describe('the dashboard shell', () => {
     })
 
     try {
-      await tab.route('**/api/dashboard/stats', async (route) => {
+      await tab.route('**/api/dashboard/overview*', async (route) => {
         await held
         await route.continue()
       })
@@ -113,6 +119,37 @@ test.describe('the dashboard shell', () => {
       await expect(tab).toHaveURL(/\/search/)
     } finally {
       release?.()
+      await context.close()
+    }
+  })
+
+  test('fetches the core projection once, and does not ask the old stats endpoint at all', async ({ browser }) => {
+    /**
+     * "Fetch the core overview once" is Wave 1's Do line, and the page was fetching it twice — the recency chart
+     * and source coverage from `/api/dashboard/overview`, the three headline counts from `/api/dashboard/stats`,
+     * over the same columns with the same predicates.
+     *
+     * Asserted against the network rather than by reading the component, because the failure mode is a second
+     * caller nobody remembers: a widget that reaches for the old endpoint reintroduces the duplicate read without
+     * changing a line of this page. The endpoint itself still exists and still has its own contract tests — what
+     * is under test is that the dashboard no longer needs it.
+     */
+    const context = await browser.newContext({ storageState: harness.owner.storageState! })
+    const tab = await context.newPage()
+    const requested: string[] = []
+    try {
+      tab.on('request', (request) => {
+        const path = new URL(request.url()).pathname
+        if (path.startsWith('/api/dashboard/')) requested.push(path)
+      })
+
+      await gotoHydrated(tab, `${harness.baseURL}/dashboard`)
+      await dismissOverlays(tab)
+      await expect(tab.locator('[data-dashboard-state="ready"]')).toBeVisible({ timeout: 20_000 })
+
+      expect(requested).not.toContain('/api/dashboard/stats')
+      expect(requested.filter((path) => path === '/api/dashboard/overview')).toHaveLength(1)
+    } finally {
       await context.close()
     }
   })
