@@ -217,6 +217,19 @@ IP ban of whichever host runs it. Before setting it `true` in production:
 
 ---
 
+## Connection pooling (PgBouncer)
+
+Not deployed yet. When it is, it is a **separate service on the private network** and the change is
+entirely in which URLs the app is given: the five runtime URLs move to the pooler and
+`DATABASE_MIGRATION_URL` stays direct on 5432. That last one is not a preference — a migration runs many
+statements in one transaction and takes advisory locks, and transaction pooling hands it a different
+backend between statements, releasing the locks underneath it.
+
+Rollback is pointing those five URLs back at 5432 and redeploying. The pooler holds no state the
+application needs and no schema changes with it.
+
+Full procedure, inputs, metrics and stop conditions: [`load-testing.md`](./load-testing.md).
+
 ## Rollback
 
 1. In Coolify, redeploy the previous successful image (or revert the commit and push).

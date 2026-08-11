@@ -289,7 +289,7 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
 
 ## Phase 6 — Certification and production rollout
 
-- [ ] **Document the Coolify pooler rollout and rollback**
+- [~] **Document the Coolify pooler rollout and rollback**
   - Files: `docs/operations/deploy-runbook.md`, `docs/operations/database-roles.md`,
     `docs/operations/load-testing.md`, `.env.production.example`
   - Do: Document the separate private-network PgBouncer service, five role-secret inputs, direct
@@ -298,6 +298,18 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     explicit approval.
   - Verify: a redacted dry run of the documented preflight passes on the isolated environment;
     `pnpm deploy:preflight`, `pnpm type-check`, and `pnpm ci:local` are green.
+  - Written: `docs/operations/load-testing.md` (new — the harness, how to read a report without being
+    misled, the three safety refusals, the sign-in ceiling, the connection budget, the local pooled
+    topology, the Coolify rollout order, metrics with stop conditions, rollback, and what the harness
+    does *not* cover); a pooling section in `deploy-runbook.md` at the rollback boundary where an
+    operator is already looking; two sections in `database-roles.md` — role settings are not inherited
+    through membership, and the transaction-local GUC the tenant boundary rests on under a pooler; and
+    the six pooler secrets plus five pool caps in `.env.production.example`.
+  - **Not done: the redacted dry run on the isolated environment.** There is no isolated environment
+    provisioned — standing it up is one of the cost-bearing steps excluded from this branch by
+    agreement. The documented preflight *was* run for real against the local pooled topology (13/13),
+    which is the same script and the same assertions against a different host.
+  - Result: `pnpm deploy:preflight` passed, `git diff --check` clean, `check-env-fidelity` 0 gaps.
 
 - [ ] **Run the isolated two-hour certification**
   - Files: `docs/operations/load-certification-<date>.md`
@@ -334,3 +346,8 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     budget. Do not close from the calibration or CI smoke.
   - Verify: `pnpm plans:check-order`, `pnpm plans:check-tasks`, `pnpm ci:local`, and
     `git diff --check` pass; no unchecked task remains and the certification report says `pass`.
+  - **Deliberately still open.** This task's own Do line forbids closing from the calibration or the CI
+    smoke, and the certification is one of the four cost-bearing runs excluded from this branch by
+    agreement (the 10-minute direct baseline, the pooled calibration, the two-hour soak, and the
+    production rollout). Everything the certification needs is built and exercised at smoke scale; what
+    remains is an isolated host, a window and an approval, not code.
