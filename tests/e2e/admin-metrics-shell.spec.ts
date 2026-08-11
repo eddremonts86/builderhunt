@@ -15,7 +15,7 @@
  */
 import { expect, test } from 'playwright/test'
 
-import { startInterviewHarness, stopInterviewHarness, type InterviewHarness } from './harness/fixtures/interviews'
+import { addMember, startInterviewHarness, stopInterviewHarness, type InterviewHarness } from './harness/fixtures/interviews'
 import {
   createPlatformAdminPrincipal,
   registerPlatformAdminEnv,
@@ -463,6 +463,81 @@ test.describe('the Admin Metrics shell', () => {
       await expect(tab.getByTestId('admin-metrics-section-traffic')).toHaveAttribute('data-active', 'true')
     } finally {
       guard.dispose()
+      await context.close()
+    }
+  })
+
+  test('refuses every persona that is not a platform admin, and the same way each time', async ({ browser }) => {
+    /**
+     * Plan 57, Admin track — "Add admin scope, audit, and performance release gates". The Verify line names four
+     * personas, and the point of testing them together is the *consistency*: an organization admin who gets a
+     * different refusal from a plain member has learned that the difference exists.
+     *
+     * An organization **admin** is the persona most likely to be let through by a guard written as "is this person
+     * an admin", because they are one — of an organization, which is a different authority entirely. The tenant
+     * owner is the highest tenant privilege and the API and the database both re-check underneath; this asserts the
+     * page never renders.
+     */
+    const orgAdmin = await addMember(harness, 'admin')
+    const orgMember = await addMember(harness, 'member')
+
+    for (const [label, principal] of [
+      ['organization owner', harness.owner],
+      ['organization admin', orgAdmin],
+      ['organization member', orgMember],
+    ] as const) {
+      const context = await browser.newContext({ storageState: principal.storageState! })
+      const tab = await context.newPage()
+      try {
+        await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=traffic&range=24h&variant=rate&compare=false`)
+        await dismissOverlays(tab)
+        await expect(tab.getByTestId('admin-metrics-page'), label).toHaveCount(0)
+        // And the API refuses them too, so the page guard is not the only thing standing there.
+        const api = await principal.api!.fetch('/api/admin/metrics/sections?section=traffic')
+        expect([401, 403], `${label} API`).toContain(api.status())
+      } finally {
+        await context.close()
+      }
+    }
+
+    // Signed out: the same refusal, and never a hint that the console exists.
+    const anonymous = await browser.newContext()
+    const anonymousTab = await anonymous.newPage()
+    try {
+      await gotoHydrated(anonymousTab, `${harness.baseURL}/admin/metrics?section=traffic&range=24h&variant=rate&compare=false`)
+      await expect(anonymousTab.getByTestId('admin-metrics-page')).toHaveCount(0)
+    } finally {
+      await anonymous.close()
+    }
+  })
+
+  test('a failing section leaves the other seven readable, on the page and not just in the payload', async ({ browser }) => {
+    /**
+     * "Per-section failures" from the Verify line, asserted where it matters: the monolith could not have this
+     * property, because one failed read meant no numbers at all.
+     *
+     * Driven by intercepting one section's request rather than by breaking a database, because what is under test
+     * is the page's isolation and not the query's. The interception is against a `useEffect` fetch — a
+     * `page.route` on a TanStack Query endpoint hangs in this repository, which is why this hook uses plain
+     * `fetch`.
+     */
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    try {
+      await tab.route('**/api/admin/metrics/sections?section=traffic*', (route) =>
+        route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Failed"}' }),
+      )
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=traffic&range=24h&variant=rate&compare=false`)
+      await dismissOverlays(tab)
+
+      // The section says it failed, in words, and the page around it still works.
+      await expect(tab.getByTestId('metric-section-load-error')).toBeVisible({ timeout: 20_000 })
+      await expect(tab.getByTestId('admin-metrics-sections')).toBeVisible()
+
+      // And another section still loads — the failure was confined to the one that asked.
+      await tab.getByTestId('admin-metrics-section-runtime').click()
+      await expect(tab.getByTestId('metric-values')).toBeVisible({ timeout: 20_000 })
+    } finally {
       await context.close()
     }
   })

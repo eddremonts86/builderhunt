@@ -12,7 +12,21 @@
  *
  * Usage: `node scripts/check-admin-metrics-budgets.mjs`
  */
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
+import { join } from 'node:path'
+
+/** Every `.ts`/`.tsx` under the metrics UI directory, tests excluded. */
+async function metricsUiFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) return metricsUiFiles(path)
+      return /\.(ts|tsx)$/.test(entry.name) && !/\.test\./.test(entry.name) ? [path] : []
+    }),
+  )
+  return nested.flat()
+}
 
 const findings = []
 
@@ -123,6 +137,48 @@ if (!/visibilitychange/.test(hook)) {
   findings.push(`${HOOK}: no visibilitychange listener — a hidden tab would keep polling.`)
 }
 
+/**
+ * 6. No destructive or outward-facing operation on the Command Center.
+ *
+ * The plan's release-gate task says to "confirm destructive/outward-facing operations are absent from the Command
+ * Center", and the reason is specific to what this page is: a summary read at 02:00 by somebody under time
+ * pressure, where every number is a link to somewhere that can act. A button that *does* something next to a
+ * number that says something is wrong gets pressed as though it were the fix.
+ *
+ * So the metrics page and its sections may only read. Mutations live on the canonical detail pages, which have
+ * their own confirmations and their own audit rows. This reads the client modules rather than the routes, because
+ * the routes are already sealed to GET by `check-api-route-methods` — what this catches is a widget growing a
+ * "retry this" button.
+ */
+const METRICS_UI_DIR = 'src/modules/admin/metrics'
+const uiFiles = await metricsUiFiles(METRICS_UI_DIR)
+for (const file of uiFiles) {
+  const source = code(await readFile(file, 'utf8'))
+  const mutations = [...source.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/gi)]
+  for (const mutation of mutations) {
+    findings.push(
+      `${file}: sends a ${mutation[1].toUpperCase()} — the Command Center reads. A control that acts belongs on ` +
+        'the canonical detail page, which has the confirmation and the audit row.',
+    )
+  }
+}
+
+/**
+ * 7. Nothing in the metrics modules logs a path, an id or a payload.
+ *
+ * "Redacted telemetry/logs" in the Verify line. The route-family allowlist keeps a raw path out of the *stored*
+ * metric, and a `console.log` of the same value would put it in the server log instead — same identifier, different
+ * sink, and the log is the one nobody audits. `console.error` with a caught error is allowed: that is the failure
+ * itself, not data about a request.
+ */
+for (const [label, file] of [['sections', SECTIONS], ['hook', HOOK]]) {
+  const source = label === 'sections' ? sections : hook
+  const logs = [...source.matchAll(/console\.(log|info|warn|debug)\s*\(/g)]
+  if (logs.length > 0) {
+    findings.push(`${file}: ${logs.length} console.${logs[0][1]} call(s) — the metrics path must not log request data.`)
+  }
+}
+
 if (findings.length > 0) {
   console.error(`${findings.length} admin-metrics budget problem(s):\n`)
   for (const finding of findings) console.error(`  - ${finding}`)
@@ -134,5 +190,7 @@ console.log(
     ranges: rangeKeys.length,
     cappedCollections: 5,
     billingSweepOnMetricsPath: false,
+    uiFilesScanned: uiFiles.length,
+    mutationsOnCommandCenter: 0,
   }),
 )

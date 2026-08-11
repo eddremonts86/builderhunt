@@ -1055,10 +1055,41 @@ missing — so the only honest version of this widget was an empty one.
     a question about what those controls should even do. The store refuses the wrong things correctly; nothing
     calls it from the page yet.
 
-- [ ] **Add admin scope, audit, and performance release gates**
+- [~] **Add admin scope, audit, and performance release gates**
   - Files: admin dashboard contract/E2E/accessibility/performance tests, rollout runbook
   - Do: Test platform-role and organization-role boundaries, cross-scope caches, redacted telemetry/logs, per-section failures, accessible charts, bounded queries, and independent feature flags. Confirm destructive/outward-facing operations are absent from the Command Center.
   - Verify: authenticated desktop/mobile runtime passes for organization admin, owner, platform admin, and negative personas; disabling either admin surface preserves all existing detailed routes.
+  - **Most of it landed 2026-08-11**, and the split is the same one as the other gates task: static where the
+    property is textual, browser where it is behavioural.
+  - **All four personas in one case, and the point is the consistency.** Organization owner, organization admin,
+    organization member and signed-out all get the same refusal — an organization admin who got a *different*
+    refusal from a plain member would have learned that the difference exists. The organization admin is the
+    persona most likely to be let through by a guard written as "is this person an admin", because they are one —
+    of an organization, which is a different authority entirely. Each is checked twice: the page never renders and
+    the API answers 401/403, so the route guard is not the only thing standing there.
+  - **Per-section failure isolation is asserted on the page**, not only in the payload: one section's request is
+    intercepted with a 500, that section says it failed in words, the navigation still works, and another section
+    still loads. The monolith could not have this property — one failed read meant no numbers at all. Driven by
+    interception rather than by breaking a database because what is under test is the page's isolation, and it
+    works against this hook precisely because the hook uses plain `fetch`: a `page.route` on a TanStack Query
+    endpoint hangs in this repository.
+  - **"Destructive/outward-facing operations are absent from the Command Center" is now a gate**, not a review
+    item. `check:admin-metrics` scans every module under `modules/admin/metrics` for a `method: 'POST'|'PUT'|
+    'PATCH'|'DELETE'` and fails on any. The reason is specific to what this page is: a summary read at 02:00 where
+    every number links to somewhere that can act, so a button that *does* something beside a number that says
+    something is wrong gets pressed as though it were the fix. Confirmed by adding a POST to one widget's fetch and
+    watching the gate name the file.
+  - **Redacted telemetry is a gate too.** The route-family allowlist keeps a raw path out of the stored metric, and
+    a `console.log` of the same value would put it in the server log instead — the same identifier, a different
+    sink, and the log is the one nobody audits. `console.error` with a caught error stays allowed: that is the
+    failure itself, not data about a request. Confirmed by adding a `console.log` and watching it fail.
+  - **Bounded queries, cross-scope caches and independent flags were already covered** by work earlier in this
+    plan: the read-path detector plus the payload caps, the preference-store isolation asserted as 42501 in both
+    directions, and `reliability` answering `not_enabled` from the interview capability flags independently.
+  - **Still open:** the mobile runtime pass for each persona — the current matrix is desktop, and the a11y gate
+    covers 320 px only as the platform admin. And "disabling either admin surface preserves all existing detailed
+    routes" has nothing to exercise: there is no flag that disables the admin surface, so the sentence describes a
+    capability this product does not have rather than a test that is missing.
 
 ## Wave 6 — Personalization
 
