@@ -87,7 +87,7 @@ tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each
 
 ## Phase 3 — Database-role timeouts
 
-- [ ] **Add and mirror role timeout defaults**
+- [x] **Add and mirror role timeout defaults**
   - Files: `drizzle/<next>_role_timeouts.sql`, `drizzle/meta/_journal.json`,
     `drizzle/meta/<next>_snapshot.json`, `scripts/db/roles.sql`,
     `tests/unit/shared/lib/security/database-roles.test.ts`
@@ -97,7 +97,7 @@ tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each
   - Verify: `pnpm test:migration-integrity`, `pnpm exec drizzle-kit check`, and
     `pnpm vitest run tests/unit/shared/lib/security/database-roles.test.ts` pass.
 
-- [ ] **Verify timeouts through exact roles**
+- [~] **Verify timeouts through exact roles**
   - Files: `scripts/db/verify-role-timeouts.mjs`, `package.json`,
     `tests/e2e/api/database-role-timeouts.spec.ts`
   - Do: Connect through each `DATABASE_*_URL`, assert both `SHOW` values, and run a bounded

@@ -75,3 +75,27 @@ ALTER ROLE builderhunt_worker   LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOIN
 ALTER ROLE builderhunt_platform   LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 ALTER ROLE builderhunt_capability LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 ALTER ROLE builderhunt_readonly LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+
+-- ── Per-role timeouts (drizzle/0168_role_timeouts.sql) ───────────────────────────────────────────
+--
+-- Mirrored here for the same reason every other attribute in this file is: a restored cluster runs the
+-- dump's policies, and `ALTER ROLE ... SET` is *role* state, not database state — `pg_dump` of a database
+-- does not carry it. Without this, a restore comes back with correct RLS and no timeouts, and the first
+-- load event after it exhausts the pool exactly the way plan 55 exists to prevent.
+--
+-- The tiers and the reasoning are documented in the migration. `builderhunt_readonly` is deliberately
+-- absent: it is the restore and inspection identity, driven by a human at a psql prompt, and a timeout
+-- there turns a legitimate long analytical query into a mystery cancellation.
+--
+-- Idempotent by nature: `ALTER ROLE ... SET` overwrites, so re-running this after a hand-edit during an
+-- incident puts the budget back rather than compounding it.
+ALTER ROLE builderhunt_app SET statement_timeout = '5s';
+ALTER ROLE builderhunt_app SET idle_in_transaction_session_timeout = '10s';
+ALTER ROLE builderhunt_auth SET statement_timeout = '5s';
+ALTER ROLE builderhunt_auth SET idle_in_transaction_session_timeout = '10s';
+ALTER ROLE builderhunt_capability SET statement_timeout = '5s';
+ALTER ROLE builderhunt_capability SET idle_in_transaction_session_timeout = '10s';
+ALTER ROLE builderhunt_worker SET statement_timeout = '30s';
+ALTER ROLE builderhunt_worker SET idle_in_transaction_session_timeout = '30s';
+ALTER ROLE builderhunt_platform SET statement_timeout = '15s';
+ALTER ROLE builderhunt_platform SET idle_in_transaction_session_timeout = '10s';

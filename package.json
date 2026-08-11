@@ -49,7 +49,7 @@
     "identity:verify": "node --env-file=.env --import tsx scripts/identity/verify-reciprocity.ts",
     "lint": "eslint . --cache --cache-location .eslintcache",
     "lint:fix": "eslint . --fix",
-    "test:db-role-timeouts": "node scripts/db/verify-role-timeouts.mjs",
+    "test:db-role-timeouts": "node --env-file=.env scripts/db/verify-role-timeouts.mjs",
     "load:pooler:preflight": "node scripts/load/compose-preflight.mjs",
     "plans:check-order": "node scripts/check-plan-order.mjs",
     "plans:check-readiness": "node scripts/check-phase-readiness.mjs phase-2 phase-3 && pnpm plans:check-tasks",
