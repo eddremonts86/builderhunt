@@ -1,8 +1,15 @@
 # Action-Centered Dashboard — Implementation Plan
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Spec**: [`spec.md`](./spec.md)
 > **Execution order**: truth and accessibility -> data projection -> critical workflows -> dependent widgets -> personalization -> release gates
+> **Status reconciliation 2026-08-12.** `pending` → `implemented`. Every task is checked with no `- [ ]` and no
+> `- [~]`, and the four rulings recorded in `tasks.md` closed the last of them on their evidence rather than by
+> flipping a marker: the `from` return context could only ever carry one value, the hidden-widget control has
+> nothing optional to act on, the persona default table would re-encode what `roles`/`isVisible`/`whenEmpty`
+> already express and keep a widget hidden after the workspace stopped being new, and "disabling either admin
+> surface" describes a capability this product does not have. The one item that was open inside a checked task —
+> bounding the legacy `/api/admin/metrics` response — was closed as code, not recounted.
 
 ## Delivery principles
 

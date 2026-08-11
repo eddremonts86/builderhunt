@@ -8,12 +8,12 @@ twelve of those collide with phase 1's, so a flat archive could hold one phase a
 
 | | Plans | What it holds |
 |---|---|---|
-| `phase-1/` | 52 | every finished phase-1 plan, numbered 01-59 with gaps where a live plan still sits |
+| `phase-1/` | 53 | every finished phase-1 plan, numbered 01-59 with gaps where a live plan still sits |
 | `phase-3/` | 13 | all of phase 3 — the phase is complete |
 
-Two plans remain in `plans/phase-1/`, and both are real open work: `55` waiting on cost-bearing
-certification runs, and `57` with seven partial tasks. The five `superseded` ones moved to
-[`plans/rejected/phase-1/`](../rejected/README.md) on 2026-08-11 — see below.
+One plan remains in `plans/phase-1/`: `55`, waiting on cost-bearing certification runs that need an isolated
+host and explicit approval. `57` was archived on 2026-08-12 — it closed with 65 tasks done, 0 open and 0 partial.
+The five `superseded` ones moved to [`plans/rejected/phase-1/`](../rejected/README.md) on 2026-08-11 — see below.
 
 ## What a plan had to satisfy to be in here
 
@@ -35,7 +35,6 @@ and why it changed, so the claim is auditable rather than asserted.
 | Plan | Status | Where it is | Why |
 |---|---|---|---|
 | `55-load-1000-concurrent-users` | `pending` | `plans/phase-1/` | 5 open + 1 partial — the cost-bearing certification runs |
-| `57-ui-dashboard` | `pending` | `plans/phase-1/` | 7 partial |
 | `11-sourcehut-integration` | `superseded` | `plans/rejected/phase-1/` | retired 2026-08-04, not built |
 | `16-hashnode-integration` | `superseded` | `plans/rejected/phase-1/` | retired 2026-08-04, not built |
 | `20-indiehackers-integration` | `superseded` | `plans/rejected/phase-1/` | closed and skipped, not built |
@@ -48,7 +47,8 @@ be the opposite of the point.
 
 They are not *pending* either, and until 2026-08-11 they sat in `plans/phase-1/` beside the live work —
 recorded here at the time as "the second-best answer and one worth revisiting". They now have their own
-root, so `plans/phase-1/` answers "what is left?" with two entries instead of seven. A plan has three
+root, which cut `plans/phase-1/` from seven entries to two that day, and to one when `57` was archived on
+2026-08-12. A plan has three
 possible homes and they are decided by outcome, not by topic:
 
 | Root | Means |
@@ -66,11 +66,12 @@ differently was an inconsistency, not a distinction anybody had drawn.
 
 A plan's two-digit prefix is its position in the canonical build order recorded in
 [`../_meta/phase-1-order.md`](../_meta/phase-1-order.md), and that order is a property of the work
-rather than of where the file is filed. So `01-security-and-multitenancy` is still `01` in here, and
-`plans/phase-1/` still holds `11`, `16`, `20`, `31`, `39`, `55` and `57`.
+rather than of where the file is filed. So `01-security-and-multitenancy` is still `01` in here, `11`, `16`,
+`20`, `31` and `39` keep their numbers under `plans/rejected/phase-1/`, `57` keeps its own in here, and
+`plans/phase-1/` holds `55` alone.
 
-`scripts/check-plan-order.mjs` therefore reads the **union** of the two directories. Left pointed at
-`plans/phase-1/` alone it would have passed vacuously — seven directories asked to be numbered 01-07,
+`scripts/check-plan-order.mjs` therefore reads the **union** of all three roots. Left pointed at
+`plans/phase-1/` alone it would now pass vacuously on a single directory asked to be numbered 01 —
 and every dependency on a moved plan resolving to "not a plan directory". It now reports
 `OK: 59 plans numbered 01-59, every dependency points backward`, which is the same guarantee as before
 the split.

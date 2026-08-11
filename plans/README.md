@@ -29,8 +29,8 @@ and nothing else:
 
 | Root | Means | Phase-1 count |
 |---|---|---|
-| `plans/<phase>/` | live work: open or partial tasks remain, or `blocked` and waiting | 2 |
-| [`plans/implemented/`](./implemented/README.md) | done and tested — every task closed, `implemented` in all three files, `pnpm ci:local` green | 52 |
+| `plans/<phase>/` | live work: open or partial tasks remain, or `blocked` and waiting | 1 |
+| [`plans/implemented/`](./implemented/README.md) | done and tested — every task closed, `implemented` in all three files, `pnpm ci:local` green | 53 |
 | [`plans/rejected/`](./rejected/README.md) | `superseded` — never built, and never will be under this number | 5 |
 
 `pnpm plans:check-implemented` enforces all three in both directions, so none of these is a claim anyone
@@ -38,8 +38,8 @@ has to trust. `blocked` deliberately stays in the phase directory: it is work wa
 work that ended.
 
 The two-digit prefixes did not change: the number is a plan's position in the canonical build order, not
-its address. `scripts/check-plan-order.mjs` reads both directories as one corpus and still reports 59
-plans numbered 01-59.
+its address. `scripts/check-plan-order.mjs` reads all three roots as one corpus and still reports 59 plans
+numbered 01-59, so a phase directory keeps the gaps where its moved plans used to be.
 
 ## Read this first
 

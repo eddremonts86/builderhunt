@@ -1,10 +1,17 @@
 # Action-Centered Dashboard
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Audience**: recruiters, team members, organization owners/admins, and verified profile owners
-> **Depends on**: selected deliverables from [`plans/UI`](../../implemented/phase-1/56-UI/spec.md), [`saved-search-health`](../../phase-4/saved-search-health/spec.md), and [`hiring-pipeline-kanban`](../../phase-4/hiring-pipeline-kanban/spec.md)
+> **Depends on**: selected deliverables from [`plans/UI`](../56-UI/spec.md), [`saved-search-health`](../../../phase-4/saved-search-health/spec.md), and [`hiring-pipeline-kanban`](../../../phase-4/hiring-pipeline-kanban/spec.md)
 > **Canonical surface**: `/dashboard`
 > **Reality check**: the current dashboard already has banners, four metric tiles, activity, sprints, recommendations, alerts, saved searches, recent builders, plan usage, and source mix. The problem is not an empty dashboard; it is weak prioritization, ambiguous data semantics, disconnected workflows, and incomplete failure/accessibility states.
+> **Status reconciliation 2026-08-12.** `pending` → `implemented`. Every task is checked with no `- [ ]` and no
+> `- [~]`, and the four rulings recorded in `tasks.md` closed the last of them on their evidence rather than by
+> flipping a marker: the `from` return context could only ever carry one value, the hidden-widget control has
+> nothing optional to act on, the persona default table would re-encode what `roles`/`isVisible`/`whenEmpty`
+> already express and keep a widget hidden after the workspace stopped being new, and "disabling either admin
+> surface" describes a capability this product does not have. The one item that was open inside a checked task —
+> bounding the legacy `/api/admin/metrics` response — was closed as code, not recounted.
 
 ## Purpose
 

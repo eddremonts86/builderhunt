@@ -1,9 +1,16 @@
 # Action-Centered Dashboard — Tasks
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Spec**: [`spec.md`](./spec.md)
 > **Plan**: [`plan.md`](./plan.md)
 > **Rule**: a task is complete only after its runtime and negative authorization states are verified. Dependency-gated tasks stay open until the canonical domain capability ships.
+> **Status reconciliation 2026-08-12.** `pending` → `implemented`. Every task is checked with no `- [ ]` and no
+> `- [~]`, and the four rulings recorded in `tasks.md` closed the last of them on their evidence rather than by
+> flipping a marker: the `from` return context could only ever carry one value, the hidden-widget control has
+> nothing optional to act on, the persona default table would re-encode what `roles`/`isVisible`/`whenEmpty`
+> already express and keep a widget hidden after the workspace stopped being new, and "disabling either admin
+> surface" describes a capability this product does not have. The one item that was open inside a checked task —
+> bounding the legacy `/api/admin/metrics` response — was closed as code, not recounted.
 
 ## Wave 0 — Baseline and truth
 
@@ -330,7 +337,7 @@
 ## Wave 5 — Dependency-gated widgets
 
 **Saved-Search Health** moved to
-[`plans/phase-4/saved-search-health`](../../phase-4/saved-search-health/tasks.md) on 2026-08-11,
+[`plans/phase-4/saved-search-health`](../../../phase-4/saved-search-health/tasks.md) on 2026-08-11,
 deliberately not as a checkbox: a box here reads as pending engineering in this plan, and there is none.
 It was blocked on that plan rather than deferred by effort — its Verify line requires reconciling against
 a canonical health endpoint, and that plan is what builds one. Building the widget first would have meant
@@ -339,7 +346,7 @@ forbids. It now sits beside the endpoint, so whoever ships one ships the other w
 their head.
 
 **Pipeline Stage Distribution and aging** moved to
-[`plans/phase-4/hiring-pipeline-kanban`](../../phase-4/hiring-pipeline-kanban/tasks.md) on 2026-08-11,
+[`plans/phase-4/hiring-pipeline-kanban`](../../../phase-4/hiring-pipeline-kanban/tasks.md) on 2026-08-11,
 also as prose rather than a checkbox. There were no canonical stages, no stage-entry timestamps and no
 Kanban to link a filtered view to. Aging was the part that could not be approximated at all: the task
 requires that missing stage-entry timestamps *suppress* aging, and before that plan every timestamp is
