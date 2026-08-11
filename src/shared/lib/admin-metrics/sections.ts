@@ -1,7 +1,14 @@
 import type { AdminMetricRange, AdminMetricSection, AdminMetricSectionPayload } from './contracts'
+import { ADMIN_METRIC_LIMITS } from './contracts'
+import { LATENCY_BOUNDARIES_MS, LATENCY_SLOTS, percentileFrom } from './history'
 import { metrics } from '../metrics'
 import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '../repositories/platform-billing'
 import { getDiscoveryState } from '../repositories/discovery-state'
+import { readServiceMetricWindow } from '../repositories/service-metrics'
+import type { FamilyWindow } from '../repositories/service-metrics'
+
+/** The `values` array of a ready payload, named so the builders below can push into it. */
+type AdminMetricValues = Extract<AdminMetricSectionPayload, { status: 'ready' }>['data']['values']
 
 /**
  * One section, built from a source that exists — or `unavailable`, never zeroes (plan 57, Admin track).
@@ -53,9 +60,20 @@ function processIdentity() {
 }
 
 function windowFor(range: AdminMetricRange, now: Date, from?: Date) {
+  /**
+   * A supplied `from` that is not before `now` falls back to the range.
+   *
+   * The two callers that supply one read it from a *different clock* than `now`: runtime derives it from
+   * `process.uptime()`, and discovery from the worker's persisted `lastRunAt`. Neither is guaranteed to be
+   * in the past relative to the `now` the caller passed — a worker whose clock runs ahead, or any caller
+   * passing an explicit `now`, produces `from > to`. The contract refuses that window, so the payload would
+   * fail its own parse and the section would answer 500 instead of rendering, which is the one outcome the
+   * per-section split exists to prevent.
+   */
+  const supplied = from && from.getTime() < now.getTime() ? from : undefined
   return {
     range,
-    from: (from ?? new Date(now.getTime() - RANGE_MS[range])).toISOString(),
+    from: (supplied ?? new Date(now.getTime() - RANGE_MS[range])).toISOString(),
     to: now.toISOString(),
     /**
      * The server's zone, reported rather than assumed.
@@ -99,20 +117,190 @@ export async function buildSection(input: SectionInput): Promise<AdminMetricSect
       return buildDiscovery(range, now)
     case 'runtime':
       return buildRuntime(range, now)
+    case 'traffic':
+      return buildTraffic(range, input.variant, now)
+    case 'search':
+      return buildSearch(range, input.variant, now)
     /**
-     * The four with no source yet, and the task that will give them one.
+     * The two still with no source, and why they are not lumped in with traffic and search any more.
      *
      * `insufficient_history` rather than `dependency_unavailable`: the dependency is not missing, the
-     * *history* is. Nothing persists request latencies, search outcomes, conversion cohorts or feature
-     * availability over time, so there is nothing to window. See plan 57's "Add truthful historical
-     * service-metric storage or adapter".
+     * *history* is. `service_metric_buckets` now persists request and search counts per minute, which is
+     * what turned `traffic` and `search` into real sections — but conversion cohorts need billing events
+     * bucketed by signup cohort, and feature reliability needs per-feature availability samples, and
+     * neither of those is a request counter. They stay honest until something writes them.
      */
-    case 'traffic':
-    case 'search':
     case 'conversion':
     case 'reliability':
       return unavailable('insufficient_history')
   }
+}
+
+/**
+ * Traffic, from the persisted minute buckets.
+ *
+ * The variant is not cosmetic here: `rate`, `latency` and `errors` return different metric keys and rank by
+ * different columns, which is exactly what the contract means by "a variant changes which shape the section
+ * returns". Rendering the default while the URL said `latency` would show an operator the wrong panel and
+ * they would have no way to tell.
+ *
+ * Everything is `scope: 'database'` and `platformTotal: true`, and that is the claim the storage was built
+ * to earn: the rows are per-instance, the query sums them, so unlike `metrics.get()` this genuinely is the
+ * platform's number over the stated window.
+ */
+async function buildTraffic(
+  range: AdminMetricRange,
+  variant: string,
+  now: Date,
+): Promise<AdminMetricSectionPayload> {
+  const window = windowFor(range, now)
+  const from = new Date(window.from)
+  const read = await readServiceMetricWindow(from, now).catch(() => null)
+  if (!read) return unavailable('error')
+  // No rows in the window is not "zero requests" — it is a window before the store began, or a store that
+  // is not being written. Either way there is nothing to report, and zeroes would read as an outage.
+  if (read.families.length === 0) return unavailable('insufficient_history')
+
+  const total = read.totals
+  const generatedAt = now.toISOString()
+  const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
+  const values: AdminMetricValues = [
+    { key: 'requests', value: total.requests, ...dbCount },
+    { key: 'errors', value: total.errors, ...dbCount },
+    // The count of instances that contributed, so an operator can tell a platform sum from one process.
+    { key: 'instances_reporting', value: read.instances, ...dbCount },
+  ]
+
+  if (variant === 'latency') {
+    /**
+     * A percentile is included only when the histogram can name one.
+     *
+     * `null` from `percentileFrom` means the answer is past the last boundary, and there is no number to
+     * report — so instead of inventing one, `requests_over_10s` says how many requests were slower than
+     * the coarsest bucket. That count is the honest form of the same information, and it is why an absent
+     * `p99_ms` is not a hole in the section: its sibling explains it.
+     */
+    const overflowCount = read.families.reduce(
+      (sum, family) => sum + (family.latencyBuckets[LATENCY_SLOTS - 1] ?? 0),
+      0,
+    )
+    const dbMs = { unit: 'milliseconds' as const, scope: 'database' as const, platformTotal: true }
+    if (total.p50Ms !== null) values.push({ key: 'latency_p50_ms', value: total.p50Ms, ...dbMs })
+    if (total.p95Ms !== null) values.push({ key: 'latency_p95_ms', value: total.p95Ms, ...dbMs })
+    if (total.p99Ms !== null) values.push({ key: 'latency_p99_ms', value: total.p99Ms, ...dbMs })
+    values.push({ key: 'requests_over_10s', value: overflowCount, ...dbCount })
+
+    return {
+      status: 'ready',
+      generatedAt,
+      window,
+      data: { values, ranked: rankFamilies(read.families, (family) => familyP95(family), 'milliseconds') },
+    }
+  }
+
+  if (variant === 'errors') {
+    // The rate is omitted, not zeroed, when nothing was served: 0 errors out of 0 requests is undefined,
+    // and `0 %` next to an empty window reads as a clean bill of health.
+    if (total.requests > 0) {
+      values.push({
+        key: 'error_rate',
+        value: total.errors / total.requests,
+        unit: 'ratio',
+        scope: 'database',
+        platformTotal: true,
+        // Higher is worse, and the pair is checked for direction by the contract.
+        threshold: { direction: 'higher_is_worse', warn: 0.01, critical: 0.05 },
+      })
+    }
+    return {
+      status: 'ready',
+      generatedAt,
+      window,
+      data: { values, ranked: rankFamilies(read.families, (family) => family.errors, 'count') },
+    }
+  }
+
+  // `rate`, the default.
+  const seconds = Math.max(1, Math.round((now.getTime() - from.getTime()) / 1000))
+  values.push({
+    key: 'requests_per_second',
+    value: total.requests / seconds,
+    unit: 'per_second',
+    scope: 'database',
+    platformTotal: true,
+  })
+  return {
+    status: 'ready',
+    generatedAt,
+    window,
+    data: { values, ranked: rankFamilies(read.families, (family) => family.requests, 'count') },
+  }
+}
+
+/**
+ * Search volume and cache quality, from the same buckets.
+ *
+ * Separate from the runtime section's `searches` counter, which is this process since boot. These are
+ * windowed and summed across instances, so the two will disagree — and that is correct rather than a bug:
+ * they answer different questions and each says which one on the wire, via `scope`.
+ */
+async function buildSearch(
+  range: AdminMetricRange,
+  variant: string,
+  now: Date,
+): Promise<AdminMetricSectionPayload> {
+  const window = windowFor(range, now)
+  const read = await readServiceMetricWindow(new Date(window.from), now).catch(() => null)
+  if (!read) return unavailable('error')
+  if (read.totals.searches === 0) return unavailable('insufficient_history')
+
+  const generatedAt = now.toISOString()
+  const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
+  const values: AdminMetricValues = [
+    { key: 'searches', value: read.totals.searches, ...dbCount },
+    { key: 'search_cache_hits', value: read.totals.searchCacheHits, ...dbCount },
+  ]
+
+  if (variant === 'quality') {
+    values.push({
+      key: 'search_cache_hit_rate',
+      value: read.totals.searchCacheHits / read.totals.searches,
+      unit: 'ratio',
+      scope: 'database',
+      platformTotal: true,
+      // A cold cache is slow and expensive, not broken, so lower is worse and neither bound is an alarm.
+      threshold: { direction: 'lower_is_worse', warn: 0.4, critical: 0.1 },
+    })
+  }
+
+  return { status: 'ready', generatedAt, window, data: { values } }
+}
+
+/** The p95 for one family, or the last boundary when it overflows — used only for ranking, never reported. */
+function familyP95(family: FamilyWindow): number {
+  const result = percentileFrom(family.latencyBuckets, 0.95)
+  return result.atMostMs ?? LATENCY_BOUNDARIES_MS[LATENCY_BOUNDARIES_MS.length - 1]
+}
+
+/**
+ * Top families by one column, capped at the contract's limit.
+ *
+ * The cap is `ADMIN_METRIC_LIMITS.rankedRows`, and slicing to it is the design rather than a truncation to
+ * apologise for — but there are fourteen families and ten rows, so on a busy platform four are genuinely
+ * not shown. Families with a zero value are dropped first, which is what usually makes the difference
+ * moot; when it does not, the section's totals still account for every family, so the arithmetic on the
+ * page stays right even when the ranking is partial.
+ */
+function rankFamilies(
+  families: readonly FamilyWindow[],
+  valueOf: (family: FamilyWindow) => number,
+  unit: 'count' | 'milliseconds',
+) {
+  return families
+    .map((family) => ({ family: family.routeFamily, value: valueOf(family), unit }))
+    .filter((row) => row.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, ADMIN_METRIC_LIMITS.rankedRows)
 }
 
 /**

@@ -189,6 +189,7 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   // The split sections (plan 57). `sections.ts` is probed with a valid section, because an invalid one is
   // a 400 for *everybody* and would pass this table without ever reaching the authorization guard.
   { file: 'metrics/overview.ts', method: 'GET', path: '/api/admin/metrics/overview' },
+  { file: 'metrics/run-retention.ts', method: 'POST', path: '/api/admin/metrics/run-retention' },
   { file: 'metrics/sections.ts', method: 'GET', path: '/api/admin/metrics/sections?section=runtime' },
   { file: 'metrics/trust.ts', method: 'GET', path: '/api/admin/metrics/trust' },
   { file: 'operations/$jobKey.ts', method: 'PATCH', path: '/api/admin/operations/absent-job' },
@@ -240,6 +241,7 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'enrichment/run-worker.ts', method: 'GET', path: '/api/admin/enrichment/run-worker' },
   { file: 'interviews/run-retention.ts', method: 'GET', path: '/api/admin/interviews/run-retention' },
   { file: 'legal/run-worker.ts', method: 'GET', path: '/api/admin/legal/run-worker' },
+  { file: 'metrics/run-retention.ts', method: 'GET', path: '/api/admin/metrics/run-retention' },
   { file: 'sprints/run-worker.ts', method: 'GET', path: '/api/admin/sprints/run-worker' },
   { file: 'status/snapshot.ts', method: 'GET', path: '/api/admin/status/snapshot' },
 ]
@@ -378,13 +380,33 @@ test.describe('a platform admin', () => {
       expect(value.processIdentity?.pid, `${value.key} must name its process`).toBeGreaterThan(0)
     }
 
-    // A section with no history says so, and carries no data at all to be misread.
+    /**
+     * Traffic, which now has a store behind it — so this asserts the *rule*, not one of its two outcomes.
+     *
+     * `service_metric_buckets` is written by a thirty-second flush that deliberately leaves the minute in
+     * progress behind, so whether a spec run has rows yet depends on how long the run has been going. An
+     * assertion pinned to `unavailable` would have passed on a fresh database and started failing once the
+     * suite got slower, for no product reason. What must hold either way is that the section never invents
+     * a zero: it is `unavailable: insufficient_history` with no data at all, or it is real numbers that say
+     * they came from the database and are platform totals.
+     */
     const traffic = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=traffic')
     expect(traffic.status()).toBe(200)
     const trafficBody = await traffic.json()
-    expect(trafficBody.payload.status).toBe('unavailable')
-    expect(trafficBody.payload.code).toBe('insufficient_history')
-    expect(trafficBody.payload.data).toBeUndefined()
+    if (trafficBody.payload.status === 'unavailable') {
+      expect(trafficBody.payload.code).toBe('insufficient_history')
+      expect(trafficBody.payload.data).toBeUndefined()
+    } else {
+      expect(trafficBody.payload.status).toBe('ready')
+      for (const value of trafficBody.payload.data.values) {
+        expect(value.scope, `${value.key} is read from the buckets table`).toBe('database')
+        // The claim the per-instance rows plus the summing query earn, and the runtime section cannot make.
+        expect(value.platformTotal, `${value.key} sums every instance`).toBe(true)
+        expect(value.processIdentity, `${value.key} is not one process's counter`).toBeUndefined()
+      }
+      // Fourteen families, ten rows: the ranking is capped in the payload, not trimmed by the client.
+      expect((trafficBody.payload.data.ranked ?? []).length).toBeLessThanOrEqual(10)
+    }
 
     // Caller mistakes: unknown section, unknown range, and a variant that belongs to another section.
     for (const query of ['section=surveillance', 'section=traffic&range=18mo', 'section=search&variant=latency']) {
@@ -393,12 +415,32 @@ test.describe('a platform admin', () => {
       expect((await bad.json()).error, query).toBe('invalid_request')
     }
 
-    // And the guard is on both routes, which is the failure eight copies of it would have hidden.
+    /**
+     * The retention pass, which is the only path to a DELETE on the buckets.
+     *
+     * `builderhunt_app` writes the minutes and is not granted DELETE; `builderhunt_worker` is. So a 200 here
+     * is the evidence that the worker role's grant is actually in place — a unit test cannot produce it,
+     * because unit tests connect as a superuser and would succeed with no grant at all.
+     */
+    const retention = await harness.admin.api!.fetch('/api/admin/metrics/run-retention', { method: 'POST' })
+    expect(retention.status()).toBe(200)
+    const retentionBody = await retention.json()
+    expect(retentionBody.retainDays).toBe(30)
+    expect(typeof retentionBody.deletedCount).toBe('number')
+    // Nothing in a fresh window is old enough to remove, and the pass must say so rather than fail.
+    expect(retentionBody.deletedCount).toBeGreaterThanOrEqual(0)
+
+    // And the guard is on all three routes, which is the failure eight copies of it would have hidden.
     for (const path of ['/api/admin/metrics/overview', '/api/admin/metrics/sections?section=runtime']) {
       const asTenant = await harness.tenant.api!.fetch(path)
       expect([401, 403], `${path} must refuse a tenant`).toContain(asTenant.status())
       const anonymous = await harness.anonymous.fetch(path)
       expect([401, 403], `${path} must refuse an anonymous caller`).toContain(anonymous.status())
     }
+    // The retention trigger refuses the same callers, by POST — the method that actually deletes.
+    const tenantRetention = await harness.tenant.api!.fetch('/api/admin/metrics/run-retention', { method: 'POST' })
+    expect([401, 403]).toContain(tenantRetention.status())
+    const anonRetention = await harness.anonymous.fetch('/api/admin/metrics/run-retention', { method: 'POST' })
+    expect([401, 403]).toContain(anonRetention.status())
   })
 })

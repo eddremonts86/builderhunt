@@ -1,0 +1,306 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  adminMetricSectionSchema,
+  ADMIN_METRIC_LIMITS,
+  ROUTE_FAMILIES,
+} from '../../../../../src/shared/lib/admin-metrics/contracts'
+import { emptyHistogram, observe } from '../../../../../src/shared/lib/admin-metrics/history'
+import type { FamilyWindow, ServiceMetricWindow } from '../../../../../src/shared/lib/repositories/service-metrics'
+
+/**
+ * Plan 57, Admin track — the two sections the historical store turned from `insufficient_history` into real
+ * answers.
+ *
+ * Every assertion here is about a *lie a metrics page could tell*, not about plumbing: a zero that reads as
+ * an outage, a rate divided by nothing, a percentile invented inside a bucket, a ranking longer than the
+ * contract's cap, and a process counter presented as a platform total.
+ */
+
+const mocks = vi.hoisted(() => ({
+  readServiceMetricWindow: vi.fn(),
+  getPlatformAccountMetrics: vi.fn(),
+  getOnboardingActivationMetrics: vi.fn(),
+  getDiscoveryState: vi.fn(),
+}))
+
+vi.mock('../../../../../src/shared/lib/repositories/service-metrics', () => ({
+  readServiceMetricWindow: mocks.readServiceMetricWindow,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/platform-billing', () => ({
+  getPlatformAccountMetrics: mocks.getPlatformAccountMetrics,
+  getOnboardingActivationMetrics: mocks.getOnboardingActivationMetrics,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/discovery-state', () => ({
+  getDiscoveryState: mocks.getDiscoveryState,
+}))
+
+const { buildSection } = await import('../../../../../src/shared/lib/admin-metrics/sections')
+
+const NOW = new Date('2026-08-11T12:00:00.000Z')
+
+function family(overrides: Partial<FamilyWindow> & { routeFamily: FamilyWindow['routeFamily'] }): FamilyWindow {
+  return {
+    requests: 0,
+    errors: 0,
+    searches: 0,
+    searchCacheHits: 0,
+    latencyBuckets: emptyHistogram(),
+    ...overrides,
+  }
+}
+
+/**
+ * A window whose totals are derived from its families, so a case cannot state a total that contradicts the
+ * rows it also states. The percentiles default to `null` — the latency case overrides them explicitly,
+ * because that is the one place the relationship between a histogram and a percentile is under test.
+ */
+function windowOf(families: FamilyWindow[]): ServiceMetricWindow {
+  const sum = (pick: (f: FamilyWindow) => number) => families.reduce((total, f) => total + pick(f), 0)
+  return {
+    from: new Date(NOW.getTime() - 86_400_000),
+    to: NOW,
+    instances: 2,
+    families,
+    totals: {
+      requests: sum((f) => f.requests),
+      errors: sum((f) => f.errors),
+      searches: sum((f) => f.searches),
+      searchCacheHits: sum((f) => f.searchCacheHits),
+      p50Ms: null,
+      p95Ms: null,
+      p99Ms: null,
+      overflow: false,
+    },
+  }
+}
+
+/** Reads a value out of a ready/partial payload, or fails the assertion by returning undefined. */
+function valueOf(payload: unknown, key: string): number | undefined {
+  const data = (payload as { data?: { values: { key: string; value: number }[] } }).data
+  return data?.values.find((entry) => entry.key === key)?.value
+}
+
+function parsed(payload: unknown) {
+  // Every case parses the payload: a section that does not satisfy its own contract is not a passing case,
+  // however plausible the numbers look.
+  return adminMetricSectionSchema.parse(payload)
+}
+
+beforeEach(() => {
+  mocks.readServiceMetricWindow.mockReset()
+})
+
+describe('traffic', () => {
+  it('says insufficient_history rather than zero when the window has no rows', async () => {
+    /**
+     * The lie this whole plan is about. An empty window is a window before the store began, or a store
+     * nobody is writing — and "requests: 0, errors: 0" renders as a healthy idle platform either way.
+     */
+    mocks.readServiceMetricWindow.mockResolvedValue(windowOf([]))
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW }))
+    expect(payload.status).toBe('unavailable')
+    expect(payload).toMatchObject({ code: 'insufficient_history' })
+  })
+
+  it('reports a database-scoped platform total, with the instance count beside it', async () => {
+    // The scope claim the storage earns: rows are per-instance and the query sums them, so unlike
+    // `metrics.get()` this really is the platform's number.
+    mocks.readServiceMetricWindow.mockResolvedValue(
+      windowOf([family({ routeFamily: 'api.search', requests: 900 }), family({ routeFamily: 'api.admin', requests: 100, errors: 5 })]),
+    )
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW }))
+    expect(payload.status).toBe('ready')
+    expect(valueOf(payload, 'requests')).toBe(1000)
+    expect(valueOf(payload, 'errors')).toBe(5)
+    expect(valueOf(payload, 'instances_reporting')).toBe(2)
+
+    const requests = (payload as { data: { values: { key: string; scope: string; platformTotal?: boolean }[] } }).data.values
+      .find((v) => v.key === 'requests')
+    expect(requests?.scope).toBe('database')
+    expect(requests?.platformTotal).toBe(true)
+  })
+
+  it('omits the error rate rather than reporting 0 % over an empty denominator', async () => {
+    // 0 errors out of 0 requests is undefined, and `0 %` next to an empty window reads as a clean bill of
+    // health. The families exist (so the section is not `unavailable`) but carry no requests.
+    mocks.readServiceMetricWindow.mockResolvedValue(windowOf([family({ routeFamily: 'api.search' })]))
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'errors', now: NOW }))
+    expect(valueOf(payload, 'error_rate')).toBeUndefined()
+  })
+
+  it('carries a direction-checked threshold on the error rate', async () => {
+    mocks.readServiceMetricWindow.mockResolvedValue(
+      windowOf([family({ routeFamily: 'api.search', requests: 200, errors: 4 })]),
+    )
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'errors', now: NOW }))
+    expect(valueOf(payload, 'error_rate')).toBeCloseTo(0.02)
+    const rate = (payload as { data: { values: { key: string; threshold?: { direction: string } }[] } }).data.values
+      .find((v) => v.key === 'error_rate')
+    expect(rate?.threshold?.direction).toBe('higher_is_worse')
+  })
+
+  it('ranks by errors under the errors variant and by requests under rate', async () => {
+    /**
+     * The variant is not cosmetic: a URL that says `errors` must not render the request ranking. An operator
+     * sharing that URL would send somebody to a different view than the one they were reading.
+     */
+    const families = [
+      family({ routeFamily: 'api.search', requests: 1000, errors: 1 }),
+      family({ routeFamily: 'api.billing', requests: 10, errors: 9 }),
+    ]
+    mocks.readServiceMetricWindow.mockResolvedValue(windowOf(families))
+    const byRate = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW }))
+    mocks.readServiceMetricWindow.mockResolvedValue(windowOf(families))
+    const byErrors = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'errors', now: NOW }))
+
+    const top = (p: unknown) => (p as { data: { ranked?: { family: string }[] } }).data.ranked?.[0]?.family
+    expect(top(byRate)).toBe('api.search')
+    expect(top(byErrors)).toBe('api.billing')
+  })
+
+  it('never returns more ranked rows than the contract allows, even with every family present', async () => {
+    // Fourteen families, ten rows. The cap is the design; the parse is what proves it is applied before the
+    // payload leaves rather than trusted downstream.
+    mocks.readServiceMetricWindow.mockResolvedValue(
+      windowOf(ROUTE_FAMILIES.map((routeFamily, index) => family({ routeFamily, requests: index + 1 }))),
+    )
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW }))
+    const ranked = (payload as { data: { ranked?: unknown[] } }).data.ranked
+    expect(ranked).toHaveLength(ADMIN_METRIC_LIMITS.rankedRows)
+  })
+
+  it('drops families with nothing in them instead of padding the ranking with zeroes', async () => {
+    mocks.readServiceMetricWindow.mockResolvedValue(
+      windowOf([family({ routeFamily: 'api.search', requests: 5 }), family({ routeFamily: 'api.billing' })]),
+    )
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW }))
+    expect((payload as { data: { ranked?: unknown[] } }).data.ranked).toHaveLength(1)
+  })
+
+  it('reports the boundary for a percentile and a count for what overflowed it', async () => {
+    /**
+     * Two honesty rules in one case.
+     *
+     * A percentile is reported as the bucket boundary, never interpolated inside it — there is no
+     * information about where in the bucket the value sat. And when the answer is past the last boundary
+     * there is no number at all, so `requests_over_10s` says how many were slower instead. An absent
+     * `p99_ms` is explained by its sibling rather than being a hole.
+     */
+    const slow = emptyHistogram()
+    for (let i = 0; i < 99; i += 1) observe(slow, 80)
+    observe(slow, 45_000)
+    const read = windowOf([family({ routeFamily: 'api.search', requests: 100, latencyBuckets: slow })])
+    read.totals = { ...read.totals, p50Ms: 100, p95Ms: 100, p99Ms: null, overflow: true }
+    mocks.readServiceMetricWindow.mockResolvedValue(read)
+
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'latency', now: NOW }))
+    expect(valueOf(payload, 'latency_p95_ms')).toBe(100)
+    expect(valueOf(payload, 'latency_p99_ms')).toBeUndefined()
+    expect(valueOf(payload, 'requests_over_10s')).toBe(1)
+  })
+
+  it('answers `error` rather than throwing when the read fails', async () => {
+    // One section failing must leave the others readable — that is the entire point of the split.
+    mocks.readServiceMetricWindow.mockRejectedValue(new Error('57014: canceling statement due to statement timeout'))
+    const payload = parsed(await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
+  })
+})
+
+describe('search', () => {
+  it('says insufficient_history rather than a 0 % hit rate when nothing was searched', async () => {
+    mocks.readServiceMetricWindow.mockResolvedValue(windowOf([family({ routeFamily: 'api.search', requests: 40 })]))
+    const payload = parsed(await buildSection({ section: 'search', range: '24h', variant: 'quality', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'insufficient_history' })
+  })
+
+  it('reports the hit rate only under the quality variant', async () => {
+    const read = () => windowOf([family({ routeFamily: 'api.search', searches: 200, searchCacheHits: 150 })])
+    mocks.readServiceMetricWindow.mockResolvedValue(read())
+    const volume = parsed(await buildSection({ section: 'search', range: '24h', variant: 'volume', now: NOW }))
+    expect(valueOf(volume, 'searches')).toBe(200)
+    expect(valueOf(volume, 'search_cache_hit_rate')).toBeUndefined()
+
+    mocks.readServiceMetricWindow.mockResolvedValue(read())
+    const quality = parsed(await buildSection({ section: 'search', range: '24h', variant: 'quality', now: NOW }))
+    expect(valueOf(quality, 'search_cache_hit_rate')).toBe(0.75)
+  })
+
+  it('marks a cold cache as lower_is_worse, not as an error', async () => {
+    // A cold cache is slow and expensive, not broken. Getting the direction wrong here would make a warning
+    // fire on a *healthy* cache and never fire on a cold one.
+    mocks.readServiceMetricWindow.mockResolvedValue(
+      windowOf([family({ routeFamily: 'api.search', searches: 100, searchCacheHits: 2 })]),
+    )
+    const payload = parsed(await buildSection({ section: 'search', range: '24h', variant: 'quality', now: NOW }))
+    const rate = (payload as { data: { values: { key: string; threshold?: { direction: string } }[] } }).data.values
+      .find((v) => v.key === 'search_cache_hit_rate')
+    expect(rate?.threshold?.direction).toBe('lower_is_worse')
+  })
+})
+
+describe('the sections that still have no source', () => {
+  it('keeps conversion and reliability at insufficient_history', async () => {
+    /**
+     * Not an oversight, and not something to fill with zeroes now that a store exists. Conversion cohorts
+     * need billing events bucketed by signup cohort and reliability needs per-feature availability samples;
+     * neither is a request counter, so neither is answerable from `service_metric_buckets`.
+     */
+    for (const section of ['conversion', 'reliability'] as const) {
+      const payload = parsed(await buildSection({ section, range: '24h', variant: 'funnel', now: NOW }))
+      expect(payload, section).toMatchObject({ status: 'unavailable', code: 'insufficient_history' })
+    }
+    // And they did not reach the store at all, which is what makes them free.
+    expect(mocks.readServiceMetricWindow).not.toHaveBeenCalled()
+  })
+})
+
+describe('runtime, next to the sections that are platform-wide', () => {
+  it('marks every counter as process-scoped with an identity, and never as a platform total', async () => {
+    /**
+     * The bug the contract's scope rule exists for. These counters start at zero when the process starts,
+     * they are per-instance, and a deploy resets them — so rendering them beside Overview's database totals
+     * without a scope is the sentence "this instance's counter is the platform's number".
+     */
+    const payload = parsed(await buildSection({ section: 'runtime', range: '24h', variant: 'process', now: NOW }))
+    const values = (payload as { data: { values: { scope: string; platformTotal?: boolean; processIdentity?: unknown }[] } }).data.values
+    expect(values.length).toBeGreaterThan(0)
+    for (const value of values) {
+      expect(value.scope).toBe('process')
+      expect(value.platformTotal).toBeUndefined()
+      expect(value.processIdentity).toBeDefined()
+    }
+  })
+})
+
+describe('the window, when its start comes from another clock', () => {
+  it('falls back to the range instead of emitting a window the contract refuses', async () => {
+    /**
+     * Found by the case above, and a real hazard rather than a test artifact.
+     *
+     * Runtime derives `from` from `process.uptime()` and discovery from the worker's persisted `lastRunAt` —
+     * neither is the clock `now` came from. `from > to` fails the contract's own refinement, so the payload
+     * would not parse and the section would answer 500 rather than render. A section that cannot fail alone
+     * defeats the split.
+     */
+    const payload = parsed(
+      await buildSection({ section: 'runtime', range: '1h', variant: 'process', now: new Date('2020-01-01T00:00:00.000Z') }),
+    )
+    const window = (payload as { window: { from: string; to: string } }).window
+    expect(new Date(window.from).getTime()).toBeLessThan(new Date(window.to).getTime())
+    // The range, not the process start, because the process start was not usable.
+    expect(window.from).toBe('2019-12-31T23:00:00.000Z')
+  })
+
+  it('still prefers a usable supplied start, so discovery keeps reporting the worker run', async () => {
+    // The fallback must not swallow the legitimate case: discovery's window is deliberately the worker's
+    // last run rather than the asked-for range, because these are state and not a windowed aggregate.
+    mocks.getDiscoveryState.mockResolvedValue({
+      lastRunAt: new Date('2026-08-11T09:30:00.000Z'),
+      stats: { cellsScanned: 12, profilesSeen: 40, profilesStored: 7 },
+    })
+    const payload = parsed(await buildSection({ section: 'discovery', range: '24h', variant: 'coverage', now: NOW }))
+    expect((payload as { window: { from: string } }).window.from).toBe('2026-08-11T09:30:00.000Z')
+    expect(valueOf(payload, 'discovery_profiles_stored')).toBe(7)
+  })
+})

@@ -463,18 +463,49 @@ missing — so the only honest version of this widget was an empty one.
   - Result: `admin.spec.ts` 229 passed; e2e route coverage 210/211 with 0 missing; `check-api-route-methods`
     and `check-route-client-boundary` clean.
   - **Still open:** migrating the page to the new routes and bounding the legacy `/api/admin/metrics`
-    response, which is the other half of this task and belongs with the lazy-shell rebuild below.
-    request state, and per-section failure isolation. Blocked on the section contracts task above.
+    response, which is the other half of this task and belongs with the lazy-shell rebuild below —
+    together with the per-section request state and failure isolation the rebuild needs.
   - **`db.totalBuilders` is not merely deferred.** Making those three counts real needs
     `builderhunt_platform` to hold unscoped SELECT on tenant tables — saved queries and notes being
     private workflow content — which is the surveillance the Admin track's own rule forbids. If a
     platform-wide builder count is wanted, it is its own task with its own policy migration, not a
     line in this one.
 
-- [ ] **Add truthful historical service-metric storage or adapter**
+- [x] **Add truthful historical service-metric storage or adapter**
   - Files: metrics repository/schema or observability adapter, retention/aggregation worker, tests and runbook
   - Do: Persist bounded time buckets or integrate a real metrics backend for request counts, errors, latency histograms, search/cache outcomes, and allowlisted route families. Record instance/deployment/reset identity and retention. Do not infer history from cumulative process counters.
   - Verify: rates and p50/p95/p99 reconcile with fixture observations across process restart and multiple instances; high-cardinality URLs/IDs are normalized or rejected; retention is bounded.
+  - **Landed 2026-08-11.** `drizzle/0169_service_metric_buckets.sql`, `admin-metrics/history.ts`,
+    `admin-metrics/recorder.ts`, `admin-metrics/flush.ts`, `admin-metrics/middleware.ts`,
+    `repositories/service-metrics.ts`, `api/admin/metrics/run-retention.ts`.
+  - **The defect it closed first, which was not in the plan.** `metrics.ts` declared `apiRequests` and
+    `apiErrors`, initialised them to zero, and `AdminMetricsPage.tsx` rendered both as cards.
+    **Nothing incremented either one.** The page had shown `0` API requests for its whole existence, on the
+    one screen whose purpose is to be believed at 02:00. Counting at call sites is what produced it — a
+    route that forgets looks exactly like a route with no traffic — so the fix is one request middleware
+    registered in `src/start.ts`, where no route can opt out.
+  - **Why a table and not a counter.** A deploy zeroes a cumulative counter, so subtracting consecutive
+    reads gives a negative rate; with two instances the reads interleave and the subtraction describes
+    neither. Each row is "what this instance saw in this minute", which sums across instances and survives a
+    restart by starting a new row.
+  - **Verified against the real local database and the real roles**, not a mock: two flushes for the same
+    minute and instance added (100 + 1) instead of replacing, a second instance's minute summed to 201, the
+    elementwise histogram sum in SQL preserved all 12 slots across 200 observations, p50/p95 = 100 ms and
+    p99 = 5000 ms reconciled across both instances, and `runServiceMetricRetention()` deleted through
+    `builderhunt_worker` — the only role granted DELETE, which a unit test could never prove because unit
+    tests connect as a superuser.
+  - **Tests:** 79 in `tests/unit/shared/lib/admin-metrics/` (contracts 27, history 21, recorder 13, flush 6,
+    sections 12). Four guarantees were confirmed by *breaking* them and watching a test fail: no restore on
+    a failed flush, no once-per-process timer guard, `take()` handing over the minute in progress, and the
+    buffer's eviction.
+  - **A real hazard the sections test surfaced:** `windowFor` accepted a caller-supplied `from` read from a
+    *different clock* (`process.uptime()` for runtime, the worker's `lastRunAt` for discovery) and never
+    checked it preceded `to`. The contract refuses that window, so the payload would fail its own parse and
+    the section would answer 500 — the one outcome the per-section split exists to prevent. It now falls
+    back to the range.
+  - **Deliberately not stored:** a raw path. `/api/sprints/<id>` names a real sprint, so normalisation to
+    one of fourteen allowlisted families happens in `record()`, before anything enters even the in-memory
+    map — a heap object a crash dump would show.
 
 - [~] **Rebuild `/admin/metrics` as a route-driven lazy widget shell**
   - Files: `src/routes/_dashboard/admin/metrics.tsx`, `src/modules/admin/metrics/AdminMetricsPage.tsx`, query hooks, UI tests
