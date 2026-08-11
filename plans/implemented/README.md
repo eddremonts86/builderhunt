@@ -74,4 +74,33 @@ the split.
    links and 252 full-path references across 170 files; it also fixed 20 depth bugs that predated it,
    taking the repository from 37 broken relative links inside `plans/` down to 2 — both of which are the
    `../other-plan/spec.md` placeholder in `_meta/conventions.md`, which is illustrative prose.
-6. Run `node scripts/check-plan-order.mjs`.
+6. Run `pnpm plans:check-order` and `pnpm plans:check-implemented`.
+
+## What keeps this folder honest
+
+`pnpm plans:check-implemented` runs in `pnpm ci:local` and in CI's Quality job, and it asserts the two
+claims this file makes — plus one more that is easy to forget:
+
+1. Everything in here has zero open *and* zero partial tasks, and says `implemented` in every file that
+   carries a Status header.
+2. Nothing in `plans/phase-1/` has zero open tasks and `implemented` everywhere. A folder that
+   *understates* what is done is as unusable as one that overstates it, because a reader then has to
+   check both directories anyway.
+3. Every Status in either directory is one of the five values `check-phase-readiness.mjs` accepts. Eight
+   unreadable values drifted across phase-1 for weeks because nothing looked.
+
+Each of those four rules was verified against deliberate breakage rather than assumed: a partial task
+inside the folder, a `pending` status inside it, an invented status value, and a finished plan left
+outside. All four fail the gate.
+
+`pnpm plans:check-order` runs beside it, and guards that a two-digit prefix is still a position in a
+contiguous build order across both directories.
+
+### Why the readiness gate is *not* pointed at this folder
+
+`check-phase-readiness.mjs` asks "is this plan ready to be executed?" — no reserved migration numbers,
+no placeholders, an exact three-file set. Those rules are about work that has not happened yet. Run over
+these 48 plans it reports 52 failures, and 22 of them are task texts naming the migration the plan
+*actually created*. Satisfying those would mean rewriting the record of what happened to please a
+forward-looking lint. The position-contiguity half of that gate *was* fixed to read both directories,
+because that part is about order rather than readiness.

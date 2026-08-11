@@ -294,6 +294,11 @@ jobs:
       - run: pnpm security:boundaries
       - run: pnpm security:route-coverage
       # Phase 3: every list read declares a bound, every data grid names a capability.
+      # The plan record. Seconds, and they guard the two claims the plans directory makes out loud:
+      # `plans/implemented/` contains only finished work, and a two-digit prefix is a position in the
+      # canonical build order. Neither ran in any gate before 2026-08-11.
+      - run: pnpm plans:check-order
+      - run: pnpm plans:check-implemented
       - run: pnpm check:unbounded
       - run: pnpm check:table-surfaces
       - run: pnpm security:ui-route-graph

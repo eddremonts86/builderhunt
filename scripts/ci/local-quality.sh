@@ -224,6 +224,14 @@ step env-fidelity node scripts/ci/check-env-fidelity.mjs
 # And the other half of the same claim: same environment, same list of checks.
 step step-parity node scripts/ci/check-step-parity.mjs
 
+# The plan record, which is documentation only until something reads it. Both are seconds and both
+# guard a claim this repository now makes out loud: `plans/implemented/` means done and tested, and a
+# plan's two-digit prefix is its position in the build order. Neither check ran anywhere before
+# 2026-08-11, which is how eight unreadable status values and four plans sitting at 100% of their tasks
+# while labelled `pending` survived for weeks.
+step plans-order pnpm plans:check-order
+step plans-implemented pnpm plans:check-implemented
+
 step migration-integrity pnpm test:migration-integrity
 step deploy-imports pnpm test:deploy-imports
 step drizzle-check pnpm exec drizzle-kit check
