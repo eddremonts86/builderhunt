@@ -175,7 +175,7 @@
 
 ## Phase 3 — Operator and member UX
 
-- [~] **Build the conflict-safe admin control on the existing billing page**
+- [x] **Build the conflict-safe admin control on the existing billing page**
   - Files: `src/modules/admin/billing/BetaModeControl.tsx`,
     `tests/unit/modules/admin/billing/BetaModeControl.test.tsx`,
     `src/routes/_dashboard/admin/billing.tsx`.

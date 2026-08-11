@@ -108,7 +108,7 @@ tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each
 
 ## Phase 4 — PgBouncer
 
-- [ ] **Build a pinned multi-architecture PgBouncer image**
+- [x] **Build a pinned multi-architecture PgBouncer image**
   - Files: `docker/pgbouncer/Dockerfile`, `docker/pgbouncer/entrypoint.sh`,
     `docker/pgbouncer/pgbouncer.ini`, `docker/pgbouncer/README.md`,
     `docker/pgbouncer/LICENSE`
@@ -120,7 +120,7 @@ tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each
 docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; image inspection
     shows a non-root user and no auth file layer.
 
-- [ ] **Add bounded local compose topology**
+- [~] **Add bounded local compose topology**
   - Files: `docker-compose.yml`, `.env.example`, `scripts/load/compose-preflight.mjs`, `package.json`
   - Do: Add PgBouncer on `127.0.0.1:6432` with transaction mode, pool 12 + reserve 4,
     `max_db_connections=80`, `max_client_conn=500`, SCRAM auth, healthcheck, and auth-file tmpfs.

@@ -231,7 +231,7 @@
     `pnpm security:route-methods`, `pnpm security:ui-route-graph`, `pnpm type-check`,
     `pnpm lint`, and `pnpm build` all exit 0 and their results are copied into the evidence file.
 
-- [ ] **Verify the complete flow manually and close only on the full gate**
+- [~] **Verify the complete flow manually and close only on the full gate**
   - Files: `docs/operations/personalized-invitations-verification.md`,
     `plans/phase-1/59-personalized-invitations/spec.md`,
     `plans/phase-1/59-personalized-invitations/plan.md`,
