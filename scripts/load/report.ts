@@ -35,6 +35,26 @@ export interface ObservabilitySample {
   pgBouncerClientsWaiting: number | null
   pgBouncerMaxWaitMs: number | null
   processRssBytes: number
+  /**
+   * The rest of the observability contract in `spec.md`, optional because a field that was never observed
+   * has to be distinguishable from one observed to be zero.
+   *
+   * That distinction is the whole reason these are `?: number | null` and not `number`. A direct run has no
+   * pooler, so `SHOW STATS` yields nothing; a run outside compose has no container to ask about CPU or
+   * restarts. Defaulting those to `0` would print "0 restarts" and "0% CPU" for a run that never looked —
+   * which reads as a clean bill of health and is the failure this file already has scars from.
+   */
+  postgresActive?: number | null
+  postgresIdleInTransaction?: number | null
+  postgresWaiting?: number | null
+  /** `53300 too_many_connections`, counted from the monitor's own refused connections. */
+  tooManyConnections?: number | null
+  pgBouncerTotalQueryCount?: number | null
+  pgBouncerAvgQueryTimeUs?: number | null
+  containerCpuPercent?: number | null
+  containerRssBytes?: number | null
+  containerRestarts?: number | null
+  openFileDescriptors?: number | null
 }
 
 export interface LoadRunInput {
@@ -73,10 +93,31 @@ export interface LoadReport {
     pgBouncerBackends: number | null
     pgBouncerMaxWaitMs: number | null
     waitSampleCompliance: number | null
+    /**
+     * `null` where nothing was observed, never `0`.
+     *
+     * `peakOf` returns null for an empty or all-null series precisely so a run that did not look at a
+     * metric cannot be read as a run that looked and found nothing.
+     */
+    postgresActive: number | null
+    postgresIdleInTransaction: number | null
+    tooManyConnections: number | null
+    containerCpuPercent: number | null
+    containerRssBytes: number | null
+    containerRestarts: number | null
+    openFileDescriptors: number | null
   }
   rssGrowthRatio: number | null
   checks: ThresholdCheck[]
   verdict: 'pass' | 'fail' | 'aborted'
+  /**
+   * Why the run aborted, carried through to the artifact.
+   *
+   * Without this the report said "did not reach steady state" and nothing more, so an aborted run named no
+   * cause — and the cause is the entire content of an aborted run. The reason is runner-authored text, never
+   * a URL or a body, and `assertNoSecrets` scans it with everything else.
+   */
+  abortedReason?: string
   exitCode: LoadExitCode
 }
 
@@ -112,6 +153,21 @@ function fmtRatio(value: number): string {
  * latency figure in it describes a ramp — and calling that a failed certification would send somebody
  * looking for a slow query when the truth is that the fixtures never validated.
  */
+/**
+ * The largest observed value, or `null` when nothing was observed.
+ *
+ * `Math.max()` of an empty list is `-Infinity` and `Math.max(0, …)` of one is `0`; both are answers to a
+ * question that was never asked. Returning `null` keeps "not measured" and "measured as zero" apart all the
+ * way into the report, where a reader can tell them apart too.
+ */
+function peakOf(
+  samples: readonly ObservabilitySample[],
+  pick: (sample: ObservabilitySample) => number | null | undefined,
+): number | null {
+  const values = samples.map(pick).filter((value): value is number => typeof value === 'number')
+  return values.length === 0 ? null : Math.max(...values)
+}
+
 export function buildLoadReport(input: LoadRunInput): LoadReport {
   const total = new LatencyHistogram()
   const totals = { requests: 0, ok: 0, serverErrors: 0, unexpected: 0, timeouts: 0 }
@@ -242,10 +298,18 @@ export function buildLoadReport(input: LoadRunInput): LoadReport {
       pgBouncerBackends: peakBackends,
       pgBouncerMaxWaitMs: peakMaxWait,
       waitSampleCompliance,
+      postgresActive: peakOf(input.samples, (sample) => sample.postgresActive),
+      postgresIdleInTransaction: peakOf(input.samples, (sample) => sample.postgresIdleInTransaction),
+      tooManyConnections: peakOf(input.samples, (sample) => sample.tooManyConnections),
+      containerCpuPercent: peakOf(input.samples, (sample) => sample.containerCpuPercent),
+      containerRssBytes: peakOf(input.samples, (sample) => sample.containerRssBytes),
+      containerRestarts: peakOf(input.samples, (sample) => sample.containerRestarts),
+      openFileDescriptors: peakOf(input.samples, (sample) => sample.openFileDescriptors),
     },
     rssGrowthRatio,
     checks: input.abortedReason ? [] : checks,
     verdict,
+    ...(input.abortedReason ? { abortedReason: input.abortedReason } : {}),
     exitCode: verdict === 'pass'
       ? LOAD_EXIT_CODES.pass
       : verdict === 'aborted' ? LOAD_EXIT_CODES.aborted : LOAD_EXIT_CODES.thresholdBreach,
@@ -275,6 +339,9 @@ export function renderLoadReportMarkdown(report: LoadReport): string {
     lines.push('The run did not reach steady state, so **no thresholds were evaluated**. This is not a')
     lines.push('capacity result — treating it as one sends somebody looking for a slow query that may not exist.')
     lines.push('')
+    // The cause is the whole content of an aborted report. Printed before anything else a reader might
+    // mistake for a result.
+    if (report.abortedReason) lines.push(`Reason: ${report.abortedReason}`, '')
   } else {
     lines.push('| metric | target | observed | |')
     lines.push('|---|---|---|---|')

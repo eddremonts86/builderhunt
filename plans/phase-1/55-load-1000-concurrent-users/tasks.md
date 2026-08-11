@@ -39,24 +39,50 @@
   - Result: 1,000 login-capable users, 1,000 owning memberships, 33,200 rows across nine tables;
     cleanup returned every run-scoped count to zero.
 
-- [ ] **Implement the HTTP load runner and reporter**
+- [x] **Implement the HTTP load runner and reporter**
   - Files: `scripts/load/runner.ts`, `scripts/load/auth.ts`, `scripts/load/histogram.ts`,
-    `scripts/load/report.ts`, `tests/unit/scripts/load/report.test.ts`, `package.json`
+    `scripts/load/report.ts`, `tests/unit/scripts/load/report.test.ts`, `package.json`,
+    `scripts/load/smoke.ts`
   - Do: Sign in through Better Auth with bounded startup concurrency; preflight every route; run
     fixed virtual users; aggregate per-route status/latency without retaining every sample; redact
     cookies, passwords, and URL credentials. On SIGINT/SIGTERM, drain for 30 seconds and write an
     `aborted` report. Add `load:test`, `load:test:baseline`, and `test:load:smoke` scripts.
   - Verify: `pnpm vitest run tests/unit/scripts/load/report.test.ts` passes; a 2-user/10-second run
     writes valid redacted JSON/Markdown and returns the documented exit code.
+  - Found while verifying, all four in the runner and none of them loud: the weighted route table was
+    *blocked* rather than interleaved, so the first nine-request run sent every request to
+    `/api/dashboard/overview` and reported four routes with no samples (now largest-remainder
+    assignment, correct at every prefix); the drain ceiling was raced against the normal ending, so
+    any run longer than thirty seconds aborted itself — the ten-second smoke passed while the
+    ten-minute baseline could never have completed; the report carried the aborted *verdict* without
+    the reason, which is the whole content of an aborted run; and sign-in sent no `Origin`, which
+    Better Auth answers with a bare `403`, so the error now carries Better Auth's own `code`.
+  - Result: 78 requests over a 30-second local run, verdict `pass`, exit 0; the 2-user/10-second run
+    exercises all five routes' fixtures and reports `fail` on p95 alone (one cold first request at
+    1.8 s), which the smoke deliberately does not gate on.
 
-- [ ] **Implement PostgreSQL, PgBouncer, and host monitoring**
+- [x] **Implement PostgreSQL, PgBouncer, and host monitoring**
   - Files: `scripts/load/monitor.ts`, `scripts/load/sql.ts`,
-    `tests/unit/scripts/load/monitor.test.ts`
+    `tests/unit/scripts/load/monitor.test.ts`, `scripts/load/report.ts`
   - Do: Sample PostgreSQL activity, PgBouncer `SHOW POOLS`/`SHOW STATS`, container CPU/RSS/restarts,
     and file descriptors every five seconds. Use separate monitor credentials; calculate peak and
     the percentage of samples meeting `cl_waiting`/`maxwait` targets. Redact connection strings.
   - Verify: `pnpm vitest run tests/unit/scripts/load/monitor.test.ts` passes; a local 30-second run
     contains all observability fields named in `spec.md` and no credential substring.
+  - Found while verifying: `count(*)::int filter (where …)` is a syntax error — `FILTER` has to follow
+    the aggregate before any cast. Every sample threw, and the report printed
+    `PostgreSQL connections: 0 peak ✅`: a threshold satisfied by the absence of data. The runner now
+    aborts a run whose every sample failed, `peakOf` returns `null` rather than `0` for an unobserved
+    metric, and a unit test asserts the query shape.
+  - Not covered, and deliberately: the spec's SQLSTATE **57014** count. It is not observable from SQL
+    — no catalog view carries it — so a sampled figure would have to come from the server log. What
+    that count would evidence is already proven directly and more strongly by
+    `pnpm run test:db-role-timeouts` and `tests/e2e/api/database-role-timeouts.spec.ts`, which *cause*
+    a 57014 through each role and assert on it. **53300** is covered, counted from the monitor's own
+    refused connection, which is the moment the condition is real.
+  - Result: 78 tests across the four load suites; a 30-second local run reports peak 14 connections,
+    1 active, 0 too-many-connections, and `null` for every pooler and container field — nulls because
+    there was no pooler and no container, which is the distinction the optional fields exist for.
 
 ## Phase 1 — Direct baseline
 
@@ -170,13 +196,31 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - Operator: starting the 1,000-user calibration on the isolated host requires the same explicit
     confirmation as the baseline.
 
-- [ ] **Add a dedicated CI load smoke**
+- [~] **Add a dedicated CI load smoke**
   - Files: `.github/workflows/load-smoke.yml`, `package.json`, `scripts/load/smoke.ts`
   - Do: Provision PostgreSQL 18, Redis, PgBouncer, a production app build, disposable fixtures, and
     25 users for 30 seconds. Run on workflow dispatch and on pull requests that change DB/pool/load
     files. Upload artifacts with a seven-day retention on success and failure.
   - Verify: `pnpm run test:load:smoke` passes locally; a workflow-dispatch run is green and its
     artifact contains no cookie, password, or credential-bearing URL; `pnpm ci:local` remains green.
+  - Done: PostgreSQL 18 on the same pgvector pin as Quality, Redis, a production build, disposable
+    fixtures, 25 users for 30 seconds, artifacts on success and failure with seven-day retention, and
+    triggers on dispatch plus pull requests touching the harness. The smoke gates on correctness only
+    — requests happened, no 5xx, the observability samples have data behind them, neither artifact
+    carries a credential — and prints the thresholds without gating, because a shared two-core runner's
+    percentiles describe the runner.
+  - Size changed from 25 to 15, on the application's terms: `better-auth.ts` caps `/sign-in/email` at
+    20 per minute per IP, so a 25-user run aborts on the 21st sign-in with a `429`. Verified locally,
+    and correct behaviour. The smoke refuses that size up front with the reason rather than seeding a
+    database first, and raising the cap to make a check pass would take a brute-force guard out of
+    production to buy a larger number in CI.
+  - **Not done: the PgBouncer leg.** The job runs the direct topology only. Wiring the pooled path
+    through CI means building the image in the job and re-pointing the application at 6432 with a
+    generated `userlist.txt`, and the pooled behaviour it would cover is the subject of its own task
+    below (`tests/e2e/api/pgbouncer-compatibility.spec.ts`) plus `pnpm load:pooler:preflight` locally.
+    Left open rather than claimed.
+  - Also outstanding: the workflow-dispatch run itself, which needs the branch pushed.
+  - Result locally: 15 users over 30 seconds, 199 requests, verdict `pass`, exit 0.
 
 ## Phase 6 — Certification and production rollout
 
