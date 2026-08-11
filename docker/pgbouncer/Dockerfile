@@ -51,8 +51,8 @@ RUN apk add --no-cache libevent openssl c-ares postgresql-client \
  # it generates itself, and a pooler running as root is a pooler whose compromise is a host compromise.
  && addgroup -g 10001 -S pgbouncer \
  && adduser -u 10001 -S -G pgbouncer -h /var/lib/pgbouncer pgbouncer \
- && mkdir -p /var/lib/pgbouncer /etc/pgbouncer \
- && chown -R pgbouncer:pgbouncer /var/lib/pgbouncer /etc/pgbouncer
+ && mkdir -p /var/lib/pgbouncer /etc/pgbouncer /run/pgbouncer \
+ && chown -R pgbouncer:pgbouncer /var/lib/pgbouncer /etc/pgbouncer /run/pgbouncer
 
 COPY --from=build /usr/local/bin/pgbouncer /usr/local/bin/pgbouncer
 COPY pgbouncer.ini /etc/pgbouncer/pgbouncer.ini

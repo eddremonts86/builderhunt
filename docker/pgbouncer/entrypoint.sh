@@ -6,7 +6,12 @@
 # An auth file in an image layer is a credential in a registry. Layers are cacheable, pullable and — for
 # anyone who can read the image — permanent, so a `COPY userlist.txt` would publish five database passwords
 # to everywhere that image ever travels. Generating it here means the secrets exist only in this
-# container's memory-backed `/etc/pgbouncer`, and die with it.
+# container's memory-backed `/run/pgbouncer`, and die with it.
+#
+# `/run/pgbouncer` and not `/etc/pgbouncer`: the tmpfs has to be mounted somewhere, and mounting it over the
+# directory holding the baked `pgbouncer.ini` hides that file. The container then restarts forever on
+# `could not load file "/etc/pgbouncer/pgbouncer.ini"` — with a clean build and a correct `--version` behind
+# it, so nothing before `docker compose up` catches it.
 #
 # ## Why `set -u` and no echo of any value
 #
@@ -18,7 +23,7 @@
 # explains which variable is missing: naming the variable is enough to fix it.
 set -eu
 
-USERLIST=/etc/pgbouncer/userlist.txt
+USERLIST=/run/pgbouncer/userlist.txt
 
 require() {
   eval "value=\${$1:-}"

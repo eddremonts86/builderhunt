@@ -31,6 +31,15 @@ services:
     # once by the combination of a running dev server + drizzle-kit +
     # vitest + ad-hoc tsx scripts, each opening their own postgres() pool.
     # Bumped for local headroom — not a production tuning recommendation.
+    #
+    # Deliberately 200 and not the 120 plan 55 specifies for the load topology. That 120 is a property
+    # of the isolated 4-vCPU certification host, where one app process talks to one database through
+    # PgBouncer. This service is shared with an 11-worker Playwright run, and Playwright starts a
+    # server per worker: five pools at E2E's `max: 3` is 15 connections per process, so 11 workers plus
+    # the config's own webServer is ~180 before the harness's admin clients. 120 here would not tighten
+    # anything — it would reintroduce `sorry, too many clients already` in whichever spec was unlucky,
+    # which is the exact failure `pool-options.ts` documents at 197 connections.
+    #
     # log_lock_failures=on: a migration that loses a lock race says so
     # in the log instead of timing out silently. See deploy-runbook.md
     # (PG18 observability surface). io_method is left as the default
@@ -91,8 +100,13 @@ services:
       - '127.0.0.1:6432:6432'
     # tmpfs, so the generated auth file never touches a writable layer or a volume. It exists in memory
     # for the life of the container and dies with it.
+    #
+    # Mounted at /run/pgbouncer, not /etc/pgbouncer. Mounting it over /etc/pgbouncer shadowed the
+    # `pgbouncer.ini` the image bakes there, and the container restarted forever on `could not load file
+    # "/etc/pgbouncer/pgbouncer.ini"` — while the image built clean, passed `buildx --check` on both
+    # architectures and answered `--version` correctly. Only `docker compose up` found it.
     tmpfs:
-      - /etc/pgbouncer:mode=0700,uid=10001,gid=10001
+      - /run/pgbouncer:mode=0700,uid=10001,gid=10001
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -p 6432 -U pgbouncer -d pgbouncer || exit 1']
       interval: 10s

@@ -193,7 +193,7 @@ tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each
 docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; image inspection
     shows a non-root user and no auth file layer.
 
-- [~] **Add bounded local compose topology**
+- [x] **Add bounded local compose topology**
   - Files: `docker-compose.yml`, `.env.example`, `scripts/load/compose-preflight.mjs`, `package.json`
   - Do: Add PgBouncer on `127.0.0.1:6432` with transaction mode, pool 12 + reserve 4,
     `max_db_connections=80`, `max_client_conn=500`, SCRAM auth, healthcheck, and auth-file tmpfs.
@@ -202,6 +202,20 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - Verify: `docker compose config` passes; `pnpm run load:pooler:preflight` proves all five roles
     can `SELECT 1` via 6432, the migration URL uses 5432, and PgBouncer reports transaction mode and
     the exact caps.
+  - Found by running it, and only by running it: the tmpfs mounted at `/etc/pgbouncer` **shadowed the
+    `pgbouncer.ini` the image bakes there**. The container restarted forever on `could not load file
+    "/etc/pgbouncer/pgbouncer.ini": No such file or directory` while the entrypoint kept writing a
+    correct `userlist.txt` into the mount. Everything upstream of `docker compose up` was green —
+    `buildx --check` on amd64 and arm64, `--version` reporting PgBouncer 1.25.2, no auth file in any
+    layer, non-root uid. The auth file now lives in `/run/pgbouncer`: runtime state and baked
+    configuration need separate directories.
+  - `max_connections` stays 200, not the 120 the plan specifies. That 120 describes the isolated
+    4-vCPU certification host; this compose service is shared with an 11-worker Playwright run, where
+    five pools at E2E's `max: 3` is 15 per server process and 11 workers plus the config's webServer is
+    ~180. 120 here would reintroduce `sorry, too many clients already`. The preflight already asserts
+    `>= 120` for exactly this reason.
+  - Result: 13/13 preflight checks — five roles through 6432, transaction mode, 12/4/80/500 read back
+    from `SHOW CONFIG`, migration URL on 5432, container healthy.
 
 - [ ] **Verify auth, tenant isolation, and timeouts through PgBouncer**
   - Files: `tests/e2e/api/pgbouncer-compatibility.spec.ts`, `playwright.config.ts`
