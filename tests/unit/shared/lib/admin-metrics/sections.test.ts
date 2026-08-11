@@ -26,6 +26,7 @@ import type { FamilyWindow, ServiceMetricWindow } from '../../../../../src/share
 const envStub: Record<string, string> = {}
 
 const mocks = vi.hoisted(() => ({
+  countUnresolvedIncidents: vi.fn(),
   getRemovalOperationsMetrics: vi.fn(),
   countAbuseSignalsBySeverity: vi.fn(),
   countBillingWebhookEventsByStatus: vi.fn(),
@@ -69,6 +70,9 @@ vi.mock('../../../../../src/shared/lib/repositories/abuse-signals', () => ({
 }))
 vi.mock('../../../../../src/shared/lib/repositories/billing-events', () => ({
   countBillingWebhookEventsByStatus: mocks.countBillingWebhookEventsByStatus,
+}))
+vi.mock('../../../../../src/shared/lib/repositories/platform-content', () => ({
+  countUnresolvedIncidents: mocks.countUnresolvedIncidents,
 }))
 /**
  * Partial, not wholesale.
@@ -148,6 +152,7 @@ beforeEach(() => {
   mocks.getRemovalOperationsMetrics.mockReset()
   mocks.countAbuseSignalsBySeverity.mockReset()
   mocks.countBillingWebhookEventsByStatus.mockReset()
+  mocks.countUnresolvedIncidents.mockReset()
 })
 
 describe('traffic', () => {
@@ -1104,5 +1109,77 @@ describe('the Platform Action Queue', () => {
     for (const forbidden of ['organizationId', 'userId', 'stripe', 'payload', 'stack']) {
       expect(serialized.toLowerCase(), forbidden).not.toContain(forbidden.toLowerCase())
     }
+  })
+})
+
+describe('incident communication aging', () => {
+  /**
+   * Plan 57, Admin track — the operational half of "Build Growth, Conversion, and Public Content admin widgets".
+   *
+   * "Omit vanity page-view panels" is explicit in the Do line, so there is no traffic number here and only one
+   * variant, which is what keeps a second one from being the invitation to add them. Growth and conversion
+   * already have honest homes: `activation` for the cohort-correct rate, `conversion` for the landing funnel.
+   */
+  it('reports zero open incidents as a real zero, unlike a disabled capability', async () => {
+    /**
+     * The one place in this module where zero is the honest answer, and the reason is specific: the incidents
+     * table is written on every incident, so an empty result means none are open rather than that nothing is
+     * recording them. Compare `removals`, where zero can mean the door is shut — that one answers `not_enabled`.
+     */
+    mocks.countUnresolvedIncidents.mockResolvedValue(new Map())
+    const payload = parsed(await buildSection({ section: 'content', range: '24h', variant: 'incidents', now: NOW }))
+    expect(payload.status).toBe('ready')
+    expect(valueOf(payload, 'incidents_open')).toBe(0)
+  })
+
+  it('reports the age of the oldest unresolved incident, which the count cannot tell you', async () => {
+    /**
+     * One open incident is normal operation. One that started six days ago means nobody has closed the loop with
+     * the people reading the status page — a communication failure rather than an outage, and indistinguishable
+     * from the healthy case by count alone.
+     */
+    mocks.countUnresolvedIncidents.mockResolvedValue(
+      new Map([['major', { open: 1, oldestStartedAt: new Date(NOW.getTime() - 6 * 86_400_000) }]]),
+    )
+    const payload = parsed(await buildSection({ section: 'content', range: '24h', variant: 'incidents', now: NOW }))
+    expect(valueOf(payload, 'incidents_open_major')).toBe(1)
+    expect(valueOf(payload, 'incidents_oldest_major_seconds')).toBe(6 * 86_400)
+  })
+
+  it('draws a line on critical and major ages, and not on minor', async () => {
+    // Four hours to warn and a day to escalate: a status page that has said "investigating" for a day has stopped
+    // being a status page. A minor incident sitting open is housekeeping, and a line there trains an operator to
+    // ignore lines.
+    mocks.countUnresolvedIncidents.mockResolvedValue(
+      new Map([
+        ['critical', { open: 1, oldestStartedAt: new Date(NOW.getTime() - 3_600_000) }],
+        ['major', { open: 1, oldestStartedAt: new Date(NOW.getTime() - 3_600_000) }],
+        ['minor', { open: 4, oldestStartedAt: new Date(NOW.getTime() - 30 * 86_400_000) }],
+      ]),
+    )
+    const payload = parsed(await buildSection({ section: 'content', range: '24h', variant: 'incidents', now: NOW }))
+    const byKey = new Map(
+      (payload as { data: { values: { key: string; threshold?: { warn: number } }[] } }).data.values.map((v) => [v.key, v]),
+    )
+    expect(byKey.get('incidents_oldest_critical_seconds')?.threshold?.warn).toBe(4 * 3600)
+    expect(byKey.get('incidents_oldest_major_seconds')?.threshold?.warn).toBe(4 * 3600)
+    expect(byKey.get('incidents_oldest_minor_seconds')?.threshold).toBeUndefined()
+    // The counts themselves carry no threshold: one open incident is not a breach, an old one is.
+    expect(byKey.get('incidents_open_critical')?.threshold).toBeUndefined()
+  })
+
+  it('omits the age rather than reporting zero when a severity has no start on record', async () => {
+    mocks.countUnresolvedIncidents.mockResolvedValue(new Map([['major', { open: 2, oldestStartedAt: null }]]))
+    const payload = parsed(await buildSection({ section: 'content', range: '24h', variant: 'incidents', now: NOW }))
+    expect(valueOf(payload, 'incidents_open_major')).toBe(2)
+    expect(valueOf(payload, 'incidents_oldest_major_seconds')).toBeUndefined()
+  })
+
+  it('answers `error` rather than "no incidents" when the read fails', async () => {
+    // The one that matters most here: "0 open" on a failed read is the most reassuring wrong answer this page
+    // could give.
+    mocks.countUnresolvedIncidents.mockRejectedValue(new Error('53300: too many connections'))
+    const payload = parsed(await buildSection({ section: 'content', range: '24h', variant: 'incidents', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
   })
 })

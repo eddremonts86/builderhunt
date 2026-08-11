@@ -125,6 +125,13 @@ const VALUE_LABELS: Record<string, string> = {
   removal_overdue: 'Past their deadline',
   removal_expired: 'Expired',
   removal_active_suppressions: 'Active suppressions',
+  incidents_open: 'Unresolved incidents',
+  incidents_open_critical: 'Critical',
+  incidents_open_major: 'Major',
+  incidents_open_minor: 'Minor',
+  incidents_oldest_critical_seconds: 'Oldest critical, unresolved for',
+  incidents_oldest_major_seconds: 'Oldest major, unresolved for',
+  incidents_oldest_minor_seconds: 'Oldest minor, unresolved for',
 }
 
 function labelFor(key: string): string {

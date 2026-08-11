@@ -505,10 +505,34 @@ missing — so the only honest version of this widget was an empty one.
     are distributions, so the row-level "each row opens an authorized detail destination" belongs with the action
     queue task above, which is where rows live.
 
-- [ ] **Build Growth, Conversion, and Public Content admin widgets**
+- [x] **Build Growth, Conversion, and Public Content admin widgets**
   - Files: admin metrics/content adapters, admin dashboard widget components, tests
   - Do: Render conversion only from canonical ordered events with denominator/window/exclusions and insufficient-cohort states. Show content publishing/incident-communication aging as an operational checklist; omit vanity page-view panels.
   - Verify: cohort totals reconcile; empty/insufficient/degraded cases avoid fabricated rates; no causal language is generated; content actions remain on their audited detail pages.
+  - **Closed 2026-08-11, and two of the three halves were already done.** Growth and conversion have honest homes
+    from earlier today: `activation` for the cohort-correct seven-day rate — with the lifetime-over-recent division
+    asserted against — and `conversion` for the landing funnel, whose every step's denominator is the previous
+    step's event on the same session. Neither fabricates a rate: an empty cohort omits the ratio and marks the
+    section `partial` rather than rendering `0%`.
+  - **What was missing was the operational half**, added as the `content` section: unresolved incidents per
+    severity with the age of the oldest.
+  - **The age is the number, not the count.** One open incident is normal operation; one that started six days ago
+    means nobody has closed the loop with the people reading the status page — a communication failure rather than
+    an outage, and indistinguishable from healthy by count alone. So `critical` and `major` carry an age threshold
+    (four hours to warn, a day to escalate, because a status page that has said "investigating" for a day has
+    stopped being one) and the counts carry none.
+  - **`resolvedAt IS NULL`, not `status <> 'resolved'`.** The status column is free text with four documented
+    values, so a typo or a fifth value added later would silently drop an incident out of the count — and the one
+    thing an incident-aging widget must not do is lose an incident. The timestamp is the fact; the status is the
+    label.
+  - **Zero open incidents is a real zero here**, and this is the only section in the module where that is true. The
+    incidents table is written on every incident, so an empty result means none are open rather than that nothing
+    is recording them — unlike `removals`, where zero can mean the door is shut and the section answers
+    `not_enabled`. A test states the contrast rather than leaving it to be inferred.
+  - **"Omit vanity page-view panels" is honoured by shape, not by restraint.** There is one variant, so there is no
+    empty slot inviting a traffic-to-the-blog number later.
+  - **Tests:** 5 unit cases, two guarantees confirmed by breaking them — a failed read answering zero (the most
+    reassuring wrong answer this page could give) and thresholding minor ages.
 
 ### `/admin/metrics` optimization
 

@@ -13,6 +13,7 @@ import { listSolutionSources } from '../repositories/solution-catalog'
 import { getRemovalOperationsMetrics } from '../repositories/profile-removal'
 import { countAbuseSignalsBySeverity } from '../repositories/abuse-signals'
 import { countBillingWebhookEventsByStatus } from '../repositories/billing-events'
+import { countUnresolvedIncidents } from '../repositories/platform-content'
 import type { FamilyWindow } from '../repositories/service-metrics'
 
 /** The `values` array of a ready payload, named so the builders below can push into it. */
@@ -143,6 +144,8 @@ export async function buildSection(input: SectionInput): Promise<AdminMetricSect
       return buildOperations(range, input.variant, now)
     case 'trust':
       return buildTrust(range, input.variant, now)
+    case 'content':
+      return buildContent(range, now)
     /**
      * Still with no source, and why it is not lumped in with traffic and search.
      *
@@ -1139,4 +1142,63 @@ async function buildTrust(
     { key: 'removal_active_suppressions', value: removals.activeSuppressions, ...dbCount },
   ]
   return { status: 'ready', generatedAt, window, data: { values } }
+}
+
+/**
+ * Incident communication aging (plan 57, Admin track — "Build Growth, Conversion, and Public Content admin
+ * widgets").
+ *
+ * ## What this is, and what the task explicitly excludes
+ *
+ * "Omit vanity page-view panels" is in the Do line, so there is no traffic-to-the-blog number here and there is
+ * no second variant to invite one. Growth and conversion already have honest homes — `activation` for the
+ * cohort-correct rate and `conversion` for the landing funnel — so what was missing is the operational half: is
+ * anything unresolved, and how long has it been unresolved.
+ *
+ * ## Why the age matters more than the count
+ *
+ * One open incident is normal operation. One open incident that started six days ago means nobody has closed the
+ * loop with the people reading the status page, which is a communication failure rather than an outage. The count
+ * cannot distinguish those and the age can, which is why `critical` and `major` carry an age threshold and the
+ * counts do not.
+ */
+async function buildContent(range: AdminMetricRange, now: Date): Promise<AdminMetricSectionPayload> {
+  const window = windowFor(range, now)
+  const counts = await countUnresolvedIncidents().catch(() => null)
+  if (!counts) return unavailable('error')
+
+  const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
+  const total = [...counts.values()].reduce((sum, entry) => sum + entry.open, 0)
+  const values: AdminMetricValues = [{ key: 'incidents_open', value: total, ...dbCount }]
+
+  for (const [severity, entry] of [...counts.entries()].sort()) {
+    values.push({ key: `incidents_open_${severity}`, value: entry.open, ...dbCount })
+    if (!entry.oldestStartedAt) continue
+
+    /**
+     * The age of the oldest unresolved incident at this severity, in seconds.
+     *
+     * Thresholded only for `critical` and `major`: four hours to warn and a day to escalate, because a status
+     * page that has said "investigating" for a day has stopped being a status page. A `minor` incident sitting
+     * open is a housekeeping question and drawing a line on it would train an operator to ignore the line.
+     */
+    const ageSeconds = Math.max(0, Math.floor((now.getTime() - entry.oldestStartedAt.getTime()) / 1000))
+    values.push({
+      key: `incidents_oldest_${severity}_seconds`,
+      value: ageSeconds,
+      ...dbCount,
+      ...(severity === 'critical' || severity === 'major'
+        ? { threshold: { direction: 'higher_is_worse' as const, warn: 4 * 3600, critical: 86_400 } }
+        : {}),
+    })
+  }
+
+  /**
+   * Nothing unresolved is `ready` with a zero, not `unavailable`.
+   *
+   * This is the one place in this module where a zero is the honest answer, and the difference is that the
+   * incidents table is *written on every incident* — so an empty result means none are open rather than that
+   * nothing is recording them. Compare `removals`, where zero can mean the door is shut.
+   */
+  return { status: 'ready', generatedAt: now.toISOString(), window, data: { values: values.slice(0, 24) } }
 }

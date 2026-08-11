@@ -45,6 +45,7 @@ const SECTION_TITLES: Record<AdminMetricSection, string> = {
   reliability: 'Reliability',
   operations: 'Workers & sources',
   trust: 'Trust & billing ops',
+  content: 'Incident comms',
   runtime: 'Runtime',
 }
 

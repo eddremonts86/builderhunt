@@ -62,6 +62,7 @@ export const ADMIN_METRIC_SECTIONS = [
   'reliability',
   'operations',
   'trust',
+  'content',
   'runtime',
 ] as const
 export type AdminMetricSection = (typeof ADMIN_METRIC_SECTIONS)[number]
@@ -108,6 +109,13 @@ export const ADMIN_METRIC_VARIANTS_BY_SECTION = {
    * and the plan's own rule keeps mutations on the canonical detail pages either way.
    */
   trust: ['removals', 'abuse', 'billing'],
+  /**
+   * One variant, because the task asks for an operational checklist rather than a dashboard.
+   *
+   * "Omit vanity page-view panels" is explicit in the plan, and a second variant would be the invitation to add
+   * them. Incident communication aging is the whole question: is anything unresolved, and how long has it been.
+   */
+  content: ['incidents'],
   runtime: ['process', 'freshness'],
 } as const satisfies Record<AdminMetricSection, readonly [string, ...string[]]>
 
