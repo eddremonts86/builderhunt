@@ -261,7 +261,7 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - Operator: starting the 1,000-user calibration on the isolated host requires the same explicit
     confirmation as the baseline.
 
-- [~] **Add a dedicated CI load smoke**
+- [x] **Add a dedicated CI load smoke**
   - Files: `.github/workflows/load-smoke.yml`, `package.json`, `scripts/load/smoke.ts`
   - Do: Provision PostgreSQL 18, Redis, PgBouncer, a production app build, disposable fixtures, and
     25 users for 30 seconds. Run on workflow dispatch and on pull requests that change DB/pool/load
@@ -279,10 +279,19 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     and correct behaviour. The smoke refuses that size up front with the reason rather than seeding a
     database first, and raising the cap to make a check pass would take a brute-force guard out of
     production to buy a larger number in CI.
-  - **Not done: the PgBouncer leg.** The job runs the direct topology only. Wiring the pooled path
-    through CI means building the image in the job and re-pointing the application at 6432 with a
-    generated `userlist.txt`, and the pooled behaviour it would cover is the subject of its own task
-    below (`tests/e2e/api/pgbouncer-compatibility.spec.ts`) plus `pnpm load:pooler:preflight` locally.
+  - **The PgBouncer leg landed 2026-08-11.** The job now builds the image, gives the five
+    `builderhunt_*` roles freshly generated passwords on its ephemeral cluster (masked, one variable each,
+    the same value reaching both the pooler's `userlist.txt` and the app's URLs), starts the pooler on the
+    host network, and runs the smoke a second time with `LOAD_SMOKE_POOLED=true`. The pooled leg is the
+    more faithful of the two: PgBouncer authenticates against those five roles, so unlike the direct leg —
+    which connects as the job's superuser — RLS is actually in the path.
+  - Found while wiring it: `pgbouncer.ini` hardcoded `host=db`, the compose service name, directly under a
+    comment saying the upstream comes from the environment "because a host in a committed file is one edit
+    away from being the wrong host". The comment described something the file did not do, and it made the
+    image unusable anywhere `db` is not the hostname — CI reaches PostgreSQL on `127.0.0.1`, and Coolify's
+    private network uses its own service name. The entrypoint now writes a `%include`d
+    `/run/pgbouncer/databases.ini` from `PGBOUNCER_UPSTREAM_HOST`/`_PORT`, defaulting to `db:5432` so the
+    compose profile is unchanged. Verified: the compose path still passes 13/13 preflight.
     Left open rather than claimed.
   - Also outstanding: the workflow-dispatch run itself, which needs the branch pushed.
   - Result locally: 15 users over 30 seconds, 199 requests, verdict `pass`, exit 0.

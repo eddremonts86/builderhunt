@@ -8,7 +8,7 @@ operator's copy.
 
 | Piece | File | What it does |
 |---|---|---|
-| Safety | [`scripts/load/safety.ts`](../../scripts/load/safety.ts) | Three refusals between a run and somebody's production database |
+| Safety | [`scripts/load/safety.ts`](../../scripts/load/safety.ts) | Three refusals between a run and an unintended database, plus one deliberate way through |
 | Fixtures | [`scripts/load/seed.ts`](../../scripts/load/seed.ts), [`cleanup.ts`](../../scripts/load/cleanup.ts) | 1,000 users and ~33,000 rows in; every run-scoped row out |
 | Runner | [`scripts/load/runner.ts`](../../scripts/load/runner.ts), [`auth.ts`](../../scripts/load/auth.ts) | Closed-loop virtual users, preflight, drain, report |
 | Monitor | [`scripts/load/monitor.ts`](../../scripts/load/monitor.ts), [`sql.ts`](../../scripts/load/sql.ts) | PostgreSQL activity, `SHOW POOLS`/`SHOW STATS`, container gauges, every 5s |
@@ -56,6 +56,10 @@ leaves a real path open:
   URL, including the username and database name — and this one applies even with the remote flag set.
 
 Errors never echo the URL, because it carries a password.
+
+Production is reachable, but only down a separate and deliberate path — see
+[Load-testing production itself](#load-testing-production-itself). Two variables, one of them a typed
+sentence, and a mandatory fixture password.
 
 ### 2. Seed, run, clean up
 
@@ -187,7 +191,46 @@ Point the five runtime URLs back at 5432 and redeploy. That is the whole procedu
 state the application needs, no schema changed, and `DATABASE_MIGRATION_URL` never moved. Stop the
 pooler service afterwards if it is not being reintroduced.
 
-### Production load runs require explicit approval
+## Load-testing production itself
+
+The decision on this product is to certify against **production**, not against a rented lookalike: the real
+Coolify private network, the real pooler and the real host only exist there, and a 4-vCPU box somewhere else
+measures a different system. During beta there are no real users and the database is expendable, which is
+what makes it defensible.
+
+It is still not something a script should be able to do by accident, so the guard takes **two** deliberate
+variables and refuses without either:
+
+```bash
+export LOAD_TARGET_PRODUCTION=i-am-seeding-and-deleting-rows-in-production
+export LOAD_FIXTURE_PASSWORD="$(openssl rand -hex 24)"
+```
+
+The sentinel is a sentence rather than `true` because `LOAD_DISPOSABLE_DATABASE=true` is one keystroke away
+from being left set in a shell that later runs something else. With it, the disposable-name-prefix and
+production-marker checks yield; the loopback rule still needs `LOAD_DISPOSABLE_DATABASE=true` on top.
+
+**`LOAD_FIXTURE_PASSWORD` is not optional off loopback, and that is the point.** `seed.ts` hashes one
+password for a thousand accounts, and the repository's default is a constant anybody can read. On loopback
+those accounts are unreachable. On production they are a thousand live logins on a public site with a
+password published in git — and if a run aborts before cleanup, they stay. This is an access problem, not a
+data problem, so it is refused rather than warned about.
+
+Keep the run id. Cleanup is scoped to it and is the only thing that removes those accounts:
+
+```bash
+LOAD_DATABASE_URL=… LOAD_RUN_ID=load-<stamp>-<suffix> pnpm load:cleanup
+```
+
+### The sign-in ceiling is the practical limit, and production is where it matters most
+
+`/sign-in/email` allows 20 per minute per IP. A thousand virtual users signing in from one machine therefore
+needs about 53 minutes of paced startup, or the limit raised for the window. Raising it on a public site
+removes a real brute-force guard, so the paced option is the one that costs nothing but time — and a
+two-hour soak can afford an hour of ramp-in. Either way it is an operator decision with a window, not
+something the runner should choose.
+
+### Production load runs still require explicit approval
 
 A load run against production is a deliberate, approved act with a named owner and a window, not a
 troubleshooting step. `safety.ts` refuses a production marker in a URL, and that refusal is not to be

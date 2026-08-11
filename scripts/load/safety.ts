@@ -54,9 +54,18 @@ export interface LoadTargetOptions {
    * to point a run at production by adding one environment variable.
    */
   allowRemote?: boolean
+  /**
+   * Overrides the `LOAD_TARGET_PRODUCTION` sentinel, for tests only.
+   *
+   * A caller cannot use this to sneak past the guard in anger: nothing in `seed.ts`, `cleanup.ts` or the
+   * runner passes it, so in production the environment sentinel is the only way through.
+   */
+  allowProduction?: boolean
 }
 
 export interface LoadTarget {
+  /** `true` when the caller deliberately authorized a production target. */
+  production?: boolean
   url: string
   databaseName: string
   host: string
@@ -65,6 +74,27 @@ export interface LoadTarget {
 /**
  * Parses and refuses. Returns the target only when all three checks pass.
  */
+/**
+ * The one string that lets a run target production, and why it is a sentence.
+ *
+ * A load run against production seeds a thousand login-capable accounts into a live, internet-facing
+ * database and later deletes rows from it. For this product that is an approved thing to do — there are no
+ * real users during beta, and the production host is the only place the real Coolify private network and
+ * the real pooler exist, so testing anywhere else measures a different system.
+ *
+ * What it must never be is *accidental*. `LOAD_DISPOSABLE_DATABASE=true` is one keystroke away from being
+ * set in a shell that later runs something else; this is not. It has to be typed, it says what it does, and
+ * it is required **together with** a `LOAD_FIXTURE_PASSWORD` — see `assertFixturePassword`, because the
+ * repository's default fixture password is public and a thousand accounts carrying it on a public site is
+ * an access problem rather than a data problem.
+ */
+export const PRODUCTION_TARGET_SENTINEL = 'i-am-seeding-and-deleting-rows-in-production'
+
+/** Set to the sentinel above, and to nothing else, to allow a production target. */
+export function productionTargetAuthorized(env: Record<string, string | undefined> = process.env): boolean {
+  return env.LOAD_TARGET_PRODUCTION === PRODUCTION_TARGET_SENTINEL
+}
+
 export function assertDisposableLoadTarget(rawUrl: string | undefined, options: LoadTargetOptions = {}): LoadTarget {
   if (!rawUrl) throw new LoadSafetyError('no database URL was provided')
 
@@ -79,24 +109,40 @@ export function assertDisposableLoadTarget(rawUrl: string | undefined, options: 
   const databaseName = parsed.pathname.replace(/^\//, '')
   if (!databaseName) throw new LoadSafetyError('the database URL names no database')
 
+  /**
+   * The production path, taken only when the sentinel is present.
+   *
+   * When it is, the name-prefix and production-marker checks are the two that have to yield — production's
+   * database is not called `builderhunt_load_test_*` and its URL contains `coolify`. The loopback rule below
+   * still applies and still needs its own flag, so a production run takes two deliberate variables and a
+   * fixture password, not one.
+   */
+  const production = options.allowProduction ?? productionTargetAuthorized()
+
   // Checked first, because it is the one that fires on the likeliest mistake — the right host, the wrong
   // database — and its message can name the expected prefix without leaking anything.
-  if (!databaseName.startsWith(DISPOSABLE_DATABASE_PREFIX)) {
+  if (!production && !databaseName.startsWith(DISPOSABLE_DATABASE_PREFIX)) {
     throw new LoadSafetyError(
-      `database "${databaseName}" is not disposable; its name must start with "${DISPOSABLE_DATABASE_PREFIX}"`,
+      `database "${databaseName}" is not disposable; its name must start with "${DISPOSABLE_DATABASE_PREFIX}". ` +
+        `To target production deliberately, set LOAD_TARGET_PRODUCTION="${PRODUCTION_TARGET_SENTINEL}" ` +
+        'and a LOAD_FIXTURE_PASSWORD.',
     )
   }
 
   /**
    * Scanned lowercased and across the whole URL, host *and* credentials.
    *
-   * This runs even when `allowRemote` is set. The flag is for the certification host, not for production,
-   * and a guard that one environment variable can fully disable is not a guard.
+   * This runs even when `allowRemote` is set — that flag is for a remote *disposable* host, not for
+   * production. Only the `LOAD_TARGET_PRODUCTION` sentinel yields here, and it takes a typed sentence plus a
+   * `LOAD_FIXTURE_PASSWORD` to be usable, because a guard one variable can fully disable is not a guard.
    */
   const haystack = rawUrl.toLowerCase()
   const marker = PRODUCTION_MARKERS.find((needle) => haystack.includes(needle))
-  if (marker) {
-    throw new LoadSafetyError(`the database URL contains "${marker}", which reads as a production target`)
+  if (marker && !production) {
+    throw new LoadSafetyError(
+      `the database URL contains "${marker}", which reads as a production target. If that is deliberate, ` +
+        `set LOAD_TARGET_PRODUCTION="${PRODUCTION_TARGET_SENTINEL}".`,
+    )
   }
 
   const host = parsed.hostname
@@ -106,7 +152,33 @@ export function assertDisposableLoadTarget(rawUrl: string | undefined, options: 
     )
   }
 
-  return { url: rawUrl, databaseName, host }
+  return { url: rawUrl, databaseName, host, production }
+}
+
+/**
+ * The fixture password, refused when it would be the public one on anything but loopback.
+ *
+ * `seed.ts` hashes one password for a thousand accounts, and the repository's default is a constant anybody
+ * can read. On a loopback disposable database that is correct and deliberate — the accounts cannot be
+ * reached. On a remote or production host those thousand accounts are live on the public internet with a
+ * password published in git, and if a run aborts before cleanup they stay that way.
+ *
+ * So the default is loopback-only, and every other target must supply its own. This is the check that makes
+ * the production path safe to have at all.
+ */
+export function assertFixturePassword(target: LoadTarget, publicDefault: string): string {
+  const supplied = process.env.LOAD_FIXTURE_PASSWORD
+  const loopback = LOOPBACK_HOSTS.has(target.host) && !target.production
+  if (supplied && supplied.length >= 16) return supplied
+  if (supplied) {
+    throw new LoadSafetyError('LOAD_FIXTURE_PASSWORD must be at least 16 characters')
+  }
+  if (loopback) return publicDefault
+  throw new LoadSafetyError(
+    'LOAD_FIXTURE_PASSWORD is required for any target that is not a loopback disposable database. The ' +
+      'default fixture password is published in this repository, and a thousand reachable accounts ' +
+      'carrying it is an access problem. Generate one: openssl rand -hex 24',
+  )
 }
 
 /** `true` only for the exact string. `LOAD_DISPOSABLE_DATABASE=1` or `yes` is not an authorization. */

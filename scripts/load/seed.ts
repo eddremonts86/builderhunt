@@ -32,7 +32,13 @@ import { dirname, resolve } from 'node:path'
 import { hashPassword } from 'better-auth/crypto'
 import postgres, { type Sql } from 'postgres'
 import { personalOrganizationId, personalOrganizationSlug } from '../../src/shared/lib/migration/backfill'
-import { assertDisposableLoadTarget, loadRunId, remoteAllowedFromEnv } from './safety'
+import {
+  assertDisposableLoadTarget,
+  assertFixturePassword,
+  loadRunId,
+  remoteAllowedFromEnv,
+  type LoadTarget,
+} from './safety'
 
 /**
  * The one password every fixture user shares.
@@ -41,7 +47,20 @@ import { assertDisposableLoadTarget, loadRunId, remoteAllowedFromEnv } from './s
  * `safety.ts` allow the script to run, so a secret here would protect nothing and would have to be threaded
  * to the runner through a file that then holds a credential.
  */
-export const LOAD_FIXTURE_PASSWORD = 'builderhunt_load_test_password'
+export const LOOPBACK_FIXTURE_PASSWORD = 'builderhunt_load_test_password'
+
+/**
+ * The password every fixture user shares, for this target.
+ *
+ * Loopback keeps the constant above: those accounts are unreachable, and a secret there would protect
+ * nothing while having to be threaded to the runner through a file that then holds a credential. Anything
+ * else — a remote disposable host, or production — must supply `LOAD_FIXTURE_PASSWORD`, because a thousand
+ * accounts carrying a git-published password on a reachable host is an access problem rather than a data
+ * one. `assertFixturePassword` is where that is enforced.
+ */
+export function fixturePasswordFor(target: LoadTarget): string {
+  return assertFixturePassword(target, LOOPBACK_FIXTURE_PASSWORD)
+}
 
 /**
  * How many rows sit behind each route, and why each number is what it is.
@@ -143,7 +162,7 @@ export async function seedLoadFixtures(options: SeedOptions): Promise<LoadFixtur
     log(`seeding ${counts.users} users into ${target.databaseName} as run ${runId}`)
 
     // One scrypt call for the whole fixture — see the module comment.
-    const passwordHash = await hashPassword(LOAD_FIXTURE_PASSWORD)
+    const passwordHash = await hashPassword(fixturePasswordFor(target))
 
     const userIds = Array.from({ length: counts.users }, (_, i) =>
       fixtureId(runId, 'u', String(i).padStart(4, '0')),

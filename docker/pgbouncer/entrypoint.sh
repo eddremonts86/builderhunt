@@ -57,6 +57,14 @@ umask 0177
   printf '"%s" "%s"\n' pgbouncer "$PGBOUNCER_ADMIN_PASSWORD"
 } >> "$USERLIST"
 
+# The upstream, written rather than baked — see the note in pgbouncer.ini. `*` forwards whatever database
+# the client asked for, so one line serves the app, the disposable load databases and the admin console.
+DATABASES=/run/pgbouncer/databases.ini
+printf '[databases]\n* = host=%s port=%s\n' \
+  "${PGBOUNCER_UPSTREAM_HOST:-db}" "${PGBOUNCER_UPSTREAM_PORT:-5432}" > "$DATABASES"
+chmod 0600 "$DATABASES"
+printf 'pgbouncer: upstream %s:%s\n' "${PGBOUNCER_UPSTREAM_HOST:-db}" "${PGBOUNCER_UPSTREAM_PORT:-5432}"
+
 # Confirms the mode without revealing the contents. `0600` is what the ini file's `auth_file` requires and
 # what makes this safe to leave in a shared tmpfs.
 printf 'pgbouncer: wrote %s (%s), %s roles\n' "$USERLIST" "$(stat -c '%a' "$USERLIST")" 6

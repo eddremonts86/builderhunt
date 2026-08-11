@@ -25,7 +25,28 @@
  * take.
  */
 
-import { LOAD_FIXTURE_PASSWORD } from './seed'
+import { LOOPBACK_FIXTURE_PASSWORD } from './seed'
+
+/**
+ * The password the runner signs in with.
+ *
+ * Mirrors `fixturePasswordFor` in `seed.ts` but keyed on the *base URL*, because the runner never holds a
+ * database target — it drives HTTP. Same rule: the published constant only for a loopback app, an explicit
+ * `LOAD_FIXTURE_PASSWORD` for anything reachable. A mismatch between the two fails at sign-in rather than
+ * silently, which is the right direction.
+ */
+export function runnerFixturePassword(baseUrl: string): string {
+  const supplied = process.env.LOAD_FIXTURE_PASSWORD
+  if (supplied) return supplied
+  const host = new URL(baseUrl).hostname
+  if (host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]') {
+    return LOOPBACK_FIXTURE_PASSWORD
+  }
+  throw new LoadAuthError(
+    `LOAD_FIXTURE_PASSWORD is required to sign in against ${host} — the default is published in this ` +
+      'repository and must never reach a host somebody else can call',
+  )
+}
 
 /** A signed-in fixture user. The cookie is opaque here and never logged — see `describeSession`. */
 export interface LoadSession {
@@ -116,7 +137,10 @@ export async function signInFixtureUser(options: SignInOptions): Promise<string>
         // whether the other 400,000 are authenticated at all.
         origin: new URL(options.baseUrl).origin,
       },
-      body: JSON.stringify({ email: options.email, password: options.password ?? LOAD_FIXTURE_PASSWORD }),
+      body: JSON.stringify({
+        email: options.email,
+        password: options.password ?? runnerFixturePassword(options.baseUrl),
+      }),
       signal: controller.signal,
       redirect: 'manual',
     })

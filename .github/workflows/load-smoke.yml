@@ -126,8 +126,64 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Load smoke
+      - name: Load smoke — direct
         run: pnpm test:load:smoke
+
+      # ── The pooled leg ───────────────────────────────────────────────────────────────────────────
+      #
+      # The direct leg above proves the harness works. This one proves the *topology* production will run
+      # does, and it is the more faithful of the two: PgBouncer authenticates against a `userlist.txt` built
+      # from the five `builderhunt_*` roles, so the pooled run necessarily connects as those roles rather
+      # than as this job's superuser — which means RLS is actually in the path.
+      #
+      # The passwords are generated here and used in two places, the pooler's userlist and the app's URLs,
+      # from one variable each. They are throwaway values for an ephemeral service container and never
+      # leave the job.
+      - name: Give the five roles passwords the pooler can authenticate
+        run: |
+          set -euo pipefail
+          for role in app auth worker platform capability; do
+            var="BUILDERHUNT_$(echo "$role" | tr '[:lower:]' '[:upper:]')_PASSWORD"
+            value="$(openssl rand -hex 16)"
+            echo "::add-mask::$value"
+            echo "$var=$value" >> "$GITHUB_ENV"
+            PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+              -c "ALTER ROLE builderhunt_${role} WITH PASSWORD '${value}'"
+          done
+          admin="$(openssl rand -hex 16)"
+          echo "::add-mask::$admin"
+          echo "PGBOUNCER_ADMIN_PASSWORD=$admin" >> "$GITHUB_ENV"
+
+      - name: Build and start PgBouncer
+        run: |
+          set -euo pipefail
+          docker build -t builderhunt-pgbouncer ./docker/pgbouncer
+          docker run -d --name builderhunt-pgbouncer --network host \
+            --tmpfs /run/pgbouncer:mode=0700,uid=10001,gid=10001 \
+            -e BUILDERHUNT_APP_PASSWORD -e BUILDERHUNT_AUTH_PASSWORD -e BUILDERHUNT_WORKER_PASSWORD \
+            -e BUILDERHUNT_PLATFORM_PASSWORD -e BUILDERHUNT_CAPABILITY_PASSWORD \
+            -e PGBOUNCER_ADMIN_PASSWORD \
+            -e PGBOUNCER_UPSTREAM_HOST=127.0.0.1 \
+            builderhunt-pgbouncer
+          # `--network host` so `127.0.0.1:5432` inside the container is the service container's Postgres,
+          # and so the smoke reaches the pooler on 6432 without a published-port dance.
+          for _ in $(seq 1 30); do
+            if PGPASSWORD="$PGBOUNCER_ADMIN_PASSWORD" psql -h 127.0.0.1 -p 6432 -U pgbouncer -d pgbouncer \
+                 -Atc 'SHOW CONFIG' >/dev/null 2>&1; then
+              echo 'pgbouncer answering on 6432'; exit 0
+            fi
+            sleep 2
+          done
+          echo 'pgbouncer never answered on 6432'; docker logs builderhunt-pgbouncer; exit 1
+
+      - name: Load smoke — pooled
+        env:
+          LOAD_SMOKE_POOLED: 'true'
+        run: pnpm test:load:smoke
+
+      - name: PgBouncer logs
+        if: always()
+        run: docker logs builderhunt-pgbouncer 2>&1 | tail -40 || true
 
       # Uploaded on success too, and not only on failure: the report *is* the evidence a run happened and
       # what it observed, and a green run whose artifact nobody kept is a green run nobody can check.
@@ -135,7 +191,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: load-smoke-report
+          name: load-smoke-reports
           path: tests/artifacts/load/
           if-no-files-found: ignore
           retention-days: 7

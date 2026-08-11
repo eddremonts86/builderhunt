@@ -42,6 +42,18 @@ const DATABASE_NAME = 'builderhunt_load_test_smoke'
  * (the spec's thirty seconds, enough to collect several observability samples) should not need a second
  * script that could drift from this one.
  */
+/**
+ * `LOAD_SMOKE_POOLED=true` runs the same smoke through PgBouncer instead of straight at PostgreSQL.
+ *
+ * The pooled leg is not a nice-to-have variant: it is the only one that exercises what a transaction
+ * pooler changes — a different server connection per transaction, session state that does not belong to
+ * the client, and prepared statements that do not survive a checkout. And it is *more* faithful than the
+ * direct leg here, because it necessarily connects as the five `builderhunt_*` roles rather than as the
+ * CI superuser, so RLS is actually in the path.
+ */
+const POOLED = process.env.LOAD_SMOKE_POOLED === 'true'
+const POOLER_PORT = Number(process.env.LOAD_SMOKE_POOLER_PORT ?? '6432')
+
 const SMOKE_USERS = Number(process.env.LOAD_SMOKE_USERS ?? '2')
 const SMOKE_SECONDS = Number(process.env.LOAD_SMOKE_SECONDS ?? '10')
 
@@ -137,6 +149,37 @@ async function main(): Promise<void> {
   const targetApp = withDatabase(appUrl, DATABASE_NAME)
 
   /**
+   * The five runtime URLs, pooled or direct.
+   *
+   * Pooled means port 6432 *and* a `builderhunt_*` role, because PgBouncer authenticates against a
+   * `userlist.txt` built from those five roles and would refuse anything else — the superuser included.
+   * The passwords come from the same `BUILDERHUNT_*_PASSWORD` variables the pooler's own entrypoint reads,
+   * so there is exactly one source for each and no chance of the two disagreeing.
+   */
+  const roleUrl = (role: string, passwordEnv: string): string => {
+    const password = process.env[passwordEnv]
+    if (!password) {
+      fail(`${passwordEnv} is required for a pooled run — the pooler's userlist is built from the same value`)
+    }
+    return `postgresql://${role}:${encodeURIComponent(password)}@127.0.0.1:${POOLER_PORT}/${DATABASE_NAME}`
+  }
+  const runtimeUrls = POOLED
+    ? {
+        DATABASE_URL: roleUrl('builderhunt_app', 'BUILDERHUNT_APP_PASSWORD'),
+        DATABASE_AUTH_URL: roleUrl('builderhunt_auth', 'BUILDERHUNT_AUTH_PASSWORD'),
+        DATABASE_WORKER_URL: roleUrl('builderhunt_worker', 'BUILDERHUNT_WORKER_PASSWORD'),
+        DATABASE_PLATFORM_URL: roleUrl('builderhunt_platform', 'BUILDERHUNT_PLATFORM_PASSWORD'),
+        DATABASE_CAPABILITY_URL: roleUrl('builderhunt_capability', 'BUILDERHUNT_CAPABILITY_PASSWORD'),
+      }
+    : {
+        DATABASE_URL: targetApp,
+        DATABASE_AUTH_URL: withDatabase(process.env.DATABASE_AUTH_URL ?? appUrl, DATABASE_NAME),
+        DATABASE_WORKER_URL: withDatabase(process.env.DATABASE_WORKER_URL ?? appUrl, DATABASE_NAME),
+        DATABASE_PLATFORM_URL: withDatabase(process.env.DATABASE_PLATFORM_URL ?? appUrl, DATABASE_NAME),
+        DATABASE_CAPABILITY_URL: withDatabase(process.env.DATABASE_CAPABILITY_URL ?? appUrl, DATABASE_NAME),
+      }
+
+  /**
    * Says so out loud when the application is about to connect as a superuser.
    *
    * A superuser bypasses RLS entirely, so every tenant-scoped read is faster than it will ever be in
@@ -145,7 +188,7 @@ async function main(): Promise<void> {
    * with. That is an acceptable trade for a correctness smoke and an unacceptable one for a capacity number,
    * so the difference is printed rather than left for a reader to infer from a URL nobody prints.
    */
-  const appRole = decodeURIComponent(new URL(targetApp).username)
+  const appRole = decodeURIComponent(new URL(POOLED ? runtimeUrls.DATABASE_URL : targetApp).username)
   if (!appRole.startsWith('builderhunt_')) {
     console.log(`⚠️   the application will connect as \`${appRole}\`, not a builderhunt_* role:`)
     console.log('     RLS is not in the path, so these latencies are a floor and not a measurement')
@@ -187,11 +230,9 @@ async function main(): Promise<void> {
         ...process.env,
         // The application connects as its own role against the disposable database — not as a superuser,
         // which would bypass RLS and make every tenant-scoped read faster than it will ever be in production.
-        DATABASE_URL: targetApp,
-        DATABASE_AUTH_URL: withDatabase(process.env.DATABASE_AUTH_URL ?? appUrl, DATABASE_NAME),
-        DATABASE_WORKER_URL: withDatabase(process.env.DATABASE_WORKER_URL ?? appUrl, DATABASE_NAME),
-        DATABASE_PLATFORM_URL: withDatabase(process.env.DATABASE_PLATFORM_URL ?? appUrl, DATABASE_NAME),
-        DATABASE_CAPABILITY_URL: withDatabase(process.env.DATABASE_CAPABILITY_URL ?? appUrl, DATABASE_NAME),
+        ...runtimeUrls,
+        // Never pooled. A migration takes advisory locks across statements, and transaction pooling would
+        // hand it a different backend between them and release them underneath it.
         DATABASE_MIGRATION_URL: targetAdmin,
         APP_URL: baseUrl,
         VITE_APP_URL: baseUrl,
@@ -229,9 +270,14 @@ async function main(): Promise<void> {
         users: SMOKE_USERS,
         stages: { rampSeconds: 2, steadySeconds: SMOKE_SECONDS },
       },
-      poolMode: 'direct',
+      poolMode: POOLED ? 'transaction' : 'direct',
       // Monitoring on, so the smoke also proves the sampler runs and that its numbers reach the report.
+      // The monitor's database connection stays direct either way — it is measuring PostgreSQL, and
+      // routing it through the pooler would make it one more client competing for the pool it observes.
       monitorDatabaseUrl: targetAdmin,
+      poolerAdminUrl: POOLED
+        ? `postgresql://pgbouncer:${encodeURIComponent(process.env.PGBOUNCER_ADMIN_PASSWORD ?? '')}@127.0.0.1:${POOLER_PORT}/pgbouncer`
+        : undefined,
     })
 
     const json = await readFile(result.jsonPath, 'utf8')

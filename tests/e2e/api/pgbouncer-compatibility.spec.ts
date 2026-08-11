@@ -9,7 +9,7 @@ import { loadHarnessEnv } from '../harness/load-env'
 loadHarnessEnv()
 
 import { e2eEnv } from '../harness/env'
-import { LOAD_FIXTURE_PASSWORD, seedLoadFixtures, type LoadFixtureManifest } from '../../../scripts/load/seed'
+import { LOOPBACK_FIXTURE_PASSWORD, seedLoadFixtures, type LoadFixtureManifest } from '../../../scripts/load/seed'
 
 /**
  * What changes when a transaction pooler is in the path (plan 55 phase 4).
@@ -287,7 +287,7 @@ test('the application signs in and reads its own tenant through the pooler', asy
   const signIn = await fetch(`${appBaseUrl}/api/auth/sign-in/email`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: appBaseUrl },
-    body: JSON.stringify({ email: tenant.email, password: LOAD_FIXTURE_PASSWORD }),
+    body: JSON.stringify({ email: tenant.email, password: LOOPBACK_FIXTURE_PASSWORD }),
     redirect: 'manual',
   })
   expect(signIn.status, 'sign-in through the pooler').toBe(200)
