@@ -116,8 +116,14 @@ export interface SeedOptions {
   databaseUrl: string | undefined
   runIdSuffix?: string
   now?: Date
-  /** Overrides for a fast integration check that still exercises every table. */
-  counts?: Partial<typeof FIXTURE_COUNTS>
+  /**
+   * Overrides for a fast integration check that still exercises every table.
+   *
+   * `Record<…, number>` and not `Partial<typeof FIXTURE_COUNTS>`: the constant is `as const`, so the
+   * second form types every field as the literal it happens to default to — `users: 1000` accepts only
+   * `1000`, which makes an override the one thing it cannot express.
+   */
+  counts?: Partial<Record<keyof typeof FIXTURE_COUNTS, number>>
   log?: (message: string) => void
 }
 

@@ -217,13 +217,36 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - Result: 13/13 preflight checks — five roles through 6432, transaction mode, 12/4/80/500 read back
     from `SHOW CONFIG`, migration URL on 5432, container healthy.
 
-- [ ] **Verify auth, tenant isolation, and timeouts through PgBouncer**
+- [x] **Verify auth, tenant isolation, and timeouts through PgBouncer**
   - Files: `tests/e2e/api/pgbouncer-compatibility.spec.ts`, `playwright.config.ts`
   - Do: Start the worker server with pooled runtime URLs and a direct migration URL. Cover sign-in,
     tenant-scoped dashboard read, a negative cross-tenant read, worker/platform/capability probes,
     and all five role timeout values.
   - Verify: `pnpm test:e2e --workers=11 tests/e2e/api/pgbouncer-compatibility.spec.ts` and
     `pnpm test:rls:local` pass with pooled role URLs; `pnpm ci:local` is green.
+  - `playwright.config.ts` needed no change: the spec creates its own disposable database and starts its
+    own preview server with pooled runtime URLs and a direct migration URL. It has to, because the rest
+    of the suite connects as per-database *member* roles and PgBouncer authenticates against a
+    `userlist.txt` built from the five base roles — the pooler would refuse those members, and the
+    failure would read as a pooling incompatibility rather than a harness detail.
+  - Beyond the task's list, the spec asserts the property the tenant boundary actually rests on under a
+    pooler: that a transaction-local GUC does **not** survive a checkout. `withTenantContext` uses
+    `set_config(..., true)`; were it session-scoped, the value would stay on the backend after the
+    transaction and the next client handed that backend would inherit another tenant's context — a
+    cross-tenant read no application code is wrong about. Asserted with `max: 2` so the two queries can
+    land on different pooled backends.
+  - Found while writing it: postgres.js runs a type-introspection query over the *extended* protocol on
+    connect, which PgBouncer's admin console refuses (`extended query protocol not supported by admin
+    console`). `fetch_types: false` is required, and it surfaced as a failure in an unrelated test with a
+    message about a protocol nobody had written a query in.
+  - `pnpm test:rls:local` is not separately runnable: it reads `RLS_TEST_*_URL` from
+    `scripts/db/prepare-rls-fixture.mjs`, which `pnpm ci:local` prepares. Its evidence therefore comes
+    from the gate — and that fixture is one of the two places this branch taught to copy the base roles'
+    timeouts onto their member roles.
+  - Result: 8/8 — five roles authenticating through 6432 with their exact timeouts *enforced* (57014 at
+    5s, 15s and 30s through the pooler), no session-state leak across checkouts, sign-in plus a
+    tenant-scoped 200 plus a cross-tenant read that is not 200, and `SHOW CONFIG` reporting transaction
+    mode with 12/4/80/500.
 
 ## Phase 5 — Calibration and smoke gate
 
