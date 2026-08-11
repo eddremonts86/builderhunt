@@ -97,14 +97,22 @@ tests/unit/shared/lib/env.test.ts` and `pnpm type-check` pass; tests assert each
   - Verify: `pnpm test:migration-integrity`, `pnpm exec drizzle-kit check`, and
     `pnpm vitest run tests/unit/shared/lib/security/database-roles.test.ts` pass.
 
-- [~] **Verify timeouts through exact roles**
+- [x] **Verify timeouts through exact roles**
   - Files: `scripts/db/verify-role-timeouts.mjs`, `package.json`,
-    `tests/e2e/api/database-role-timeouts.spec.ts`
+    `tests/e2e/api/database-role-timeouts.spec.ts`,
+    `src/shared/lib/db/create-disposable-test-database.ts`, `scripts/db/prepare-rls-fixture.mjs`
   - Do: Connect through each `DATABASE_*_URL`, assert both `SHOW` values, and run a bounded
     `pg_sleep` cancellation probe that expects SQLSTATE 57014. Never serialize query text or URLs.
     Exercise direct URLs first; the same script accepts pooled URLs in Phase 4.
   - Verify: `pnpm run test:db-role-timeouts` passes against a migrated disposable PostgreSQL 18
     database; `pnpm test:e2e --workers=11 tests/e2e/api/database-role-timeouts.spec.ts` passes.
+  - Found while verifying: role settings are **not** inherited through role membership. The base roles
+    carried the budget and all fifteen per-database member roles the test harnesses create carried
+    `null`, so the E2E suite — the only place the application actually serves requests — ran with
+    `statement_timeout = 0` while this migration and the verifier both passed. Both harnesses now copy
+    the base role's `pg_db_role_setting` rows onto the member role, replayed from the catalog rather
+    than restated, and the e2e spec connects through the harness URLs so a regression fails there.
+  - Result: `test:db-role-timeouts` 15/15; the e2e spec 6/6 (cancellation observed at 5s, 15s and 30s).
 
 ## Phase 4 — PgBouncer
 

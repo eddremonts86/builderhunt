@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
-import postgres from 'postgres'
+import postgres, { type Sql } from 'postgres'
 
 /**
  * Shared setup for tests that need a real, disposable Postgres database —
@@ -115,6 +115,47 @@ export const E2E_BASE_ROLES = [
 export const E2E_ROLE_PASSWORD = 'builderhunt_e2e'
 
 /**
+ * Copies a base role's `ALTER ROLE ... SET` values onto a dedicated member role.
+ *
+ * ## The gap this closes
+ *
+ * Table privileges and RLS policies apply through role membership. **Role settings do not.**
+ * `ALTER ROLE ... SET` writes a `pg_db_role_setting` row keyed on the role that authenticates, and
+ * PostgreSQL never consults the member's grantors when it applies those at connection time.
+ *
+ * So `drizzle/0168_role_timeouts.sql` gave `builderhunt_app` a 5-second `statement_timeout`, and every
+ * E2E worker — which connects as `builderhunt_app_e2e_w0_…`, a member — got `statement_timeout = 0`.
+ * The suite is the only place the application actually serves requests, and it was serving them
+ * unbounded while a migration and a passing verifier both said otherwise. Measured, not assumed: the
+ * five base roles carried the budget and all fifteen member roles carried `null`.
+ *
+ * ## Why it replays the catalog instead of restating the numbers
+ *
+ * Hardcoding `5s` here would be a second statement of the budget that drifts from the migration in
+ * silence. Reading `pg_db_role_setting` means the harness tracks whatever the migration chain set,
+ * including a future change, with nothing to remember.
+ */
+async function copyRoleSettings(admin: Sql, baseRole: string, dedicated: string): Promise<void> {
+  const rows = await admin.unsafe<Array<{ setconfig: string[] | null }>>(
+    `SELECT s.setconfig FROM pg_db_role_setting s
+     JOIN pg_roles r ON r.oid = s.setrole
+     WHERE r.rolname = $1 AND s.setdatabase = 0`,
+    [baseRole],
+  )
+  for (const entry of rows[0]?.setconfig ?? []) {
+    const separator = entry.indexOf('=')
+    if (separator <= 0) continue
+    const key = entry.slice(0, separator)
+    const value = entry.slice(separator + 1)
+    // The key becomes an identifier in DDL, so it is checked rather than trusted: catalog content is
+    // still input. The value goes through a literal, which `postgres` cannot parameterise inside
+    // `ALTER ROLE`, so it is escaped by doubling quotes.
+    if (!/^[a-z_][a-z0-9_.]*$/.test(key)) continue
+    await admin.unsafe(`ALTER ROLE ${dedicated} SET ${key} = '${value.replaceAll("'", "''")}'`)
+  }
+}
+
+/**
  * Deterministic per-database role name for a base role, derivable from the
  * database name alone so `e2e/harness/database.ts` can reconstruct the
  * connection URLs without threading extra state.
@@ -164,6 +205,7 @@ export async function createE2EWorkerDatabase(workerIndex: number) {
         `CREATE ROLE ${dedicated} LOGIN INHERIT PASSWORD '${E2E_ROLE_PASSWORD}' IN ROLE ${baseRole}`,
       )
       await admin.unsafe(`GRANT CONNECT ON DATABASE ${databaseName} TO ${dedicated}`)
+      await copyRoleSettings(admin, baseRole, dedicated)
     }
   } catch (error) {
     await client.end({ timeout: 5 }).catch(() => {})
