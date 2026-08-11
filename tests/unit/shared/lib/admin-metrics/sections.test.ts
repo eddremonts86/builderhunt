@@ -18,6 +18,7 @@ import type { FamilyWindow, ServiceMetricWindow } from '../../../../../src/share
 
 const mocks = vi.hoisted(() => ({
   readServiceMetricWindow: vi.fn(),
+  readServiceMetricFreshness: vi.fn(),
   getPlatformAccountMetrics: vi.fn(),
   getOnboardingActivationMetrics: vi.fn(),
   getDiscoveryState: vi.fn(),
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../../src/shared/lib/repositories/service-metrics', () => ({
   readServiceMetricWindow: mocks.readServiceMetricWindow,
+  readServiceMetricFreshness: mocks.readServiceMetricFreshness,
 }))
 vi.mock('../../../../../src/shared/lib/repositories/platform-billing', () => ({
   getPlatformAccountMetrics: mocks.getPlatformAccountMetrics,
@@ -88,6 +90,7 @@ function parsed(payload: unknown) {
 
 beforeEach(() => {
   mocks.readServiceMetricWindow.mockReset()
+  mocks.readServiceMetricFreshness.mockReset()
 })
 
 describe('traffic', () => {
@@ -302,5 +305,109 @@ describe('the window, when its start comes from another clock', () => {
     const payload = parsed(await buildSection({ section: 'discovery', range: '24h', variant: 'coverage', now: NOW }))
     expect((payload as { window: { from: string } }).window.from).toBe('2026-08-11T09:30:00.000Z')
     expect(valueOf(payload, 'discovery_profiles_stored')).toBe(7)
+  })
+})
+
+describe('the comparison window', () => {
+  it('reads a window of equal length immediately before, and never a longer one', async () => {
+    /**
+     * Comparing a 24-hour figure against a 30-day one is a comparison of two different questions, and the
+     * difference reads as a change in traffic. Asserted on the *arguments*, because getting this wrong
+     * produces numbers that are individually correct and jointly meaningless — nothing about the payload
+     * would look wrong.
+     */
+    mocks.readServiceMetricWindow.mockResolvedValue(
+      windowOf([family({ routeFamily: 'api.search', requests: 100 })]),
+    )
+    // `7d`, deliberately not the default `24h`: with a 24-hour range a hard-coded one-day span would satisfy
+    // every assertion here and the bug would ship. The case has to ask for a window the wrong answer cannot
+    // accidentally match.
+    await buildSection({ section: 'traffic', range: '7d', variant: 'rate', now: NOW, compare: true })
+
+    expect(mocks.readServiceMetricWindow).toHaveBeenCalledTimes(2)
+    const [currentFrom, currentTo] = mocks.readServiceMetricWindow.mock.calls[0]
+    const [earlierFrom, earlierTo] = mocks.readServiceMetricWindow.mock.calls[1]
+    // Adjacent: the earlier window ends exactly where the current one begins, with no gap and no overlap.
+    expect(earlierTo.getTime()).toBe(currentFrom.getTime())
+    // And the same length.
+    expect(earlierTo.getTime() - earlierFrom.getTime()).toBe(currentTo.getTime() - currentFrom.getTime())
+  })
+
+  it('does not read a second window when nobody asked', async () => {
+    // It doubles the cost of a section that sits on a refresh timer.
+    mocks.readServiceMetricWindow.mockResolvedValue(windowOf([family({ routeFamily: 'api.search', requests: 1 })]))
+    await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW })
+    expect(mocks.readServiceMetricWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits `previous` for a rate whose earlier denominator was empty', async () => {
+    /**
+     * "was 0 %" beside a window that served nothing is the same lie the current-window rate already refuses:
+     * 0 errors out of 0 requests is undefined, not clean.
+     */
+    mocks.readServiceMetricWindow
+      .mockResolvedValueOnce(windowOf([family({ routeFamily: 'api.search', requests: 200, errors: 4 })]))
+      .mockResolvedValueOnce(windowOf([family({ routeFamily: 'api.search' })]))
+    const payload = parsed(
+      await buildSection({ section: 'traffic', range: '24h', variant: 'errors', now: NOW, compare: true }),
+    )
+    const rate = (payload as { data: { values: { key: string; value: number; previous?: number }[] } }).data.values
+      .find((v) => v.key === 'error_rate')
+    expect(rate?.value).toBeCloseTo(0.02)
+    expect(rate?.previous).toBeUndefined()
+  })
+
+  it('keeps the section readable when only the comparison read fails', async () => {
+    // The comparison is an extra; losing it must cost the operator the comparison, not the numbers.
+    mocks.readServiceMetricWindow
+      .mockResolvedValueOnce(windowOf([family({ routeFamily: 'api.search', requests: 50 })]))
+      .mockRejectedValueOnce(new Error('57014: canceling statement due to statement timeout'))
+    const payload = parsed(
+      await buildSection({ section: 'traffic', range: '24h', variant: 'rate', now: NOW, compare: true }),
+    )
+    expect(payload.status).toBe('ready')
+    expect(valueOf(payload, 'requests')).toBe(50)
+  })
+})
+
+describe('data freshness', () => {
+  it('reports instances reporting even with an empty store, because zero is the answer', async () => {
+    /**
+     * "Nothing is writing" is the state that otherwise looks exactly like no traffic. It is the one value in
+     * this variant that is unconditional — the lag figures are genuinely absent before the first minute is
+     * written, and inventing a lag of zero would say the data is current when there is none.
+     */
+    mocks.readServiceMetricFreshness.mockResolvedValue({
+      newestBucketStart: null,
+      oldestBucketStart: null,
+      reportingInstances: 0,
+    })
+    const payload = parsed(await buildSection({ section: 'runtime', range: '24h', variant: 'freshness', now: NOW }))
+    expect(payload.status).toBe('ready')
+    expect(valueOf(payload, 'reporting_instances')).toBe(0)
+    expect(valueOf(payload, 'metric_lag_seconds')).toBeUndefined()
+    expect(valueOf(payload, 'history_span_seconds')).toBeUndefined()
+  })
+
+  it('states the lag in seconds rather than a timestamp the reader has to subtract', async () => {
+    mocks.readServiceMetricFreshness.mockResolvedValue({
+      newestBucketStart: new Date(NOW.getTime() - 95_000),
+      oldestBucketStart: new Date(NOW.getTime() - 3 * 86_400_000),
+      reportingInstances: 2,
+    })
+    const payload = parsed(await buildSection({ section: 'runtime', range: '24h', variant: 'freshness', now: NOW }))
+    expect(valueOf(payload, 'metric_lag_seconds')).toBe(95)
+    expect(valueOf(payload, 'history_span_seconds')).toBe(3 * 86_400)
+
+    // ~90 s of lag is normal operation: the flush runs every 30 s and holds the minute in progress back.
+    const lag = (payload as { data: { values: { key: string; threshold?: { warn: number } }[] } }).data.values
+      .find((v) => v.key === 'metric_lag_seconds')
+    expect(lag?.threshold?.warn).toBe(180)
+  })
+
+  it('answers `error` rather than a plausible zero when the freshness read fails', async () => {
+    mocks.readServiceMetricFreshness.mockRejectedValue(new Error('boom'))
+    const payload = parsed(await buildSection({ section: 'runtime', range: '24h', variant: 'freshness', now: NOW }))
+    expect(payload).toMatchObject({ status: 'unavailable', code: 'error' })
   })
 })

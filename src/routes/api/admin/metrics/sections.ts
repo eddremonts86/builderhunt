@@ -53,6 +53,22 @@ export const Route = createFileRoute('/api/admin/metrics/sections')({
           }
 
           /**
+           * `compare` is refused rather than coerced, like everything else in the query string.
+           *
+           * It doubles the query cost of the section — a second windowed read of the same length — so a typo
+           * silently defaulting to "on" would double the cost of a page on a refresh timer, and a typo
+           * silently defaulting to "off" would return numbers with no comparison while the caller's URL says
+           * there is one. Absent means off; anything other than the two literals is a caller mistake.
+           */
+          const rawCompare = url.searchParams.get('compare')
+          if (rawCompare !== null && rawCompare !== 'true' && rawCompare !== 'false') {
+            return Response.json(
+              { error: 'invalid_request', detail: 'compare must be "true" or "false"' },
+              { status: 400 },
+            )
+          }
+
+          /**
            * The per-section catch, which is the whole point of the route.
            *
            * `buildSection` already answers `unavailable` for a source that is absent by design. This
@@ -66,6 +82,7 @@ export const Route = createFileRoute('/api/admin/metrics/sections')({
               section: parsed.section,
               range: parsed.range,
               variant: parsed.variant,
+              compare: rawCompare === 'true',
             })
           } catch (sectionError) {
             console.error(`admin metrics section "${parsed.section}" failed:`, sectionError)

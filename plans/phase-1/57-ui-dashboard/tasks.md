@@ -507,7 +507,7 @@ missing — so the only honest version of this widget was an empty one.
     one of fourteen allowlisted families happens in `record()`, before anything enters even the in-memory
     map — a heap object a crash dump would show.
 
-- [~] **Rebuild `/admin/metrics` as a route-driven lazy widget shell**
+- [x] **Rebuild `/admin/metrics` as a route-driven lazy widget shell**
   - Files: `src/routes/_dashboard/admin/metrics.tsx`, `src/modules/admin/metrics/AdminMetricsPage.tsx`, query hooks, UI tests
   - Do: Add Overview, Traffic, Search/Discovery, Activation, Conversion, Feature reliability, and Runtime sections with validated `section`, `range`, `variant`, and comparison URL state. Fetch only the visible section; cancel/dedupe overlap, pause polling in hidden tabs, and show last success/stale/retry state.
   - Verify: direct/bookmarked filters restore correctly; invalid values normalize safely; hidden section requests do not fire; organization admins/non-admins remain denied; manual refresh has an accessible result announcement.
@@ -523,20 +523,96 @@ missing — so the only honest version of this widget was an empty one.
     gate's log rather than by a failing check — nothing was broken, the page worked perfectly, and only
     the bundle grew.
   - **Polling already pauses in hidden tabs** (previous task in this track).
-  - **Still open:** the section split itself — validated `section`/`range`/`variant` URL state, fetching
-    only the visible section, per-section last-success/stale/retry. Blocked on the section contracts
-    task, which is where those states get defined.
+  - **The section split landed 2026-08-11.** `AdminMetricsPage.tsx` is now a shell over eight tabs;
+    `useMetricSection.ts` owns one section's fetch; `MetricSectionView.tsx` renders any section's payload;
+    `sections/{Overview,Conversion,Reliability,Discovery,Runtime}Section.tsx` are `React.lazy` chunks;
+    `shared/lib/admin-metrics/url-state.ts` is the URL contract.
+  - **Measured, not asserted:** the build emits `OverviewSection` 9.3K, `ConversionSection` 8.7K,
+    `RuntimeSection` 5.2K, `ReliabilitySection` 5.0K and `DiscoverySection` 3.1K as separate chunks beside an
+    8.4K shell — so somebody reading latency no longer downloads the conversion funnel table.
+  - **What the page stopped doing.** It read the monolithic `/api/admin/metrics` every fifteen seconds *plus*
+    `conversion?variant=baseline`, `conversion?variant=treatment` and `trust` on mount, and rendered every
+    section at once. So an operator reading one number paid for a platform billing sweep, an interview
+    capability read and a removal aggregate — and the query nobody wanted was indistinguishable from the one
+    they did. An e2e case now asserts against the *network* that opening `traffic` requests traffic and
+    nothing else.
+  - **URL state normalizes, and the URL is then rewritten.** The API refuses an unknown section because a
+    defaulted one would return a payload that does not match the request; the page falls back, because a 400
+    on a metrics page during an incident is worse than the overview. But falling back silently is its own
+    failure — the operator shares `?section=traffic` and the next person also gets the overview — so
+    `beforeLoad` redirects to what is actually shown.
+  - **The rewrite was in a `useEffect` first, and it broke navigation outright.** Comparing
+    `useLocation().searchStr` against `useSearch()` races during a router transition: the effect saw the new
+    raw string beside the old validated search, concluded the URL needed correcting, and navigated back — every
+    section click bounced to the section it came from. Found by an e2e click assertion, not by review, and the
+    fix is placement rather than logic: `beforeLoad` sees both values already consistent.
+  - **Stale is not error.** A failed refresh keeps the last successful payload on screen with the time it was
+    true and says the refresh failed. Replacing it with an error box answers "we do not know" when we knew,
+    thirty seconds ago.
+  - **One section's numbers cannot appear under another's heading.** The section host is keyed on
+    `section:range:variant:compare`, so React discards the state rather than the hook remembering to clear it —
+    which matters because every section shares one body shape, so traffic's numbers would render *perfectly*
+    under "Activation" for as long as a fetch took.
+  - **`aria-current` is the router's, `data-active` is ours.** `Link` computes and writes its own
+    `aria-current`, silently replacing the value passed in props — so the first version of the tests asserted
+    on markup that never shipped, and the e2e run is what caught it.
+  - **Comparison is real, not a validated no-op.** `?compare=true` makes the builder read the window of equal
+    length immediately before and attach each value's earlier figure as `previous`; the toggle is offered only
+    by `traffic` and `search`, the two sections that can honour it. Both absolute numbers are shown rather than
+    a percentage change — 1 error becoming 2 is "+100%" — and there is no arrow or colour, because whether up
+    is good depends on the metric and only the threshold knows that.
+  - **Tests:** 34 unit cases (`AdminMetricsPage.test.tsx`, rewritten to render the section under test rather
+    than the page's default tab) and 8 browser cases (`tests/e2e/admin-metrics-shell.spec.ts`). Three
+    guarantees were confirmed by breaking them: the threshold direction, `unavailable` rendering no numbers,
+    and polling ignoring `document.hidden`.
+  - **Still open:** bounding the legacy `/api/admin/metrics` response. Three widgets still read it for
+    interview capabilities, discovery worker state and process diagnostics — each on the tab that needs it, so
+    it is no longer on a timer, but the endpoint itself still returns everything.
 
-- [ ] **Build Request Health and bottleneck widgets**
+- [x] **Build Request Health and bottleneck widgets**
   - Files: Admin Metrics traffic components/repository, tests
   - Depends on: truthful historical service-metric storage or adapter
   - Do: Render request rate, error ratio, p50/p95/p99 latency, and bounded slow/error route-family rankings with exact values, comparison, thresholds, and Operations/Incident drill-downs.
   - Verify: values/units/time buckets reconcile, zero traffic is distinct from missing instrumentation, normalized route families reveal no identifiers, and no percentile appears without histogram data.
+  - **Landed 2026-08-11**, as the `traffic` section's three variants rather than three widgets: `rate` gives
+    requests, errors and requests-per-second ranked by volume; `errors` adds the ratio with a
+    `higher_is_worse` threshold and ranks by errors; `latency` gives p50/p95/p99 ranked by each family's p95.
+  - **Zero traffic and missing instrumentation are different answers.** An empty window is
+    `unavailable: 'insufficient_history'` carrying no data at all — never `requests: 0`, which renders as a
+    healthy idle platform. And `reporting_instances` on the Data Freshness variant is the number that says
+    "nothing is writing", which is the state that otherwise looks exactly like a quiet hour.
+  - **No percentile appears without a histogram to support it.** `percentileFrom` returns the bucket boundary
+    and never interpolates inside it, returns `null` for an empty histogram rather than `0`, and returns `null`
+    with an `overflow` flag when the answer is past the last boundary — in which case the section reports
+    `requests_over_10s` instead. An absent `p99_ms` is explained by its sibling rather than being a hole.
+  - **The ranking cannot carry an identifier**, because its labels come from the contract's fourteen-value
+    allowlist and the path is normalised in `record()` before it enters even the in-memory map. It is capped at
+    `ADMIN_METRIC_LIMITS.rankedRows`, and a family with a zero value is dropped rather than padding the list.
+  - **Drill-downs appear only on a breach.** A page that always offers "check Operations" is offering
+    navigation, not information; the link means something because it appears when a number has crossed a line
+    somebody wrote down. It points at Operations and Incidents, not at a worker endpoint that runs something.
 
-- [ ] **Build Search and Discovery metrics widgets**
+- [x] **Build Search and Discovery metrics widgets**
   - Files: Admin Metrics search/discovery components/repositories, tests
   - Do: Render searches, eligible cache lookups/hits/misses/hit rate, search latency/errors, discovery run/upsert/error/duration/backlog state, and last/next run. Label every value as bounded-window, current-run, or lifetime and keep cursor/cell keys in a diagnostic disclosure.
   - Verify: cache-rate denominator and discovery totals reconcile; worker-never-run, dormant, failed, stale, and unavailable states are distinct; actions link to Search, Operations, or Integrations rather than worker APIs.
+  - **Landed 2026-08-11** as two sections: `search` (`volume`, `quality`) and `discovery` (`coverage`,
+    `throughput`), both from the persisted minute buckets and the worker's own state.
+  - **The cache-rate denominator reconciles because the two counters cannot drift.** `lib/search.ts` counts
+    the search on entry and discovers a cache hit later, in one of two early returns — so a single
+    `recordSearch({ cacheHit })` would be called twice on a hit and the rate would come out at 50 % when it is
+    100 %. Two methods, each sitting directly under the `metrics.increment` it mirrors, and a unit case
+    asserting the ratio is exactly 1.
+  - **Every value says which kind it is.** The section's counts are windowed and summed across instances
+    (`scope: 'database'`, `platformTotal: true`); the worker's cursor and last cell key are current-run state
+    and live in a disclosure, because "cursor 4821" reads as progress and says nothing about coverage without a
+    total this page does not have; the lifetime run/upsert/error counts are labelled as lifetime in the same
+    disclosure.
+  - **Worker-never-run is not zero.** `null` from the API means the sweep has never run and renders as a
+    sentence saying so; a *failed read* stays `undefined` and renders as loading, because a failed read must
+    not look like a deliberate configuration.
+  - **Nothing links to a worker API.** The breach drill-down goes to Operations and Incidents — screens that
+    show what the workers are doing — rather than to a POST that runs one.
 
 - [ ] **Build cohort-correct Acquisition and Activation widgets**
   - Files: Admin Metrics activation repository/components, tests
@@ -554,7 +630,7 @@ missing — so the only honest version of this widget was an empty one.
   - Do: Group booking conflicts, document backlog/failure, transcript reconnect/retry, provider/parse/fallback/refusal, stale schedule/reservation, usage variance, and retention failure into actionable thresholds. Use persisted buckets when available; otherwise label the per-process reset scope.
   - Verify: no candidate/interview IDs or content enter DTO/DOM/logs; each breached threshold links to the correct feature/Operations runbook; unsupported capture is labeled a support signal rather than an error.
 
-- [~] **Demote Runtime diagnostics and add Data Freshness**
+- [x] **Demote Runtime diagnostics and add Data Freshness**
   - Files: Admin Metrics runtime/freshness components and contracts, tests
   - Do: Move Node/platform/PID/memory/uptime into a collapsed per-instance diagnostic panel. Add a visible freshness matrix for each source, including generated time, last success, stale threshold, unavailable reason, process start/reset, and partial state.
   - Verify: Runtime is not presented as platform health; multiple-instance/reset fixtures are explicit; zero, stale, reset, unavailable, and error remain distinguishable without color.
@@ -576,9 +652,26 @@ missing — so the only honest version of this widget was an empty one.
     load where the difference matters. The per-source matrix (last success, stale threshold,
     unavailable reason, partial state) is **still open**: it needs the per-section split, since with
     one endpoint there is one success and one failure to report.
-  - **Not collapsed.** The task asks for a collapsed panel; the diagnostics card is four short rows
-    that no longer carry anything the rest of the page depends on. A disclosure widget over eight
-    values would add an interaction to save two centimetres.
+  - **Now collapsed, and the earlier reasoning for leaving it open no longer held.** The previous note argued
+    a disclosure over eight values was an interaction to save two centimetres — true while the page rendered
+    every section at once, and wrong once Runtime became a tab an operator has to choose. Node, platform and
+    the four heap figures sit in a closed `<details>` inside it; nothing was deleted, because heap growth
+    across refreshes is the only signal for a leak and whoever needs it needs it badly.
+  - **Data Freshness landed 2026-08-11** as the runtime section's `freshness` variant, reading
+    `readServiceMetricFreshness()`.
+  - **Lag in seconds, not a timestamp.** A timestamp asks the reader to subtract, and a page read at 02:00
+    across a timezone is exactly where that goes wrong. Three facts, each answering a distinct failure: a
+    newest bucket well behind the clock means the flush is broken (warn at 180 s — the flush runs every 30 s
+    and holds the minute in progress back, so ~90 s is normal); a history span shorter than the asked-for range
+    means a "30d" chart is not thirty days; and zero reporting instances is the state that otherwise looks
+    exactly like no traffic.
+  - **The lag values are absent when there is nothing to state, and `reporting_instances` never is.**
+    Inventing a lag of zero for an empty store would say the data is current when there is none; "nothing is
+    reporting" is a real answer and is always shown.
+  - **Runtime is not presented as platform health.** Every value in the `process` variant carries
+    `scope: 'process'` and its process identity, and the schema refuses `platformTotal` on it — so the shape
+    that would let one instance's counter be read as the platform's number cannot be built. An e2e case walks
+    every rendered value and asserts both.
 
 - [ ] **Add Admin Metrics accessibility, performance, and regression gates**
   - Files: Admin Metrics component/E2E/accessibility/visual/performance tests, CI configuration

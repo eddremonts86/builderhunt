@@ -198,6 +198,60 @@ export async function readServiceMetricWindow(from: Date, to: Date): Promise<Ser
   }
 }
 
+export interface ServiceMetricFreshness {
+  /** The newest complete minute on record, or `null` when nothing has ever been written. */
+  newestBucketStart: Date | null
+  /** The oldest minute still retained. With the newest, this is the real span of available history. */
+  oldestBucketStart: Date | null
+  /** Instances that wrote a minute in the recent window. Zero means nothing is reporting *now*. */
+  reportingInstances: number
+}
+
+/**
+ * How current the stored history is, which is a different question from what it says.
+ *
+ * The Data Freshness widget exists because every other number on the page is undated in the reader's mind:
+ * an operator sees "requests: 1,204" and takes it to mean now. If the flush stopped an hour ago the figure is
+ * real, correctly windowed, and describes an hour ago — and nothing on the page would say so. `generatedAt`
+ * only says when the *query* ran.
+ *
+ * Three facts, and each answers a distinct failure. A newest bucket well behind the clock means the flush is
+ * broken. An oldest bucket younger than the asked-for range means the window is longer than the history, so a
+ * "30d" chart is not thirty days. Zero reporting instances means nothing is writing at all, which is the
+ * state that otherwise looks exactly like no traffic.
+ */
+export async function readServiceMetricFreshness(now: Date = new Date()): Promise<ServiceMetricFreshness> {
+  const recentSince = new Date(now.getTime() - 10 * 60 * 1000)
+  // unbounded-read-ok: three aggregates over the whole table with no group-by, so this returns exactly one
+  // row by construction. A LIMIT would bound nothing.
+  const [row] = await platformDb
+    .select({
+      newest: sql<string | null>`max(${serviceMetricBuckets.bucketStart})`,
+      oldest: sql<string | null>`min(${serviceMetricBuckets.bucketStart})`,
+      /**
+       * Two things this one line gets wrong if written the obvious way, both found by an e2e failure rather
+       * than by review — and both fail *quietly*, because the caller catches and the section reports
+       * `unavailable: 'error'`, which on screen is indistinguishable from a source that has no data.
+       *
+       * 1. **The cast wraps the whole aggregate, parentheses included.** Without them `::int` binds to the
+       *    last thing inside `filter`, so the predicate becomes `bucket_start >= $1::int` — a timestamptz
+       *    compared to an integer. Same trap as the load monitor's `count(*) filter (…)`.
+       * 2. **The bound is an ISO string with an explicit cast, not a `Date`.** A `Date` interpolated into a
+       *    raw `sql` fragment throws `ERR_INVALID_ARG_TYPE` before it reaches Postgres: drizzle maps a `Date`
+       *    correctly when it is compared against a typed column (`gte(bucketStart, from)` in the query above
+       *    works), but a raw fragment carries no column type for it to use.
+       */
+      reporting: sql<number>`(count(distinct ${serviceMetricBuckets.instance}) filter (where ${serviceMetricBuckets.bucketStart} >= ${recentSince.toISOString()}::timestamptz))::int`,
+    })
+    .from(serviceMetricBuckets)
+
+  return {
+    newestBucketStart: row?.newest ? new Date(row.newest) : null,
+    oldestBucketStart: row?.oldest ? new Date(row.oldest) : null,
+    reportingInstances: Number(row?.reporting ?? 0),
+  }
+}
+
 /**
  * Deletes minutes past the retention horizon.
  *

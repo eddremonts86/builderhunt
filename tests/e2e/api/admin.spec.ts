@@ -408,6 +408,19 @@ test.describe('a platform admin', () => {
       expect((trafficBody.payload.data.ranked ?? []).length).toBeLessThanOrEqual(10)
     }
 
+    /**
+     * The comparison, which doubles the section's cost when asked for.
+     *
+     * `compare` is refused rather than coerced for a reason specific to it: defaulting a typo to "on" doubles
+     * the query cost of a page that refreshes on a timer, and defaulting it to "off" returns numbers with no
+     * comparison while the caller's URL says there is one.
+     */
+    const compared = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=traffic&compare=true')
+    expect(compared.status()).toBe(200)
+    const badCompare = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=traffic&compare=yes')
+    expect(badCompare.status()).toBe(400)
+    expect((await badCompare.json()).error).toBe('invalid_request')
+
     // Caller mistakes: unknown section, unknown range, and a variant that belongs to another section.
     for (const query of ['section=surveillance', 'section=traffic&range=18mo', 'section=search&variant=latency']) {
       const bad = await harness.admin.api!.fetch(`/api/admin/metrics/sections?${query}`)

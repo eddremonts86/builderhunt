@@ -4,7 +4,7 @@ import { LATENCY_BOUNDARIES_MS, LATENCY_SLOTS, percentileFrom } from './history'
 import { metrics } from '../metrics'
 import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '../repositories/platform-billing'
 import { getDiscoveryState } from '../repositories/discovery-state'
-import { readServiceMetricWindow } from '../repositories/service-metrics'
+import { readServiceMetricFreshness, readServiceMetricWindow } from '../repositories/service-metrics'
 import type { FamilyWindow } from '../repositories/service-metrics'
 
 /** The `values` array of a ready payload, named so the builders below can push into it. */
@@ -21,11 +21,11 @@ type AdminMetricValues = Extract<AdminMetricSectionPayload, { status: 'ready' }>
  * '0 pending' and an operator would conclude the queue is empty rather than that the door is shut."
  *
  * That is the same trap the whole Admin Metrics rebuild is about, and it is worth stating once here
- * because four of the eight sections have no source yet. Traffic latency histograms, search quality,
- * conversion cohorts and feature reliability all need the persisted time buckets that
- * "Add truthful historical service-metric storage or adapter" is a separate open task for. Until it
- * lands, those sections say `insufficient_history` and render nothing, which is the only answer that
- * cannot be misread as good news.
+ * because two of the eight sections still have no source. `service_metric_buckets` gave traffic and
+ * search theirs; conversion cohorts need billing events bucketed by signup cohort and feature
+ * reliability needs per-feature availability samples, and neither is a request counter. Until something
+ * writes those, both say `insufficient_history` and render nothing, which is the only answer that cannot
+ * be misread as good news.
  *
  * ## Why the range is accepted but not always honoured
  *
@@ -94,6 +94,14 @@ export interface SectionInput {
   section: AdminMetricSection
   range: AdminMetricRange
   variant: string
+  /**
+   * Read the window immediately before this one too, and attach each value's earlier figure as `previous`.
+   *
+   * Off unless asked for, because it is a second windowed read of the same length — doubling the cost of a
+   * section that sits on a refresh timer. Only the sections with a real time series can honour it: a process
+   * counter has no previous window, and a section with no history has nothing to compare.
+   */
+  compare?: boolean
   now?: Date
 }
 
@@ -116,11 +124,11 @@ export async function buildSection(input: SectionInput): Promise<AdminMetricSect
     case 'discovery':
       return buildDiscovery(range, now)
     case 'runtime':
-      return buildRuntime(range, now)
+      return input.variant === 'freshness' ? buildFreshness(range, now) : buildRuntime(range, now)
     case 'traffic':
-      return buildTraffic(range, input.variant, now)
+      return buildTraffic(range, input.variant, now, input.compare === true)
     case 'search':
-      return buildSearch(range, input.variant, now)
+      return buildSearch(range, input.variant, now, input.compare === true)
     /**
      * The two still with no source, and why they are not lumped in with traffic and search any more.
      *
@@ -152,11 +160,13 @@ async function buildTraffic(
   range: AdminMetricRange,
   variant: string,
   now: Date,
+  compare: boolean,
 ): Promise<AdminMetricSectionPayload> {
   const window = windowFor(range, now)
   const from = new Date(window.from)
   const read = await readServiceMetricWindow(from, now).catch(() => null)
   if (!read) return unavailable('error')
+  const earlier = compare ? await previousWindow(from, now) : null
   // No rows in the window is not "zero requests" — it is a window before the store began, or a store that
   // is not being written. Either way there is nothing to report, and zeroes would read as an outage.
   if (read.families.length === 0) return unavailable('insufficient_history')
@@ -165,8 +175,8 @@ async function buildTraffic(
   const generatedAt = now.toISOString()
   const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
   const values: AdminMetricValues = [
-    { key: 'requests', value: total.requests, ...dbCount },
-    { key: 'errors', value: total.errors, ...dbCount },
+    { key: 'requests', value: total.requests, ...dbCount, ...was(earlier?.totals.requests) },
+    { key: 'errors', value: total.errors, ...dbCount, ...was(earlier?.totals.errors) },
     // The count of instances that contributed, so an operator can tell a platform sum from one process.
     { key: 'instances_reporting', value: read.instances, ...dbCount },
   ]
@@ -185,9 +195,9 @@ async function buildTraffic(
       0,
     )
     const dbMs = { unit: 'milliseconds' as const, scope: 'database' as const, platformTotal: true }
-    if (total.p50Ms !== null) values.push({ key: 'latency_p50_ms', value: total.p50Ms, ...dbMs })
-    if (total.p95Ms !== null) values.push({ key: 'latency_p95_ms', value: total.p95Ms, ...dbMs })
-    if (total.p99Ms !== null) values.push({ key: 'latency_p99_ms', value: total.p99Ms, ...dbMs })
+    if (total.p50Ms !== null) values.push({ key: 'latency_p50_ms', value: total.p50Ms, ...dbMs, ...was(earlier?.totals.p50Ms ?? undefined) })
+    if (total.p95Ms !== null) values.push({ key: 'latency_p95_ms', value: total.p95Ms, ...dbMs, ...was(earlier?.totals.p95Ms ?? undefined) })
+    if (total.p99Ms !== null) values.push({ key: 'latency_p99_ms', value: total.p99Ms, ...dbMs, ...was(earlier?.totals.p99Ms ?? undefined) })
     values.push({ key: 'requests_over_10s', value: overflowCount, ...dbCount })
 
     return {
@@ -210,6 +220,9 @@ async function buildTraffic(
         platformTotal: true,
         // Higher is worse, and the pair is checked for direction by the contract.
         threshold: { direction: 'higher_is_worse', warn: 0.01, critical: 0.05 },
+        // Only when the earlier window served anything: a rate over an empty denominator is undefined, and
+        // "was 0 %" beside a window that served nothing is the same lie in the comparison column.
+        ...was(earlier && earlier.totals.requests > 0 ? earlier.totals.errors / earlier.totals.requests : undefined),
       })
     }
     return {
@@ -228,6 +241,9 @@ async function buildTraffic(
     unit: 'per_second',
     scope: 'database',
     platformTotal: true,
+    // The same divisor, because the previous window is the same length by construction — comparing two rates
+    // computed over different spans would move the number for a reason that is not traffic.
+    ...was(earlier ? earlier.totals.requests / seconds : undefined),
   })
   return {
     status: 'ready',
@@ -248,17 +264,20 @@ async function buildSearch(
   range: AdminMetricRange,
   variant: string,
   now: Date,
+  compare: boolean,
 ): Promise<AdminMetricSectionPayload> {
   const window = windowFor(range, now)
-  const read = await readServiceMetricWindow(new Date(window.from), now).catch(() => null)
+  const from = new Date(window.from)
+  const read = await readServiceMetricWindow(from, now).catch(() => null)
   if (!read) return unavailable('error')
   if (read.totals.searches === 0) return unavailable('insufficient_history')
+  const earlier = compare ? await previousWindow(from, now) : null
 
   const generatedAt = now.toISOString()
   const dbCount = { unit: 'count' as const, scope: 'database' as const, platformTotal: true }
   const values: AdminMetricValues = [
-    { key: 'searches', value: read.totals.searches, ...dbCount },
-    { key: 'search_cache_hits', value: read.totals.searchCacheHits, ...dbCount },
+    { key: 'searches', value: read.totals.searches, ...dbCount, ...was(earlier?.totals.searches) },
+    { key: 'search_cache_hits', value: read.totals.searchCacheHits, ...dbCount, ...was(earlier?.totals.searchCacheHits) },
   ]
 
   if (variant === 'quality') {
@@ -270,10 +289,34 @@ async function buildSearch(
       platformTotal: true,
       // A cold cache is slow and expensive, not broken, so lower is worse and neither bound is an alarm.
       threshold: { direction: 'lower_is_worse', warn: 0.4, critical: 0.1 },
+      ...was(earlier && earlier.totals.searches > 0 ? earlier.totals.searchCacheHits / earlier.totals.searches : undefined),
     })
   }
 
   return { status: 'ready', generatedAt, window, data: { values } }
+}
+
+/**
+ * The window of equal length immediately before this one.
+ *
+ * Equal length matters: comparing a 24-hour figure against a 30-day one is a comparison of two different
+ * questions, and the difference would read as a change in traffic. Returns `null` on failure rather than
+ * throwing, so a comparison that cannot be read costs the operator the comparison and not the section.
+ */
+async function previousWindow(from: Date, to: Date) {
+  const span = to.getTime() - from.getTime()
+  return readServiceMetricWindow(new Date(from.getTime() - span), from).catch(() => null)
+}
+
+/**
+ * Attaches `previous` only when there is a number to attach.
+ *
+ * Spreading an absent value rather than writing `previous: undefined` keeps the key off the payload entirely,
+ * which is what the contract means by optional — and it is the difference between "no comparison was
+ * requested" and "the comparison is zero". A client cannot tell those apart from a `0`.
+ */
+function was(previous: number | null | undefined): { previous?: number } {
+  return typeof previous === 'number' && Number.isFinite(previous) ? { previous } : {}
 }
 
 /** The p95 for one family, or the last boundary when it overflows — used only for ranking, never reported. */
@@ -475,4 +518,79 @@ function buildRuntime(range: AdminMetricRange, now: Date): AdminMetricSectionPay
        */
     },
   }
+}
+
+/**
+ * Data Freshness — the runtime section's second variant, and the answer to a question the rest of the page
+ * cannot ask about itself.
+ *
+ * Every other number here is undated in the reader's mind: an operator sees "requests: 1,204" and takes it to
+ * mean now. If the flush stopped an hour ago that figure is real, correctly windowed, and describes an hour
+ * ago — and nothing else on the page would say so, because `generatedAt` reports when the *query* ran, not
+ * how current its input was.
+ *
+ * `scope: 'database'` on the lag values and `process` on the process age, because they are genuinely
+ * different claims: the lag is a platform fact read from the table, the age is this instance's.
+ */
+async function buildFreshness(range: AdminMetricRange, now: Date): Promise<AdminMetricSectionPayload> {
+  const window = windowFor(range, now)
+  const identity = processIdentity()
+  const freshness = await readServiceMetricFreshness(now).catch(() => null)
+  if (!freshness) return unavailable('error')
+
+  const values: AdminMetricValues = [
+    {
+      key: 'process_age_seconds',
+      value: Math.round((now.getTime() - new Date(identity.startedAt).getTime()) / 1000),
+      unit: 'count',
+      scope: 'process',
+      processIdentity: identity,
+    },
+  ]
+
+  if (freshness.newestBucketStart) {
+    /**
+     * Lag, not a timestamp. A timestamp needs the reader to subtract, and a page read at 02:00 is exactly
+     * where that subtraction goes wrong — especially across a timezone, which is why the window carries one.
+     *
+     * The threshold is 180 s warn / 600 s critical: the flush runs every 30 s and holds the minute in
+     * progress back, so ~90 s of lag is normal operation and three minutes is not.
+     */
+    values.push({
+      key: 'metric_lag_seconds',
+      value: Math.max(0, Math.round((now.getTime() - freshness.newestBucketStart.getTime()) / 1000)),
+      unit: 'count',
+      scope: 'database',
+      platformTotal: true,
+      threshold: { direction: 'higher_is_worse', warn: 180, critical: 600 },
+    })
+  }
+
+  if (freshness.oldestBucketStart) {
+    // How much history exists at all. A "30d" range over four days of history is not thirty days, and this
+    // is the only value on the page that says so.
+    values.push({
+      key: 'history_span_seconds',
+      value: Math.max(0, Math.round((now.getTime() - freshness.oldestBucketStart.getTime()) / 1000)),
+      unit: 'count',
+      scope: 'database',
+      platformTotal: true,
+    })
+  }
+
+  /**
+   * Instances that wrote in the last ten minutes. Zero is the state that otherwise looks exactly like no
+   * traffic, so it is reported as its own number rather than inferred from an empty chart — and it is why
+   * this variant is `ready` even when the store is empty. "Nothing is reporting" is an answer.
+   */
+  values.push({
+    key: 'reporting_instances',
+    value: freshness.reportingInstances,
+    unit: 'count',
+    scope: 'database',
+    platformTotal: true,
+    threshold: { direction: 'lower_is_worse', warn: 1, critical: 0 },
+  })
+
+  return { status: 'ready', generatedAt: now.toISOString(), window, data: { values } }
 }

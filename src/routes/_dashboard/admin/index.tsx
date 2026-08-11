@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { requirePlatformAdminPage } from '~/shared/lib/auth/auth-session'
+import { DEFAULT_ADMIN_METRICS_SEARCH } from '~/shared/lib/admin-metrics/url-state'
 
 /**
  * `/admin` — the index the Admin area never had.
@@ -38,6 +39,8 @@ export const Route = createFileRoute('/_dashboard/admin/')({
     await requirePlatformAdminPage()
     // `replace` so the URL does not become a back-button stop the admin has to
     // click past on their way out of the area.
-    throw redirect({ to: '/admin/metrics', replace: true })
+    // The metrics route validates its search, so every link and redirect has to supply the whole state —
+    // otherwise a redirect would silently reset a field. `DEFAULT_ADMIN_METRICS_SEARCH` is its one home.
+    throw redirect({ to: '/admin/metrics', search: DEFAULT_ADMIN_METRICS_SEARCH, replace: true })
   },
 })
