@@ -57,6 +57,7 @@
     "load:test": "tsx --env-file-if-exists=.env scripts/load/runner.ts",
     "load:test:baseline": "tsx --env-file-if-exists=.env scripts/load/runner.ts --baseline",
     "load:verify-fixtures": "tsx --env-file-if-exists=.env scripts/load/verify-fixtures.ts",
+    "plans:check-links": "node scripts/check-plan-links.mjs",
     "plans:check-order": "node scripts/check-plan-order.mjs",
     "plans:check-implemented": "node scripts/check-implemented-plans.mjs",
     "plans:check-readiness": "node scripts/check-phase-readiness.mjs phase-2 phase-3 && pnpm plans:check-tasks",

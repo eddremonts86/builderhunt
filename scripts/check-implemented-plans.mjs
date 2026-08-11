@@ -30,15 +30,37 @@ import { join, relative } from 'node:path'
  * `check-phase-readiness.mjs` accepts is a status no gate can read, and that is how eight of them drifted
  * across phase 1 for weeks while four plans sat at 100% of their tasks still labelled `pending`.
  *
- * ## Why the archive is split by phase
+ * ## Three homes, by outcome
  *
- * Plan numbers are unique only *within* a phase. Phase 3 is numbered 01-13 and twelve of those collide
- * with phase 1's, so a flat archive could hold one phase and no more. `plans/implemented/<phase>/` is what
- * lets both live there, and `check-plan-order.mjs` reads a phase's live directory together with its
- * archive so the build order still reads as one contiguous sequence.
+ *   plans/<phase>/              live work — open or partial tasks remain, or it is `blocked` and waiting
+ *   plans/implemented/<phase>/  done and tested
+ *   plans/rejected/<phase>/     `superseded` — never built, and never will be under this number
+ *
+ * Every one is enforced in both directions, because a directory whose meaning is only asserted drifts: rule
+ * 2 and 2b check that what is in a root belongs there, and rule 3 checks that what belongs in a root is in
+ * it. `blocked` moves nowhere on purpose — it is work waiting on something, and the live directory is where
+ * waiting work stays visible.
+ *
+ * Each root is split by phase because plan numbers are unique only *within* one. Phase 3 is numbered 01-13
+ * and twelve of those collide with phase 1's, so a flat root could hold one phase and no more.
+ * `check-plan-order.mjs` reads all three together, so the build order still reads as one contiguous
+ * sequence however the plans are filed.
  */
 const ROOT = process.cwd()
 const ARCHIVE = join(ROOT, 'plans', 'implemented')
+/**
+ * Plans that were never built and never will be under their number.
+ *
+ * A third root rather than a status header alone, because a header is something you have to open a file to
+ * read. Until 2026-08-11 the five `superseded` phase-1 plans sat in `plans/phase-1/` beside the live work,
+ * so the directory answered "what is left in phase 1?" with seven entries when the honest answer was two.
+ * The commit that built the archive said filing them with live work was "the second-best answer and worth
+ * revisiting"; this is the revisit.
+ *
+ * Not `plans/implemented/`: that directory means done and tested, and rule 2 below would reject them on the
+ * spot. A rejected plan is not a finished one, and the two must not share a home.
+ */
+const REJECTED = join(ROOT, 'plans', 'rejected')
 
 /**
  * The phases whose plans are still being worked.
@@ -104,16 +126,20 @@ function readPlan(root, dir) {
   return { files, statuses, open, partial }
 }
 
-/** Every plan directory in the repository, tagged with its phase and whether it is archived. */
+/** Every plan directory in the repository, tagged with its phase and which of the three homes it is in. */
 function allPlans() {
   const out = []
   for (const phase of planDirectories(ARCHIVE)) {
     const root = join(ARCHIVE, phase)
-    for (const dir of planDirectories(root)) out.push({ phase, root, dir, archived: true })
+    for (const dir of planDirectories(root)) out.push({ phase, root, dir, home: 'archived' })
+  }
+  for (const phase of planDirectories(REJECTED)) {
+    const root = join(REJECTED, phase)
+    for (const dir of planDirectories(root)) out.push({ phase, root, dir, home: 'rejected' })
   }
   for (const phase of LIVE_PHASES) {
     const root = join(ROOT, 'plans', phase)
-    for (const dir of planDirectories(root)) out.push({ phase, root, dir, archived: false })
+    for (const dir of planDirectories(root)) out.push({ phase, root, dir, home: 'live' })
   }
   return out
 }
@@ -134,8 +160,8 @@ for (const { root, dir } of plans) {
 }
 
 // ── 2. Everything in the archive is finished ─────────────────────────────────────────────────────
-for (const { phase, root, dir, archived } of plans) {
-  if (!archived) continue
+for (const { phase, root, dir, home } of plans) {
+  if (home !== 'archived') continue
   const { files, statuses, open, partial } = readPlan(root, dir)
   if (files.length === 0) {
     fail(`plans/implemented/${phase}/${dir} has no markdown file`)
@@ -160,24 +186,62 @@ for (const { phase, root, dir, archived } of plans) {
   }
 }
 
+// ── 2b. Everything in the rejected root was rejected ────────────────────────────────────────────
+//
+// The mirror of rule 2, and it exists for the same reason: a directory whose meaning is only asserted
+// drifts. `superseded` is the one status that belongs here — `blocked` means "not yet", which is live
+// work waiting on something, and filing it as rejected would quietly write off work nobody cancelled.
+for (const { phase, root, dir, home } of plans) {
+  if (home !== 'rejected') continue
+  const { files, statuses } = readPlan(root, dir)
+  if (files.length === 0) {
+    fail(`plans/rejected/${phase}/${dir} has no markdown file`)
+    continue
+  }
+  if (statuses.size === 0) {
+    fail(`plans/rejected/${phase}/${dir} carries no Status header in any file`)
+    continue
+  }
+  for (const [file, status] of statuses) {
+    if (status !== 'superseded') {
+      fail(
+        `plans/rejected/${phase}/${dir}/${file} says \`${status}\`, but everything in plans/rejected/ is ` +
+          `superseded. A \`blocked\` plan is waiting, not rejected — move it back to plans/${phase}/.`,
+      )
+    }
+  }
+}
+
 /**
  * ── 3. Finish a plan, move it ───────────────────────────────────────────────────────────────────
  *
  * The standing rule, enforced rather than remembered. A plan with no open work whose every file says
- * `implemented` is finished, and a finished plan belongs in the archive.
+ * `implemented` is finished, and a finished plan belongs in the archive. A plan whose every file says
+ * `superseded` was rejected, and belongs in the rejected root.
  *
- * `superseded` and `blocked` plans are untouched by this: they have no open tasks either, and they were
- * never built, so filing them as implemented would be the opposite of the point.
+ * `blocked` is deliberately not moved anywhere: it has no open tasks either, but it is work waiting on
+ * something rather than work that ended, and the live phase directory is where waiting work is visible.
  */
-for (const { phase, root, dir, archived } of plans) {
-  if (archived) continue
+for (const { phase, root, dir, home } of plans) {
+  if (home !== 'live') continue
   const { statuses, open, partial } = readPlan(root, dir)
   const values = [...statuses.values()]
-  const allImplemented = values.length > 0 && values.every((status) => status === 'implemented')
-  if (allImplemented && open === 0 && partial === 0) {
+  const every = (want) => values.length > 0 && values.every((status) => status === want)
+
+  if (every('implemented') && open === 0 && partial === 0) {
     fail(
       `plans/${phase}/${dir} is finished — no open tasks, \`implemented\` in every file — so it belongs in ` +
         `plans/implemented/${phase}/. Run: git mv plans/${phase}/${dir} plans/implemented/${phase}/${dir}`,
+    )
+  }
+
+  // No task-count condition on this one, unlike the rule above. A rejected plan is usually abandoned
+  // mid-flight with tasks still unchecked, and requiring them to be closed first would mean editing a
+  // plan nobody intends to build just to be allowed to file it.
+  if (every('superseded')) {
+    fail(
+      `plans/${phase}/${dir} says \`superseded\` in every file — it was never built, so it belongs in ` +
+        `plans/rejected/${phase}/. Run: git mv plans/${phase}/${dir} plans/rejected/${phase}/${dir}`,
     )
   }
 }
@@ -235,13 +299,26 @@ if (failed) {
   process.exit(1)
 }
 
-const archived = plans.filter((plan) => plan.archived)
-const live = plans.filter((plan) => !plan.archived)
-const byPhase = [...new Set(archived.map((plan) => plan.phase))]
-  .sort()
-  .map((phase) => `${phase} ${archived.filter((plan) => plan.phase === phase).length}`)
-  .join(', ')
+/*
+ * The summary reports all three homes, and it is worth stating why it is not an afterthought.
+ *
+ * These filters read `plan.archived` when the tag was renamed to `plan.home` — a field that no longer
+ * existed, so every plan counted as live and the line read "0 archived plans (), 98 live plans" while the
+ * script exited 0. A green gate whose own summary is nonsense is worse than a red one: the exit code is
+ * what CI reads, and nobody re-reads a passing step's output. Caught by reading it rather than by trusting
+ * the zero.
+ */
+const inHome = (home) => plans.filter((plan) => plan.home === home)
+const archived = inHome('archived')
+const rejected = inHome('rejected')
+const live = inHome('live')
+const byPhase = (group) =>
+  [...new Set(group.map((plan) => plan.phase))]
+    .sort()
+    .map((phase) => `${phase} ${group.filter((plan) => plan.phase === phase).length}`)
+    .join(', ')
 console.log(
-  `OK: ${archived.length} archived plans (${byPhase}), none carrying open or partial tasks; ` +
-    `${live.length} live plans, none of them finished`,
+  `OK: ${archived.length} archived plans (${byPhase(archived)}), none carrying open or partial tasks; ` +
+    `${rejected.length} rejected plans (${byPhase(rejected)}), all superseded; ` +
+    `${live.length} live plans, none of them finished or superseded`,
 )

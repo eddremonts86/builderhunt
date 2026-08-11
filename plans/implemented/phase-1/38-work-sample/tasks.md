@@ -4,7 +4,7 @@
 > `GITHUB_TOKEN`/`MINIMAX_API_KEY` — neither is configured in this environment; everything
 > reachable without them is done and verified)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft — `src/lib/github/work-sample.ts` — see note below)
-> **Blocks**: nothing. **Supersedes**: [`technical-sandbox`](../../../phase-1/39-technical-sandbox/tasks.md).
+> **Blocks**: nothing. **Supersedes**: [`technical-sandbox`](../../../rejected/phase-1/39-technical-sandbox/tasks.md).
 > **Reality check**: `code-fingerprinting`'s v2 phase hadn't shipped `content.ts` yet when
 > this plan started, so its selection heuristics (exclusion regex, code-file ranking) were
 > written directly into `src/lib/github/work-sample.ts` per this plan's own header

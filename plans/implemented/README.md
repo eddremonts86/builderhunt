@@ -11,8 +11,9 @@ twelve of those collide with phase 1's, so a flat archive could hold one phase a
 | `phase-1/` | 52 | every finished phase-1 plan, numbered 01-59 with gaps where a live plan still sits |
 | `phase-3/` | 13 | all of phase 3 — the phase is complete |
 
-Seven plans remain in `plans/phase-1/`: two with real open work (`55` waiting on cost-bearing
-certification runs, `57` out of scope by decision) and five `superseded` ones that were never built.
+Two plans remain in `plans/phase-1/`, and both are real open work: `55` waiting on cost-bearing
+certification runs, and `57` with seven partial tasks. The five `superseded` ones moved to
+[`plans/rejected/phase-1/`](../rejected/README.md) on 2026-08-11 — see below.
 
 ## What a plan had to satisfy to be in here
 
@@ -31,20 +32,30 @@ and why it changed, so the claim is auditable rather than asserted.
 
 ## What is deliberately *not* in here
 
-| Plan | Status | Why it stayed |
-|---|---|---|
-| `55-load-1000-concurrent-users` | `pending` | 5 open + 2 partial — the cost-bearing certification runs |
-| `57-ui-dashboard` | `pending` | 17 open + 9 partial |
-| `11-sourcehut-integration` | `superseded` | retired 2026-08-04, not built |
-| `16-hashnode-integration` | `superseded` | retired 2026-08-04, not built |
-| `20-indiehackers-integration` | `superseded` | closed and skipped, not built |
-| `31-pricing-and-billing` | `superseded` | replaced by `30-stripe-billing-platform` |
-| `39-technical-sandbox` | `superseded` | replaced elsewhere |
+| Plan | Status | Where it is | Why |
+|---|---|---|---|
+| `55-load-1000-concurrent-users` | `pending` | `plans/phase-1/` | 5 open + 1 partial — the cost-bearing certification runs |
+| `57-ui-dashboard` | `pending` | `plans/phase-1/` | 7 partial |
+| `11-sourcehut-integration` | `superseded` | `plans/rejected/phase-1/` | retired 2026-08-04, not built |
+| `16-hashnode-integration` | `superseded` | `plans/rejected/phase-1/` | retired 2026-08-04, not built |
+| `20-indiehackers-integration` | `superseded` | `plans/rejected/phase-1/` | closed and skipped, not built |
+| `31-pricing-and-billing` | `superseded` | `plans/rejected/phase-1/` | replaced by `30-stripe-billing-platform` |
+| `39-technical-sandbox` | `superseded` | `plans/rejected/phase-1/` | replaced elsewhere |
 
-The five `superseded` plans have no open tasks either, which is exactly why the move rule cannot be "zero
-open tasks" alone: they were never built, and filing them as implemented would be the opposite of the
-point. They are also not *pending*, so sitting beside live work is the second-best answer and one worth
-revisiting.
+The five `superseded` plans have no open tasks either, which is exactly why the move rule into *this*
+directory cannot be "zero open tasks" alone: they were never built, and filing them as implemented would
+be the opposite of the point.
+
+They are not *pending* either, and until 2026-08-11 they sat in `plans/phase-1/` beside the live work —
+recorded here at the time as "the second-best answer and one worth revisiting". They now have their own
+root, so `plans/phase-1/` answers "what is left?" with two entries instead of seven. A plan has three
+possible homes and they are decided by outcome, not by topic:
+
+| Root | Means |
+|---|---|
+| `plans/<phase>/` | live work: open or partial tasks remain, or it is `blocked` and waiting on something |
+| `plans/implemented/<phase>/` | done and tested |
+| `plans/rejected/<phase>/` | `superseded`: never built, and never will be under this number |
 
 `54-waitlist-launch` used to be on this list as `blocked`. It is now archived: all four of its own tasks
 were done and its five remaining items moved to `plans/phase-5/` on 2026-08-05 — the same state as

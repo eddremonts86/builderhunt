@@ -5,7 +5,7 @@
 > **Blocks**: nothing
 > **Reality check**: the checked inventory below exists in source; all remaining corrections,
 > migration, and Stripe work are executable only in
-> [`30-stripe-billing-platform/tasks.md`](../../implemented/phase-1/30-stripe-billing-platform/tasks.md).
+> [`30-stripe-billing-platform/tasks.md`](../../../implemented/phase-1/30-stripe-billing-platform/tasks.md).
 
 ## Delivered historical inventory
 

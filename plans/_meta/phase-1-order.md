@@ -127,16 +127,16 @@ hosts → package registries → community platforms → credential/decision-gat
 |--:|------|----------:|------|------|
 | 09 | [`gitlab-integration`](../implemented/phase-1/09-gitlab-integration/spec.md) | 0/9 | — | **Closed 2026-07-28**: `GITLAB_TOKEN` is documented in `.env.example`. |
 | 10 | [`codeberg-integration`](../implemented/phase-1/10-codeberg-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: both Codeberg env vars documented. |
-| 11 | [`sourcehut-integration`](../phase-1/11-sourcehut-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
+| 11 | [`sourcehut-integration`](../rejected/phase-1/11-sourcehut-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
 | 12 | [`npm-registry-integration`](../implemented/phase-1/12-npm-registry-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: search runs on `registry.npmjs.org`, not npms.io. |
 | 13 | [`huggingface-integration`](../implemented/phase-1/13-huggingface-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
 | 14 | [`stack-overflow-integration`](../implemented/phase-1/14-stack-overflow-integration/spec.md) | 0/10 | — | **Closed 2026-07-28**: env documented and quota exhaustion logged. |
 | 15 | [`lobsters-integration`](../implemented/phase-1/15-lobsters-integration/spec.md) | 0/6 | — | **Closed 2026-07-28**: JSON-only by decision; scraping enrichment is a closed non-goal. |
-| 16 | [`hashnode-integration`](../phase-1/16-hashnode-integration/spec.md) | 1/8 | — | Paused on a paid-API vendor decision (decided: paused). |
+| 16 | [`hashnode-integration`](../rejected/phase-1/16-hashnode-integration/spec.md) | 1/8 | — | Paused on a paid-API vendor decision (decided: paused). |
 | 17 | [`bluesky-integration`](../implemented/phase-1/17-bluesky-integration/spec.md) | 0/6 | — | Ships without credentials. |
 | 18 | [`producthunt-integration`](../implemented/phase-1/18-producthunt-integration/spec.md) | 0/6 | — | Wired but dormant until a token is provisioned. |
 | 19 | [`devpost-integration`](../implemented/phase-1/19-devpost-integration/spec.md) | 0/3 | — | Implemented, dark by default. |
-| 20 | [`indiehackers-integration`](../phase-1/20-indiehackers-integration/spec.md) | 2/1 | — | Closed by decision; the two open boxes are optional follow-ups that inflate every count. |
+| 20 | [`indiehackers-integration`](../rejected/phase-1/20-indiehackers-integration/spec.md) | 2/1 | — | Closed by decision; the two open boxes are optional follow-ups that inflate every count. |
 
 ## Wave 3 — the one AI platform (21)
 
@@ -170,7 +170,7 @@ mutations on top; none of them may create a competing organization model.
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
 | 30 | [`stripe-billing-platform`](../implemented/phase-1/30-stripe-billing-platform/spec.md) | 2/49 | 01, 27 | Owns Stripe and the credit ledger for the whole product. Remaining: sandbox/Test-Clock certification and the Denmark canary. |
-| 31 | [`pricing-and-billing`](../phase-1/31-pricing-and-billing/spec.md) | 0/3 | (superseded by 30) | Read-only record. |
+| 31 | [`pricing-and-billing`](../rejected/phase-1/31-pricing-and-billing/spec.md) | 0/3 | (superseded by 30) | Read-only record. |
 | 32 | [`abuse-and-usage-integrity`](../implemented/phase-1/32-abuse-and-usage-integrity/spec.md) | 1/32 | 01, 27, 30 | Enforcement rollout closed out at "warn" by user decision. |
 
 ## Wave 7 — product surfaces on the platform (33–41)
@@ -183,7 +183,7 @@ mutations on top; none of them may create a competing organization model.
 | 36 | [`claimable-profiles`](../implemented/phase-1/36-claimable-profiles/spec.md) | 2/12 | — | The open trust boundary: the claim email proves mailbox access, not ownership of the indexed source identity. |
 | 37 | [`portfolio-builder`](../implemented/phase-1/37-portfolio-builder/spec.md) | 5/8 | 36 | Composes verified claims (+ optional `24`/`33` artifacts) into an explicitly published surface. |
 | 38 | [`work-sample`](../implemented/phase-1/38-work-sample/spec.md) | 1/8 | 21, 25 | Leftover needs a real `GITHUB_TOKEN` / `MINIMAX_API_KEY`; neither configured. |
-| 39 | [`technical-sandbox`](../phase-1/39-technical-sandbox/spec.md) | 0/0 | (superseded by 38) | Never implement real-person roleplay. |
+| 39 | [`technical-sandbox`](../rejected/phase-1/39-technical-sandbox/spec.md) | 0/0 | (superseded by 38) | Never implement real-person roleplay. |
 | 40 | [`team-synergy`](../implemented/phase-1/40-team-synergy/spec.md) | 1/6 | 21, 24, 25, 27 | Phase 5 carries its own "do not start" note. |
 | 41 | [`ai-sourcing-sprints`](../implemented/phase-1/41-ai-sourcing-sprints/spec.md) | 1/22 | 01, 21, 22, 23, 27 | Phases 1–5 shipped and live-verified; Phase 6 has one dedicated item — see the plan header. |
 

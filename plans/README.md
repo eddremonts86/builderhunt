@@ -22,12 +22,20 @@ build order, `01`–`54`. That number is the answer to "in what sequence would t
 built from an empty repository, so no plan starts before its dependencies exist" — and it is
 also the order to walk when auditing plan-vs-reality.
 
-## Where finished plans live
+## Where a plan lives
 
-`plans/implemented/` holds the 47 phase-1 plans that are **done and tested** — every task closed, all
-three files saying `implemented`, and `pnpm ci:local` green. See
-[`implemented/README.md`](./implemented/README.md) for the entry criteria and for the twelve plans that
-deliberately stayed in `plans/phase-1/`.
+Three roots, decided by outcome rather than by topic, so a phase directory answers *what is left to do?*
+and nothing else:
+
+| Root | Means | Phase-1 count |
+|---|---|---|
+| `plans/<phase>/` | live work: open or partial tasks remain, or `blocked` and waiting | 2 |
+| [`plans/implemented/`](./implemented/README.md) | done and tested — every task closed, `implemented` in all three files, `pnpm ci:local` green | 52 |
+| [`plans/rejected/`](./rejected/README.md) | `superseded` — never built, and never will be under this number | 5 |
+
+`pnpm plans:check-implemented` enforces all three in both directions, so none of these is a claim anyone
+has to trust. `blocked` deliberately stays in the phase directory: it is work waiting on something, not
+work that ended.
 
 The two-digit prefixes did not change: the number is a plan's position in the canonical build order, not
 its address. `scripts/check-plan-order.mjs` reads both directories as one corpus and still reports 59
@@ -83,11 +91,11 @@ Ship the small, already-understood gaps before adding AI infrastructure:
   non-schema truth fixes below, but RLS enforcement precedes every later private-data expansion.
 - [`project-hygiene`](implemented/05-project-hygiene/spec.md): remove fabricated `Math.random()`
   evidence and use real repository signals.
-- [`hashnode-integration`](./phase-1/16-hashnode-integration/spec.md): migrate the dead legacy API.
+- [`hashnode-integration`](rejected/phase-1/16-hashnode-integration/spec.md): migrate the dead legacy API.
 - [`gitlab-integration`](implemented/09-gitlab-integration/spec.md),
   [`codeberg-integration`](implemented/10-codeberg-integration/spec.md),
   [`huggingface-integration`](implemented/13-huggingface-integration/spec.md),
-  [`sourcehut-integration`](./phase-1/11-sourcehut-integration/spec.md), and
+  [`sourcehut-integration`](rejected/phase-1/11-sourcehut-integration/spec.md), and
   [`stack-overflow-integration`](implemented/14-stack-overflow-integration/spec.md): close env,
   observability, and quota-reporting gaps.
 - [`production-infrastructure`](implemented/02-production-infrastructure/spec.md): backups,
@@ -134,7 +142,7 @@ usable when Chrome AI or MiniMax is unavailable according to its degradation lad
 - [`unified-timeline`](implemented/33-unified-timeline/spec.md) is non-AI core functionality; its
   optional summary task plugs into the AI platform.
 - Keep [`devpost-integration`](implemented/19-devpost-integration/spec.md) and
-  [`indiehackers-integration`](./phase-1/20-indiehackers-integration/spec.md) blocked until their
+  [`indiehackers-integration`](rejected/phase-1/20-indiehackers-integration/spec.md) blocked until their
   explicit acquisition-policy decisions are resolved. Do not add brittle scraping to
   the live search request path.
 
@@ -160,12 +168,12 @@ seat limits, and audit-event redaction all pass integration tests.
   AI task registry, tracking, semantic-index write-through, and the worker pattern.
 - [`portfolio-builder`](implemented/37-portfolio-builder/spec.md) composes verified claims and
   optional enrichment/timeline artifacts into an explicitly published surface.
-- [`technical-sandbox`](./phase-1/39-technical-sandbox/spec.md) stays superseded by work-sample;
+- [`technical-sandbox`](rejected/phase-1/39-technical-sandbox/spec.md) stays superseded by work-sample;
   never implement real-person roleplay.
 
 ### Wave 6 — launch and continuous quality
 
-- Complete [`pricing-and-billing`](./phase-1/31-pricing-and-billing/spec.md),
+- Complete [`pricing-and-billing`](rejected/phase-1/31-pricing-and-billing/spec.md),
   [`public-landing-pages`](implemented/45-public-landing-pages/spec.md),
   [`content-marketing`](implemented/46-content-marketing/spec.md), and
   [`status-and-trust`](implemented/47-status-and-trust/spec.md).
@@ -239,7 +247,7 @@ flowchart LR
 - [`production-infrastructure`](implemented/02-production-infrastructure/spec.md)
 - [`postgres-18-upgrade`](implemented/03-postgres-18-upgrade/spec.md) — moved here from `phase-2`
   on 2026-07-28; see [`_meta/phase-1-order.md`](./_meta/phase-1-order.md) for why it sits at 03
-- [`pricing-and-billing`](./phase-1/31-pricing-and-billing/spec.md)
+- [`pricing-and-billing`](rejected/phase-1/31-pricing-and-billing/spec.md)
 - [`legal-and-compliance`](implemented/04-legal-and-compliance/spec.md)
 - [`status-and-trust`](implemented/47-status-and-trust/spec.md)
 - [`public-landing-pages`](implemented/45-public-landing-pages/spec.md)
@@ -257,7 +265,7 @@ flowchart LR
 - [`project-hygiene`](implemented/05-project-hygiene/spec.md)
 - [`work-sample`](implemented/38-work-sample/spec.md)
 - [`team-synergy`](implemented/40-team-synergy/spec.md)
-- [`technical-sandbox`](./phase-1/39-technical-sandbox/spec.md) (superseded)
+- [`technical-sandbox`](rejected/phase-1/39-technical-sandbox/spec.md) (superseded)
 
 ### Orchestration and publishing
 
@@ -280,11 +288,11 @@ flowchart LR
 - [`bluesky-integration`](implemented/17-bluesky-integration/spec.md)
 - [`producthunt-integration`](implemented/18-producthunt-integration/spec.md)
 - [`devpost-integration`](implemented/19-devpost-integration/spec.md) (blocked)
-- [`indiehackers-integration`](./phase-1/20-indiehackers-integration/spec.md) (blocked)
+- [`indiehackers-integration`](rejected/phase-1/20-indiehackers-integration/spec.md) (blocked)
 - [`gitlab-integration`](implemented/09-gitlab-integration/spec.md)
 - [`codeberg-integration`](implemented/10-codeberg-integration/spec.md)
-- [`sourcehut-integration`](./phase-1/11-sourcehut-integration/spec.md)
-- [`hashnode-integration`](./phase-1/16-hashnode-integration/spec.md)
+- [`sourcehut-integration`](rejected/phase-1/11-sourcehut-integration/spec.md)
+- [`hashnode-integration`](rejected/phase-1/16-hashnode-integration/spec.md)
 - [`huggingface-integration`](implemented/13-huggingface-integration/spec.md)
 - [`lobsters-integration`](implemented/15-lobsters-integration/spec.md)
 - [`npm-registry-integration`](implemented/12-npm-registry-integration/spec.md)

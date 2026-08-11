@@ -1,9 +1,9 @@
 # Technical Sandbox — Superseded (spec)
 
-> **Status**: `superseded` — merged into [`work-sample`](../../implemented/phase-1/38-work-sample/spec.md)
+> **Status**: `superseded` — merged into [`work-sample`](../../../implemented/phase-1/38-work-sample/spec.md)
 > **Depends on**: nothing (no work planned here)
 > **Blocks**: nothing
-> **Reality check**: zero code was ever built for this plan — no `sandbox_chats` table, no persona prompt engine, no streaming routes, no terminal UI. The recruiter-side "understand a candidate's real code before outreach" need it targeted is delivered by [`work-sample`](../../implemented/phase-1/38-work-sample/spec.md).
+> **Reality check**: zero code was ever built for this plan — no `sandbox_chats` table, no persona prompt engine, no streaming routes, no terminal UI. The recruiter-side "understand a candidate's real code before outreach" need it targeted is delivered by [`work-sample`](../../../implemented/phase-1/38-work-sample/spec.md).
 
 ## What this plan was
 
@@ -37,7 +37,7 @@ streamed over SSE.
 
 - No part of this plan will be implemented as specified.
 - Surviving kernel: context-aware interview questions grounded in real code →
-  `suggestedInterviewQuestions` in [`work-sample`](../../implemented/phase-1/38-work-sample/spec.md)'s output schema.
+  `suggestedInterviewQuestions` in [`work-sample`](../../../implemented/phase-1/38-work-sample/spec.md)'s output schema.
 - If interactive Q&A over a builder's code is ever revisited, it must be framed as a
   clearly-labeled _analysis assistant_ ("ask about this repo"), never as the builder's
   persona — and it would be a new plan written against the AI platform's rules at that time.

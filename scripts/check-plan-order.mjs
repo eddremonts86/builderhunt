@@ -10,26 +10,32 @@ import { join, relative } from 'node:path'
 // dependency on 23-proactive-discovery, and 23 declares one back on 22. README.md's
 // dependency graph resolves it as semantic -> discovery, so 22 precedes 23.
 //
-// ## Why two directories
+// ## Why three directories
 //
-// A finished plan moves to plans/implemented/<phase>/, so the archive answers "what is done
-// and tested?" without anyone reading 59 status headers. The build order does not move with
-// it: the number *is* the position, and positions have to stay contiguous whether or not
-// the work landed. So the corpus this script checks is the union of the live phase directory
-// and its archive, and the invariant is unchanged — 01..N with no gaps, every dependency
-// backward.
+// A plan has one of three homes, by outcome rather than by topic:
 //
-// Reading only plans/phase-1 would make the check pass vacuously the moment a plan moved:
-// seven directories numbered 11, 16, 20, 31, 39, 55 and 57 would be asked to be numbered
-// 01-07, and every dependency on a moved plan would resolve to "not a plan directory". That
-// is exactly what it did before this was taught the union.
+//   plans/phase-1/              live work — open or partial tasks remain
+//   plans/implemented/phase-1/  done and tested
+//   plans/rejected/phase-1/     never built and never will be under this number
 //
-// The archive is split by phase because the numbers are only unique *within* a phase: phase 3
-// is numbered 01-13 and twelve of those collide with phase 1's. A flat archive could hold one
-// phase and no more.
+// The build order does not move with a plan: the number *is* the position in
+// plans/_meta/phase-1-order.md, and positions have to stay contiguous whether or not the work
+// landed — or was abandoned. So the corpus this script checks is the union of all three, and the
+// invariant is unchanged: 01..N with no gaps, every dependency backward.
+//
+// Reading only plans/phase-1 would make the check pass vacuously the moment a plan moved: after
+// the 2026-08-11 moves it holds exactly two directories, numbered 55 and 57, which would be asked
+// to be numbered 01-02 while every dependency on a moved plan resolved to "not a plan directory".
+// That is what it did before it was taught the union, and adding the third root without adding it
+// here would have reproduced it — five plans' worth.
+//
+// Each root is split by phase because the numbers are only unique *within* a phase: phase 3 is
+// numbered 01-13 and twelve of those collide with phase 1's. A flat root could hold one phase and
+// no more.
 const PLAN_ROOTS = [
   join(process.cwd(), 'plans', 'phase-1'),
   join(process.cwd(), 'plans', 'implemented', 'phase-1'),
+  join(process.cwd(), 'plans', 'rejected', 'phase-1'),
 ]
 const ALLOWED_FORWARD_EDGES = new Set(['22-semantic-search -> 23-proactive-discovery'])
 
@@ -46,7 +52,10 @@ for (const root of PLAN_ROOTS) {
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     if (rootOf.has(entry.name)) {
-      fail(`${entry.name} exists under both plans/phase-1 and plans/implemented — a plan has one home`)
+      // Names the two roots it was found under, because with three of them "a plan has one home"
+      // is no longer enough to locate the duplicate.
+      const first = relative(process.cwd(), rootOf.get(entry.name))
+      fail(`${entry.name} exists under both ${first} and ${relative(process.cwd(), root)} — a plan has one home`)
     }
     rootOf.set(entry.name, root)
   }
@@ -84,10 +93,16 @@ function dependsOn(text) {
   const rest = text.slice(start)
   const end = rest.search(/\n> \*\*(?!Depends)/)
   const block = end === -1 ? rest : rest.slice(0, end)
-  // `../NN-name/` for a sibling and `../../<root>/NN-name/` once the two live in different
-  // directories. Matching only the plan segment keeps this indifferent to which root it is in —
+  // `../NN-name/` for a sibling, and `../../<root>/phase-1/NN-name/` once the two live under
+  // different roots. Matching only the plan segment keeps this indifferent to which root it is in —
   // the dependency is on the plan, not on where the plan is filed.
-  return [...block.matchAll(/(?:\.\.\/)+(?:phase-1\/|implemented\/)?(\d\d-[a-z0-9-]+)\//g)].map((m) => m[1])
+  //
+  // The optional group has to list every root segment a path can pass through, `rejected/` included:
+  // without it a `Depends on` pointing into the rejected root would match nothing, the dependency
+  // would read as absent, and a forward edge through it would go unreported. That is the failure
+  // this alternation exists to prevent, and it is silent — which is why it is spelled out rather
+  // than left to a looser pattern.
+  return [...block.matchAll(/(?:\.\.\/)+(?:phase-1\/|implemented\/|rejected\/)?(?:phase-1\/)?(\d\d-[a-z0-9-]+)\//g)].map((m) => m[1])
 }
 
 for (const dir of dirs) {

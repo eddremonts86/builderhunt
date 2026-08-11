@@ -229,6 +229,7 @@ step step-parity node scripts/ci/check-step-parity.mjs
 # plan's two-digit prefix is its position in the build order. Neither check ran anywhere before
 # 2026-08-11, which is how eight unreadable status values and four plans sitting at 100% of their tasks
 # while labelled `pending` survived for weeks.
+step plans-links pnpm plans:check-links
 step plans-order pnpm plans:check-order
 step plans-implemented pnpm plans:check-implemented
 
