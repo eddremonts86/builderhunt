@@ -555,4 +555,79 @@ test.describe('the Admin Metrics shell', () => {
       await context.close()
     }
   })
+
+  /**
+   * The saved landing view (plan 57, Admin track — "Persist isolated platform-admin preferences").
+   *
+   * The store, its route and its GRANT isolation landed with five e2e cases connecting as the roles themselves.
+   * What had no coverage was the half a person touches: nothing called the store from the page, so "reset" and
+   * "keyboard reorder" in the Verify line had no surface to exercise.
+   *
+   * These three run in one test rather than three, and the ordering is the reason: the preference is persistent
+   * per-admin state, so a case that saves without resetting changes what every later case in this file sees from a
+   * bare URL. One test that saves, asserts, and resets leaves the store as it found it.
+   */
+  test('a saved landing view is where /admin opens, an explicit URL wins, and reset undoes it', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: admin.storageState! })
+    const tab = await context.newPage()
+    try {
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=reliability&range=7d&variant=summary`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-page')).toBeVisible({ timeout: 20_000 })
+
+      // Keyboard-reachable, which is the Verify line's word for it — not clicked by coordinate.
+      const save = tab.getByTestId('admin-metrics-save-landing')
+      await expect(save).toBeVisible()
+      await save.focus()
+      await tab.keyboard.press('Enter')
+
+      /**
+       * The button reports the *stored* state, not the click.
+       *
+       * It re-labels itself from the PUT's response body rather than from what it sent, so this assertion is the
+       * one that would fail if the route normalized the value to something else — the "reports success and the
+       * next read disagrees" shape this plan keeps finding.
+       */
+      await expect(save).toHaveText('This is your default view', { timeout: 20_000 })
+
+      // Opening the console — `/admin`, the index that means "open the console" — now lands on the saved view.
+      await gotoHydrated(tab, `${harness.baseURL}/admin`)
+      await dismissOverlays(tab)
+      await expect(tab).toHaveURL(/section=reliability/)
+      await expect(tab).toHaveURL(/range=7d/)
+      await expect(tab.getByTestId('admin-metrics-section-reliability')).toHaveAttribute('data-active', 'true')
+
+      /**
+       * And an explicit URL is *not* overridden — the assertion this pair exists for.
+       *
+       * A personal default that won over a named section would mean two admins following the same incident link
+       * saw different pages while both address bars agreed, which is worse than having no default at all.
+       */
+      await gotoHydrated(tab, `${harness.baseURL}/admin/metrics?section=traffic&range=24h&variant=rate&compare=false`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-section-traffic')).toHaveAttribute('data-active', 'true')
+      await expect(tab).toHaveURL(/section=traffic/)
+
+      /**
+       * Reset, and then a bare URL stops redirecting at all.
+       *
+       * "Reset" is an update back to the defaults rather than a delete — the store has no DELETE grant — so the
+       * observable consequence is the absence of a redirect, not the absence of a row.
+       */
+      await gotoHydrated(tab, `${harness.baseURL}/admin`)
+      await dismissOverlays(tab)
+      const reset = tab.getByTestId('admin-metrics-reset-landing')
+      await expect(reset).toBeVisible({ timeout: 20_000 })
+      await reset.focus()
+      await tab.keyboard.press('Enter')
+      await expect(reset).toHaveCount(0, { timeout: 20_000 })
+
+      await gotoHydrated(tab, `${harness.baseURL}/admin`)
+      await dismissOverlays(tab)
+      await expect(tab.getByTestId('admin-metrics-section-overview')).toHaveAttribute('data-active', 'true')
+      await expect(tab).not.toHaveURL(/section=reliability/)
+    } finally {
+      await context.close()
+    }
+  })
 })

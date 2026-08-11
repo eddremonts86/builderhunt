@@ -9,7 +9,12 @@ import {
   type AdminMetricRange,
   type AdminMetricSection,
 } from '~/shared/lib/admin-metrics/contracts'
-import { DEFAULT_RANGE, DEFAULT_SECTION, type AdminMetricsUrlState } from '~/shared/lib/admin-metrics/url-state'
+import {
+  DEFAULT_ADMIN_METRICS_SEARCH,
+  DEFAULT_RANGE,
+  DEFAULT_SECTION,
+  type AdminMetricsUrlState,
+} from '~/shared/lib/admin-metrics/url-state'
 import { MetricSectionView } from './MetricSectionView'
 import { useMetricSection } from './useMetricSection'
 
@@ -196,6 +201,8 @@ export function AdminMetricsPage(props: Partial<AdminMetricsUrlState> = {}) {
         every section the same body shape, traffic's numbers would render perfectly under "Activation" for as
         long as the fetch took. A key makes React discard the state instead of asking the code to remember to.
       */}
+      <LandingViewControls section={section} range={range} variant={variant} />
+
       <MetricSectionHost
         key={`${section}:${range}:${variant}:${compare}`}
         section={section}
@@ -203,6 +210,167 @@ export function AdminMetricsPage(props: Partial<AdminMetricsUrlState> = {}) {
         variant={variant}
         compare={compare}
       />
+    </div>
+  )
+}
+
+/**
+ * "Open here by default" and "Use the default view" (plan 57, Admin track — "Persist isolated platform-admin
+ * preferences").
+ *
+ * ## Why this exists as two buttons and not a checkbox
+ *
+ * The preference is a *value* — one of eight sections, four ranges and a per-section variant — and the control
+ * saves whatever the operator is currently looking at. A checkbox would need a label naming the view it applies
+ * to, which changes every time they click a tab.
+ *
+ * Two separate actions rather than a toggle for the same reason the store has no DELETE grant: "reset" is an
+ * update back to the defaults, not the removal of a row. The second button is what the task's Verify line calls
+ * "reset", and it is only rendered when there is something to reset — a button that reports success and changes
+ * nothing teaches an operator to distrust the pair.
+ *
+ * ## What it deliberately does not do
+ *
+ * `compare` is not saved. It is a question about one reading — "is this number moving?" — rather than a place
+ * to start from, and an admin who saved it on would open every session with two windows fetched.
+ *
+ * The hidden-widget half of the same store has no control here, and that is not an omission: `action_queue` is
+ * the only id in the vocabulary, it is required, and it is refused with a 422. There is no optional admin widget
+ * to hide, so a hide control would need one invented first.
+ */
+function LandingViewControls({
+  section,
+  range,
+  variant,
+}: {
+  section: AdminMetricSection
+  range: AdminMetricRange
+  variant: string
+}) {
+  const [saved, setSaved] = React.useState<{ section: string; range: string; variant: string } | null>(null)
+  const [status, setStatus] = React.useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
+
+  /**
+   * Read once on mount, so the buttons can tell "this is already your default" from "you have not chosen one".
+   *
+   * A failed read leaves `saved` null, which renders the save button and hides the reset one — the conservative
+   * pair. Offering "reset" on the strength of a read that did not happen would be offering to overwrite a
+   * preference whose value is unknown.
+   */
+  React.useEffect(() => {
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        const response = await fetch('/api/admin/preferences', {
+          credentials: 'include',
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const body = (await response.json()) as { landing?: { section: string; range: string; variant: string } }
+        if (body.landing) setSaved(body.landing)
+      } catch {
+        // Silent: a preferences read that failed must not put an error on a metrics page during an incident.
+      }
+    })()
+    return () => controller.abort()
+  }, [])
+
+  const isCurrentDefault =
+    saved !== null && saved.section === section && saved.range === range && saved.variant === variant
+  const hasNonDefaultSaved =
+    saved !== null &&
+    !(
+      saved.section === DEFAULT_ADMIN_METRICS_SEARCH.section &&
+      saved.range === DEFAULT_ADMIN_METRICS_SEARCH.range &&
+      saved.variant === DEFAULT_ADMIN_METRICS_SEARCH.variant
+    )
+
+  async function save(next: { section: string; range: string; variant: string }) {
+    setStatus('saving')
+    try {
+      const response = await fetch('/api/admin/preferences', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+      if (!response.ok) {
+        setStatus('failed')
+        return
+      }
+      const body = (await response.json()) as { landing?: { section: string; range: string; variant: string } }
+      /**
+       * The saved state comes from the response, not from what was sent.
+       *
+       * The route normalizes against the live vocabularies and refuses a required widget, so echoing the request
+       * would show a value the server may not have stored — the shape of failure this plan keeps finding, where a
+       * control reports success and the next read disagrees with it.
+       */
+      setSaved(body.landing ?? null)
+      setStatus('saved')
+    } catch {
+      setStatus('failed')
+    }
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2" data-testid="admin-metrics-landing-controls">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-xs"
+        disabled={status === 'saving' || isCurrentDefault}
+        onClick={() => void save({ section, range, variant })}
+        data-testid="admin-metrics-save-landing"
+      >
+        {isCurrentDefault ? 'This is your default view' : 'Open here by default'}
+      </Button>
+
+      {hasNonDefaultSaved && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-xs"
+          disabled={status === 'saving'}
+          /*
+            Three fields, not `DEFAULT_ADMIN_METRICS_SEARCH` itself.
+            That object carries `compare` as well, and the route's body is `.strict()` — deliberately, so an
+            unknown key is a 400 rather than a save that silently ignores half of what was sent. Passing it
+            whole made every reset fail with a 400 while the save beside it worked, because the save path only
+            ever sent the three. The route was right and this was the client bug it exists to catch.
+          */
+          onClick={() =>
+            void save({
+              section: DEFAULT_ADMIN_METRICS_SEARCH.section,
+              range: DEFAULT_ADMIN_METRICS_SEARCH.range,
+              variant: DEFAULT_ADMIN_METRICS_SEARCH.variant,
+            })
+          }
+          data-testid="admin-metrics-reset-landing"
+        >
+          Reset to the overview
+        </Button>
+      )}
+
+      {/*
+        One live region for the pair, and it announces the outcome rather than the action. "Saving…" is not
+        news to somebody who just pressed the button; "your default view is now Reliability" is.
+      */}
+      <p aria-live="polite" role="status" className="sr-only" data-testid="admin-metrics-landing-announcement">
+        {status === 'saved' && saved
+          ? `Your default view is now ${SECTION_TITLES[saved.section as AdminMetricSection] ?? saved.section}, ${saved.range}.`
+          : status === 'failed'
+            ? 'Your default view could not be saved.'
+            : ''}
+      </p>
+
+      {status === 'failed' && (
+        <span className="text-xs text-bh-danger" data-testid="admin-metrics-landing-error">
+          Could not save — try again.
+        </span>
+      )}
     </div>
   )
 }

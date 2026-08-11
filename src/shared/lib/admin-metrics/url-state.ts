@@ -94,3 +94,38 @@ export function searchNeedsRewrite(
   if (input.variant !== undefined && input.variant !== normalized.variant) return true
   return false
 }
+
+/**
+ * The search state a bare `/admin/metrics` should be redirected to, or `null` for "leave it alone".
+ *
+ * Not simply "the saved view". Two things have to be true before a redirect is worth firing:
+ *
+ * 1. **It resolves to something this build can render.** Run through `normalizeAdminMetricsSearch` — the same
+ *    normalizer `validateSearch` uses — rather than a second copy of the vocabulary checks. A stored row can name
+ *    a section a later build removed, and redirecting to it would bounce through `validateSearch` back to the
+ *    overview: a visible flicker on every load, for a preference nobody can act on. Reusing the normalizer also
+ *    means a section added to the contract needs no change here.
+ * 2. **It differs from where a bare URL already lands.** An admin who has never saved anything reads back the
+ *    defaults, so without this the redirect would fire on every visit and add a history entry to arrive at the
+ *    page it was already going to render.
+ *
+ * `compare` comes from the defaults, never from the preference: the store does not hold it, and an admin who
+ * saved it on would open every session paying for two windows.
+ */
+export function landingRedirectTarget(
+  landing: { section: string; range: string; variant: string } | null,
+  defaults: AdminMetricsUrlState,
+): AdminMetricsUrlState | null {
+  if (!landing) return null
+  const resolved = normalizeAdminMetricsSearch({
+    section: landing.section,
+    range: landing.range,
+    variant: landing.variant,
+    compare: defaults.compare,
+  })
+  const same =
+    resolved.section === defaults.section &&
+    resolved.range === defaults.range &&
+    resolved.variant === defaults.variant
+  return same ? null : resolved
+}

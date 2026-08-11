@@ -151,14 +151,70 @@ if (!/visibilitychange/.test(hook)) {
  * "retry this" button.
  */
 const METRICS_UI_DIR = 'src/modules/admin/metrics'
+
+/**
+ * The one endpoint a metrics widget may write to: this admin's own console preferences.
+ *
+ * ## Why an exception exists at all
+ *
+ * The rule above is about *platform* state — "destructive or outward-facing", in the plan's words — and its
+ * concrete danger is a button that acts sitting beside a number that says something is wrong, pressed as though
+ * it were the fix. `PUT /api/admin/preferences` is neither destructive nor outward-facing: it writes one row keyed
+ * on the acting admin, it changes only where *their own* console opens next time, and it is refused for a
+ * different user by construction — the route takes no `userId` in either direction. Nobody presses "open here by
+ * default" believing it will restart a worker.
+ *
+ * There is also nowhere else for it to live. The rule sends actions to "the canonical detail page", and the
+ * canonical page for *this page's* landing view is this page. A control on some other screen saying "open metrics
+ * at Reliability" would be harder to find and harder to reason about than the thing it configures.
+ *
+ * ## Why it is a single literal and not a pattern
+ *
+ * An allowlist of one exact path, checked on the same statement as the method, so it cannot widen by accident.
+ * `/api/admin/**` would have admitted every billing and abuse mutation the rule exists to keep off this page, and
+ * a relaxation written to let one change through is the kind that quietly becomes a hole. Adding a second entry
+ * here should feel like the decision it is.
+ *
+ * The cost is real and worth naming rather than arguing away: any button at all erodes the "this page only reads"
+ * property that makes it safe to skim at 02:00. Two buttons, both about the viewer's own view, is the budget.
+ */
+const PREFERENCES_ENDPOINT = '/api/admin/preferences'
+
 const uiFiles = await metricsUiFiles(METRICS_UI_DIR)
 for (const file of uiFiles) {
   const source = code(await readFile(file, 'utf8'))
-  const mutations = [...source.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/gi)]
-  for (const mutation of mutations) {
+  /**
+   * Matched per `fetch(...)` call rather than per `method:` occurrence, so the method and its URL are judged
+   * together. Scanning for `method:` alone and then asking whether the *file* mentions the preferences path would
+   * pass a file that writes to preferences once and deletes a billing row somewhere below it.
+   */
+  const calls = [...source.matchAll(/fetch\(\s*(['"`])([^'"`]*)\1[\s\S]{0,400}?\)/g)]
+  for (const call of calls) {
+    const [statement, , url] = call
+    const method = /method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.exec(statement)
+    if (!method) continue
+    if (url === PREFERENCES_ENDPOINT) continue
     findings.push(
-      `${file}: sends a ${mutation[1].toUpperCase()} — the Command Center reads. A control that acts belongs on ` +
-        'the canonical detail page, which has the confirmation and the audit row.',
+      `${file}: sends a ${method[1].toUpperCase()} to ${url || '(dynamic url)'} — the Command Center reads. A ` +
+        'control that acts belongs on the canonical detail page, which has the confirmation and the audit row. ' +
+        `Only ${PREFERENCES_ENDPOINT} is exempt, because it writes the viewer's own landing view and nothing else.`,
+    )
+  }
+
+  /**
+   * A mutating `method:` that no `fetch(<literal>)` accounted for is still a finding.
+   *
+   * Otherwise the exemption above could be sidestepped by building the URL in a variable — `fetch(endpoint, {
+   * method: 'DELETE' })` — which this file's own history argues is worth guarding: the abort check in this same
+   * script was once satisfied by an identifier appearing anywhere in the file, and deleting the real guard left
+   * the gate green.
+   */
+  const declared = [...source.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/gi)].length
+  const accounted = calls.filter((call) => /method:\s*['"](POST|PUT|PATCH|DELETE)['"]/i.test(call[0])).length
+  if (declared > accounted) {
+    findings.push(
+      `${file}: ${declared - accounted} mutating request(s) whose URL is not a literal in the fetch call — the ` +
+        'Command Center reads, and a dynamic URL cannot be checked against the one exempt endpoint.',
     )
   }
 }
