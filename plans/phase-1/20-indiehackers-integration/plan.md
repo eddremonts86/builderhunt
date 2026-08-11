@@ -31,7 +31,7 @@ an explicit "founder" facet.
 
 ## If (a) is chosen — follow-ups outside this plan
 
-1. Execute [`producthunt-integration`](../18-producthunt-integration/plan.md).
+1. Execute [`producthunt-integration`](../../implemented/18-producthunt-integration/plan.md).
 2. Optionally spec a small "builder tags + founder filter" feature (tracked builders
    already own `builders.metadata`; a namespaced `metadata.userTags` key would follow the
    shared-surface convention in `plans/_meta/conventions.md`).

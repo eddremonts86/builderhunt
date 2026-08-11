@@ -21,7 +21,7 @@ import type { PageRequest, PageResult, TableQuery } from '../table/types'
 
 /**
  * Tenant-scoped data access for the 7 billing record types a checkout/summary
- * surface needs (plans/phase-1/30-stripe-billing-platform/tasks.md §3). Every function
+ * surface needs (plans/implemented/30-stripe-billing-platform/tasks.md §3). Every function
  * takes an already-tenant-scoped `TenantTransaction` (see
  * `~/shared/lib/db/tenant-context.ts`'s `withTenantContext`) and re-filters by
  * `organizationId` explicitly in the query even though RLS already forces it —
@@ -319,7 +319,7 @@ export async function markBillingSubscriptionCanceledImmediately(
 }
 
 /**
- * The one repair reconciliation.ts (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Implement daily
+ * The one repair reconciliation.ts (plans/implemented/30-stripe-billing-platform/tasks.md §10 "Implement daily
  * financial reconciliation") is ever allowed to apply automatically: re-syncing the three fields
  * that mirror provider-authoritative subscription state (`webhook-handlers.ts`'s
  * `handleSubscriptionUpsert` would set these same fields from a real webhook event — this is the
@@ -935,7 +935,7 @@ export async function updateBillingRefundState(
 }
 
 // ---------------------------------------------------------------------------
-// Auto-recharge (plans/phase-1/30-stripe-billing-platform/tasks.md §8 "Implement capped
+// Auto-recharge (plans/implemented/30-stripe-billing-platform/tasks.md §8 "Implement capped
 // auto-recharge and SCA recovery") — one row per organization
 // (`billing_auto_recharge_rules.organization_id` is its own primary key).
 // ---------------------------------------------------------------------------

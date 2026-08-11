@@ -1,8 +1,8 @@
 # Load capacity — Delivery plan
 
 > **Status**: `pending`
-> **Depends on**: [`02-production-infrastructure`](../02-production-infrastructure/spec.md),
-> [`03-postgres-18-upgrade`](../03-postgres-18-upgrade/spec.md)
+> **Depends on**: [`02-production-infrastructure`](../../implemented/02-production-infrastructure/spec.md),
+> [`03-postgres-18-upgrade`](../../implemented/03-postgres-18-upgrade/spec.md)
 > **Blocks**: nothing
 > **Reality check**: the production app currently connects directly to the Coolify PostgreSQL
 > resource. The generic Redis/in-memory limiter already exists and several workload routes already

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
  * The radar form's `eventType` options must read as **labels**, not as events
  * the product observes.
  *
- * `plans/phase-1/34-smart-alerts/spec.md` §"Honest v1 semantics" states it
+ * `plans/implemented/34-smart-alerts/spec.md` §"Honest v1 semantics" states it
  * directly: those four values "are **match labels, not detected events**". The
  * worker has no per-builder activity stream — it runs the radar's keyword search
  * and files every trigger as `keyword_match` (`src/lib/alerts/worker.ts`, with a

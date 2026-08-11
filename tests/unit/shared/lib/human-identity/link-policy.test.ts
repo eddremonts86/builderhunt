@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 3 — the pure decision layer behind identity linking.
+ * plans/implemented/43-solutions-intelligence Phase 3 — the pure decision layer behind identity linking.
  *
  * `tests/unit/security/human-identity-linking.test.ts` proves the behaviour end to end against a
  * real database. This file covers the edges that never reach the database: score clamping, the

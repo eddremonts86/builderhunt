@@ -3,7 +3,7 @@
 ## Notifications
 
 `src/shared/lib/billing/notifications.ts`'s `runNotificationSweep` covers all seven message types
-plans/phase-1/30-stripe-billing-platform/tasks.md §10 names — renewal, grace, action-required, expiry-30/7/1
+plans/implemented/30-stripe-billing-platform/tasks.md §10 names — renewal, grace, action-required, expiry-30/7/1
 (three windows, one message family), refund, dispute, reconciliation — using the same O(organizations)
 cross-org sweep pattern `reconciliation.ts`/`operations-metrics.ts` already establish. It deliberately
 does **not** modify any existing writer (`webhook-handlers.ts`, `refunds.ts`, `disputes.ts`,

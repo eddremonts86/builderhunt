@@ -2,7 +2,7 @@
 
 > Companion to [`src/lib/enrichment/policies.ts`](../../src/lib/enrichment/policies.ts)
 > (the compile-time enforcement point) and
-> [`plans/phase-1/42-stealth-scraping/spec.md`](../../plans/phase-1/42-stealth-scraping/spec.md) §4.
+> [`plans/implemented/42-stealth-scraping/spec.md`](../../plans/implemented/42-stealth-scraping/spec.md) §4.
 > Every connector registered in `policies.ts` must have exactly one entry below.
 > An entry with status `blocked` has no approval date and no lawful-basis reference.
 
@@ -121,7 +121,7 @@
 
 ## Runtime adversarial matrix — run 2026-08-05
 
-Evidence for `plans/phase-1/42-stealth-scraping/task.md` Phase 7, "Run runtime adversarial matrix".
+Evidence for `plans/implemented/42-stealth-scraping/task.md` Phase 7, "Run runtime adversarial matrix".
 Reproduce with `pnpm test:enrichment-matrix:local`
 ([`scripts/ops/run-enrichment-matrix-local.sh`](../../scripts/ops/run-enrichment-matrix-local.sh) →
 [`scripts/ops/verify-enrichment-adversarial-local.mjs`](../../scripts/ops/verify-enrichment-adversarial-local.mjs)).

@@ -1,7 +1,7 @@
 # Specification: Evidence-led conversion audit
 
 > **Status**: `partially-implemented`
-> **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md)
+> **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md), [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md)
 > **Blocks**: nothing
 > **Reality check**: The home page already renders real desktop/mobile product screenshots from `public/images/search-desktop.png` and `public/images/search-mobile.png`, open signup at `/auth/sign-up`, and guest discovery at `/explore`. `src/modules/landing/components/HomePage.tsx` still hides `/explore` from the hero, shows an unverifiable anonymous quote, and renders a newsletter-like email control without a form handler or persistence; no conversion instrumentation exists.
 

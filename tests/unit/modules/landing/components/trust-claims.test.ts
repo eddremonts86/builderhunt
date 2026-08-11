@@ -11,7 +11,7 @@ function read(relativePath: string): string {
 }
 
 /**
- * Regression guard for plans/phase-1/52-audit-trust: every one of these was a
+ * Regression guard for plans/implemented/52-audit-trust: every one of these was a
  * real, live claim on the landing page that didn't match runtime behavior
  * (a fabricated JSON-LD rating, an invented user quote, unverifiable scale
  * numbers, a submit-less email form, and copy describing a user-suppliable

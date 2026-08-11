@@ -32,7 +32,7 @@ parallel deliberately: queued, they add three weeks for no reason.
   - Verify: `pnpm test:visual` run against the deployed URL reports zero unexpected diffs, and
     `docs/visual-system.md` records the date, the commit and any accepted difference with its reason.
   - Operator: needs a deployed release to compare against.
-  - Moved from `plans/phase-1/50-audit-visual-system` on 2026-07-29 — it waits on production, not on work.
+  - Moved from `plans/implemented/50-audit-visual-system` on 2026-07-29 — it waits on production, not on work.
 
 
 ## Phase 2–3 — start the clocks, then wait
@@ -55,7 +55,7 @@ parallel deliberately: queued, they add three weeks for no reason.
     manual jobs; batch 2.
   - Verify: spec SLOs, no critical policy/privacy/isolation incident, zero blocked-host
     requests, and zero overdue retention rows.
-  - Moved from `plans/phase-1/42-stealth-scraping` on 2026-07-29 — it waits on production, not on work.
+  - Moved from `plans/implemented/42-stealth-scraping` on 2026-07-29 — it waits on production, not on work.
 
 - [ ] **Approve the Solutions source and domain register**
   - Files: `docs/operations/solutions-source-register.md`, `docs/operations/solutions-domain-policy.md`
@@ -67,7 +67,7 @@ parallel deliberately: queued, they add three weeks for no reason.
     **disabled by default** with a per-source toggle in Admin → Solutions sources, so enabling one is
     an explicit maintainer act and this register is the record of why it was allowed. An agent can
     build the switch; it cannot decide that scraping a given site is lawful.
-  - Moved from `plans/phase-1/43-solutions-intelligence` Phase 0 on 2026-08-01 at the maintainer's
+  - Moved from `plans/implemented/43-solutions-intelligence` Phase 0 on 2026-08-01 at the maintainer's
     direction — it waits on a human decision, not on work, and blocking the whole module's
     engineering on it was stopping real progress.
 
@@ -91,7 +91,7 @@ parallel deliberately: queued, they add three weeks for no reason.
   - Do: expand audience without enabling scheduled refresh or new connectors.
   - Verify: one authorized production job reaches terminal state and renders attributed,
     non-expired evidence with redacted logs.
-  - Moved from `plans/phase-1/42-stealth-scraping` on 2026-07-29 — it waits on production, not on work.
+  - Moved from `plans/implemented/42-stealth-scraping` on 2026-07-29 — it waits on production, not on work.
 
 - [ ] **Roll out source by source without weakening enforcement** — not attempted
   - Files: `docs/operations/` (the rollout record), `.env.production.example`
@@ -104,7 +104,7 @@ parallel deliberately: queued, they add three weeks for no reason.
   - Operator: turning `PROFILE_REMOVAL_ENABLED` on in production is a maintainer decision, and the
     kill switch is the safety net until it is made. Both tasks above are meaningful only once that
     decision exists — do not enable it to make a test pass.
-  - Moved from `plans/phase-1/52-audit-trust` on 2026-07-29 — it waits on production, not on work.
+  - Moved from `plans/implemented/52-audit-trust` on 2026-07-29 — it waits on production, not on work.
 
 
 - [ ] **Decide the public indexing posture for /blog, /changelog and /roadmap**
@@ -143,7 +143,7 @@ them was verified as far as engineering can take it, and each note below says ex
   - Operator: nothing was frozen, so there is nothing to unfreeze — what remains is the waiting. The
     03:00 schedule was created on the PG18 resource on 2026-08-05 and there is no v1 API endpoint to
     trigger a backup, so the first one cannot exist before the following morning.
-  - Moved from `plans/phase-1/03-postgres-18-upgrade` Phase 4 on 2026-08-05 — it waits on a clock.
+  - Moved from `plans/implemented/03-postgres-18-upgrade` Phase 4 on 2026-08-05 — it waits on a clock.
 
 - [ ] **Retire the pg16 resource on a schedule, not immediately**
   - Files: `docs/operations/deploy-runbook.md`
@@ -155,7 +155,7 @@ them was verified as far as engineering can take it, and each note below says ex
     still running, un-repointed, as the only rollback.
   - The doc half is done: the runbook's image line, its "status: not executed" block and its
     troubleshooting row all named `pg16` after the cutover had happened, and were corrected 2026-08-05.
-  - Moved from `plans/phase-1/03-postgres-18-upgrade` Phase 4 on 2026-08-05 — it waits on a clock.
+  - Moved from `plans/implemented/03-postgres-18-upgrade` Phase 4 on 2026-08-05 — it waits on a clock.
 
 - [ ] **Walk the authenticated app against the PG18 production database**
   - Files: none (manual)
@@ -172,7 +172,7 @@ them was verified as far as engineering can take it, and each note below says ex
     decimals** on pg16 and pg18.
   - **This is the same walk as the task below.** One browser pass closes both; they are two plans
     describing one action.
-  - Moved from `plans/phase-1/03-postgres-18-upgrade` Phase 3 on 2026-08-05 — it waits on a person.
+  - Moved from `plans/implemented/03-postgres-18-upgrade` Phase 3 on 2026-08-05 — it waits on a person.
 
 - [ ] **Smoke-test the core authenticated funnel on production**
   - Files: none (manual)
@@ -212,7 +212,7 @@ them was verified as far as engineering can take it, and each note below says ex
     configuration divergence from the plan, not an unapproved crawl. Set to `false` on the production row
     and the container redeployed so the value is in effect rather than only stored; the preview row stays
     `true`, since preview is the non-production environment the adversarial matrix requires.
-  - Moved from `plans/phase-1/42-stealth-scraping` Phase 7 on 2026-08-05 — it waits on a deploy.
+  - Moved from `plans/implemented/42-stealth-scraping` Phase 7 on 2026-08-05 — it waits on a deploy.
 
 - [ ] **Roll out the interview flags in dependency order**
   - Files: `docs/operations/interview-runtime-verification.md`, `.env.production.example`, production
@@ -224,11 +224,11 @@ them was verified as far as engineering can take it, and each note below says ex
     alerts, the disable path, backup/restore, purge, and provider-region checks all remain green.
   - Operator: a staged production rollout with observation windows — elapsed time plus a maintainer's
     judgement at each gate.
-  - Moved from `plans/phase-1/44-calendar-scheduling-interview-intelligence` Phase 12 on 2026-08-05.
+  - Moved from `plans/implemented/44-calendar-scheduling-interview-intelligence` Phase 12 on 2026-08-05.
 
 - [ ] **Close the interview Definition of Done with runtime evidence**
   - Files: `docs/operations/interview-runtime-verification.md`,
-    `plans/phase-1/44-calendar-scheduling-interview-intelligence/{spec,plan,tasks}.md`
+    `plans/implemented/44-calendar-scheduling-interview-intelligence/{spec,plan,tasks}.md`
   - Do: Attach dated evidence for email-to-booking, DST, race safety, scan/extraction/brief, a real
     30-minute bilingual live interview, reconnect/correction/report, credits/payment/refund/
     reconciliation, purge/export/delete, tenant and private-user isolation, restore, dashboards, and
@@ -237,7 +237,7 @@ them was verified as far as engineering can take it, and each note below says ex
     every production flag intended for general availability enabled intentionally.
   - Operator: needs real consented use of the live product, including an actual bilingual interview. It is
     the last item of the interview plan by construction.
-  - Moved from `plans/phase-1/44-calendar-scheduling-interview-intelligence` Phase 12 on 2026-08-05.
+  - Moved from `plans/implemented/44-calendar-scheduling-interview-intelligence` Phase 12 on 2026-08-05.
 
 ## Phase 4d — invisible partials, found and moved in on 2026-08-05
 
@@ -250,7 +250,7 @@ and incomplete at the same time. Found by auditing for the marker instead of tru
   - Do: apply the documented `log-opts` to the Docker daemon on the host and verify it took effect.
   - Verify: the runbook's own verification command reports the configured limits on the running daemon.
   - Operator: root SSH on the Hetzner VPS.
-  - Moved from `plans/phase-1/02-production-infrastructure` on 2026-08-05.
+  - Moved from `plans/implemented/02-production-infrastructure` on 2026-08-05.
 
 - [ ] **Run the live Denmark canary and staged rollout**
   - Files: `docs/operations/stripe-live-rollout.md`, `docs/operations/stripe-live-readiness.md`
@@ -262,7 +262,7 @@ and incomplete at the same time. Found by auditing for the marker instead of tru
   - Operator: real money — a live catalog, a real customer, a real charge, a real refund, a real payout.
     Seven of the original nine observations were split out and closed on 2026-08-04; these are the two no
     engineering can produce.
-  - Moved from `plans/phase-1/30-stripe-billing-platform` on 2026-08-05.
+  - Moved from `plans/implemented/30-stripe-billing-platform` on 2026-08-05.
 
 - [ ] **Run the real browser capture beta verification**
   - Files: `docs/operations/interview-runtime-verification.md`
@@ -272,7 +272,7 @@ and incomplete at the same time. Found by auditing for the marker instead of tru
   - Verify: every cell of the matrix has a result, every measurement a number, and each of the four
     inspections a recorded observation.
   - Operator: needs hardware and human participants. The procedure itself is complete (`d6b1833`).
-  - Moved from `plans/phase-1/44-calendar-scheduling-interview-intelligence` on 2026-08-05.
+  - Moved from `plans/implemented/44-calendar-scheduling-interview-intelligence` on 2026-08-05.
 
 ## Phase 4c — cohort rollouts moved in on 2026-08-05
 

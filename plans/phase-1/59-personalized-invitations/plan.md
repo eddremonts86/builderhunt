@@ -1,7 +1,7 @@
 # Personalized organization invitations — Delivery Plan
 
 > **Status**: `pending`
-> **Depends on**: [`27-team-accounts`](../27-team-accounts/spec.md)
+> **Depends on**: [`27-team-accounts`](../../implemented/27-team-accounts/spec.md)
 > **Blocks**: nothing
 > **Reality check**: implementation extends the current organization lifecycle, invitation
 > routes, Team settings page, email sender, and `/onboarding/search` route. It does not create a

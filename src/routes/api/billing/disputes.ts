@@ -6,7 +6,7 @@ import { canReadBillingSummary } from '~/shared/lib/billing/permissions'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 
 /**
- * Owner-facing dispute visibility (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 2) — the admin
+ * Owner-facing dispute visibility (plans/implemented/30-stripe-billing-platform/tasks.md §9 task 2) — the admin
  * `api/admin/billing/disputes.ts` route is platform-operator, cross-org; this one is tenant-scoped
  * (`billing:read`, matching every other financial-summary read) so an organization can see its own
  * chargebacks without a second, admin-only surface. Pack disputes only — see `billing/disputes.ts`'s

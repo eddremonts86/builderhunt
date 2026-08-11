@@ -1,7 +1,7 @@
 # Tareas — generación y adaptación de CV con IA
 
 > **Status**: `pending`
-> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md) (sólo fases 7–8), [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md), [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md)
+> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md) (sólo fases 7–8), [`ai-expansion`](../../implemented/21-ai-expansion/spec.md), [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md)
 > **Blocks**: [`delegated-job-applications`](../delegated-job-applications/spec.md)
 > **Reality check**: `candidate_documents` **no** puede almacenar el CV de una persona (`submission_id uuid NOT NULL` con FK compuesta a `candidate_submissions`); este plan crea `career_documents`/`career_document_extractions` propias con el mismo diseño. Del foundation de documentos sólo existen el schema (`drizzle/0084`/`0085`, ya commiteados) y el contrato de tipos `src/lib/storage/types.ts`: no hay adaptador, scanner, parser ni worker. Las fases 1–5 y 7–8 no dependen de nada de eso.
 

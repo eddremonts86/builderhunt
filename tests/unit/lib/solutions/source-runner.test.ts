@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 4 — the adapter runner's gates, and the crawl
+ * plans/implemented/43-solutions-intelligence Phase 4 — the adapter runner's gates, and the crawl
  * adapter's safety envelope.
  *
  * The runner holds every gate so no adapter has to remember one. These tests are what stop a future

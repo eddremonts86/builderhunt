@@ -11,7 +11,7 @@ import { methodNotAllowedAfter } from '~/shared/lib/http/method-not-allowed'
  * Point an external scheduler (systemd timer, Coolify scheduled task, or a
  * plain `curl -X POST` in a crontab authenticated as an admin) at this
  * endpoint every 15 minutes — same crontab as the alerts and embeddings
- * workers (see plans/phase-1/23-proactive-discovery/spec.md §3).
+ * workers (see plans/implemented/23-proactive-discovery/spec.md §3).
  */
 export const Route = createFileRoute('/api/admin/discovery/run-worker')({
   component: () => null,

@@ -117,5 +117,5 @@ in.
 | Is a fundamental-rights impact assessment required? | — | — | — |
 
 Related: `docs/operations/solutions-security-review.md` (open item 2),
-`plans/phase-1/43-solutions-intelligence/tasks.md` (Phase 7),
+`plans/implemented/43-solutions-intelligence/tasks.md` (Phase 7),
 `docs/compliance/interview-ai-act-classification.md` (the same exercise for the interview module).

@@ -1,6 +1,6 @@
 /**
  * Top-author enrichment in the Hugging Face connector
- * (plans/phase-1/13-huggingface-integration/tasks.md — "Enrich top authors with avatar + real followers").
+ * (plans/implemented/13-huggingface-integration/tasks.md — "Enrich top authors with avatar + real followers").
  *
  * The connector's own contract is that enrichment is *decoration*: it upgrades the top authors when Hugging
  * Face answers, and produces byte-identical output when it does not. Both halves are asserted here, because

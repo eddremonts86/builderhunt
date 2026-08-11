@@ -124,7 +124,7 @@ marks the checkboxes `[x]` and the status headers to match.
 
 - **Plan 30, task 10 (Certify Stripe sandbox)** — partial
   progress (real-provider test, CI workflow). The remaining
-  e2e spec is in scope for `plans/phase-1/53-exhaustive-local-e2e-design/`,
+  e2e spec is in scope for `plans/implemented/53-exhaustive-local-e2e-design/`,
   which is in-progress as untracked work.
 - **Plan 30, task 11 (Run live Denmark canary)** — requires
   live Stripe credentials and a deployment slot, both outside

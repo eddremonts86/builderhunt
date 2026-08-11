@@ -1,8 +1,8 @@
 # Performance and QA Release Gate
 
 > **Status**: `partially-implemented`
-> **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md)
-> **Blocks**: [`audit-trust`](../52-audit-trust/spec.md), [`audit-visual-system`](../50-audit-visual-system/spec.md)
+> **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md)
+> **Blocks**: [`audit-trust`](../../implemented/52-audit-trust/spec.md), [`audit-visual-system`](../../implemented/50-audit-visual-system/spec.md)
 > **Reality check**: The active hero is `src/modules/landing/components/HomePage.tsx`, not
 > `src/routes/_landing/index.tsx`, and it renders `public/images/search-desktop.png` (983 KiB,
 > 2774×2110) plus `search-mobile.png` (749 KiB, 1212×2380). Both have dimensions and loading

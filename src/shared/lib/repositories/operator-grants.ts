@@ -1,6 +1,6 @@
 /**
  * The canonical operator grant: a platform admin setting an organization's entitlement by hand
- * (plans/phase-1/30-stripe-billing-platform §10 "Contract legacy schema only after the compatibility window").
+ * (plans/implemented/30-stripe-billing-platform §10 "Contract legacy schema only after the compatibility window").
  *
  * ## What this replaces, and why it is a build rather than a delete
  *

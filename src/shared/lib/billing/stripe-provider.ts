@@ -1,6 +1,6 @@
 /**
  * The one call site that decides which `BillingProvider` implementation backs the whole billing
- * platform (plans/phase-1/30-stripe-billing-platform/tasks.md §5 "Create organization Stripe Customers
+ * platform (plans/implemented/30-stripe-billing-platform/tasks.md §5 "Create organization Stripe Customers
  * idempotently"). `.env.example` is explicit: "keep STRIPE_BILLING_ENABLED=false ... until §7
  * gates pass" — every other billing module already calls through this seam (or accepts an
  * injected `BillingProvider` directly in tests), so swapping fake for real here needed no

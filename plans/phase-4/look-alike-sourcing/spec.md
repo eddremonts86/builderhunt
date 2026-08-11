@@ -1,7 +1,7 @@
 # Look-alike Sourcing (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`semantic-search`](../../phase-1/22-semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW — already shipped); [`proactive-discovery`](../../phase-1/23-proactive-discovery/spec.md) (index breadth; already shipped — a thin index makes look-alikes weak but must not break them). Enhanced by [`collaboration-graph`](../collaboration-graph/spec.md) and [`availability-signals`](../availability-signals/spec.md) (neither is required).
+> **Depends on**: [`semantic-search`](../../implemented/22-semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW — already shipped); [`proactive-discovery`](../../implemented/23-proactive-discovery/spec.md) (index breadth; already shipped — a thin index makes look-alikes weak but must not break them). Enhanced by [`collaboration-graph`](../collaboration-graph/spec.md) and [`availability-signals`](../availability-signals/spec.md) (neither is required).
 > **Blocks**: nothing
 > **Reality check**: The vector substrate already ships: `builder_embeddings` (global, `unique(source, source_id)`, HNSW cosine index — `src/shared/lib/db/schema.ts` §"Semantic Search", `drizzle/0013_polite_night_thrasher.sql`), `findSimilarBuilderEmbeddings(queryVector, limit)` + the exported `similarBuilderEmbeddingsQuery(db, vector, limit)` builder (`src/shared/lib/repositories/public-builder-embeddings.ts`), the write-through indexer (`src/lib/semantic/index-writer.ts`), the embed worker (`src/routes/api/admin/embeddings/run-worker.ts`), and the query path (`src/lib/semantic/semantic-search.ts`, `src/routes/api/search/semantic.ts`). This plan adds **no table, no migration, no new env var, and no entry in `AI_TASKS`**: a second query mode over the same index (vector-as-seed instead of query-as-seed), a pure hybrid re-ranker, and an identity-collapse step.
 > **Inherited premise (verified at HEAD 2026-07-27)**: the HNSW ordering defect this plan used to own is **already fixed and landed** (commit `24a280b`). `similarBuilderEmbeddingsQuery` orders by `asc(distance)` with ``sql`1 - (${distance})` `` kept as a *selected* `similarity` column, and `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts` EXPLAINs the emitted SQL under `enable_seqscan = off` to assert `Index Scan using builder_embeddings_hnsw_idx` (plus a negative control on the old derived-descending shape). This plan **asserts** that shape and does not re-apply it — see "The HNSW ordering fix already landed".
@@ -30,7 +30,7 @@ profiles at the top, which reads as broken.
 
 - **No federated/keyword fallback.** "More like this" has no keyword form — the seed *is* a vector.
   Turning a whole profile into a keyword query is exactly what
-  [`ai-sourcing-sprints`](../../phase-1/41-ai-sourcing-sprints/spec.md) already does, so the thin-index state
+  [`ai-sourcing-sprints`](../../implemented/41-ai-sourcing-sprints/spec.md) already does, so the thin-index state
   links to "start a sprint" instead of inventing a worse second fallback. Deliberate, not an
   omission.
 - No URL, file, or résumé ingestion — pasted **text only**. Server-side URL fetching is an SSRF

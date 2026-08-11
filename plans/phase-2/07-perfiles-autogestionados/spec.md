@@ -6,9 +6,9 @@
 >   - [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md) (segmento `building` ya definido)
 >   - [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md) (existing dashboard registry and preferences)
 >   - [`06-landing-segmentada`](../06-landing-segmentada/spec.md) (typed building landing contract)
->   - [`../phase-1/36-claimable-profiles/spec.md`](../../phase-1/36-claimable-profiles/spec.md) (modelo de `builder_claims` y DTOs públicos)
->   - [`../phase-1/37-portfolio-builder/spec.md`](../../phase-1/37-portfolio-builder/spec.md) (superficie de portfolio público, esquema v1)
->   - [`../phase-1/38-work-sample/spec.md`](../../phase-1/38-work-sample/spec.md) (modelo de evidencias/adjuntos)
+>   - [`../phase-1/36-claimable-profiles/spec.md`](../../implemented/36-claimable-profiles/spec.md) (modelo de `builder_claims` y DTOs públicos)
+>   - [`../phase-1/37-portfolio-builder/spec.md`](../../implemented/37-portfolio-builder/spec.md) (superficie de portfolio público, esquema v1)
+>   - [`../phase-1/38-work-sample/spec.md`](../../implemented/38-work-sample/spec.md) (modelo de evidencias/adjuntos)
 > **Blocks**: nothing
 > **Reality check**: El segmento `building` se describe en
 > `plans/phase-2/01-investigacion-icp/spec.md` y

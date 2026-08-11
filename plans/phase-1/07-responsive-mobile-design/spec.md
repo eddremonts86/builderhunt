@@ -6,7 +6,7 @@
 > broken shell)
 > **Blocks**: nothing directly, but every future UI task inherits whatever shell/nav pattern this
 > plan lands, so land Phase 1 early relative to other in-flight UI-heavy plans
-> **Overlap note**: [`audit-visual-system`](../50-audit-visual-system/spec.md) (`partially-implemented`)
+> **Overlap note**: [`audit-visual-system`](../../implemented/50-audit-visual-system/spec.md) (`partially-implemented`)
 > already has an unchecked task, "Normalize the dashboard shell without hiding navigation," that
 > targets the same file (`DashboardLayout.tsx`) with the same requirement ("at 320/390 px every nav
 > action is reachable by keyboard and pointer"). That plan bundles this alongside canonical
@@ -92,7 +92,7 @@ and above) must not regress — this plan adds narrow-viewport handling, it does
   "dashboard redesign" plan — this plan works within those tokens, not against them.
 - Rebuilding pages that already reflow correctly today (confirmed: landing home, `/explore`, sprint
   wizard step 1) — only touch what the audit in this spec + Phase 0's sweep actually finds broken.
-- A native mobile app, or any change to `plans/phase-1/02-production-infrastructure`'s deployment target.
+- A native mobile app, or any change to `plans/implemented/02-production-infrastructure`'s deployment target.
 - Any change to desktop (`lg:`/`xl:`) layout or breakpoint values.
 - **New automated viewport/visual-regression tests (e.g. Playwright).** Per standing project
   direction earlier in this same working session, this repo does not add new e2e test suites for UI

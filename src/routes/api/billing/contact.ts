@@ -13,7 +13,7 @@ import { env } from '~/shared/lib/env'
 const SetContactBody = z.object({ email: z.string().email() }).strict()
 
 /**
- * Verified billing contact (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 4). GET is owner/admin
+ * Verified billing contact (plans/implemented/30-stripe-billing-platform/tasks.md §9 task 4). GET is owner/admin
  * read-only (`billing:read`, matching the rest of the financial summary); PUT is owner + recent-auth
  * (`billing:contact`, matching payment-method-adjacent mutations) and starts a NEW verification —
  * the previous contact (verified or not) is immediately replaced.

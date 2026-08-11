@@ -11,7 +11,7 @@
  * `builders.metadata.aiEnrichment` jsonb column. That table is no longer
  * the live write path for newly tracked builders (security-and-multitenancy
  * migration moved tracking to `organization_builders` + `builder_identities`
- * — see plans/phase-1/01-security-and-multitenancy). This plan's persistence instead
+ * — see plans/implemented/01-security-and-multitenancy). This plan's persistence instead
  * targets `organization_builders.privateMetadata.aiEnrichment`, mirroring
  * where topics/language/country overrides already live for tracked
  * builders (see organization-builders.ts). The schemas/thresholds below are

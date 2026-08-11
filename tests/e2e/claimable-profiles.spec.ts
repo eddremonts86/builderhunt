@@ -1,6 +1,6 @@
 /**
  * The builder-claim lifecycle over real HTTP — plan 36's last open task
- * (`plans/phase-1/36-claimable-profiles/tasks.md`).
+ * (`plans/implemented/36-claimable-profiles/tasks.md`).
  *
  * The flow was live-verified by hand when it was built (real dev server, real Postgres rows, a real
  * unmodified public GitHub profile), so the behaviour was already proven. What was missing, and what this

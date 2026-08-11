@@ -7,7 +7,7 @@
 > `src/shared/lib/repositories/platform-billing.ts`, `src/shared/lib/billing-shared.ts`, the
 > `plans`/`plan_changes`/`plan_requests` tables, `/pricing`, `/settings/billing`, and the platform
 > plan-request UI. Organization entitlements now exist and the approved replacement is
-> [`stripe-billing-platform`](../30-stripe-billing-platform/spec.md).
+> [`stripe-billing-platform`](../../implemented/30-stripe-billing-platform/spec.md).
 
 ## Supersession decision
 
@@ -17,7 +17,7 @@ design is unsafe for organization subscriptions, annual monthly credits, prorati
 disputes, tax, and synchronous provider-cost authorization.
 
 All future billing implementation is owned by
-[`stripe-billing-platform`](../30-stripe-billing-platform/spec.md). It migrates the delivered artifacts
+[`stripe-billing-platform`](../../implemented/30-stripe-billing-platform/spec.md). It migrates the delivered artifacts
 rather than rebuilding or silently deleting them. No unchecked task remains executable here.
 
 ## Delivered inventory
@@ -42,4 +42,4 @@ rather than rebuilding or silently deleting them. No unchecked task remains exec
 ## Archived discovery
 
 The original Spanish payment-flow analysis is preserved outside the executable plan directory at
-[`docs/archive/pricing-and-billing-process-analysis.txt`](../../docs/archive/pricing-and-billing-process-analysis.txt).
+[`docs/archive/pricing-and-billing-process-analysis.txt`](../../../docs/archive/pricing-and-billing-process-analysis.txt).

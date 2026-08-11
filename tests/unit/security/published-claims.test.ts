@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The drift contract `plans/phase-1/52-audit-trust` deferred.
+ * The drift contract `plans/implemented/52-audit-trust` deferred.
  *
  * That plan shipped `trust-claims.test.ts`, which pins the specific false claims one pass removed from
  * the landing page, and recorded the general version as still open: *"a true generic 'any displayed

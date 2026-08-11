@@ -1,5 +1,5 @@
 /**
- * Signed, durable Stripe webhook receipt (plans/phase-1/30-stripe-billing-platform/tasks.md §6 "Implement
+ * Signed, durable Stripe webhook receipt (plans/implemented/30-stripe-billing-platform/tasks.md §6 "Implement
  * signed durable Stripe webhook receipt"; spec.md §Webhook and consistency contract). Verifies the
  * raw request body's `Stripe-Signature` header — trying the current signing secret and, during a
  * rotation window, the previous one too — rejects a livemode/API-version mismatch, then inserts one

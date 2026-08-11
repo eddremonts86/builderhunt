@@ -1,7 +1,7 @@
 # ATS Integrations (Greenhouse, Lever, Ashby) (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md) (hard — the pipeline stage model this plan maps external ATS status onto); [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md) (per-organization third-party credentials, RLS, tenant-scoped sync state); [`stripe-billing-platform`](../../phase-1/30-stripe-billing-platform/spec.md) (the Team-tier gate this feature sells into does not bill anyone yet); [`legal-and-compliance`](../../phase-1/04-legal-and-compliance/spec.md) (candidate data leaving the product to a third-party processor).
+> **Depends on**: [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md) (hard — the pipeline stage model this plan maps external ATS status onto); [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md) (per-organization third-party credentials, RLS, tenant-scoped sync state); [`stripe-billing-platform`](../../implemented/30-stripe-billing-platform/spec.md) (the Team-tier gate this feature sells into does not bill anyone yet); [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md) (candidate data leaving the product to a third-party processor).
 > **Blocks**: nothing
 > **Reality check**: No ATS code, no per-tenant third-party credential storage, and no general-purpose secret encryption exist. The only encryption helper in the repo is `src/shared/lib/crypto/webhook-payload.ts`, whose own doc comment says "this is not a general-purpose encryption utility" and which is keyed on `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` (only required when `STRIPE_BILLING_ENABLED=true`). The reusable foundations are real: the provider-contract + deterministic-fake + shared-contract-suite pattern in `src/shared/lib/billing/{provider.ts,fake-provider.ts,provider-contract-suite.ts}`, the connector registry in `src/lib/enrichment/registry.ts`, the lease/backoff worker in `src/lib/enrichment/worker.ts` + `src/shared/lib/repositories/enrichment-worker.ts`, the cross-org worker sweep in `src/shared/lib/repositories/billing-worker.ts`, and the notification-dedup idea in `src/shared/lib/billing/notifications.ts`. Re-verified against
 `master` on 2026-07-27: still no `src/lib/ats/`, no `secret-box.ts`, no `integration:*` permission,
@@ -35,7 +35,7 @@ pipeline, and `src/lib/score.ts` has **zero outcome labels** to be evaluated aga
 - **Not an ATS.** No job/req creation, offers, scorecards, interview kits, feedback, EEO or
   demographic data, approvals, or job-board publishing.
 - **Not a two-way source of truth for interview scheduling.**
-  [`calendar-scheduling-interview-intelligence`](../../phase-1/44-calendar-scheduling-interview-intelligence/spec.md)
+  [`calendar-scheduling-interview-intelligence`](../../implemented/44-calendar-scheduling-interview-intelligence/spec.md)
   owns availability, booking, transcription and interview reports, and lists "a general ATS" as its
   own non-goal. Boundary: **this plan never reads or writes interview events, times, attendees,
   transcripts, or reports in either direction.** The only thing that crosses is the candidate's
@@ -555,7 +555,7 @@ acknowledge a versioned disclosure listing the exact field allowlist and stating
 vendor becomes an independent controller under the customer's own agreement with that vendor.
 Recorded as `disclosureVersion` + `disclosureAcknowledgedAt` on `ats_connections` (per organization
 per provider — not `user_consents`, which is account-subject scoped).
-[`legal-and-compliance`](../../phase-1/04-legal-and-compliance/spec.md)'s privacy-policy processor list gains
+[`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md)'s privacy-policy processor list gains
 "customer-configured ATS (Greenhouse / Lever / Ashby) — recipient of candidate data you choose to
 export".
 

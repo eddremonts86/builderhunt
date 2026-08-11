@@ -1,7 +1,7 @@
 # Plan de entrega — workspace interno de ofertas de trabajo
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md), [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md), [`stealth-scraping`](../../phase-1/42-stealth-scraping/spec.md), [`stripe-billing-platform`](../../phase-1/30-stripe-billing-platform/spec.md)
+> **Depends on**: [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md), [`ai-expansion`](../../implemented/21-ai-expansion/spec.md), [`stealth-scraping`](../../implemented/42-stealth-scraping/spec.md), [`stripe-billing-platform`](../../implemented/30-stripe-billing-platform/spec.md)
 > **Blocks**: [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), [`delegated-job-applications`](../delegated-job-applications/spec.md)
 > **Reality check**: Crea un dominio nuevo (`src/shared/lib/jobs/`, `src/lib/jobs/`, `src/modules/jobs/`, cuatro tablas) y reutiliza sin duplicar: `safeFetch` (`src/lib/enrichment/network.ts`), `isPathAllowedByRobots` (`src/lib/enrichment/robots.ts`), `HARD_BLOCKED_CONNECTOR_IDS` (`src/lib/enrichment/policies.ts`), `validateExternalHttpUrl` (`src/shared/lib/security/url-policy.ts`), el registro IA (`src/shared/lib/ai/tasks.ts`), la reserva/settlement de créditos (`src/shared/lib/billing/feature-authorization.ts`, `src/shared/lib/billing/rate-cards.ts`), el patrón de lease de `enrichment_jobs` y el worker HTTP de `src/routes/api/admin/alerts/run-worker.ts`. No toca `candidate_*`, `organization_builders`, `pipeline_*` ni `job_runs` (salvo escribir una fila por ejecución vía `withJobRun`).
 

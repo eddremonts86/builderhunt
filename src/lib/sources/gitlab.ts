@@ -22,7 +22,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  *
  * Quota: 2000 req/h unauth, 6000/h with GITLAB_TOKEN.
  *
- * Spec reference: plans/phase-1/09-gitlab-integration/spec.md
+ * Spec reference: plans/implemented/09-gitlab-integration/spec.md
  */
 /** Shape of `GET /api/v4/search?scope=users` — a lean directory match, not a full user profile
  * (no bio, no followers — GitLab doesn't expose follower counts on any endpoint). */

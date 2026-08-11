@@ -126,7 +126,7 @@ const classifications: Classification[] = [
   // unsubscribe token, the raw token only ever appears once, in the unsubscribe URL.
   operational('status_subscribers', 'email_lower (unsubscribe_token_hash is the only bearer secret)', ['status-and-trust']),
 
-  // Calendar and scheduling (plans/phase-1/44-calendar-scheduling-interview-intelligence).
+  // Calendar and scheduling (plans/implemented/44-calendar-scheduling-interview-intelligence).
   //
   // Classified ahead of the rest of the unclassified set — roughly fifty tables across billing,
   // enrichment, sprints and abuse still have no entry — because these ten already carry RLS and
@@ -247,7 +247,7 @@ const classifications: Classification[] = [
     retention: 'retention_expires_at; keyed to the event rather than the session so a report survives its session being reclaimed',
   }),
 
-  // Semantic search and proactive discovery (plans/phase-1/22-semantic-search, 23-proactive-discovery).
+  // Semantic search and proactive discovery (plans/implemented/22-semantic-search, 23-proactive-discovery).
   //
   // `builder_embeddings` is the global pgvector index, written by the write-through path that fires
   // after every search/track request and by the proactive-discovery worker. The data inside is a

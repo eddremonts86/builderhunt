@@ -1,7 +1,7 @@
 # Why This Match — Evidence Panel (plan)
 
 > **Status**: `pending`
-> **Depends on**: nothing (pure read-only consumer of `src/lib/score.ts` and `builder_source_snapshots`). Files new connector findings against [`audit-trust`](../../phase-1/52-audit-trust/spec.md) and must respect [`project-hygiene`](../../phase-1/05-project-hygiene/spec.md) (no synthetic evidence presented as measured fact).
+> **Depends on**: nothing (pure read-only consumer of `src/lib/score.ts` and `builder_source_snapshots`). Files new connector findings against [`audit-trust`](../../implemented/52-audit-trust/spec.md) and must respect [`project-hygiene`](../../implemented/05-project-hygiene/spec.md) (no synthetic evidence presented as measured fact).
 > **Blocks**: [`jd-to-candidates-matching`](../jd-to-candidates-matching/spec.md) (soft — that plan reuses this panel to explain per-JD match reasons); [`browser-extension-overlay`](../browser-extension-overlay/spec.md) (soft — it reads `src/lib/score.ts`, so land Phase 1 first)
 > **Reality check**: `src/lib/score.ts` returns one integer and now branches over **15** sources; `getScoreBreakdown` (`src/components/ui/score-ring.tsx:158`) is a drifted second copy feeding the ring tooltip; `SearchPage.tsx:1408` already renders a one-line "why this match"; `builder_source_snapshots` is migrated (`drizzle/0005_builder_normalization.sql`) but has no reader, no writer, and no `builderhunt_app` grant.
 
@@ -114,7 +114,7 @@ data.
    `docs/architecture/authorization-matrix.md` (new route) per `security-policy.md` release gate 9.
 5. File the connector defects the panel exposes (Stack Overflow synthetic `lastSeen`, HN
    query-echo topics, Reddit `t2` field mismatch, cross-source handle merge) as follow-up findings
-   in `plans/phase-1/52-audit-trust/tasks.md`.
+   in `plans/implemented/52-audit-trust/tasks.md`.
 
 **Ships**: release-gate clean.
 

@@ -1,5 +1,5 @@
 /**
- * Capped auto-recharge and SCA recovery (plans/phase-1/30-stripe-billing-platform/tasks.md §8 task 2
+ * Capped auto-recharge and SCA recovery (plans/implemented/30-stripe-billing-platform/tasks.md §8 task 2
  * "Implement capped auto-recharge and SCA recovery"; spec.md §Packs and auto-recharge). One rule row
  * per organization (`billing_auto_recharge_rules.organization_id` is its own primary key) — off by
  * default (`enabled: false`, `state: 'inactive'`), owner-only, and requires a fresh sign-in at the

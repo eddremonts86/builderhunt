@@ -13,7 +13,7 @@
 > monitoring prod analytics day-to-day). None of it is code. Reviewed 2026-07-25 and left
 > as-is — this plan is the founder's own launch runbook to execute, not an implementation
 > task queue.
-> **Depends on**: [`production-infrastructure`](../02-production-infrastructure/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md), [`public-landing-pages`](../45-public-landing-pages/spec.md), [`content-marketing`](../46-content-marketing/spec.md), [`status-and-trust`](../47-status-and-trust/spec.md), [`pricing-and-billing`](../31-pricing-and-billing/spec.md)
+> **Depends on**: [`production-infrastructure`](../../implemented/02-production-infrastructure/spec.md), [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md), [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md), [`content-marketing`](../../implemented/46-content-marketing/spec.md), [`status-and-trust`](../../implemented/47-status-and-trust/spec.md), [`pricing-and-billing`](../31-pricing-and-billing/spec.md)
 > **Blocks**: nothing
 > **Reality check**: No waitlist is built or planned. These are execution/verification tasks
 > against the already-deployed app; the only "Files" entries are checklists run against prod.

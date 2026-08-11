@@ -1,6 +1,6 @@
 /**
  * The invitation routes over real HTTP (plan 53, task 1 —
- * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`).
+ * `plans/implemented/53-exhaustive-local-e2e-design/tasks.md`).
  *
  * An invitation is the one object in this system that deliberately crosses a tenant boundary: it is created
  * inside organization A and consumed by a session that is not yet a member of A. Every other route can be

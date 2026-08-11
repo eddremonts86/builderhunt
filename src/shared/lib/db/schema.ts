@@ -1287,7 +1287,7 @@ export const discoveryState = pgTable('discovery_state', {
 // ---------------------------------------------------------------------------
 // Devpost Ingestion (plan: devpost-integration) — global, non-tenant scraped
 // store. Devpost has no API and bot-challenges plain server-side fetch (see
-// plans/phase-1/19-devpost-integration/spec.md), so a headless-browser worker
+// plans/implemented/19-devpost-integration/spec.md), so a headless-browser worker
 // (src/lib/devpost/worker.ts) populates this table on a cron cadence; the
 // `devpost` source connector (src/lib/sources/devpost.ts) only ever reads
 // it, never scrapes live inside a search request. Deliberately a table of
@@ -1416,7 +1416,7 @@ export const sprintResults = pgTable(
 // ---------------------------------------------------------------------------
 // Public Profile Enrichment (plan: stealth-scraping) — organization-scoped
 // job queue + evidence, plus one platform-scoped subject-restriction table.
-// Spec: plans/phase-1/42-stealth-scraping/spec.md §7. Reuses the organization_builders
+// Spec: plans/implemented/42-stealth-scraping/spec.md §7. Reuses the organization_builders
 // composite-FK convention (organization_id, builder_identity_id) so a job can
 // never reference a builder identity the organization hasn't tracked.
 // ---------------------------------------------------------------------------
@@ -1542,7 +1542,7 @@ export const builderProcessingRestrictions = pgTable(
 )
 
 // ---------------------------------------------------------------------------
-// Stripe Billing Platform Tables (plans/phase-1/30-stripe-billing-platform/spec.md §Data model)
+// Stripe Billing Platform Tables (plans/implemented/30-stripe-billing-platform/spec.md §Data model)
 // ---------------------------------------------------------------------------
 
 export const billingCustomers = pgTable(
@@ -1895,7 +1895,7 @@ export const billingRefunds = pgTable(
 )
 
 /**
- * Chargeback tracking (plans/phase-1/30-stripe-billing-platform/tasks.md §8 "Implement dispute freeze,
+ * Chargeback tracking (plans/implemented/30-stripe-billing-platform/tasks.md §8 "Implement dispute freeze,
  * outcome, and alerts"). Pack disputes only (see `billing/disputes.ts`'s module comment for why
  * subscription disputes are a documented, separate gap) — `grantId` is therefore always set for a
  * row this app itself created.
@@ -1937,7 +1937,7 @@ export const billingDisputes = pgTable(
 )
 
 /**
- * Verified billing contact (plans/phase-1/30-stripe-billing-platform/tasks.md §9 "Add verified billing contact
+ * Verified billing contact (plans/implemented/30-stripe-billing-platform/tasks.md §9 "Add verified billing contact
  * management") — one current contact email per organization, owner-set and self-verified (mirrors
  * `billing_auto_recharge_rules`' shape: PK'd directly on `organization_id`, no surrogate id, since
  * this is mutable current state, not an append-only ledger). Setting a NEW email while a PREVIOUS one
@@ -1966,7 +1966,7 @@ export const billingContacts = pgTable(
 /**
  * Durable compliance snapshot written just before an organization row (and its full cascade —
  * members, resources, `billing_customers`/`billing_subscriptions`/etc.) is hard-deleted, whether via
- * the 30-day scheduled path or the owner-initiated immediate path (plans/phase-1/30-stripe-billing-platform/
+ * the 30-day scheduled path or the owner-initiated immediate path (plans/implemented/30-stripe-billing-platform/
  * tasks.md §9 "Integrate subscription-safe organization deletion" — "retains only approved financial
  * records"). Deliberately NOT a foreign key to `organizations`: by the time this row is read back,
  * the organization it describes no longer exists. No RLS tenant-scoping either, for the same
@@ -1993,7 +1993,7 @@ export const organizationDeletionFinancialRecords = pgTable(
 )
 
 /**
- * Append-only velocity signal for fraud/high-volume exception controls (plans/phase-1/30-stripe-billing-platform/
+ * Append-only velocity signal for fraud/high-volume exception controls (plans/implemented/30-stripe-billing-platform/
  * tasks.md §8 "Add fraud and high-volume exception controls"). Every known payment failure is
  * recorded here by its own call site (`packs.ts`'s Checkout decline, `auto-recharge.ts`'s off-session
  * decline) — `risk.ts` only ever reads this table, never writes it directly, mirroring
@@ -2059,7 +2059,7 @@ export const billingReconciliationRuns = pgTable(
 )
 
 /**
- * Deduplication ledger for financial notifications (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Add
+ * Deduplication ledger for financial notifications (plans/implemented/30-stripe-billing-platform/tasks.md §10 "Add
  * financial notifications, metrics, and alerts") — the general "have we already sent notification X
  * for entity Y in policy window W" answer every message type in that task needs. `organizationId` has
  * no FK (mirrors `organization_deletion_financial_records`): the `'platform'` sentinel value is used
@@ -2336,7 +2336,7 @@ export const conversionEvents = pgTable(
     // via a skip scan on the composite `(name, server_day)` index with the
     // same Index Searches count (8) and the same row count, so the single
     // column is redundant. See `scripts/db/pg18/explain-skip-scan.mjs` and
-    // `plans/phase-1/03-postgres-18-upgrade/tasks.md` Phase 5 tasks 5+6.
+    // `plans/implemented/03-postgres-18-upgrade/tasks.md` Phase 5 tasks 5+6.
     index('conversion_events_name_server_day_idx').on(table.name, table.serverDay),
     index('conversion_events_created_at_idx').on(table.createdAt),
     check(
@@ -2480,7 +2480,7 @@ export const profileSuppressions = pgTable(
 
 // ---------------------------------------------------------------------------
 // Calendar, Scheduling, and Interview Intelligence
-// (plans/phase-1/44-calendar-scheduling-interview-intelligence/spec.md §Data model)
+// (plans/implemented/44-calendar-scheduling-interview-intelligence/spec.md §Data model)
 //
 // Conventions from that spec's "Normative persistence contract": uuid PK with
 // `gen_random_uuid()`, `organization_id text not null`, created/updated timestamptz, every

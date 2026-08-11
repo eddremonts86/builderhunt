@@ -1,7 +1,7 @@
 # Especificación — generación y adaptación de CV con IA
 
 > **Status**: `pending`
-> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md) (modelo `job_opportunities`/`job_opportunity_versions` y el `career-principal`; sin él sólo se pierde el tailoring, no el CV base), [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md) (registry de tasks, budget, caché, MiniMax), [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md) (`withTenantContext`, RLS, roles)
+> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md) (modelo `job_opportunities`/`job_opportunity_versions` y el `career-principal`; sin él sólo se pierde el tailoring, no el CV base), [`ai-expansion`](../../implemented/21-ai-expansion/spec.md) (registry de tasks, budget, caché, MiniMax), [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md) (`withTenantContext`, RLS, roles)
 > **Blocks**: [`delegated-job-applications`](../delegated-job-applications/spec.md) (consume `resume_versions` aprobadas y `career_facts` confirmadas)
 > **Reality check**: Existe la plataforma de IA (`src/shared/lib/ai/tasks.ts`, `budget.ts`, `cache.ts`, `minimax.ts`), el ledger de créditos (`src/shared/lib/billing/feature-authorization.ts` + `rate-cards.ts`), tenancy (`src/shared/lib/db/tenant-context.ts`) y la organización personal (`src/shared/lib/auth/personal-organization.ts`). **No** existe perfil profesional canónico, editor de CV, renderer, comparación CV↔oferta ni batch. Del "foundation de documentos" sólo aterrizó el **schema** (`candidate_documents`/`document_extractions` en `src/shared/lib/db/schema.ts`, `drizzle/0084`+`0085`) y el **contrato de tipos** (`src/lib/storage/types.ts`): no hay adaptador de storage, ni scanner, ni parser, ni worker. `pdfjs-dist`, `mammoth` y `file-type` están en `package.json` pero ningún archivo de `src/` los importa todavía.
 
@@ -110,7 +110,7 @@ el producto ([research §8, §9, §16](../competitive-research-enhancv.md)):
 ## Decisión sobre el foundation de documentos — RESUELTO
 
 El plan anterior afirmaba que reutilizaba el foundation de documentos privados de
-[`calendar-scheduling-interview-intelligence`](../../phase-1/44-calendar-scheduling-interview-intelligence/spec.md).
+[`calendar-scheduling-interview-intelligence`](../../implemented/44-calendar-scheduling-interview-intelligence/spec.md).
 Verificado contra HEAD, **esa afirmación era parcialmente falsa** y se retira.
 
 ### Lo que realmente existe

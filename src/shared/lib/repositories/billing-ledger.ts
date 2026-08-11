@@ -434,7 +434,7 @@ export async function listExpiredButStillActiveGrants(
 }
 
 // ---------------------------------------------------------------------------
-// Reservations and allocations (plans/phase-1/30-stripe-billing-platform/tasks.md §4
+// Reservations and allocations (plans/implemented/30-stripe-billing-platform/tasks.md §4
 // "Implement atomic reservation lifecycle") — business logic and invariants
 // live in `~/shared/lib/billing/reservations.ts`, this file only reads/writes.
 // ---------------------------------------------------------------------------

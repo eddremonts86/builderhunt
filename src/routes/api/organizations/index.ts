@@ -70,7 +70,7 @@ export const Route = createFileRoute('/api/organizations/')({
       // grace period — never a client-chosen one, via `requireTenantPrincipal`.
       // `requestNormalDeletion` enforces owner-only + recent-auth (via the
       // underlying `requestOrganizationDeletion`) and additionally stops
-      // subscription renewal right now (plans/phase-1/30-stripe-billing-platform/
+      // subscription renewal right now (plans/implemented/30-stripe-billing-platform/
       // tasks.md §9 "Integrate subscription-safe organization deletion").
       DELETE: async ({ request }) => {
         try {

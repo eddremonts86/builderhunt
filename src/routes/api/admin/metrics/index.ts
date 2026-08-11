@@ -113,10 +113,10 @@ export const Route = createFileRoute('/api/admin/metrics/')({
               onboardingSkipped: onboardingMetrics.onboardingSkipped,
               activationRate7d,
             },
-            // plans/phase-1/52-audit-trust §"Add trust runtime gates and redacted metrics" — counts and
+            // plans/implemented/52-audit-trust §"Add trust runtime gates and redacted metrics" — counts and
             // states only. See `getRemovalRequestMetrics` for what is deliberately absent and why.
             ...(removals ? { removals } : {}),
-            // plans/phase-1/44-calendar-scheduling-interview-intelligence §"Add redacted metrics and
+            // plans/implemented/44-calendar-scheduling-interview-intelligence §"Add redacted metrics and
             // operator dashboards". Counters and flags only: every value here is a number or a boolean,
             // which is what makes it safe to render on a page that must never approach a candidate's name.
             interviews: {

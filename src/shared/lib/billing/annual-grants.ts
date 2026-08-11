@@ -1,6 +1,6 @@
 /**
  * The remaining 11 monthly credit windows for an annual subscription
- * (plans/phase-1/30-stripe-billing-platform/tasks.md §7 "Issue annual subscription
+ * (plans/implemented/30-stripe-billing-platform/tasks.md §7 "Issue annual subscription
  * credits monthly"; spec.md: "a daily idempotent worker grants the
  * remaining 11 windows on calendar anniversaries of the billing anchor,
  * clamped to month end. Each grant expires at the next anniversary and is

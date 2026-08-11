@@ -5,7 +5,7 @@
 > when phase-5 closes. `blocked` rather than the free-text "moved to phase-5" that was here:
 > `check-phase-readiness.mjs` allows exactly `pending | partially-implemented | implemented |
 > blocked | superseded`, and a status outside that set is a status no gate can read.
-> **Depends on**: [`production-infrastructure`](../02-production-infrastructure/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md), [`public-landing-pages`](../45-public-landing-pages/spec.md), [`content-marketing`](../46-content-marketing/spec.md), [`status-and-trust`](../47-status-and-trust/spec.md), [`pricing-and-billing`](../31-pricing-and-billing/spec.md)
+> **Depends on**: [`production-infrastructure`](../../implemented/02-production-infrastructure/spec.md), [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md), [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md), [`content-marketing`](../../implemented/46-content-marketing/spec.md), [`status-and-trust`](../../implemented/47-status-and-trust/spec.md), [`pricing-and-billing`](../31-pricing-and-billing/spec.md)
 > **Blocks**: nothing
 > **Reality check**: No waitlist code exists and none will be built (decision in spec). The
 > product and all public marketing surfaces are live on Coolify/Hetzner; this plan is

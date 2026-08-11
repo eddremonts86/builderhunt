@@ -123,7 +123,7 @@ badges (`.kbd`), and literal keys/identifiers — never for marketing or discove
 
 **Character:** A single, versatile grotesk (Inter) carries the whole system today. Hero numbers
 and large stat figures are the system's next typographic differentiation point (tracked in
-`plans/phase-1/06-design-modernization`), not yet a second display face.
+`plans/implemented/06-design-modernization`), not yet a second display face.
 
 ### Hierarchy
 - **Display / Hero** (800 weight, `text-5xl`–`text-7xl`, tight tracking): landing hero headline.

@@ -1,8 +1,8 @@
 # Delivery Plan: Performance and QA Release Gate
 
 > **Status**: `partially-implemented`
-> **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md)
-> **Blocks**: [`audit-trust`](../52-audit-trust/spec.md), [`audit-visual-system`](../50-audit-visual-system/spec.md)
+> **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md)
+> **Blocks**: [`audit-trust`](../../implemented/52-audit-trust/spec.md), [`audit-visual-system`](../../implemented/50-audit-visual-system/spec.md)
 > **Reality check**: Explicit image dimensions, eager/lazy hints, font preconnects, Vitest, and
 > standalone Playwright scripts already exist. The missing work is active-asset optimization, a
 > supported browser config, quantitative budgets, and CI/deploy enforcement.

@@ -1,6 +1,6 @@
 /**
  * The platform-admin authorization boundary, over every admin route (plan 53, task 2 —
- * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`).
+ * `plans/implemented/53-exhaustive-local-e2e-design/tasks.md`).
  *
  * `/api/admin/*` is the largest concentration of privilege in the product: it revokes claims, replays billing
  * events, runs workers, edits public content, and reads cross-tenant metrics. Membership of that set is not

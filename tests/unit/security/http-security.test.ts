@@ -158,7 +158,7 @@ describe('CSRF mutation-origin gate', () => {
 
 /**
  * The stricter policy for the candidate-facing scheduling surface
- * (plans/phase-1/44-calendar-scheduling-interview-intelligence, "Implement capability exchange and
+ * (plans/implemented/44-calendar-scheduling-interview-intelligence, "Implement capability exchange and
  * session validation" — the one part of that task still open until 2026-08-05).
  *
  * The load-bearing case is the last one. `DocumentUploader.tsx` PUTs the candidate's file straight to

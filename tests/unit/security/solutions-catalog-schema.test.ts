@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 4, "Add catalog, graph, evidence, and source-policy
+ * plans/implemented/43-solutions-intelligence Phase 4, "Add catalog, graph, evidence, and source-policy
  * schema". Verify line: "constraints reject active unsupported edges, dangling evidence, overlapping
  * invalid versions, tenant fields in public records, and workerless writes."
  *

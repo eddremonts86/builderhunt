@@ -1,5 +1,5 @@
 /**
- * Restricted Stripe Customer Portal session creation (plans/phase-1/30-stripe-billing-platform/tasks.md §5
+ * Restricted Stripe Customer Portal session creation (plans/implemented/30-stripe-billing-platform/tasks.md §5
  * "Create restricted Customer Portal sessions"; spec.md: "Customer Portal is owner-only and limited
  * to payment methods, tax identity, invoices, and receipts. All plan changes/cancellation remain
  * BuilderHunt-owned."). Owner-only and recent-auth enforcement happen at the route layer

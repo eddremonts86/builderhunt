@@ -1,8 +1,8 @@
 # Load capacity — 1,000 concurrent authenticated users (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`02-production-infrastructure`](../02-production-infrastructure/spec.md),
-> [`03-postgres-18-upgrade`](../03-postgres-18-upgrade/spec.md)
+> **Depends on**: [`02-production-infrastructure`](../../implemented/02-production-infrastructure/spec.md),
+> [`03-postgres-18-upgrade`](../../implemented/03-postgres-18-upgrade/spec.md)
 > **Blocks**: nothing
 > **Reality check**: `src/shared/lib/db/pool-options.ts` leaves production on the
 > `postgres.js` default of 10 connections per client and only caps E2E at 3. The runtime creates

@@ -21,7 +21,7 @@ import {
  * `organization-alerts.test.ts`, `account-privacy.test.ts`). That's a
  * deliberate, precedent-setting choice here: financial-data correctness
  * ("A/B isolation, missing rows, duplicate keys" per
- * plans/phase-1/30-stripe-billing-platform/tasks.md §3) is worth proving against a real
+ * plans/implemented/30-stripe-billing-platform/tasks.md §3) is worth proving against a real
  * database rather than trusting a static scan, given the stakes. This is safe
  * to run unconditionally because `DATABASE_MIGRATION_URL` (superuser,
  * reachable Postgres) is already a hard requirement for this entire app

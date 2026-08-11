@@ -1,7 +1,7 @@
 # Personalized organization invitations — Tasks
 
 > **Status**: `pending`
-> **Depends on**: [`27-team-accounts`](../27-team-accounts/spec.md)
+> **Depends on**: [`27-team-accounts`](../../implemented/27-team-accounts/spec.md)
 > **Blocks**: nothing
 > **Reality check**: execute against the existing organization lifecycle and route files named
 > below. The current Drizzle head is `0162_alerts_keyset_indexes`, but the migration generator owns

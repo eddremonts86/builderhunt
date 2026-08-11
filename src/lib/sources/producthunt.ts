@@ -14,7 +14,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * resolves to no topic yields `[]` — Product Hunt genuinely cannot answer
  * arbitrary keyword queries, so that's the honest result, not a bug.
  *
- * Spec reference: plans/phase-1/18-producthunt-integration/spec.md
+ * Spec reference: plans/implemented/18-producthunt-integration/spec.md
  */
 interface PHMaker {
   id: string

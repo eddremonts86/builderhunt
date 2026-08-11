@@ -1,6 +1,6 @@
 /**
  * The organization core routes over real HTTP (plan 53, task 1 —
- * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`).
+ * `plans/implemented/53-exhaustive-local-e2e-design/tasks.md`).
  *
  * `cross-tenant.spec.ts` probes the *tenant-scoped resource* routes for an enumeration oracle. This file
  * covers the routes that manage the organization itself — list, create, switch, read the team, schedule and

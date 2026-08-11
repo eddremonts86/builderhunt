@@ -256,7 +256,7 @@ Full procedure, inputs, metrics and stop conditions: [`load-testing.md`](./load-
 ## PG18 observability — `pg_stat_io` and `pg_aios`
 
 PG18 ships two system views that did not exist on PG16 and that the
-DB work in `plans/phase-1/03-postgres-18-upgrade` reads and writes
+DB work in `plans/implemented/03-postgres-18-upgrade` reads and writes
 through:
 
 - `pg_stat_io` — per-backend, per-context, per-operation I/O
@@ -291,7 +291,7 @@ optimisation.
 
 > **Status: executed 2026-08-05, via the §2b MVP path.** The dated account of what actually happened —
 > including the 11½-hour restore-to-repoint gap and the 67 rows it cost — is in §2b below; the
-> task-by-task record is `plans/phase-1/03-postgres-18-upgrade/tasks.md` Phase 4. Two items are still
+> task-by-task record is `plans/implemented/03-postgres-18-upgrade/tasks.md` Phase 4. Two items are still
 > open there and both are waits, not work: one soak period including the first 03:00 backup landing
 > from the pg18 resource, and stopping the pg16 resource seven days after that backup exists.
 >
@@ -314,7 +314,7 @@ optimisation.
 >   is correct — not a stale config.
 >
 > See the ordering-violation note at the top of
-> `plans/phase-1/03-postgres-18-upgrade/tasks.md` for how these migrations landed before the cutover
+> `plans/implemented/03-postgres-18-upgrade/tasks.md` for how these migrations landed before the cutover
 > that licenses them.
 
 ### 0. Non-negotiables
@@ -549,7 +549,7 @@ What is **not** skippable, because none of it is about preserving data:
 **Do not use this path once there are real customer rows.** The moment that changes, §3–§7 stop being
 ceremony and become the procedure — and the rehearsal in §3 has already been executed once
 (2026-08-01), so it is ready rather than theoretical. The plan note at
-`plans/phase-1/03-postgres-18-upgrade/tasks.md` ("most of Phases 3 and 4 is ceremony for data this
+`plans/implemented/03-postgres-18-upgrade/tasks.md` ("most of Phases 3 and 4 is ceremony for data this
 project does not have") is the same decision recorded from the plan's side.
 
 ### 3. The pipeline

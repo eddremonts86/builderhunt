@@ -9,7 +9,7 @@ refunds: resolving "which organization/subscription" from a bare disputed Paymen
 knowing that PaymentIntent belongs to a specific subscription invoice, and this codebase never
 records an invoice's PaymentIntent id anywhere. Only `billing_credit_grants.stripe_payment_intent_id`
 is populated (for packs and auto-recharge grants — see §8 task 4's evidence in
-`plans/phase-1/30-stripe-billing-platform/tasks.md`). A disputed subscription-invoice PaymentIntent simply
+`plans/implemented/30-stripe-billing-platform/tasks.md`). A disputed subscription-invoice PaymentIntent simply
 cannot be resolved to an organization today, so its webhook events stay `'deferred'` — visible and
 retried forever, never silently dropped, never misattributed.
 

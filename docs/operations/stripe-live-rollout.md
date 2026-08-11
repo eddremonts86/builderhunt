@@ -8,12 +8,12 @@ are **facts about real money** and therefore belong to phase-5.
 Companion to `stripe-live-readiness.md` (the pre-flight gate table),
 `stripe-launch-register.md` (the release checklist and its owners),
 `stripe-sandbox-certification.md` (API-level certification in CI),
-`staging-test-plan.md` in `plans/phase-1/30-stripe-billing-platform/` (test-mode coverage), and
+`staging-test-plan.md` in `plans/implemented/30-stripe-billing-platform/` (test-mode coverage), and
 `stripe-incident-response.md` (the kill switch, i.e. rollback).
 
 ## Why this document is a split and not a checklist
 
-`plans/phase-1/30-stripe-billing-platform/tasks.md` §15 asks for nine observations from the canary: a
+`plans/implemented/30-stripe-billing-platform/tasks.md` §15 asks for nine observations from the canary: a
 successful **charge**, an **invoice**, a **tax result**, a credit/entitlement **grant**, a **refund**,
 **payout/FX facts**, **reconciliation**, **rollback**, and **EU countries staying disabled**.
 

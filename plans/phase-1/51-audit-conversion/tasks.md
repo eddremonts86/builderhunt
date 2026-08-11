@@ -2,7 +2,7 @@
 
 > **Status**: `partially-implemented` — full instrumentation stack + real UX fixes shipped
 > 2026-07-26; real baseline collection and staged rollout explicitly not started (see below).
-> **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md), [`legal-and-compliance`](../04-legal-and-compliance/spec.md)
+> **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md), [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md)
 > **Blocks**: nothing
 > **Reality check**: (2026-07-26) The anonymous quote/inert email/aggregateRating items were
 > already removed by `audit-trust` earlier this session (commit `bdf77f1`) — re-verified absent,

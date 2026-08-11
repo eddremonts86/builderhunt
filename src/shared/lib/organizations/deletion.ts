@@ -1,5 +1,5 @@
 /**
- * Subscription-safe organization deletion (plans/phase-1/30-stripe-billing-platform/tasks.md §9 "Integrate
+ * Subscription-safe organization deletion (plans/implemented/30-stripe-billing-platform/tasks.md §9 "Integrate
  * subscription-safe organization deletion"). Two request paths, one shared finalize step:
  *
  * - Normal (scheduled): `requestNormalDeletion` wraps the existing 30-day-grace-period request

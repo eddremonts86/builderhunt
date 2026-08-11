@@ -2,8 +2,8 @@
 
 > **Status**: `partially-implemented` — asset pipeline done; tests/e2e/Lighthouse/CI-gate tasks explicitly
 > out of scope for this session (see notes below), not attempted.
-> **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md)
-> **Blocks**: [`audit-trust`](../52-audit-trust/spec.md), [`audit-visual-system`](../50-audit-visual-system/spec.md)
+> **Depends on**: [`public-landing-pages`](../../implemented/45-public-landing-pages/spec.md)
+> **Blocks**: [`audit-trust`](../../implemented/52-audit-trust/spec.md), [`audit-visual-system`](../../implemented/50-audit-visual-system/spec.md)
 > **Reality check**: (2026-07-26) Re-verified before starting: `pnpm type-check` and
 > `pnpm exec eslint . --quiet` were both already clean (0 errors) — the 11 `PLAN_PRICING` errors
 > and unused-`url` lint error described below were already fixed by the time this plan was picked
