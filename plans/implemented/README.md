@@ -75,6 +75,23 @@ the split.
    `../other-plan/spec.md` placeholder in `_meta/conventions.md`, which is illustrative prose.
 6. Run `pnpm plans:check-order` and `pnpm plans:check-implemented`.
 
+## Phase 3 is complete too, and is not in here
+
+`plans/phase-3/` — thirteen plans, 72 tasks, all closed, all three files saying `implemented` — is
+finished, and it stays where it is for a reason that is arithmetic rather than judgement: its plans are
+numbered 01-13, and **twelve of those numbers are already taken** by phase-1 plans in this folder. A flat
+archive cannot hold both.
+
+The fix is a per-phase subdirectory (`implemented/phase-1/`, `implemented/phase-3/`), which means
+reworking both plan gates and rewriting the links of every archived plan. That is a structural decision,
+so it has not been taken unilaterally. Meanwhile the guarantee is identical: `check-implemented-plans.mjs`
+lists phase 3 as **complete in place** and asserts the same two things it asserts here — every plan
+`implemented`, zero open, zero partial. Only the filing differs.
+
+Phases 2, 4 and 5 are audited and clean, and mostly unstarted: 79, 522 and 41 open tasks, with none of
+the defects phase 1 carried — no unreadable statuses, no files disagreeing with each other, no checked box
+saying it was not done.
+
 ## What keeps this folder honest
 
 `pnpm plans:check-implemented` runs in `pnpm ci:local` and in CI's Quality job, and it asserts the two
@@ -97,6 +114,10 @@ Every rule was verified against deliberate breakage rather than assumed: a parti
 folder, a `pending` status inside it, an invented status value, a finished plan left outside, and a
 checked task admitting a gap both with and without a pointer. Each fails, and the last one passes once
 the pointer is there.
+
+It also guards phase 3, which is complete in place: a reopened task or a downgraded status there fails
+the same way. Verified against breakage both ways — a `- [x]` flipped back to `- [ ]`, and one file
+downgraded to `partially-implemented`.
 
 `pnpm plans:check-order` runs beside it, and guards that a two-digit prefix is still a position in a
 contiguous build order across both directories.

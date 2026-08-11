@@ -32,6 +32,16 @@ import { join } from 'node:path'
 const ROOT = process.cwd()
 const IMPLEMENTED = join(ROOT, 'plans', 'implemented')
 const LIVE = join(ROOT, 'plans', 'phase-1')
+/**
+ * Phases that are complete **in place**, and why they are not in `plans/implemented/`.
+ *
+ * Phase 3's thirteen plans are numbered 01-13, and twelve of those numbers are already taken by phase-1
+ * plans sitting in `plans/implemented/`. A flat archive cannot hold both, and the fix — a per-phase
+ * subdirectory — means reworking both plan gates and rewriting the links of every archived plan. That is a
+ * structural decision, not a cleanup, so the phase stays where it is and is guarded here instead: every
+ * plan `implemented`, zero open, zero partial. The guarantee is the same; only the filing differs.
+ */
+const COMPLETE_IN_PLACE = [join(ROOT, 'plans', 'phase-3')]
 const ALLOWED_STATUSES = new Set(['pending', 'partially-implemented', 'implemented', 'blocked', 'superseded'])
 
 let failed = false
@@ -181,7 +191,31 @@ for (const root of [IMPLEMENTED, LIVE]) {
   }
 }
 
-// ── 5. A plan has one home ───────────────────────────────────────────────────────────────────────
+// ── 5. A phase that claims to be complete really is ──────────────────────────────────────────────
+for (const root of COMPLETE_IN_PLACE) {
+  const label = root.slice(root.lastIndexOf('plans/'))
+  const dirs = planDirectories(root)
+  if (dirs.length === 0) {
+    fail(`${label} is listed as complete in place but holds no plans`)
+    continue
+  }
+  for (const dir of dirs) {
+    const { statuses, open, partial } = readPlan(root, dir)
+    if (open > 0 || partial > 0) {
+      fail(
+        `${label}/${dir} has ${open} open and ${partial} partial task(s), but its phase is recorded as ` +
+          'complete. Either close them or take the phase off COMPLETE_IN_PLACE.',
+      )
+    }
+    for (const [file, status] of statuses) {
+      if (status !== 'implemented') {
+        fail(`${label}/${dir}/${file} says \`${status}\`, but its phase is recorded as complete`)
+      }
+    }
+  }
+}
+
+// ── 6. A plan has one home ───────────────────────────────────────────────────────────────────────
 const live = new Set(planDirectories(LIVE))
 for (const dir of implemented) {
   if (live.has(dir)) fail(`${dir} exists under both plans/implemented and plans/phase-1 — a plan has one home`)
@@ -194,7 +228,9 @@ if (failed) {
   process.exit(1)
 }
 
+const completeInPlace = COMPLETE_IN_PLACE.reduce((sum, root) => sum + planDirectories(root).length, 0)
 console.log(
   `OK: ${implemented.length} implemented plans have no open or partial tasks and say so in every file; ` +
+    `${completeInPlace} more complete in place (phase-3); ` +
     `${live.size} live plans in plans/phase-1; every Status is a readable value`,
 )
