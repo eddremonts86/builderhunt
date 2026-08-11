@@ -796,7 +796,7 @@ The program is complete only when runtime evidence demonstrates:
 ## 26. Implementation Plan Decomposition
 
 Keep the complete program in the single
-`plans/implemented/44-calendar-scheduling-interview-intelligence/` directory, with `spec.md`, `plan.md`, and
+`plans/implemented/phase-1/44-calendar-scheduling-interview-intelligence/` directory, with `spec.md`, `plan.md`, and
 `tasks.md` as its implementation contract. Inside that plan, preserve four independently
 verifiable workstreams:
 

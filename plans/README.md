@@ -169,7 +169,7 @@ seat limits, and audit-event redaction all pass integration tests.
   [`public-landing-pages`](implemented/45-public-landing-pages/spec.md),
   [`content-marketing`](implemented/46-content-marketing/spec.md), and
   [`status-and-trust`](implemented/47-status-and-trust/spec.md).
-- Run [`waitlist-launch`](./phase-1/54-waitlist-launch/spec.md) as the launch checklist; the product
+- Run [`waitlist-launch`](implemented/phase-1/54-waitlist-launch/spec.md) as the launch checklist; the product
   keeps open signup and does not add an artificial waitlist.
 - Apply all five audits as release gates, not as a one-time cleanup:
   [`audit-accessibility`](implemented/48-audit-accessibility/spec.md),
@@ -244,7 +244,7 @@ flowchart LR
 - [`status-and-trust`](implemented/47-status-and-trust/spec.md)
 - [`public-landing-pages`](implemented/45-public-landing-pages/spec.md)
 - [`content-marketing`](implemented/46-content-marketing/spec.md)
-- [`waitlist-launch`](./phase-1/54-waitlist-launch/spec.md)
+- [`waitlist-launch`](implemented/phase-1/54-waitlist-launch/spec.md)
 - [`onboarding-flow`](implemented/08-onboarding-flow/spec.md)
 
 ### AI and analysis

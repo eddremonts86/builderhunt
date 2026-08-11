@@ -10,7 +10,7 @@
 > conditional on a PR that touches that code with a real sprint run — the spec does not fake one.
 
 No automated viewport test suite exists or is planned for layout/responsive regressions (see
-`plans/implemented/07-responsive-mobile-design/spec.md` non-goals) — this checklist is the verification method by
+`plans/implemented/phase-1/07-responsive-mobile-design/spec.md` non-goals) — this checklist is the verification method by
 design. Run it whenever a PR touches shared shell components (`DashboardLayout`, `Header`,
 `Footer`, `OrganizationSwitcher`, `UserMenu`), a page's top-level layout, or any table/flex-row
 markup that renders user-generated free text.

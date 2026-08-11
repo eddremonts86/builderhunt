@@ -46,7 +46,7 @@ where they belong.
 Counts are `- [ ]` / `- [x]` lines in each plan's checklist. Regenerate with:
 
 ```bash
-for f in plans/phase-1/*/tasks.md plans/implemented/42-stealth-scraping/task.md; do
+for f in plans/phase-1/*/tasks.md plans/implemented/phase-1/42-stealth-scraping/task.md; do
   p=$(basename $(dirname "$f"))
   o=$(grep -c "^- \[ \]" "$f" || true); d=$(grep -c "^- \[x\]" "$f" || true)
   printf "%3s|%3s|%s\n" "${o:-0}" "${d:-0}" "$p"

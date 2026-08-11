@@ -41,7 +41,7 @@ Choose one:
 
 - **(a) Skip permanently — recommended.** Cover "founder signal" through legitimate
   channels instead:
-  - the pending [`producthunt-integration`](../../implemented/18-producthunt-integration/spec.md) (makers
+  - the pending [`producthunt-integration`](../../implemented/phase-1/18-producthunt-integration/spec.md) (makers
     ARE largely indie founders, official API, token-gated), and/or
   - user-driven tagging: BuilderHunt users already own `builder_notes` and
     `builders.metadata`; a lightweight "founder / indie hacker" tag + search filter is a

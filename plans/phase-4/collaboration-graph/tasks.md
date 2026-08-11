@@ -1,7 +1,7 @@
 # Co-Shipping Collaboration Graph (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../implemented/02-production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../implemented/40-team-synergy/spec.md) (neither is required).
+> **Depends on**: [`security-and-multitenancy`](../../implemented/phase-1/01-security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../implemented/phase-1/02-production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../implemented/phase-1/40-team-synergy/spec.md) (neither is required).
 > **Blocks**: nothing
 > **Reality check** (re-verified against master HEAD, 2026-07-27): Extends `src/shared/lib/db/schema.ts`, `src/shared/lib/env.ts`, `src/shared/lib/billing-shared.ts`, `src/shared/lib/operational-schedules.ts`, `src/lib/enrichment/worker.ts`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`, `docs/operations/deploy-runbook.md` (worker/cron inventory table at L145–154), `scripts/db/verify-api-isolation-local.mjs`. Two new global-public tables; `builder_identities` gains one additive nullable column and insert-only minimal rows using the existing deterministic-id derivation (never `trackOrganizationBuilder`'s upsert).
 
@@ -526,7 +526,7 @@ Ordered so the app ships cleanly after every checkbox.
     `@media (prefers-reduced-motion: no-preference)` (add the guard in `globals.css` if a shared
     utility is used).
   - Verify: `pnpm test:a11y` (→ `node tests/regression/test-accessibility.mjs`, the gate
-    [`audit-accessibility`](../../implemented/48-audit-accessibility/spec.md) owns) reports zero violations;
+    [`audit-accessibility`](../../implemented/phase-1/48-audit-accessibility/spec.md) owns) reports zero violations;
     `pnpm test -- tests/unit/shared/lib/accessibility.test.ts` still passes; keyboard-only traversal
     reaches every neighbour in strength order and returns focus correctly after toggling; with
     `prefers-reduced-motion: reduce` no transition occurs.

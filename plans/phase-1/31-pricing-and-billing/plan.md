@@ -4,7 +4,7 @@
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: legacy manual billing is partially present in source. Its corrective and Stripe
-> future work moved to [`stripe-billing-platform`](../../implemented/30-stripe-billing-platform/plan.md); this file is
+> future work moved to [`stripe-billing-platform`](../../implemented/phase-1/30-stripe-billing-platform/plan.md); this file is
 > historical and has no executable phase.
 
 ## Delivered
@@ -19,7 +19,7 @@
 - Plan expiry/dunning and migration away from user-owned authority.
 - Stripe Products/Prices, Checkout, Portal, webhooks, tax, credits, refunds, disputes, and accounting.
 
-These now execute only through [`stripe-billing-platform`](../../implemented/30-stripe-billing-platform/plan.md), which
+These now execute only through [`stripe-billing-platform`](../../implemented/phase-1/30-stripe-billing-platform/plan.md), which
 contains dependency gates, phased rollout, risks, rollback, and completion evidence.
 
 ## Rollback/history rule

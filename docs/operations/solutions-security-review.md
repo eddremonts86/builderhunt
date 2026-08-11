@@ -76,7 +76,7 @@ from becoming the composer's prose, and a misbehaving source is one toggle away 
 ## Open items
 
 1. **No independent review.** Everything above was written by the same person who wrote the code.
-2. **EU AI Act classification is unresolved** and flagged in `plans/implemented/43-solutions-intelligence/tasks.md`:
+2. **EU AI Act classification is unresolved** and flagged in `plans/implemented/phase-1/43-solutions-intelligence/tasks.md`:
    the human lane recommends named people for work, and Annex III point 4 reaches task allocation as well as
    recruitment. Needs a human legal read before any flag is enabled in production.
 3. **The source register's legal sign-off** lives in `plans/phase-5/01-production-readiness-audit` and is a

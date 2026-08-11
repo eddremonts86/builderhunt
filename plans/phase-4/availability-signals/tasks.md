@@ -1,7 +1,7 @@
 # Availability Signals (Open-to-Work Score) (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`abuse-and-usage-integrity`](../../implemented/32-abuse-and-usage-integrity/spec.md) (the decayed combined-signal scoring mechanics this plan reuses); [`claimable-profiles`](../../implemented/36-claimable-profiles/spec.md) (a subject's explicit open-to-work state always outranks inference); [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md) (inference about named individuals must be disclosed and contestable). Binding: [`security-policy`](../../_meta/security-policy.md), [`ai-policy`](../../_meta/ai-policy.md), [`conventions`](../../_meta/conventions.md).
+> **Depends on**: [`abuse-and-usage-integrity`](../../implemented/phase-1/32-abuse-and-usage-integrity/spec.md) (the decayed combined-signal scoring mechanics this plan reuses); [`claimable-profiles`](../../implemented/phase-1/36-claimable-profiles/spec.md) (a subject's explicit open-to-work state always outranks inference); [`legal-and-compliance`](../../implemented/phase-1/04-legal-and-compliance/spec.md) (inference about named individuals must be disclosed and contestable). Binding: [`security-policy`](../../_meta/security-policy.md), [`ai-policy`](../../_meta/ai-policy.md), [`conventions`](../../_meta/conventions.md).
 > **Blocks**: nothing
 > **Reality check**: Reuses shipped code — `src/shared/lib/abuse/risk.ts` (decay + corroboration), `src/shared/lib/repositories/enrichment-restrictions.ts` + `is_builder_processing_restricted()` (suppression), `published_builder_profiles.open_to_status` (the subject's own stated status), `src/lib/enrichment/network.ts`'s `safeFetch` (SSRF-safe fetch), `src/routes/api/admin/alerts/run-worker.ts` + `withJobRun` + `OPERATIONAL_SCHEDULES` (worker pattern). `builder_source_snapshots` has no runtime writer and no non-owner grants — Phase 0 fixes that. Read `spec.md` §Naming before creating any file: an unrelated tenant-private `availability_*` scheduling domain already exists.
 
@@ -197,7 +197,7 @@ applies an un-journaled file. Finish every migration task with
     `drizzle/0069`–`0071`), and (c) that `observed_at` is BuilderHunt's observation clock, not the
     subject's. Run `pnpm db:generate`; if you rename the auto-generated tag, update the matching
     `_journal.json` entry to match (this repo's convention — see the `0043` progress note in
-    [`abuse-and-usage-integrity`](../../implemented/32-abuse-and-usage-integrity/tasks.md)). Then
+    [`abuse-and-usage-integrity`](../../implemented/phase-1/32-abuse-and-usage-integrity/tasks.md)). Then
     `node scripts/db/verify-migration-integrity.mjs --write`.
   - Verify: the generated SQL contains exactly three `CREATE TABLE` statements, the three `CHECK`
     constraints named in the spec, and no unrelated diff; `pnpm exec drizzle-kit check` and

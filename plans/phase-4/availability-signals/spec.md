@@ -1,7 +1,7 @@
 # Availability Signals (Open-to-Work Score) (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`abuse-and-usage-integrity`](../../implemented/32-abuse-and-usage-integrity/spec.md) (the decayed combined-signal scoring mechanics this plan reuses); [`claimable-profiles`](../../implemented/36-claimable-profiles/spec.md) (a subject's explicit open-to-work state always outranks inference); [`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md) (inference about named individuals must be disclosed and contestable). Binding: [`security-policy`](../../_meta/security-policy.md), [`ai-policy`](../../_meta/ai-policy.md), [`conventions`](../../_meta/conventions.md), [`app-reality`](../../_meta/app-reality.md).
+> **Depends on**: [`abuse-and-usage-integrity`](../../implemented/phase-1/32-abuse-and-usage-integrity/spec.md) (the decayed combined-signal scoring mechanics this plan reuses); [`claimable-profiles`](../../implemented/phase-1/36-claimable-profiles/spec.md) (a subject's explicit open-to-work state always outranks inference); [`legal-and-compliance`](../../implemented/phase-1/04-legal-and-compliance/spec.md) (inference about named individuals must be disclosed and contestable). Binding: [`security-policy`](../../_meta/security-policy.md), [`ai-policy`](../../_meta/ai-policy.md), [`conventions`](../../_meta/conventions.md), [`app-reality`](../../_meta/app-reality.md).
 > **Blocks**: nothing
 > **Reality check**: The decay engine is already **shipped code**, not a pending plan — `src/shared/lib/abuse/risk.ts` (`computeDecayedRiskScore`, `MIN_CORROBORATING_SIGNAL_TYPES`, private `decayedWeight`), `src/shared/lib/repositories/abuse-signals.ts`, `src/shared/lib/repositories/account-risk.ts`, `drizzle/0043`–`0045` all exist. Suppression is shipped: `builder_processing_restrictions` + `is_builder_processing_restricted(text)` (`drizzle/0017_enrichment_rls_policies.sql:70,82`) + `POST /api/me/builder/$builderId/restrict-processing`, which already calls `cascadeBuilderProcessingRestriction` (`src/lib/enrichment/worker.ts:206`). A subject-claimed availability state is shipped: `published_builder_profiles.open_to_status` (`src/shared/lib/db/schema.ts:289`), edited via `PATCH /api/me/builder/$builderId` → `updateVerifiedBuilderProfile`. `builder_source_snapshots` still has **no runtime writer** (only `scripts/db/backfills/builders.ts:110`, owner role) and **no GRANT to any runtime role** in any migration — re-verified at HEAD. This plan adds no second scoring engine and no second suppression mechanism.
 
@@ -619,7 +619,7 @@ measurably help in review, drop Phase 6 — nothing depends on it.
 - **Same person on several sources**: signals key on `builder_identity_id`, which is per
   `(source, sourceId)`, so one human yields independent verdicts per source — same as
   `builder_embeddings`. Cross-source merging belongs to
-  [`unified-timeline`](../../implemented/33-unified-timeline/spec.md).
+  [`unified-timeline`](../../implemented/phase-1/33-unified-timeline/spec.md).
 - **Subject claims the profile after a bucket was shown**: rules 2/3 take effect on the next read;
   nothing is cached beyond the request, so no backfill is needed.
 - **Restriction withdrawn** (`withdrawBuilderProcessingRestriction`): purged rows do not return; the

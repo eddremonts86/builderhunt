@@ -112,7 +112,7 @@ Already closed in the snapshot at session start (`phase-1-order.md`
   - "Certify Stripe sandbox and Test Clock lifecycle" — the
     in-place progress note records that the e2e spec, security
     isolation test, fixtures and CI wiring are still open and
-    deliberately deferred to `plans/implemented/53-exhaustive-local-e2e-design/`.
+    deliberately deferred to `plans/implemented/phase-1/53-exhaustive-local-e2e-design/`.
   - "Run live Denmark canary and staged rollout" — `Operator:` only
     (live Stripe catalog, real customer, real charge, real refund,
     real payout/FX).

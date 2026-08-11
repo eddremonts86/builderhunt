@@ -39,4 +39,4 @@ attributable approval, and the check is that the artifact says so — not that a
 The one mechanical check worth keeping: no flag named in this plan may be `true` in the production
 environment while its item is unchecked. That failed once already — `ENRICHMENT_ENABLED` was `true` in
 production for nine days while both of its gating tasks were open (found 2026-08-05, recorded in
-`plans/implemented/42-stealth-scraping/task.md`). Measure the environment, do not trust the plan.
+`plans/implemented/phase-1/42-stealth-scraping/task.md`). Measure the environment, do not trust the plan.

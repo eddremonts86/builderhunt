@@ -1,7 +1,7 @@
 # Co-Shipping Collaboration Graph (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../implemented/02-production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../implemented/40-team-synergy/spec.md) (neither is required).
+> **Depends on**: [`security-and-multitenancy`](../../implemented/phase-1/01-security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../implemented/phase-1/02-production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../implemented/phase-1/40-team-synergy/spec.md) (neither is required).
 > **Blocks**: nothing
 > **Reality check** (re-verified against master HEAD, 2026-07-27): `builder_identities` is the global-public identity store with a *deterministic* id (`sha256(source \0 sourceId)`, built in `trackOrganizationBuilder`, `src/shared/lib/repositories/organization-builders.ts` L278). `builder_processing_restrictions` + the `is_builder_processing_restricted(text)` SECURITY DEFINER function already exist (`drizzle/0017_enrichment_rls_policies.sql` L70–82, `EXECUTE` granted to `builderhunt_app` and `builderhunt_worker`; `src/shared/lib/repositories/enrichment-restrictions.ts`). `src/lib/sources/github.ts` fetches **only** `/search/users` (L46) and `/search/repositories` (L79) — no commit, contributor or co-author data is persisted anywhere today. The worker pattern to clone is `src/lib/discovery/worker.ts` + `src/routes/api/admin/alerts/run-worker.ts`, which now also wraps the run in `withJobRun({ jobKey })` and requires an entry in the code-side schedule registry `src/shared/lib/operational-schedules.ts`.
 
@@ -434,7 +434,7 @@ layout is unit-tested and byte-identical between renders — no jitter, no simul
   paginated 50/page. Nothing is ever silently truncated.
 - SVG is `viewBox`-scaled, `max-width: 100%`, `aria-hidden="true"`.
 
-**Accessibility** ([`audit-accessibility`](../../implemented/48-audit-accessibility/spec.md) is a release
+**Accessibility** ([`audit-accessibility`](../../implemented/phase-1/48-audit-accessibility/spec.md) is a release
 gate, run as `pnpm test:a11y` → `tests/regression/test-accessibility.mjs`): the accessible equivalent is not an
 afterthought. The component always renders a real `<table>` (counterpart link, source, strength,
 shared artifacts, last seen) with a visible "Graph / Table" toggle; graph mode keeps the table
@@ -505,7 +505,7 @@ it must follow the corrected shape or it reintroduces the exact defect that was 
 
 Inference about relationships between named real people, so
 [`security-policy`](../../_meta/security-policy.md) and
-[`legal-and-compliance`](../../implemented/04-legal-and-compliance/spec.md) both apply.
+[`legal-and-compliance`](../../implemented/phase-1/04-legal-and-compliance/spec.md) both apply.
 
 1. **Public repository metadata only.** Contributor lists and commit authorship on public repos. No
    private repos (the token has no scope), no commit messages, no diffs, no email addresses at any

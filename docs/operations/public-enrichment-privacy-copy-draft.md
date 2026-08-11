@@ -1,7 +1,7 @@
 # Public-profile disclosure — draft copy for legal review
 
 **Status: draft, not published.** This is the deliverable for the *"Update legal and product copy"*
-task in [`plans/implemented/42-stealth-scraping/task.md`](../../plans/implemented/42-stealth-scraping/task.md),
+task in [`plans/implemented/phase-1/42-stealth-scraping/task.md`](../../plans/implemented/phase-1/42-stealth-scraping/task.md),
 which says explicitly: *"the wording needs a legal review signed off by a person; an agent may draft
 it but must not record the approval."*
 

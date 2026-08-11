@@ -43,7 +43,7 @@ improve a draft. It may not record an approval — see each `Operator:` line.
     disabled.
   - **Still the maintainer's**: the legitimate-interests balancing test, whether to commit publicly to
     the 180/30-day retention numbers, and recording the approval in the source register.
-  - Moved from `plans/implemented/42-stealth-scraping` on 2026-08-05. It is the only item on this plan on
+  - Moved from `plans/implemented/phase-1/42-stealth-scraping` on 2026-08-05. It is the only item on this plan on
     the critical path out of Beta: it gates `ENRICHMENT_ENABLED`, which gates the seven-day canary in
     [`01-production-readiness-audit`](../01-production-readiness-audit/tasks.md).
 
@@ -72,7 +72,7 @@ improve a draft. It may not record an approval — see each `Operator:` line.
   - **The reviewer signature is deliberately not part of this Verify line** (product-owner decision
     2026-07-28). It is a general-availability gate, recorded as such in the register's "Gates general
     availability only" table. A countersignature on an artifact does not change what the software does.
-  - Moved from `plans/implemented/44-calendar-scheduling-interview-intelligence` Phase 0 on 2026-08-05.
+  - Moved from `plans/implemented/phase-1/44-calendar-scheduling-interview-intelligence` Phase 0 on 2026-08-05.
 
 - [ ] **Obtain the EU AI Act sign-off for interview AI**
   - Files: `docs/compliance/interview-ai-act-classification.md`,
@@ -85,14 +85,14 @@ improve a draft. It may not record an approval — see each `Operator:` line.
   - **The controls shipped 2026-07-28 (`a51efc5`)** — classification, human-oversight procedure,
     post-market monitoring, the `AiDraftNotice` component and the brief editor's oversight surface. Launch
     stays behind `SENSITIVE_AI_ENABLED=false` until the sign-off exists, so nothing is running unreviewed.
-  - Moved from `plans/implemented/44-calendar-scheduling-interview-intelligence` on 2026-08-05, where it was
+  - Moved from `plans/implemented/phase-1/44-calendar-scheduling-interview-intelligence` on 2026-08-05, where it was
     marked `[~]` and therefore invisible to every open-task count in the repository.
 
 ## Commercial facts
 
 - [ ] **Verify interview unit economics in test and limited live mode**
   - Files: `docs/operations/interview-runtime-verification.md`,
-    `plans/implemented/44-calendar-scheduling-interview-intelligence/spec.md`
+    `plans/implemented/phase-1/44-calendar-scheduling-interview-intelligence/spec.md`
   - Do: Run representative 30/60/90-minute sessions and brief/report workloads; capture billed Deepgram
     minutes, sensitive-AI tokens, Stripe fees, object-storage bytes/operations, internal credits, revenue
     and gross margin. Adjust the configurable catalog before public launch; do not rewrite ledger
@@ -103,13 +103,13 @@ improve a draft. It may not record an approval — see each `Operator:` line.
   - Operator: needs real billed provider usage and a finance sign-off. Both are facts about money that
     an agent cannot produce, and a margin computed against placeholder cost constants is a number with a
     decimal point and no content.
-  - Moved from `plans/implemented/44-calendar-scheduling-interview-intelligence` Phase 12 on 2026-08-05.
+  - Moved from `plans/implemented/phase-1/44-calendar-scheduling-interview-intelligence` Phase 12 on 2026-08-05.
 
 - [ ] **Pass the Solutions quality, performance and cost gates**
   - Files: `docs/operations/solutions-evaluation.md`, `docs/operations/solutions-cost-certification.md`
   - Do: Execute the 60-brief suite, warm/cold load tests, source-outage drills, provider variance, and
     billing reconciliation against the exact release configuration.
-  - Verify: every acceptance threshold in `plans/implemented/43-solutions-intelligence/spec.md` passes with
+  - Verify: every acceptance threshold in `plans/implemented/phase-1/43-solutions-intelligence/spec.md` passes with
     dated artifacts, and `citableAsQualityGate` is true because `solution_gold_briefs` holds
     human-authored records.
   - Operator: four missing inputs, none of them code. Real provider pricing (the `MINIMAX_COST_PER_*`
@@ -120,6 +120,6 @@ improve a draft. It may not record an approval — see each `Operator:` line.
     (`docs/operations/solutions-evaluation.md`, 2026-08-01). Checking this box on the strength of a
     synthetic baseline is precisely the failure the authorship split exists to prevent: the same model
     cannot both answer and grade.
-  - Moved from `plans/implemented/43-solutions-intelligence` on 2026-08-05. That plan's own header says
+  - Moved from `plans/implemented/phase-1/43-solutions-intelligence` on 2026-08-05. That plan's own header says
     `Implementation authorized: no`, so this was never active work — it was a checklist for a future
     task, and a `- [ ]` in phase-1 read as pending engineering to everyone walking the file.

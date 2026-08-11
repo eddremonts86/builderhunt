@@ -12,17 +12,25 @@ import { join, relative } from 'node:path'
 //
 // ## Why two directories
 //
-// A finished plan moves to plans/implemented/, so the folder answers "what is done and
-// tested?" without anyone reading 59 status headers. The build order does not move with
+// A finished plan moves to plans/implemented/<phase>/, so the archive answers "what is done
+// and tested?" without anyone reading 59 status headers. The build order does not move with
 // it: the number *is* the position, and positions have to stay contiguous whether or not
-// the work landed. So the corpus this script checks is the union of the two directories,
-// and the invariant is unchanged — 01..N with no gaps, every dependency backward.
+// the work landed. So the corpus this script checks is the union of the live phase directory
+// and its archive, and the invariant is unchanged — 01..N with no gaps, every dependency
+// backward.
 //
 // Reading only plans/phase-1 would make the check pass vacuously the moment a plan moved:
-// twelve directories numbered 07, 11, 16, 20, 31, 39, 49, 51, 54, 55, 57 and 59 would be
-// asked to be numbered 01-12, and every dependency on a moved plan would resolve to
-// "not a plan directory". That is exactly what it did before this change.
-const PLAN_ROOTS = [join(process.cwd(), 'plans', 'phase-1'), join(process.cwd(), 'plans', 'implemented')]
+// seven directories numbered 11, 16, 20, 31, 39, 55 and 57 would be asked to be numbered
+// 01-07, and every dependency on a moved plan would resolve to "not a plan directory". That
+// is exactly what it did before this was taught the union.
+//
+// The archive is split by phase because the numbers are only unique *within* a phase: phase 3
+// is numbered 01-13 and twelve of those collide with phase 1's. A flat archive could hold one
+// phase and no more.
+const PLAN_ROOTS = [
+  join(process.cwd(), 'plans', 'phase-1'),
+  join(process.cwd(), 'plans', 'implemented', 'phase-1'),
+]
 const ALLOWED_FORWARD_EDGES = new Set(['22-semantic-search -> 23-proactive-discovery'])
 
 let failed = false

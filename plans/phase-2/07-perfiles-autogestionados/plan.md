@@ -5,9 +5,9 @@
 > [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md),
 > [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md),
 > [`06-landing-segmentada`](../06-landing-segmentada/spec.md),
-> [`phase-1/36-claimable-profiles`](../../implemented/36-claimable-profiles/spec.md),
-> [`phase-1/37-portfolio-builder`](../../implemented/37-portfolio-builder/spec.md), and
-> [`phase-1/38-work-sample`](../../implemented/38-work-sample/spec.md)
+> [`phase-1/36-claimable-profiles`](../../implemented/phase-1/36-claimable-profiles/spec.md),
+> [`phase-1/37-portfolio-builder`](../../implemented/phase-1/37-portfolio-builder/spec.md), and
+> [`phase-1/38-work-sample`](../../implemented/phase-1/38-work-sample/spec.md)
 > **Blocks**: nothing
 > **Reality check**: The current migration tip is `0154`. The complete quarantine, magic-byte,
 > S3-signing and ClamAV pipeline already exists under `src/lib/storage/` and

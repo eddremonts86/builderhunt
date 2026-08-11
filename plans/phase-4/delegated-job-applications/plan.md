@@ -1,7 +1,7 @@
 # Plan de entrega — candidaturas delegadas
 
 > **Status**: `pending`
-> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md), [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), [`ai-expansion`](../../implemented/21-ai-expansion/spec.md), [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md)
+> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md), [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), [`ai-expansion`](../../implemented/phase-1/21-ai-expansion/spec.md), [`security-and-multitenancy`](../../implemented/phase-1/01-security-and-multitenancy/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Crea un dominio candidate-side nuevo y separado de [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md), de `candidate_submissions` y de [`ats-integrations`](../ats-integrations/spec.md). Extiende ficheros existentes: `src/shared/lib/db/schema.ts`, `src/shared/lib/authorization/permissions.ts`, `src/shared/lib/ai/tasks.ts`, `src/shared/lib/billing/rate-cards.ts`, `src/shared/lib/repositories/account-privacy.ts`, `src/shared/lib/operational-schedules.ts`, `src/modules/dashboard/ui/shell/nav-config.ts`, `scripts/check-tenant-boundaries.mjs`, `scripts/db/verify-api-isolation-local.mjs`. Clona el patrón de `src/routes/api/admin/alerts/run-worker.ts` y la forma RLS de `drizzle/0085_candidate_documents_rls_grants.sql`. No añade cron nuevo para retención: reutiliza `legal.retention`.
 

@@ -1,8 +1,8 @@
 # Load capacity — Tasks
 
 > **Status**: `pending`
-> **Depends on**: [`02-production-infrastructure`](../../implemented/02-production-infrastructure/spec.md),
-> [`03-postgres-18-upgrade`](../../implemented/03-postgres-18-upgrade/spec.md)
+> **Depends on**: [`02-production-infrastructure`](../../implemented/phase-1/02-production-infrastructure/spec.md),
+> [`03-postgres-18-upgrade`](../../implemented/phase-1/03-postgres-18-upgrade/spec.md)
 > **Blocks**: nothing
 > **Reality check**: existing rate limiting is not work for this plan. The executable path is load
 > evidence, one pool per role, role-level timeouts, PgBouncer, and a two-hour isolated soak.

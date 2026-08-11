@@ -7,7 +7,7 @@
 > permanently. IndieHackers has no official API and the SPA requires a logged-in headless
 > browser session to read — a real ToS violation, not just a technical inconvenience. The
 > "founder" signal this plan was meant to capture is covered instead by
-> [`producthunt-integration`](../../implemented/18-producthunt-integration/spec.md) (official API) and,
+> [`producthunt-integration`](../../implemented/phase-1/18-producthunt-integration/spec.md) (official API) and,
 > optionally, a small user-tagging mini-plan (see below). No connector code will be
 > written for this source.
 

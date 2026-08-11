@@ -1,47 +1,54 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 
 /**
- * Keeps `plans/implemented/` true, and keeps it complete.
+ * Keeps the archive true, keeps it complete, and enforces the standing rule that a finished plan moves
+ * into it.
  *
  * ## Why this is not `check-phase-readiness.mjs`
  *
  * That script asks "is this plan ready to be executed?" — no reserved migration numbers, no
  * placeholders, an exact `spec.md`/`plan.md`/`tasks.md` file set. Every one of those rules is about work
- * that has not happened yet. Run over 48 finished plans it produced 52 failures, and 22 of them were
- * task texts naming the migration a plan *actually created*. Satisfying them would mean rewriting the
- * record of what happened to please a forward-looking lint, which is the wrong direction entirely.
+ * that has not happened yet. Run over the archive it produced 52 failures, and 22 of them were task texts
+ * naming the migration a plan *actually created*. Satisfying them would mean rewriting the record of what
+ * happened to please a forward-looking lint, which is the wrong direction entirely.
  *
- * So this checks the claims the folder itself makes, and nothing else:
+ * So this checks the claims the archive itself makes, and nothing else:
  *
  * 1. **Everything in it is done.** No `- [ ]`, no `- [~]`, and `implemented` in every file that carries a
  *    Status header. Both markers count: `- [~]` is the one that hides, because every status report in
  *    this repository greps for `- [ ]` alone and nine real tasks were once invisible for exactly that.
- * 2. **Nothing outside it is done.** A plan with zero open tasks and `implemented` everywhere belongs in
- *    the folder, and leaving it out makes the folder an understatement — which erodes trust in it just as
- *    fast as an overstatement, because a reader then has to check both directories anyway.
+ * 2. **Everything done is in it.** A plan in a live phase with zero open tasks and `implemented`
+ *    everywhere belongs in the archive. This is the standing rule — *finish a plan, move it* — enforced
+ *    rather than remembered, because an archive that understates what is done is as unusable as one that
+ *    overstates it: a reader then has to check both trees anyway.
  * 3. **No checked box contradicts itself.** A `- [x]` whose own text says "not implemented" must name the
- *    plan that owns the work now. This is the rule the first three could not see, and the one that caught
- *    the most: four checked tasks said the opposite of their marker while every mechanical condition
- *    passed.
+ *    plan that owns the work now. This is the rule the others could not see, and the one that caught the
+ *    most: four checked tasks said the opposite of their marker while every mechanical condition passed.
  *
- * It also checks the vocabulary, everywhere: a Status outside the five values
+ * It also checks the vocabulary everywhere: a Status outside the five values
  * `check-phase-readiness.mjs` accepts is a status no gate can read, and that is how eight of them drifted
- * across phase-1 for weeks while four plans sat at 100% of their tasks still labelled `pending`.
+ * across phase 1 for weeks while four plans sat at 100% of their tasks still labelled `pending`.
+ *
+ * ## Why the archive is split by phase
+ *
+ * Plan numbers are unique only *within* a phase. Phase 3 is numbered 01-13 and twelve of those collide
+ * with phase 1's, so a flat archive could hold one phase and no more. `plans/implemented/<phase>/` is what
+ * lets both live there, and `check-plan-order.mjs` reads a phase's live directory together with its
+ * archive so the build order still reads as one contiguous sequence.
  */
 const ROOT = process.cwd()
-const IMPLEMENTED = join(ROOT, 'plans', 'implemented')
-const LIVE = join(ROOT, 'plans', 'phase-1')
+const ARCHIVE = join(ROOT, 'plans', 'implemented')
+
 /**
- * Phases that are complete **in place**, and why they are not in `plans/implemented/`.
+ * The phases whose plans are still being worked.
  *
- * Phase 3's thirteen plans are numbered 01-13, and twelve of those numbers are already taken by phase-1
- * plans sitting in `plans/implemented/`. A flat archive cannot hold both, and the fix — a per-phase
- * subdirectory — means reworking both plan gates and rewriting the links of every archived plan. That is a
- * structural decision, not a cleanup, so the phase stays where it is and is guarded here instead: every
- * plan `implemented`, zero open, zero partial. The guarantee is the same; only the filing differs.
+ * Every one of them has rule 2 applied: finish a plan and the gate tells you to move it. Listing all five
+ * rather than only the started ones costs nothing today and means the rule is already in force on the day
+ * a phase-4 plan first closes — which is exactly the day nobody would remember to add it.
  */
-const COMPLETE_IN_PLACE = [join(ROOT, 'plans', 'phase-3')]
+const LIVE_PHASES = ['phase-1', 'phase-2', 'phase-3', 'phase-4', 'phase-5']
+
 const ALLOWED_STATUSES = new Set(['pending', 'partially-implemented', 'implemented', 'blocked', 'superseded'])
 
 let failed = false
@@ -97,140 +104,139 @@ function readPlan(root, dir) {
   return { files, statuses, open, partial }
 }
 
-// ── 1. Every status, in both directories, is a value a gate can read ─────────────────────────────
-for (const root of [IMPLEMENTED, LIVE]) {
-  for (const dir of planDirectories(root)) {
-    const { statuses } = readPlan(root, dir)
-    for (const [file, status] of statuses) {
-      if (!ALLOWED_STATUSES.has(status)) {
-        fail(
-          `${dir}/${file} has Status \`${status}\`, which no gate can read — use one of ` +
-            `${[...ALLOWED_STATUSES].join(', ')} and keep the nuance as prose beside it`,
-        )
-      }
+/** Every plan directory in the repository, tagged with its phase and whether it is archived. */
+function allPlans() {
+  const out = []
+  for (const phase of planDirectories(ARCHIVE)) {
+    const root = join(ARCHIVE, phase)
+    for (const dir of planDirectories(root)) out.push({ phase, root, dir, archived: true })
+  }
+  for (const phase of LIVE_PHASES) {
+    const root = join(ROOT, 'plans', phase)
+    for (const dir of planDirectories(root)) out.push({ phase, root, dir, archived: false })
+  }
+  return out
+}
+
+const plans = allPlans()
+
+// ── 1. Every status, everywhere, is a value a gate can read ──────────────────────────────────────
+for (const { root, dir } of plans) {
+  const { statuses } = readPlan(root, dir)
+  for (const [file, status] of statuses) {
+    if (!ALLOWED_STATUSES.has(status)) {
+      fail(
+        `${relative(ROOT, root)}/${dir}/${file} has Status \`${status}\`, which no gate can read — use one of ` +
+          `${[...ALLOWED_STATUSES].join(', ')} and keep the nuance as prose beside it`,
+      )
     }
   }
 }
 
-// ── 2. Everything in plans/implemented/ is finished ──────────────────────────────────────────────
-const implemented = planDirectories(IMPLEMENTED)
-for (const dir of implemented) {
-  const { files, statuses, open, partial } = readPlan(IMPLEMENTED, dir)
+// ── 2. Everything in the archive is finished ─────────────────────────────────────────────────────
+for (const { phase, root, dir, archived } of plans) {
+  if (!archived) continue
+  const { files, statuses, open, partial } = readPlan(root, dir)
   if (files.length === 0) {
-    fail(`plans/implemented/${dir} has no markdown file`)
+    fail(`plans/implemented/${phase}/${dir} has no markdown file`)
     continue
   }
   if (open > 0 || partial > 0) {
     fail(
-      `plans/implemented/${dir} is not finished: ${open} open and ${partial} partial task(s). ` +
-        'Move it back to plans/phase-1/ or close them.',
+      `plans/implemented/${phase}/${dir} is not finished: ${open} open and ${partial} partial task(s). ` +
+        `Move it back to plans/${phase}/ or close them.`,
     )
   }
   if (statuses.size === 0) {
-    fail(`plans/implemented/${dir} carries no Status header in any file`)
+    fail(`plans/implemented/${phase}/${dir} carries no Status header in any file`)
     continue
   }
   for (const [file, status] of statuses) {
     if (status !== 'implemented') {
-      fail(`plans/implemented/${dir}/${file} says \`${status}\`, but everything in this folder is implemented`)
+      fail(
+        `plans/implemented/${phase}/${dir}/${file} says \`${status}\`, but everything in the archive is implemented`,
+      )
     }
   }
 }
 
-// ── 3. Nothing outside it is finished ────────────────────────────────────────────────────────────
-for (const dir of planDirectories(LIVE)) {
-  const { statuses, open, partial } = readPlan(LIVE, dir)
+/**
+ * ── 3. Finish a plan, move it ───────────────────────────────────────────────────────────────────
+ *
+ * The standing rule, enforced rather than remembered. A plan with no open work whose every file says
+ * `implemented` is finished, and a finished plan belongs in the archive.
+ *
+ * `superseded` and `blocked` plans are untouched by this: they have no open tasks either, and they were
+ * never built, so filing them as implemented would be the opposite of the point.
+ */
+for (const { phase, root, dir, archived } of plans) {
+  if (archived) continue
+  const { statuses, open, partial } = readPlan(root, dir)
   const values = [...statuses.values()]
   const allImplemented = values.length > 0 && values.every((status) => status === 'implemented')
   if (allImplemented && open === 0 && partial === 0) {
     fail(
-      `plans/phase-1/${dir} has no open tasks and says \`implemented\` everywhere — ` +
-        'it belongs in plans/implemented/. A folder that understates what is done is as unusable as one that overstates it.',
+      `plans/${phase}/${dir} is finished — no open tasks, \`implemented\` in every file — so it belongs in ` +
+        `plans/implemented/${phase}/. Run: git mv plans/${phase}/${dir} plans/implemented/${phase}/${dir}`,
     )
   }
 }
 
 /**
- * A checked box that admits it was not done.
+ * ── 4. A checked box that admits it was not done ─────────────────────────────────────────────────
  *
- * This is the rule the other three could not see, and the one that mattered most. The folder's whole
- * claim rests on `- [x]`, and on 2026-08-11 four checked tasks carried titles saying the opposite —
- * "not implemented this pass", "NOT done as a dedicated test task", "not done, needs a human",
- * "moved, not done". Every mechanical condition passed. The text said no.
+ * The archive's whole claim rests on `- [x]`, and on 2026-08-11 four checked tasks carried titles saying
+ * the opposite — "not implemented this pass", "NOT done as a dedicated test task", "not done, needs a
+ * human", "moved, not done". Every mechanical condition passed. The text said no.
  *
  * Three of those four turned out to be *already built*, with only their titles stale; the fourth had
- * genuinely moved to phase 5. So the rule is not "never admit a gap" — it is **say where the work
- * went**. A task that admits not-done here must name the plan that owns it now, and a
- * `plans/phase-5/` link is the only accepted answer, because phase 5 is where launch, legal, operator
+ * genuinely moved to phase 5. So the rule is not "never admit a gap" — it is **say where the work went**.
+ * A `plans/phase-5/` link is the only accepted answer, because phase 5 is where launch, legal, operator
  * and soak work lives and a link there is itself checkable.
  *
- * Deliberately narrow: "deferred to a later pass" with no pointer fails, which is the sentence that
- * lets a gap sit unowned for weeks.
+ * Deliberately narrow: "deferred to a later pass" with no pointer fails, which is the sentence that lets
+ * a gap sit unowned for weeks.
  */
 const ADMITS_NOT_DONE = /(not implemented|not attempted|not done|not started|skipped|deferred|not built|not wired|not written)/i
 const NAMES_A_NEW_OWNER = /plans\/phase-5\/|phase-5\/[0-9]{2}-/
 
-for (const root of [IMPLEMENTED, LIVE]) {
-  for (const dir of planDirectories(root)) {
-    for (const name of markdownFiles(root, dir)) {
-      const lines = readFileSync(join(root, dir, name), 'utf8').split('\n')
-      for (const [index, line] of lines.entries()) {
-        if (!/^\s*[-*]\s*\[x\]/.test(line) || !ADMITS_NOT_DONE.test(line)) continue
-        /**
-         * The pointer may sit on the task's continuation lines rather than its title, which is how
-         * plan 43 already wrote it. Six lines is the whole of a task block in this repository's format.
-         */
-        const block = lines.slice(index, index + 7).join(' ')
-        if (NAMES_A_NEW_OWNER.test(block)) continue
-        fail(
-          `${dir}/${name}:${index + 1} is checked but its own text says it was not done, and names no ` +
-            `owner: "${line.trim().slice(0, 96)}". Either close it, or move it to a plans/phase-5/ plan and link that.`,
-        )
-      }
-    }
-  }
-}
-
-// ── 5. A phase that claims to be complete really is ──────────────────────────────────────────────
-for (const root of COMPLETE_IN_PLACE) {
-  const label = root.slice(root.lastIndexOf('plans/'))
-  const dirs = planDirectories(root)
-  if (dirs.length === 0) {
-    fail(`${label} is listed as complete in place but holds no plans`)
-    continue
-  }
-  for (const dir of dirs) {
-    const { statuses, open, partial } = readPlan(root, dir)
-    if (open > 0 || partial > 0) {
+for (const { root, dir } of plans) {
+  for (const name of markdownFiles(root, dir)) {
+    const lines = readFileSync(join(root, dir, name), 'utf8').split('\n')
+    for (const [index, line] of lines.entries()) {
+      if (!/^\s*[-*]\s*\[x\]/.test(line) || !ADMITS_NOT_DONE.test(line)) continue
+      // The pointer may sit on the task's continuation lines rather than its title, which is how plan 43
+      // already wrote it. Seven lines is the whole of a task block in this repository's format.
+      if (NAMES_A_NEW_OWNER.test(lines.slice(index, index + 7).join(' '))) continue
       fail(
-        `${label}/${dir} has ${open} open and ${partial} partial task(s), but its phase is recorded as ` +
-          'complete. Either close them or take the phase off COMPLETE_IN_PLACE.',
+        `${relative(ROOT, root)}/${dir}/${name}:${index + 1} is checked but its own text says it was not done, ` +
+          `and names no owner: "${line.trim().slice(0, 96)}". Either close it, or move it to a plans/phase-5/ ` +
+          'plan and link that.',
       )
     }
-    for (const [file, status] of statuses) {
-      if (status !== 'implemented') {
-        fail(`${label}/${dir}/${file} says \`${status}\`, but its phase is recorded as complete`)
-      }
-    }
   }
 }
 
-// ── 6. A plan has one home ───────────────────────────────────────────────────────────────────────
-const live = new Set(planDirectories(LIVE))
-for (const dir of implemented) {
-  if (live.has(dir)) fail(`${dir} exists under both plans/implemented and plans/phase-1 — a plan has one home`)
+// ── 5. A plan has one home ───────────────────────────────────────────────────────────────────────
+const homes = new Set()
+for (const { phase, dir } of plans) {
+  const key = `${phase}/${dir}`
+  if (homes.has(key)) fail(`${key} exists both in plans/${phase}/ and in the archive — a plan has one home`)
+  homes.add(key)
 }
 
 if (failed) {
-  console.error(
-    '\nplans/implemented/README.md states what this folder means and the four steps for moving a plan into it.',
-  )
+  console.error('\nplans/implemented/README.md states what the archive means and the steps for moving a plan into it.')
   process.exit(1)
 }
 
-const completeInPlace = COMPLETE_IN_PLACE.reduce((sum, root) => sum + planDirectories(root).length, 0)
+const archived = plans.filter((plan) => plan.archived)
+const live = plans.filter((plan) => !plan.archived)
+const byPhase = [...new Set(archived.map((plan) => plan.phase))]
+  .sort()
+  .map((phase) => `${phase} ${archived.filter((plan) => plan.phase === phase).length}`)
+  .join(', ')
 console.log(
-  `OK: ${implemented.length} implemented plans have no open or partial tasks and say so in every file; ` +
-    `${completeInPlace} more complete in place (phase-3); ` +
-    `${live.size} live plans in plans/phase-1; every Status is a readable value`,
+  `OK: ${archived.length} archived plans (${byPhase}), none carrying open or partial tasks; ` +
+    `${live.length} live plans, none of them finished`,
 )

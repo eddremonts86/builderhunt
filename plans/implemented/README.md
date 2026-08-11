@@ -3,10 +3,16 @@
 Every plan in this directory is **done and tested**. That is the only thing this folder means, and it
 means exactly that — nothing here is aspirational, in progress, or "code-complete pending a review".
 
-Moved here on 2026-08-11: **51 plans** — 47 in the first pass, then `59-personalized-invitations` once its
-closing evidence was written, then `07-responsive-mobile-design`, `49-audit-performance-qa` and
-`51-audit-conversion` once their remainders turned out to be either already done or already owned by
-phase 5.
+Split by phase, because plan numbers are unique only *within* a phase — phase 3 is numbered 01-13 and
+twelve of those collide with phase 1's, so a flat archive could hold one phase and no more.
+
+| | Plans | What it holds |
+|---|---|---|
+| `phase-1/` | 52 | every finished phase-1 plan, numbered 01-59 with gaps where a live plan still sits |
+| `phase-3/` | 13 | all of phase 3 — the phase is complete |
+
+Seven plans remain in `plans/phase-1/`: two with real open work (`55` waiting on cost-bearing
+certification runs, `57` out of scope by decision) and five `superseded` ones that were never built.
 
 ## What a plan had to satisfy to be in here
 
@@ -25,8 +31,6 @@ and why it changed, so the claim is auditable rather than asserted.
 
 ## What is deliberately *not* in here
 
-Eight plans stayed in `plans/phase-1/`, and the reason differs by plan:
-
 | Plan | Status | Why it stayed |
 |---|---|---|
 | `55-load-1000-concurrent-users` | `pending` | 5 open + 2 partial — the cost-bearing certification runs |
@@ -36,27 +40,26 @@ Eight plans stayed in `plans/phase-1/`, and the reason differs by plan:
 | `20-indiehackers-integration` | `superseded` | closed and skipped, not built |
 | `31-pricing-and-billing` | `superseded` | replaced by `30-stripe-billing-platform` |
 | `39-technical-sandbox` | `superseded` | replaced elsewhere |
-| `54-waitlist-launch` | `blocked` | its own tasks are done; the launch is phase-5 work |
 
-The six `superseded`/`blocked` rows are not implemented and never will be under these numbers, which is why they are not in
-here. They are also not *pending* — filing them with live work is the second-best option, and one worth
+The five `superseded` plans have no open tasks either, which is exactly why the move rule cannot be "zero
+open tasks" alone: they were never built, and filing them as implemented would be the opposite of the
+point. They are also not *pending*, so sitting beside live work is the second-best answer and one worth
 revisiting.
 
-Three of them — `11`, `16` and `20` — used to say `retired` and `closed — skipped`, values `scripts/check-phase-readiness.mjs`
-cannot read — it allows exactly `pending`, `partially-implemented`, `implemented`, `blocked` and
-`superseded`. They now say `superseded` with the original word kept beside it as prose, because
-"retired" and "superseded" are not the same story and the distinction was worth keeping. Every status
-across both directories is now a value the gate can read.
+`54-waitlist-launch` used to be on this list as `blocked`. It is now archived: all four of its own tasks
+were done and its five remaining items moved to `plans/phase-5/` on 2026-08-05 — the same state as
+`03`, `42`, `43`, `44` and `46`, every one of which said `implemented` and was archived. Treating it
+differently was an inconsistency, not a distinction anybody had drawn.
 
 ## The numbers did not move
 
 A plan's two-digit prefix is its position in the canonical build order recorded in
 [`../_meta/phase-1-order.md`](../_meta/phase-1-order.md), and that order is a property of the work
 rather than of where the file is filed. So `01-security-and-multitenancy` is still `01` in here, and
-`plans/phase-1/` still holds `11`, `16`, `20`, `31`, `39`, `54`, `55` and `57`.
+`plans/phase-1/` still holds `11`, `16`, `20`, `31`, `39`, `55` and `57`.
 
 `scripts/check-plan-order.mjs` therefore reads the **union** of the two directories. Left pointed at
-`plans/phase-1/` alone it would have passed vacuously — eight directories asked to be numbered 01-08,
+`plans/phase-1/` alone it would have passed vacuously — seven directories asked to be numbered 01-07,
 and every dependency on a moved plan resolving to "not a plan directory". It now reports
 `OK: 59 plans numbered 01-59, every dependency points backward`, which is the same guarantee as before
 the split.
@@ -66,31 +69,13 @@ the split.
 1. Close every task, including `- [~]` ones.
 2. Set `> **Status**: `implemented`` in all three files, and add a dated note saying what changed.
 3. Run `pnpm ci:local` and record the step count in the note.
-4. `git mv plans/phase-1/NN-name plans/implemented/NN-name`.
-5. Fix the links: a moved plan's siblings resolve as `../NN-name/`, but anything still in
-   `plans/phase-1/` becomes `../../phase-1/NN-name/`, and references from outside `plans/` change from
-   `plans/phase-1/NN-name` to `plans/implemented/NN-name`. The move on 2026-08-11 rewrote 370 relative
-   links and 252 full-path references across 170 files; it also fixed 20 depth bugs that predated it,
-   taking the repository from 37 broken relative links inside `plans/` down to 2 — both of which are the
-   `../other-plan/spec.md` placeholder in `_meta/conventions.md`, which is illustrative prose.
+4. `git mv plans/<phase>/NN-name plans/implemented/<phase>/NN-name`.
+5. Fix the links, and verify them with a resolver rather than by eye. Three things change at once: a
+   sibling still in the phase directory becomes `../../../<phase>/NN-name/`, a full path becomes
+   `plans/implemented/<phase>/NN-name`, and — the one that is easy to miss — **the archive sits one level
+   deeper**, so every `../../` aimed at the repository root needs another `../`. On 2026-08-11 that last
+   category was 54 of the breaks, all of them links that had been correct minutes earlier.
 6. Run `pnpm plans:check-order` and `pnpm plans:check-implemented`.
-
-## Phase 3 is complete too, and is not in here
-
-`plans/phase-3/` — thirteen plans, 72 tasks, all closed, all three files saying `implemented` — is
-finished, and it stays where it is for a reason that is arithmetic rather than judgement: its plans are
-numbered 01-13, and **twelve of those numbers are already taken** by phase-1 plans in this folder. A flat
-archive cannot hold both.
-
-The fix is a per-phase subdirectory (`implemented/phase-1/`, `implemented/phase-3/`), which means
-reworking both plan gates and rewriting the links of every archived plan. That is a structural decision,
-so it has not been taken unilaterally. Meanwhile the guarantee is identical: `check-implemented-plans.mjs`
-lists phase 3 as **complete in place** and asserts the same two things it asserts here — every plan
-`implemented`, zero open, zero partial. Only the filing differs.
-
-Phases 2, 4 and 5 are audited and clean, and mostly unstarted: 79, 522 and 41 open tasks, with none of
-the defects phase 1 carried — no unreadable statuses, no files disagreeing with each other, no checked box
-saying it was not done.
 
 ## What keeps this folder honest
 
@@ -115,9 +100,10 @@ folder, a `pending` status inside it, an invented status value, a finished plan 
 checked task admitting a gap both with and without a pointer. Each fails, and the last one passes once
 the pointer is there.
 
-It also guards phase 3, which is complete in place: a reopened task or a downgraded status there fails
-the same way. Verified against breakage both ways — a `- [x]` flipped back to `- [ ]`, and one file
-downgraded to `partially-implemented`.
+It guards every phase the same way, archived or live, and it is what makes "finish a plan, move it" a rule
+rather than a habit: a finished plan left in its phase directory fails with the `git mv` to run. Verified
+against breakage in both directions — a `superseded` plan flipped to `implemented` is told to move, and a
+`- [x]` flipped back to `- [ ]` inside the archive is told to move back.
 
 `pnpm plans:check-order` runs beside it, and guards that a two-digit prefix is still a position in a
 contiguous build order across both directories.

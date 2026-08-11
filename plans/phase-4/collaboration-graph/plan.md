@@ -1,7 +1,7 @@
 # Co-Shipping Collaboration Graph (plan)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../implemented/01-security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../implemented/02-production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../implemented/40-team-synergy/spec.md) (neither is required).
+> **Depends on**: [`security-and-multitenancy`](../../implemented/phase-1/01-security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../implemented/phase-1/02-production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../implemented/phase-1/40-team-synergy/spec.md) (neither is required).
 > **Blocks**: nothing
 > **Reality check** (re-verified against master HEAD, 2026-07-27): Builds on `src/shared/lib/db/schema.ts` (`builderIdentities` L139–162, deterministic `sha256(source \0 sourceId)` id minted in `organization-builders.ts` L278), `drizzle/0017_enrichment_rls_policies.sql`'s `is_builder_processing_restricted(text)`, `src/lib/discovery/worker.ts` (global-table worker + cursor pattern), `src/routes/api/admin/alerts/run-worker.ts` (cron auth + `withJobRun`), and `src/shared/lib/operational-schedules.ts` (the code-side schedule registry every worker must now appear in). Requires a **new** GitHub fetch path — `src/lib/sources/github.ts` fetches only `/search/users` and `/search/repositories`.
 

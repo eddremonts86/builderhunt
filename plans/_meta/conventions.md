@@ -12,6 +12,24 @@ position onward shifts up — renumbering means `git mv` plus rewriting the `../
 that point at each moved directory. `pnpm plans:check-order` fails on an unnumbered directory,
 a duplicate or missing position, and any `Depends on` header that points at a higher number.
 
+## Where a plan lives
+
+A plan lives in its phase directory while there is work in it, and in `plans/implemented/<phase>/` once
+there is not. "Once there is not" is exact: zero `- [ ]`, zero `- [~]`, and `implemented` in all three
+files. The `- [~]` half matters — every status count in this repository greps for `- [ ]` alone, and nine
+real tasks were once invisible because of it.
+
+`pnpm plans:check-implemented` enforces both directions, so the rule is not a habit anybody has to keep.
+It also refuses a `- [x]` whose text admits it was not done without naming the `plans/phase-5/` plan that
+took the work, because that sentence is how a gap sits unowned for weeks.
+
+Not everything without open tasks is finished. `superseded` and `blocked` plans have none either and were
+never built; filing them as implemented would be the opposite of the point, so they stay in the phase
+directory.
+
+The split by phase is arithmetic: numbers are unique within a phase, not across phases, and twelve of
+phase 3's thirteen collide with phase 1's.
+
 ## Files per plan
 
 Every plan directory contains exactly three files:

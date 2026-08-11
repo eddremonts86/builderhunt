@@ -97,7 +97,7 @@ visible and lets the user choose another ranking lens.
   credits.
 - Credits are organization-owned and pooled according to the canonical billing plan.
 - The feature depends on
-  [`stripe-billing-platform`](../../../plans/implemented/30-stripe-billing-platform/spec.md) and must not create a
+  [`stripe-billing-platform`](../../../plans/implemented/phase-1/30-stripe-billing-platform/spec.md) and must not create a
   balance table, grant system, Stripe integration, or parallel ledger.
 
 Initial versioned rate card:

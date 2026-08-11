@@ -1,6 +1,6 @@
 # Personalized invitations — verification evidence
 
-Closing evidence for [`plans/implemented/59-personalized-invitations`](../../plans/implemented/59-personalized-invitations/tasks.md),
+Closing evidence for [`plans/implemented/phase-1/59-personalized-invitations`](../../plans/implemented/phase-1/59-personalized-invitations/tasks.md),
 recorded 2026-08-11 on commit `8c73b0f03`.
 
 ## What was NOT done, first
