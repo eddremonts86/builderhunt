@@ -397,10 +397,32 @@
     240 sweeps an hour at nobody. `db.totalSavedQueries`, `db.totalBuilders` and `db.totalNotes` were
     hardcoded `null` in the response literal and rendered as three permanent em-dashes.
 
-- [ ] **Define versioned Admin Metrics section contracts**
-  - Files: `src/shared/lib/admin-metrics/contracts.ts`, contract tests
+- [x] **Define versioned Admin Metrics section contracts**
+  - Files: `src/shared/lib/admin-metrics/contracts.ts`, `tests/unit/shared/lib/admin-metrics/contracts.test.ts`
   - Do: Define Overview, Traffic, Search, Discovery, Activation, Conversion, Feature reliability, and Runtime section schemas with status, generated time, window/timezone, source scope, reset/process identity, units, thresholds, bounded series, and ranked rows.
   - Verify: tests reject missing units/scope, more than 90 buckets/10 ranked rows, arbitrary route labels, invalid thresholds, unknown variants, and process counters presented as persisted platform totals.
+  - **Implemented 2026-08-11**, reusing `shared/lib/dashboard/contracts.ts` rather than inventing a
+    parallel style: same section envelopes that fail independently, same mandatory `generatedAt`, same
+    rows bounded at the schema instead of trimmed. Its own schema version, because the two surfaces ship
+    independently and one shared number would force a tenant-dashboard refresh for an admin change.
+  - What it adds is the operator-specific rule: a number is meaningless without the thing that says how
+    to read it, so unit, scope, window-with-timezone and `generatedAt` are all mandatory.
+    - **The scope rule is the one this product has already been bitten by.** `metrics.get()` counters are
+      per-instance, zero at boot and reset by a deploy. `scope: 'process'` therefore *requires*
+      `processIdentity` and *refuses* `platformTotal: true` — that combination is the sentence "this
+      instance's counter is the platform's number", which is exactly what an operator would act on and be
+      wrong about. The reverse is refused too: a persisted aggregate carrying a pid reads as per-instance
+      and invites somebody to sum two of them.
+    - `direction` on a threshold is what makes the pair checkable. Without it a schema can only assert
+      two numbers exist; critical at 200 ms with warn at 2 s parses, renders, and then never fires.
+    - Route rankings use a 14-family allowlist, not raw paths: `/api/sprints/<id>` names a real sprint, so
+      a ranking built from paths publishes tenant identifiers onto an operator page and lets traffic
+      rather than design decide the row count.
+    - A `partial` state exists alongside `ready`/`unavailable`, because an admin section genuinely can be
+      half-answered — counters present, histogram store missing — and the other two both lose information.
+    - `parseSectionRequest` checks a variant *against its section*: `latency` is traffic's, not search's,
+      and a cross-section variant that resolved would render a plausible wrong view under a shareable URL.
+  - Result: 27 tests, one per rejection the Verify line names, plus the defaults. `tsc` 0, `eslint` 0.
 
 - [~] **Split the monolithic Admin Metrics API and remove frequent billing scans**
   - Files: `src/routes/api/admin/metrics/index.ts`, `src/routes/api/admin/metrics/overview.ts`, section routes/repository, API/performance tests
