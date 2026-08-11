@@ -1247,11 +1247,37 @@ missing — so the only honest version of this widget was an empty one.
     cannot read or overwrite another's console.
   - **No DELETE grant**, matching `dashboard_preferences`: "reset my layout" is an update to the defaults, and a
     case asserts the delete is refused.
-  - **Still open:** the UI half. There is no control yet that sets the landing view or hides an optional widget, so
-    "keyboard reorder" and "reset" have no surface to exercise — and the optional Growth/Content widgets the task
-    names are sections rather than movable cards after the "índice = metrics" decision, which makes "move/hide"
-    a question about what those controls should even do. The store refuses the wrong things correctly; nothing
-    calls it from the page yet.
+  - **The UI half landed 2026-08-11.** Two keyboard-reachable controls on the metrics page — "Open here by
+    default" and "Reset to the overview" — and `/admin` redirects to the saved view. The store is reachable, and
+    "reset" has the surface the Verify line asks for.
+    - **Applied at `/admin`, not in `/admin/metrics`'s `beforeLoad`.** That was tried first, gated on "the URL
+      named nothing", and it cannot work: TanStack Router serializes the *validated* search into `location`
+      before `beforeLoad` runs, so `location.searchStr` on a bare `/admin/metrics` already reads
+      `?section=overview&range=24h&variant=summary&compare=false` and the condition is never true. Measured with
+      `E2E_SERVER_LOG=1` after the redirect silently never fired — worth knowing that the harness spawns its own
+      server and its stdout is absent from the Playwright output without that flag.
+    - `/admin` is the better home regardless: it is the one URL meaning "open the console" that carries no
+      opinion about where, so "an explicit URL wins" is structural rather than a condition to keep getting right.
+      A default that overrode `?section=traffic` would mean two admins following one incident link saw different
+      pages while both address bars agreed.
+    - **`check:admin-metrics` refused the PUT and was right to.** Its rule is that the Command Center reads. The
+      exemption is one literal path — method and URL matched on the same `fetch` statement, `/api/admin/preferences`
+      only, and a mutating call with a non-literal URL still fails. Verified by attempting three ways in: a POST
+      to another admin endpoint, a path-traversal lookalike, and a URL in a variable. All refused.
+    - **Two bugs the new cases caught, both mine.** Reset sent `DEFAULT_ADMIN_METRICS_SEARCH` whole, which carries
+      `compare` — a key the route's `.strict()` body rejects — so every reset 400'd while the save beside it
+      worked. And `landingRedirectTarget` began life beside the server function; it is a pure decision about
+      search state, so it moved to `url-state.ts` where a test can reach it without `createServerFn`.
+    - `url-state.ts` had no tests, the same gap as `MetricWidget`. It has 12 now, including the two whose failure
+      is invisible: a variant carried onto a section with no such view, and `?compare=false` rewritten away from an
+      operator who typed it deliberately.
+  - **Still open: the hidden-widget half, and it is blocked on a product decision rather than on code.**
+    `action_queue` is the only id in the vocabulary, it is required, and hiding it is refused with a 422. No
+    optional admin widget exists — the id appears in no component under `src/modules/admin/` — so there is nothing
+    to hide. The task names "optional Growth/Content widgets", and after the "índice = metrics" ruling those are
+    *sections* reached from a nav, not movable cards. Building a control would mean first inventing an optional
+    widget for it to act on. The store already refuses the wrong things correctly; what is missing is something
+    worth hiding.
 
 - [~] **Add admin scope, audit, and performance release gates**
   - Files: admin dashboard contract/E2E/accessibility/performance tests, rollout runbook
