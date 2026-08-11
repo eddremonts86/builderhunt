@@ -59,7 +59,14 @@ jobs:
         image: pgvector/pgvector:0.8.5-pg18
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          # Per-run, not the literal `postgres` the other workflows use.
+          #
+          # GitGuardian's generic-password detector flagged the hardcoded pair and failed a required check on the
+          # pull request. It is not wrong about the shape, even though this database lives for one job and is
+          # reachable only from that job's network — so the fix removes the constant rather than suppressing the
+          # detector, which would have weakened it for every future file too. `github.run_id` is unique per run and
+          # available in both `services.*.env` and the job `env` below, so the two connection strings still match.
+          POSTGRES_PASSWORD: ${{ github.run_id }}
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
@@ -87,8 +94,8 @@ jobs:
       # The smoke creates and migrates `builderhunt_load_test_smoke` from this URL. It never touches the
       # database named here, and `safety.ts` refuses outright unless the *target* name carries the disposable
       # prefix and the host is loopback.
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-      DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      DATABASE_URL: postgresql://postgres:${{ github.run_id }}@127.0.0.1:5432/postgres
+      DATABASE_MIGRATION_URL: postgresql://postgres:${{ github.run_id }}@127.0.0.1:5432/postgres
       APP_URL: http://127.0.0.1:3000
       VITE_APP_URL: http://127.0.0.1:3000
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
@@ -107,7 +114,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      # `@v6` with an explicit `version`, matching every other workflow here.
+      #
+      # This was `@v4` with no `version` and no `packageManager` in `package.json` for the action to read, so the
+      # job died on its third step with "No pnpm version is specified" — every time, from the moment it was
+      # written. It had simply never run: this workflow only fires on a pull request, and the branch it was added
+      # on had none until now. A CI job that has never executed is not a gate, whatever its file says.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -147,7 +162,7 @@ jobs:
             value="$(openssl rand -hex 16)"
             echo "::add-mask::$value"
             echo "$var=$value" >> "$GITHUB_ENV"
-            PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            PGPASSWORD=${{ github.run_id }} psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
               -c "ALTER ROLE builderhunt_${role} WITH PASSWORD '${value}'"
           done
           admin="$(openssl rand -hex 16)"
