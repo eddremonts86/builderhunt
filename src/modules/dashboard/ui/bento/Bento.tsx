@@ -118,6 +118,17 @@ export function BentoTile({
     // Unconditional variants — see `BentoGrid` for what the reduced-motion branch here cost.
     <motion.div
       variants={fadeInUpVariants}
+      /**
+       * The animation library writes `opacity` and `transform` inline here, and this attribute is how
+       * a harness addresses that without guessing at the DOM shape.
+       *
+       * `tests/regression/test-accessibility.mjs` pins these to their resting values with an
+       * `!important` rule, because racing the entrance is what made that gate intermittent: it
+       * sampled a fade and reported the composite as a 1.86:1 contrast defect. A stylesheet rule wins
+       * over an inline value and applies to tiles that mount later too, which is the half a one-shot
+       * "finish all animations" call cannot cover.
+       */
+      data-bento-tile=""
       className={`${SPAN_CLASS[span]} min-w-0`}
     >
       {/*

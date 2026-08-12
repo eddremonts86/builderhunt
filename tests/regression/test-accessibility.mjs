@@ -152,12 +152,33 @@ function isExpected(_route, violationNode) {
 // different, non-token color on repeated runs — a timing race, not a real
 // bug — and no fixed wait reliably outlasts every transition under CI-like
 // load. Freeze all CSS animations/transitions instead of guessing a delay.
+//
+// The four declarations below reach CSS animations and CSS transitions, and nothing else — which is
+// the gap the note above did not know about. The dashboard's widget entrance is a Framer Motion
+// stagger driven through the Web Animations API, writing `opacity` and `transform` inline, and it
+// sailed straight through all four. Same symptom the note describes, one layer down: `/dashboard`
+// reported `#404044` at 1.86:1, which is `--color-bh-text-dim` (`#a4a4ab`, 7.2:1 against every dark
+// surface) composited at about a third of full opacity.
+//
+// `settleAnimations` finishes those animations, but finishing is a moment and mounting is not: a
+// widget whose section data arrives late starts its entrance after the call, and that race is exactly
+// how this gate failed under the full local run while passing twice in isolation. So the tiles are
+// also pinned to their resting values here. A stylesheet `!important` rule beats an inline value and
+// applies to whatever mounts next, which is what makes it a fix rather than a wider window.
+//
+// Scoped to `[data-bento-tile]` rather than to every element with an inline opacity: forcing opacity
+// to 1 anywhere raises contrast, so a blanket rule could hide a genuinely-too-dim disabled control —
+// it would make this gate pass by making it blind.
 const FREEZE_ANIMATIONS_CSS = `
   *, *::before, *::after {
     animation-duration: 0s !important;
     animation-delay: 0s !important;
     transition-duration: 0s !important;
     transition-delay: 0s !important;
+  }
+  [data-bento-tile] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 `
 
@@ -207,24 +228,34 @@ async function waitForSkeletonsToClear(page) {
  * needed to leave it alone. The resting state is also the honest thing to audit — it is the state a
  * reader spends their time in.
  */
-async function settleAnimations(page) {
+async function settleAnimations(page, route, viewportName) {
   const deadline = Date.now() + 5_000
   for (;;) {
     const pending = await page
       .evaluate(() => {
-        const isFinite_ = (animation) => {
-          const timing = animation.effect?.getComputedTiming?.()
-          return timing ? timing.iterations !== Infinity : true
-        }
+        const runsForever = (animation) => animation.effect?.getComputedTiming?.().iterations === Infinity
         for (const animation of document.getAnimations()) {
-          if (isFinite_(animation)) animation.finish()
+          if (!runsForever(animation)) animation.finish()
         }
         // Re-read: finishing one can mount markup that starts another (a widget whose section data
         // arrived while the first pass was running).
-        return document.getAnimations().filter((a) => isFinite_(a) && a.playState === 'running').length
+        return document
+          .getAnimations()
+          .filter((a) => !runsForever(a) && a.playState === 'running')
+          .map((a) => a.effect?.target?.tagName?.toLowerCase() ?? 'unknown')
       })
-      .catch(() => 0)
-    if (pending === 0 || Date.now() >= deadline) return
+      .catch(() => [])
+    if (pending.length === 0) return
+    if (Date.now() >= deadline) {
+      // Said out loud rather than returned quietly. Whatever is still moving is being measured, and a
+      // composited mid-animation colour reads as a severe contrast defect — so the log has to name the
+      // reason the numbers below might not be about the palette.
+      console.warn(
+        `   ⚠ ${route} @ ${viewportName}: ${pending.length} animation(s) still running after 5s `
+          + `(${[...new Set(pending)].join(', ')}) — colour measurements on this route may be composited`,
+      )
+      return
+    }
     await page.waitForTimeout(100)
   }
 }
@@ -268,7 +299,7 @@ async function auditRoute(page, route, viewportName) {
   await waitForSkeletonsToClear(page)
   // After the skeletons, not before: a widget whose section data arrives late mounts late, and its
   // entrance starts then.
-  await settleAnimations(page)
+  await settleAnimations(page, route, viewportName)
 
   // `target-size` (WCAG 2.2 SC 2.5.8, pointer target minimums) isn't in
   // axe-core's default rule set (confirmed by enumerating every rule id the

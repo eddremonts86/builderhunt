@@ -151,11 +151,11 @@ export async function waitForTilesSettled(page: Page, timeoutMs = 20_000): Promi
        * Opacity is multiplied up the whole ancestor chain, because any ancestor can hide a tile and a
        * tile hidden by its parent is exactly as invisible as one hiding itself.
        *
-       * The offset check is deliberately narrower: only the nearest ancestor carrying an *inline*
-       * transform, which is the one the animation library wrote. Walking the chain for any
-       * non-identity transform flagged `action-queue` at `translateY(-2px)` — a static optical nudge
-       * from a stylesheet, permanent, correct, and nothing to do with whether the tile arrived. A
-       * settle check that reports the design as unsettled is a check nobody will keep.
+       * The offset check is deliberately narrower: only `[data-bento-tile]`, the wrapper the animation
+       * library writes to. Walking the chain for any non-identity transform flagged `action-queue` at
+       * `translateY(-2px)` — a static optical nudge from a stylesheet, permanent, correct, and nothing
+       * to do with whether the tile arrived. A settle check that reports the design as unsettled is a
+       * check nobody will keep.
        */
       return Array.from(document.querySelectorAll('[data-widget]')).flatMap((tile) => {
         let opacity = 1
@@ -163,18 +163,21 @@ export async function waitForTilesSettled(page: Page, timeoutMs = 20_000): Promi
           opacity *= Number.parseFloat(getComputedStyle(node).opacity)
         }
 
-        let animated: HTMLElement | null = tile.parentElement as HTMLElement | null
-        while (animated && animated !== document.body && !animated.style.transform) {
-          animated = animated.parentElement
+        const id = tile.getAttribute('data-widget') ?? '(unnamed)'
+        const animated = tile.closest('[data-bento-tile]')
+        if (!animated) {
+          // Reported, not skipped. A missing wrapper means the attribute this check reads was renamed
+          // or dropped, and treating that as "offset zero" would let the whole offset half of this
+          // function pass by finding nothing — the failure mode where a guard survives as decoration.
+          return [`${id} has no [data-bento-tile] wrapper — the offset check cannot run`]
         }
         // `matrix(a, b, c, d, tx, ty)` — the sixth component is the vertical offset.
-        const matrix = animated && animated !== document.body ? getComputedStyle(animated).transform : 'none'
+        const matrix = getComputedStyle(animated).transform
         const offsetY = matrix.startsWith('matrix(')
           ? Number.parseFloat(matrix.slice(7, -1).split(',')[5] ?? '0')
           : 0
 
         if (opacity >= 1 && offsetY === 0) return []
-        const id = tile.getAttribute('data-widget') ?? '(unnamed)'
         return [`${id} effective-opacity=${opacity.toFixed(3)} animated-offsetY=${offsetY}`]
       })
     })
