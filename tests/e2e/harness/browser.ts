@@ -33,6 +33,43 @@ export async function gotoHydrated(page: Page, url: string): Promise<void> {
 }
 
 /**
+ * Waits for webfonts to finish, in a way a navigation cannot kill.
+ *
+ * Four specs used `await page.evaluate(() => document.fonts.ready)`, and it is a one-shot: if anything
+ * navigates between the call and its result — a client-side redirect, a URL normalisation, a router
+ * `replace` after hydration — the execution context is torn down underneath it and the whole spec fails
+ * with `page.evaluate: Execution context was destroyed, most likely because of a navigation`. Which is a
+ * clear message, and nothing to do with the screenshot the test was about to take.
+ *
+ * That is what took down all twelve `public-surfaces` baselines in one serial gate run on 2026-08-12 while
+ * every one of them passed in isolation seconds later — a race, not a stale baseline, and the kind that
+ * gets misread as a broken baseline and "fixed" by regenerating a perfectly good file.
+ *
+ * The fix keeps `document.fonts.ready` and retries it, rather than reaching for
+ * `waitForFunction(() => document.fonts.status === 'loaded')`. That was the first attempt and it trades one
+ * hazard for another: `waitForFunction` polls on `requestAnimationFrame` by default, and rAF is throttled in
+ * a page the browser considers hidden — so the version that cannot be killed by a navigation can instead
+ * wait forever on a backgrounded tab. Measured both ways under a loaded machine, they were indistinguishable
+ * (3 failed, 31 passed, identical sets), so there was no evidence to justify the new hazard.
+ *
+ * Three attempts, because a navigation that fires twice is possible and an unbounded retry would hide a
+ * page that never settles. The error is re-thrown unless it is specifically the destroyed-context one.
+ */
+export async function waitForFontsSettled(page: Page): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await page.evaluate(() => document.fonts.ready)
+      return
+    } catch (error) {
+      const destroyedByNavigation = /Execution context was destroyed|frame was detached/i.test(String(error))
+      if (!destroyedByNavigation || attempt >= 3) throw error
+      // The navigation that destroyed the context is the thing to wait for before asking again.
+      await page.waitForLoadState('domcontentloaded')
+    }
+  }
+}
+
+/**
  * Dismisses the first-visit ToS modal and cookie banner if either is
  * showing — both are one-time-per-session UI unrelated to what most specs
  * check, and both otherwise intercept pointer events on everything behind
