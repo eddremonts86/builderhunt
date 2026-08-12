@@ -344,6 +344,28 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - **What the pooled leg is for changed with this fix.** It used to be described as "the more faithful of the two"
     because the direct leg ran as a superuser with RLS out of the path. Both legs authenticate as `builderhunt_app`
     now, so the only difference left is the pooler — which is the one thing that leg exists to exercise.
+  - **Fourth defect, found by the first dispatch actually reaching the pooled leg.** With the direct leg fixed,
+    the job got further than it ever had and died four seconds into the pooled run, after the fifteenth
+    sign-in: `PostgresError: extended query protocol not supported by admin console`.
+    - **The comment in `monitor.ts` had the mechanism wrong, which is why the option was missing.** It read
+      "the admin console does not implement the extended query protocol or prepared statements" beside
+      `prepare: false` — but `prepare: false` only turns off statement *caching*, and the protocol is chosen
+      per query. `sql.unsafe(text)` with no bind parameters already picks the simple one, so `SHOW POOLS` and
+      `SHOW STATS` were never at fault. `fetch_types` defaults to true, so postgres.js asks the server for
+      array type OIDs *on connect*, extended, before this code runs anything. postgres.js sets
+      `fetch_types: false` in its own `subscribe.js` for the same class of connection.
+    - **Why no `catch` saw it.** It arrived as an uncaught rejection out of the socket read handler
+      (`triggerUncaughtException(err, fromPromise)`) for a query this module never issued, so there was no
+      pending promise to reject — past the `try`/`catch` around the pooler reads and past the
+      `.catch(() => null)` on `readPgBouncerConfig`.
+    - **Verified against a real PgBouncer 1.25.2, both ways**, on a local container pointed at the host
+      database. Without the option: exit 1 with that error and the uncaught-rejection trace. With it: exit 0,
+      preflight on all five routes, 197 requests, verdict pass — and `peaks.pgBouncerBackends = 13` in the
+      report, which is the part that matters. A pooled run that passes while every admin-console read fails
+      into `failures.pgbouncer` is the plausible-artifact failure this whole job exists to catch.
+    - **Guarded** by a unit test asserting the constructed options rather than behaviour, because behaviour
+      cannot reach it: a stubbed `Sql` never constructs a client, and the real failure bypasses every catch.
+      Confirmed to fail when the option is removed.
 - [~] **Document the Coolify pooler rollout and rollback**
   - Files: `docs/operations/deploy-runbook.md`, `docs/operations/database-roles.md`,
     `docs/operations/load-testing.md`, `.env.production.example`
