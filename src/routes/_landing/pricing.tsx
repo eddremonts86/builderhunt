@@ -1,4 +1,6 @@
-// table-surface-ok: the plan comparison is semantic prose with a fixed number of columns, written in the component.
+// table-surface-semantic: the plan comparison and the credit-pack list are bounded marketing
+// prose read rather than operated. Native <th scope> is what lets a screen reader announce
+// "Pro Max, Monthly credits, 700" instead of a bare number in a grid of numbers.
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Check, X, Mail, Sparkles, Zap, Rocket, Users } from 'lucide-react'
@@ -13,6 +15,7 @@ import {
 import { sourcingSprintAllowanceLabel } from '~/shared/lib/billing-shared'
 import { Button, Checkbox, Input, Label, LinkButton } from '~/components/ui'
 import { FaqPanel, type FaqEntry } from '~/shared/components/FaqPanel'
+import { EmptyCell, NumberCell, SemanticTable, type SemanticColumn } from '~/shared/components/table'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { getAppOrganizationPlan } from '~/shared/lib/billing-session'
 import { pageMeta } from '~/shared/lib/page-meta'
@@ -92,6 +95,80 @@ const TIER_BLURB: Record<CatalogTier, string> = {
 export function formatUsd(amountCents: number): string {
   return `$${(amountCents / 100).toFixed(amountCents % 100 === 0 ? 0 : 2)}`
 }
+
+/** A tick or a cross, sized and coloured once instead of eleven times in the comparison markup. */
+function Included({ yes }: { yes: boolean }) {
+  return yes
+    ? <Check className="w-4 h-4 text-bh-success inline" aria-label="Included" />
+    : <X className="w-4 h-4 text-bh-text-dim inline" aria-label="Not included" />
+}
+
+interface FeatureRow {
+  feature: string
+  /** One entry per tier, in `TIERS` order. */
+  values: Record<CatalogTier, React.ReactNode>
+  /** A `data-testid` per cell, for the rows a spec drives directly. */
+  cellTestId?: (tier: CatalogTier) => string
+}
+
+/**
+ * Every value in this table is either a constant the routes also enforce or derived from the same
+ * helper they call.
+ *
+ * The AI-sourcing-sprints row is the reason that sentence is here: hand-typed, it read "—" for Pro
+ * and "Up to 3" for Pro Max while `/api/sprints` was allowing 3 and 10. A pricing page that
+ * disagrees with the enforcement is worse than one with no table.
+ */
+const FEATURE_ROWS: FeatureRow[] = [
+  { feature: 'Saved searches', values: { free: '3', pro: '50', pro_max: '50', team: '200' } },
+  { feature: 'Saved builders', values: { free: '50', pro: 'Unlimited', pro_max: 'Unlimited', team: 'Unlimited' } },
+  // Free has no monthly grant at all, which is an absence rather than a withheld feature — the
+  // canonical empty cell, not a cross.
+  { feature: 'Monthly credits', values: { free: <EmptyCell label="No monthly credits" />, pro: '140', pro_max: '700', team: '2,100' } },
+  { feature: 'Smart alerts', values: { free: <Included yes={false} />, pro: <Included yes />, pro_max: <Included yes />, team: <Included yes /> } },
+  {
+    feature: 'AI sourcing sprints',
+    cellTestId: (tier) => `pricing-sprints-${tier}`,
+    values: Object.fromEntries(TIERS.map((tier) => {
+      const allowance = sourcingSprintAllowanceLabel(tier)
+      return [tier, allowance ?? <Included yes={false} />]
+    })) as Record<CatalogTier, React.ReactNode>,
+  },
+  { feature: 'Work-sample analysis', values: { free: <Included yes={false} />, pro: <Included yes={false} />, pro_max: <Included yes />, team: <Included yes /> } },
+  { feature: 'Team seats', values: { free: '1', pro: '1', pro_max: '1', team: '10' } },
+  { feature: 'Activity feed', values: { free: <Included yes={false} />, pro: <Included yes={false} />, pro_max: <Included yes={false} />, team: <Included yes /> } },
+]
+
+/**
+ * The feature name is a `<th scope="row">`.
+ *
+ * Without it a screen reader reads the third cell of the fifth row as "700" and nothing else. With
+ * it: "Pro Max, Monthly credits, 700". That is the one thing native table markup does here that a
+ * `role="grid"` over divs would have to rebuild by hand, and it is why this is a `SemanticTable`.
+ */
+const FEATURE_COLUMNS: SemanticColumn<FeatureRow>[] = [
+  { id: 'feature', header: 'Feature', rowHeader: true, cell: (row) => row.feature },
+  ...TIERS.map((tier): SemanticColumn<FeatureRow> => ({
+    id: tier,
+    header: TIER_PRESENTATION[tier].label,
+    align: 'center',
+    cell: (row) => <span data-testid={row.cellTestId?.(tier)}>{row.values[tier]}</span>,
+  })),
+]
+
+const PACK_COLUMNS: SemanticColumn<PackCatalogDto>[] = [
+  { id: 'pack', header: 'Pack', rowHeader: true, cell: (pack) => <span className="capitalize">{pack.key.replace(/_/g, ' ')}</span> },
+  { id: 'credits', header: 'Credits', align: 'end', cell: (pack) => <NumberCell value={pack.credits} /> },
+  {
+    id: 'price',
+    header: 'Price',
+    align: 'end',
+    // "+ tax" beside the figure rather than only in the section copy: a price a reader quotes to
+    // their finance team without it is a price that comes back wrong.
+    cell: (pack) => <>{formatUsd(pack.amountCents)} <span className="tbl-cell-meta inline">+ tax</span></>,
+  },
+  { id: 'expires', header: 'Expires', cell: (pack) => `${pack.expiryMonths} months, no rollover` },
+]
 
 interface SubscribeCtaProps {
   entry: SubscriptionCatalogDto
@@ -319,89 +396,12 @@ function PricingPage() {
 
       <section className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl shadow-sm mb-12" data-testid="pricing-features">
         <h2 className="text-xl font-bold text-bh-text mb-6">Feature comparison</h2>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Feature comparison table, scrollable">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-bh-border text-left">
-                <th className="py-3 px-2 font-bold text-bh-text-dim uppercase tracking-wider text-xs">Feature</th>
-                <th className="text-center py-3 px-2 font-bold text-bh-text-dim uppercase tracking-wider text-xs">Free</th>
-                <th className="text-center py-3 px-2 font-bold text-bh-accent uppercase tracking-wider text-xs">Pro</th>
-                <th className="text-center py-3 px-2 font-bold text-bh-cyan uppercase tracking-wider text-xs">Pro Max</th>
-                <th className="text-center py-3 px-2 font-bold text-bh-cyan uppercase tracking-wider text-xs">Team</th>
-              </tr>
-            </thead>
-            <tbody className="text-bh-text-muted">
-              <tr className="border-b border-bh-border/40">
-                <td className="py-3 px-2">Saved searches</td>
-                <td className="text-center py-3 px-2">3</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">50</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">50</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">200</td>
-              </tr>
-              <tr className="border-b border-bh-border/40">
-                <td className="py-3 px-2">Saved builders</td>
-                <td className="text-center py-3 px-2">50</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">Unlimited</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">Unlimited</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">Unlimited</td>
-              </tr>
-              <tr className="border-b border-bh-border/40">
-                <td className="py-3 px-2">Monthly credits</td>
-                <td className="text-center py-3 px-2">—</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">140</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">700</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">2,100</td>
-              </tr>
-              <tr className="border-b border-bh-border/40">
-                <td className="py-3 px-2">Smart alerts</td>
-                <td className="text-center py-3 px-2"><X className="w-4 h-4 text-bh-text-dim inline" /></td>
-                <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
-                <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
-                <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
-              </tr>
-              {/* Derived from SOURCING_SPRINT_LIMITS, the map /api/sprints
-                  enforces — hand-typed, this row said "—" for Pro and "Up to 3"
-                  for Pro Max while the routes allowed 3 and 10. Column order
-                  follows TIERS, which matches the header above. */}
-              <tr className="border-b border-bh-border/40">
-                <td className="py-3 px-2">AI sourcing sprints</td>
-                {TIERS.map((tier) => {
-                  const allowance = sourcingSprintAllowanceLabel(tier)
-                  return (
-                    <td
-                      key={tier}
-                      className={`text-center py-3 px-2${allowance ? ' text-bh-text font-semibold' : ''}`}
-                      data-testid={`pricing-sprints-${tier}`}
-                    >
-                      {allowance ?? <X className="w-4 h-4 text-bh-text-dim inline" />}
-                    </td>
-                  )
-                })}
-              </tr>
-              <tr className="border-b border-bh-border/40">
-                <td className="py-3 px-2">Work-sample analysis</td>
-                <td className="text-center py-3 px-2"><X className="w-4 h-4 text-bh-text-dim inline" /></td>
-                <td className="text-center py-3 px-2"><X className="w-4 h-4 text-bh-text-dim inline" /></td>
-                <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
-                <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
-              </tr>
-              <tr className="border-b border-bh-border/40">
-                <td className="py-3 px-2">Team seats</td>
-                <td className="text-center py-3 px-2">1</td>
-                <td className="text-center py-3 px-2">1</td>
-                <td className="text-center py-3 px-2">1</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">10</td>
-              </tr>
-              <tr className="border-0">
-                <td className="py-3 px-2">Activity feed</td>
-                <td className="text-center py-3 px-2"><X className="w-4 h-4 text-bh-text-dim inline" /></td>
-                <td className="text-center py-3 px-2"><X className="w-4 h-4 text-bh-text-dim inline" /></td>
-                <td className="text-center py-3 px-2"><X className="w-4 h-4 text-bh-text-dim inline" /></td>
-                <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <SemanticTable
+          caption="What each plan includes, by feature"
+          columns={FEATURE_COLUMNS}
+          rows={FEATURE_ROWS}
+          rowKey={(row) => row.feature}
+        />
       </section>
 
       <section className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl shadow-sm mb-12" data-testid="pricing-packs">
@@ -410,28 +410,13 @@ function PricingPage() {
           One-time top-ups for when you need more credits than your plan's monthly grant — separate from your subscription, on any plan.
           Pack credits expire 12 months after purchase and never roll over into a new grant period.
         </p>
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="Credit packs table, scrollable">
-          <table className="w-full text-sm" data-testid="pricing-pack-table">
-            <thead>
-              <tr className="border-b border-bh-border text-left">
-                <th className="py-3 px-2 font-bold text-bh-text-dim uppercase tracking-wider text-xs">Pack</th>
-                <th className="text-center py-3 px-2 font-bold text-bh-text-dim uppercase tracking-wider text-xs">Credits</th>
-                <th className="text-center py-3 px-2 font-bold text-bh-text-dim uppercase tracking-wider text-xs">Price</th>
-                <th className="text-center py-3 px-2 font-bold text-bh-text-dim uppercase tracking-wider text-xs">Expires</th>
-              </tr>
-            </thead>
-            <tbody className="text-bh-text-muted">
-              {packCatalog.map((pack: PackCatalogDto) => (
-                <tr key={pack.key} className="border-b border-bh-border/40 last:border-0">
-                  <td className="py-3 px-2 text-bh-text font-semibold capitalize">{pack.key.replace(/_/g, ' ')}</td>
-                  <td className="text-center py-3 px-2">{pack.credits.toLocaleString()}</td>
-                  <td className="text-center py-3 px-2">{formatUsd(pack.amountCents)} <span className="text-[10px] text-bh-text-dim">+ tax</span></td>
-                  <td className="text-center py-3 px-2">{pack.expiryMonths} months, no rollover</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SemanticTable
+          caption="Credit packs, their size, price and expiry"
+          columns={PACK_COLUMNS}
+          rows={packCatalog}
+          rowKey={(pack) => pack.key}
+          tableTestId="pricing-pack-table"
+        />
       </section>
 
       <FaqPanel

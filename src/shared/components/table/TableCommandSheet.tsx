@@ -2,9 +2,8 @@ import * as React from 'react'
 
 import { Dialog } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
-import type { ColumnDef } from '~/shared/lib/table/columns'
+import { isSortable, type ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
-import { cn } from '~/shared/lib/utils'
 
 interface TableCommandSheetProps<Row> {
   open: boolean
@@ -50,7 +49,10 @@ export function TableCommandSheet<Row>(props: TableCommandSheetProps<Row>) {
     const list: Verb[] = []
 
     for (const column of columns) {
-      if (!column.sortable) continue
+      // `isSortable`, not `column.sortable`: the sheet must not offer a verb the header refuses
+      // to show. A ⌘K entry that sorts by a status column's enum spelling is the same wrong order,
+      // reached a different way.
+      if (!isSortable(column)) continue
       for (const dir of ['asc', 'desc'] as const) {
         list.push({
           id: `sort:${column.id}:${dir}`,
@@ -116,20 +118,17 @@ export function TableCommandSheet<Row>(props: TableCommandSheetProps<Row>) {
               type="button"
               onClick={() => { verb.run(); onClose() }}
               data-testid={`table-command-${verb.id}`}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-bh-text',
-                'hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent',
-              )}
+              className="tbl-command-item"
             >
               <span className="min-w-0 flex-1 truncate">{verb.label}</span>
               {verb.count !== undefined && (
-                <span className="tabular-nums text-xs text-bh-text-muted">{verb.count.toLocaleString()}</span>
+                <span className="tbl-group-count">{verb.count.toLocaleString()}</span>
               )}
             </button>
           </li>
         ))}
         {filtered.length === 0 && (
-          <li className="px-3 py-6 text-center text-sm text-bh-text-muted">No matching command</li>
+          <li className="tbl-command-empty">No matching command</li>
         )}
       </ul>
     </Dialog>

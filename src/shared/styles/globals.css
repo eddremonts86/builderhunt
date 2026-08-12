@@ -1397,6 +1397,72 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 }
 .tbl-board-card[data-state='selected'] { border-color: var(--tbl-focus-ring); }
 
+/* ── The five states ───────────────────────────────────────────────────────
+   Loading skeleton in the final grid, genuine empty, filtered empty, inline
+   error over the rows that did load, and the resting table itself. */
+.tbl-state { padding: 3rem var(--tbl-padding-inline); text-align: center; background: var(--tbl-surface); }
+.tbl-state-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--tbl-border-outer);
+  background: var(--tbl-surface-subtle);
+  color: var(--tbl-text-muted);
+}
+.tbl-state-title {
+  margin-bottom: 0.25rem;
+  font-size: var(--tbl-font-primary-size);
+  font-weight: var(--tbl-font-primary-weight);
+  color: var(--tbl-text-primary);
+}
+.tbl-state-description {
+  margin: 0 auto 1rem;
+  max-width: 28rem;
+  font-size: var(--tbl-font-cell-size);
+  color: var(--tbl-text-muted);
+}
+/* The error keeps the loaded rows visible above it: replacing the table would throw away rows the
+   user was reading and a scroll position they may not be able to recover. */
+.tbl-error-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem var(--tbl-padding-inline);
+  border-top: 1px solid var(--tbl-border-header);
+  background: var(--tbl-surface-subtle);
+  font-size: var(--tbl-font-cell-size);
+  color: var(--tbl-text-primary);
+}
+.tbl-error-row svg { color: var(--tbl-text-muted); }
+
+/* ── The ⌘K command sheet ──────────────────────────────────────────────────── */
+.tbl-command-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: var(--tbl-font-cell-size);
+  color: var(--tbl-text-primary);
+}
+.tbl-command-item:hover { background: var(--tbl-surface-subtle); }
+.tbl-command-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--tbl-focus-ring-width) var(--tbl-focus-ring);
+}
+.tbl-command-empty {
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+  font-size: var(--tbl-font-cell-size);
+  color: var(--tbl-text-muted);
+}
+
 /* ── Status chips ──────────────────────────────────────────────────────────
    Semantic tone, never decoration. `category` is plain text on purpose: a grey
    chip around every category is the thing the reference explicitly rejects. */
@@ -1563,7 +1629,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-semantic tbody tr:hover td { background: var(--tbl-row-hover); }
 .tbl-semantic th[data-align='end'],
 .tbl-semantic td[data-align='end'] { text-align: right; font-variant-numeric: tabular-nums; }
-.tbl-semantic td[data-align='end'] { color: var(--tbl-text-primary); }
+.tbl-semantic th[data-align='center'],
+.tbl-semantic td[data-align='center'] { text-align: center; }
 /* A row header (`scope="row"`) is the row's identity, not a column label — it
    reads as body text, at the primary cell's weight. */
 .tbl-semantic tbody th[scope='row'] {
