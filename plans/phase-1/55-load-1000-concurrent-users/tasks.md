@@ -261,7 +261,7 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - Operator: starting the 1,000-user calibration on the isolated host requires the same explicit
     confirmation as the baseline.
 
-- [x] **Add a dedicated CI load smoke**
+- [~] **Add a dedicated CI load smoke**
   - Files: `.github/workflows/load-smoke.yml`, `package.json`, `scripts/load/smoke.ts`
   - Do: Provision PostgreSQL 18, Redis, PgBouncer, a production app build, disposable fixtures, and
     25 users for 30 seconds. Run on workflow dispatch and on pull requests that change DB/pool/load
@@ -298,6 +298,31 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
 
 ## Phase 6 — Certification and production rollout
 
+  - **Reopened 2026-08-12: the job had never once executed, and it fails three ways.** Its Verify line asks for a
+    green workflow-dispatch run; it only ever fired on `pull_request` and on pushes to master/dev, and the branch it
+    was written on had neither until PR #31. What "Done" recorded was the file, not a run.
+    - **`pnpm/action-setup@v4` with no `version`.** No `packageManager` in `package.json` for the action to read, so
+      it died on the third step with "No pnpm version is specified" — every invocation, from the day it was written.
+      Fixed: `@v6` with `version: 10`, matching the six other setups in this repository.
+    - **GitGuardian failed on `POSTGRES_PASSWORD: postgres`.** Not wrong about the shape, even though the database
+      lives for one job on a network only that job can reach. Fixed by removing the constant — `github.run_id` is
+      unique per run — rather than by an ignore file that would have weakened the detector for every future file.
+      That change had a trap: the pooled leg authenticates the five roles through `PGPASSWORD=postgres psql`, which
+      the new password would have broken on the next run. Four places agree now.
+    - **Still open: the preview server refuses to boot.** `❌ the preview server never answered /api/health`, and
+      the cause is in the log beneath it: `ZodError: DATABASE_URL — "Production DATABASE_URL must use the non-owner
+      application role"`. The workflow hands it `postgres`, the owner. A production build refuses that by design,
+      and this repository has the scar the rule exists for — a superuser connection ignores GRANTs and RLS, which
+      is what hid three defects.
+  - **What the fix needs, so the next attempt does not start from the symptom.** The smoke creates and migrates its
+    own disposable `builderhunt_load_test_smoke`, so the preview server's URL has to name *that* database *and*
+    `builderhunt_app`. The app-role password is minted by the "Give the five roles passwords" step, which currently
+    runs *after* the direct leg — so the ordering has to change too, and `DATABASE_URL` has to be exported through
+    `$GITHUB_ENV` rather than set as static job-level env, because the password does not exist until that step runs.
+    `DATABASE_MIGRATION_URL` stays the owner, which is correct and is what the app's own contract expects.
+  - **Deliberately not attempted during the phase-3 release.** It is a non-required check on a workflow that has
+    never worked, and the rest of this plan is blocked on provisioning an isolated host anyway. Half-fixing the
+    ordering while a merge was in flight is how a release picks up an unrelated failure.
 - [~] **Document the Coolify pooler rollout and rollback**
   - Files: `docs/operations/deploy-runbook.md`, `docs/operations/database-roles.md`,
     `docs/operations/load-testing.md`, `.env.production.example`

@@ -192,6 +192,36 @@
 
 ## Wave 2 — Action queue
 
+  - **Follow-up on 2026-08-12: removing the whole-page skeleton exposed a defect this task did not create.**
+    The Linux visual gate captured `/dashboard` with a 751px band of bare `--color-bh-bg` — one colour,
+    `rgb(10, 10, 13)`, not a single card border — where macOS captured the action queue, the three headline
+    tiles, activity, sprints, recommendations, alerts and source mix. Same page height to within 2px, both
+    attempts byte-identical, everything below the band perfect, and `data-dashboard-state="ready"` set the
+    whole time.
+    - **The cause was the reduced-motion opt-out in `Bento.tsx`, and it was inverted.**
+      `variants={reduceMotion ? undefined : fadeInUpVariants}` dropped the entrance variants for a viewer who
+      asked for less movement — and with them the only thing that would drive `opacity` to 1. The server had
+      already rendered the `hidden` keyframe inline (`opacity: 0`, `translateY(12px)`), because
+      `useReducedMotion()` snapshots a module global with `useState` and that global is `false` on the server.
+      Nothing was left to clear it. Nine widgets therefore sat at zero opacity indefinitely, holding their full
+      height: **invisible without being absent**, for precisely the people the branch was written to
+      accommodate.
+    - **Why no gate caught it for nine days.** A screenshot suite was the only coverage, and
+      `toHaveScreenshot` fast-forwards the animations it can enumerate before capturing — so on macOS the
+      baseline was a photograph of a state no viewer was ever in. A diff ratio names neither the widget nor
+      the reason, and a page whose tiles hold their height while painting nothing has the same dimensions as
+      one that renders correctly, so neither the ratio nor the size could expose it. Measuring the DOM named
+      all nine in one run.
+    - **Fixed** by honouring the preference at the root with `MotionConfig reducedMotion="user"`, which is read
+      when an animation runs rather than when a component mounts, and applies to every `motion` element rather
+      than the two that remembered to ask. The local branches are gone, so the variants are unconditional and
+      `opacity` always has something driving it to its resting value.
+    - **Guarded** by `tests/e2e/dashboard-entrance.spec.ts`: after the dashboard reports ready, every tile it
+      rendered is visible, asserted as effective opacity up the ancestor chain — once without media emulation,
+      so a failure means the product rather than the harness, and once with `reducedMotion: "reduce"`. Written
+      before the fix and observed failing on the nine widgets, which is the only reason to trust it now that it
+      passes. `waitForTilesSettled` in the e2e harness names the unsettled widgets and their measured values,
+      because "the screenshot did not match" is the least useful sentence available about this class of fault.
 - [x] **Implement the deterministic action-rule registry**
   - Files: `src/shared/lib/dashboard/action-rules.ts`, rule tests
   - Do: Model priority, eligibility, reason code, due time, resource type/ID, expiry, dismissibility, and deduplication. Start with onboarding, pending membership invitations, unread high-value alerts, paused/completed sprints, and role-safe usage thresholds.

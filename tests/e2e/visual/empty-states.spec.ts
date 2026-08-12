@@ -39,7 +39,7 @@ import { startWorkerServer, stopWorkerServer } from '../harness/server'
 import { e2eEnv } from '../harness/env'
 import { ensureFixedTimeEnv, fixedClockFromEnv, installFixedBrowserClock } from '../harness/clock'
 import { createOwnerPrincipal, disposePrincipal, type FixtureContext, type Principal } from '../harness/fixtures/principals'
-import { dismissOverlays, gotoHydrated } from '../harness/browser'
+import { dismissOverlays, gotoHydrated, waitForTilesSettled } from '../harness/browser'
 
 interface Harness {
   workerIndex: number
@@ -181,9 +181,32 @@ async function prepare(page: import('playwright/test').Page, path: string): Prom
    */
   if (path === '/dashboard') {
     await page.locator('[data-dashboard-state="ready"]').waitFor({ state: 'attached', timeout: 20_000 })
+    /**
+     * And then wait for the grid to actually arrive.
+     *
+     * `ready` was not enough, and the way it failed is worth keeping: the Linux gate captured a 751px
+     * band of bare page background where macOS captured six widgets, at the same page height, twice,
+     * byte-identically. Tiles mid-entrance hold their height at `opacity: 0`, so neither the diff
+     * ratio nor the height comparison could say which widgets were missing — see
+     * `waitForTilesSettled`, which names them instead.
+     */
+    await waitForTilesSettled(page)
   }
 
   await page.evaluate(() => document.fonts.ready)
+}
+
+/**
+ * Uncaught page errors, asserted before the screenshot.
+ *
+ * A thrown render leaves the surface incomplete, and `toHaveScreenshot` reports that as a diff ratio —
+ * a number that names neither the widget that vanished nor the exception that removed it. Checking
+ * first means the failure says what happened.
+ */
+function collectCrashes(page: import('playwright/test').Page): string[] {
+  const crashes: string[] = []
+  page.on('pageerror', (error) => crashes.push(error.message))
+  return crashes
 }
 
 test.describe('empty states — desktop', () => {
@@ -191,8 +214,10 @@ test.describe('empty states — desktop', () => {
     test(`${route.name} matches its baseline`, async ({ browser }) => {
       const context = await browser.newContext({ storageState: harness.principal.storageState! })
       const page = await context.newPage()
+      const crashes = collectCrashes(page)
       try {
         await prepare(page, route.path)
+        expect(crashes, 'the page threw while rendering').toEqual([])
         await expect(page).toHaveScreenshot(`${route.name}.png`, {
           fullPage: true,
           maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
@@ -211,8 +236,10 @@ test.describe('empty states — mobile', () => {
     test(`${route.name} matches its baseline @mobile-only`, async ({ browser }) => {
       const context = await browser.newContext({ storageState: harness.principal.storageState! })
       const page = await context.newPage()
+      const crashes = collectCrashes(page)
       try {
         await prepare(page, route.path)
+        expect(crashes, 'the page threw while rendering').toEqual([])
         await expect(page).toHaveScreenshot(`${route.name}.png`, {
           fullPage: true,
           maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,

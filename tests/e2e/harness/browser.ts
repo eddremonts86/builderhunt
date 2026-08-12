@@ -111,6 +111,88 @@ export async function dismissOverlays(page: Page): Promise<void> {
   await expect(cookies).toBeHidden()
 }
 
+/**
+ * Waits until every bento tile is actually visible and in its final position.
+ *
+ * ## Why a settle signal beyond `data-dashboard-state="ready"`
+ *
+ * The dashboard's grid is a Framer Motion stagger: `BentoGrid` mounts with
+ * `initial='hidden'` and `BentoTile` carries `fadeInUpVariants`, whose hidden
+ * keyframe is `{ opacity: 0, y: 24 }`. A tile mid-entrance therefore occupies its
+ * full height and paints nothing — it is invisible without being absent, which is
+ * the one failure mode a screenshot cannot describe and a height comparison cannot
+ * detect.
+ *
+ * That is not hypothetical. The Linux visual gate captured `/dashboard` with a
+ * 751px band of pure `--color-bh-bg` (measured: one colour, `rgb(10,10,13)`, no
+ * card borders) where macOS captured the action queue, the three headline tiles,
+ * builder recency, sourcing sprints, For you and Alerts. Both pages were the same
+ * height to within 2px, both attempts produced byte-identical output, and the
+ * region *below* the band rendered perfectly. `data-dashboard-state="ready"` was
+ * already set: it reports the core overview query, and since Wave 1 split the page
+ * into core and lazy sections it says nothing about whether the grid has finished
+ * arriving.
+ *
+ * ## Why effective opacity rather than "did Motion finish"
+ *
+ * Asking the animation library would tie this to the library. What a screenshot
+ * needs to know is whether the pixels are there, so this multiplies opacity up the
+ * ancestor chain and requires an identity transform — mechanism-agnostic, and true
+ * of a tile hidden by a parent as much as one hidden by itself.
+ *
+ * On timeout it names each unsettled widget with its measured opacity and
+ * transform, because "the screenshot did not match" is the least useful sentence
+ * available about a page that renders one way on one platform.
+ */
+export async function waitForTilesSettled(page: Page, timeoutMs = 20_000): Promise<void> {
+  const unsettled = () =>
+    page.evaluate(() => {
+      /**
+       * Opacity is multiplied up the whole ancestor chain, because any ancestor can hide a tile and a
+       * tile hidden by its parent is exactly as invisible as one hiding itself.
+       *
+       * The offset check is deliberately narrower: only the nearest ancestor carrying an *inline*
+       * transform, which is the one the animation library wrote. Walking the chain for any
+       * non-identity transform flagged `action-queue` at `translateY(-2px)` — a static optical nudge
+       * from a stylesheet, permanent, correct, and nothing to do with whether the tile arrived. A
+       * settle check that reports the design as unsettled is a check nobody will keep.
+       */
+      return Array.from(document.querySelectorAll('[data-widget]')).flatMap((tile) => {
+        let opacity = 1
+        for (let node: Element | null = tile; node && node !== document.body; node = node.parentElement) {
+          opacity *= Number.parseFloat(getComputedStyle(node).opacity)
+        }
+
+        let animated: HTMLElement | null = tile.parentElement as HTMLElement | null
+        while (animated && animated !== document.body && !animated.style.transform) {
+          animated = animated.parentElement
+        }
+        // `matrix(a, b, c, d, tx, ty)` — the sixth component is the vertical offset.
+        const matrix = animated && animated !== document.body ? getComputedStyle(animated).transform : 'none'
+        const offsetY = matrix.startsWith('matrix(')
+          ? Number.parseFloat(matrix.slice(7, -1).split(',')[5] ?? '0')
+          : 0
+
+        if (opacity >= 1 && offsetY === 0) return []
+        const id = tile.getAttribute('data-widget') ?? '(unnamed)'
+        return [`${id} effective-opacity=${opacity.toFixed(3)} animated-offsetY=${offsetY}`]
+      })
+    })
+
+  const deadline = Date.now() + timeoutMs
+  let pending = await unsettled()
+  while (pending.length > 0) {
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `the bento tiles never finished arriving after ${timeoutMs}ms — `
+          + `${pending.length} still hidden or offset: ${pending.join('; ')}`,
+      )
+    }
+    await page.waitForTimeout(100)
+    pending = await unsettled()
+  }
+}
+
 export interface StrictBrowserGuard {
   /** Violations recorded so far, in arrival order. */
   readonly violations: string[]
