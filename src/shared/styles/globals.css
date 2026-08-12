@@ -1445,6 +1445,70 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   color: var(--tbl-text-primary);
 }
 .tbl-cell-empty { color: var(--tbl-text-muted); }
+.tbl-cell-unit { margin-left: 0.25rem; font-size: var(--tbl-font-meta-size); color: var(--tbl-text-muted); }
+
+.tbl-primary { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.tbl-identity { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.tbl-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tbl-text-muted);
+  border: 1px solid var(--tbl-border-row);
+}
+.tbl-ratio { display: flex; align-items: center; gap: 0.5rem; width: 100%; min-width: 0; }
+.tbl-ratio-track { flex: 1; min-width: 0; }
+
+/* ── The actions column ────────────────────────────────────────────────────
+   One visible action and a menu. Three buttons per row across fifty rows is a
+   hundred and fifty tab stops between the top of a table and the bottom. */
+.tbl-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.125rem; }
+.tbl-actions-overflow { position: relative; }
+.tbl-actions-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  color: var(--tbl-text-muted);
+  transition: color var(--tbl-transition), background-color var(--tbl-transition);
+}
+.tbl-actions-trigger:hover { color: var(--tbl-text-primary); background: var(--tbl-surface-subtle); }
+.tbl-actions-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--tbl-focus-ring-width) var(--tbl-focus-ring);
+}
+.tbl-actions-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 40;
+  min-width: 11rem;
+  padding: 0.25rem;
+  border: 1px solid var(--tbl-border-outer);
+  border-radius: 10px;
+  background: var(--tbl-surface);
+  box-shadow: var(--tbl-shadow);
+}
+.tbl-actions-menu [role='menuitem'] {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 6px;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+  font-size: var(--tbl-font-cell-size);
+  color: var(--tbl-text-primary);
+}
+.tbl-actions-menu [role='menuitem']:hover { background: var(--tbl-surface-subtle); }
+.tbl-actions-menu [role='menuitem']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--tbl-focus-ring-width) var(--tbl-focus-ring);
+}
 .tbl-avatar {
   width: var(--tbl-avatar-size);
   height: var(--tbl-avatar-size);
