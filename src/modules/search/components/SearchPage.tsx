@@ -13,6 +13,7 @@ import { AIUnavailableError } from '~/shared/lib/ai/errors'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
 import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
 import { DataTable, VIRTUALIZATION_THRESHOLD } from '~/shared/components/table/DataTable'
+import { SEARCH_CARD_ROW_HEIGHT } from '~/shared/components/table/useTableVirtual'
 import { resolveSafeBuilderFrom } from '~/shared/lib/safe-next'
 import { SOURCE_PRESENTATION } from '~/shared/lib/source-presentation'
 import type { ColumnDef } from '~/shared/lib/table/columns'
@@ -160,8 +161,12 @@ interface SearchRow extends Record<string, unknown> {
  * row is capped below. Fixed rather than measured is the trade plan 06 made deliberately —
  * variable heights are its own plan — and a uniform card list is a defensible thing to look at,
  * where a list that jumps at the hundredth row would not be.
+ *
+ * The number itself is the table system's `--tbl-row-height-search-card`, re-exported from
+ * `useTableVirtual` — a specialized renderer's height rather than a fourth density, but a named
+ * token rather than a `176` sitting in a surface file.
  */
-const SEARCH_ROW_HEIGHT = 176
+const SEARCH_ROW_HEIGHT = SEARCH_CARD_ROW_HEIGHT
 
 /**
  * The query the shell's toolbar is handed.
@@ -759,6 +764,10 @@ export function SearchPage() {
   const resultColumns = React.useMemo<ColumnDef<SearchRow>[]>(() => [{
     id: 'result',
     header: 'Result',
+    // The row *is* this cell, so it is the table's one flexible track — and the only one. Search
+    // renders with `chrome="minimal"`, so there is no visible header for a fixed width to line up
+    // under anyway.
+    kind: 'primary',
     priority: 'primary',
     cell: (row) => (
       // `w-full`: the grid cell is a flex row, so a block child sizes to its content rather than

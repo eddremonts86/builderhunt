@@ -9,7 +9,7 @@ import { useEntityBreadcrumbLabel } from '~/modules/dashboard/ui/shell/breadcrum
 import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
 import { ai } from '~/shared/lib/ai/client'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, EmptyCell, IdentityCell, NumberCell } from '~/shared/components/table'
 import {
   SPRINT_RESULT_FILTER_LABELS,
 } from '~/shared/lib/table/capabilities/sprint-results'
@@ -228,6 +228,9 @@ function SprintDossierPage() {
     {
       id: 'builder',
       header: 'Builder',
+      // A person, so the identity cell: 26px avatar, name, and the handle on the second line
+      // rather than in a column of its own that nobody sorts by and that is first to be squeezed.
+      kind: 'identity',
       priority: 'primary',
       value: (row) => row.profile.displayName ?? row.profile.username,
       cell: (row) => (
@@ -235,18 +238,20 @@ function SprintDossierPage() {
           href={row.profile.profileUrl}
           target="_blank"
           rel="noreferrer noopener"
-          className="flex min-w-0 items-center gap-2 hover:underline"
+          className="min-w-0 hover:underline"
         >
-          {row.profile.avatarUrl && (
-            <img src={row.profile.avatarUrl} alt="" className="h-6 w-6 shrink-0 rounded-full" loading="lazy" />
-          )}
-          <span className="truncate">{row.profile.displayName ?? row.profile.username}</span>
+          <IdentityCell
+            name={row.profile.displayName ?? row.profile.username}
+            meta={row.profile.displayName ? row.profile.username : undefined}
+            avatarUrl={row.profile.avatarUrl}
+          />
         </a>
       ),
     },
     {
       id: 'source',
       header: 'Source',
+      kind: 'category',
       sortable: true,
       groupable: true,
       value: (row) => row.source,
@@ -255,39 +260,41 @@ function SprintDossierPage() {
     {
       id: 'country',
       header: 'Country',
+      kind: 'category',
       groupable: true,
       priority: 'secondary',
       value: (row) => row.profile.country ?? null,
-      cell: (row) => row.profile.country ?? '—',
+      cell: (row) => row.profile.country ?? <EmptyCell label="Country unknown" />,
     },
     {
       id: 'followers',
       header: 'Followers',
-      align: 'end',
+      kind: 'number',
       priority: 'secondary',
       value: (row) => row.profile.followersCount ?? 0,
-      cell: (row) => (row.profile.followersCount ?? 0).toLocaleString(),
+      cell: (row) => <NumberCell value={row.profile.followersCount ?? 0} />,
     },
     {
       id: 'score',
       header: 'Score',
+      kind: 'number',
       sortable: true,
-      align: 'end',
       value: (row) => row.score,
-      cell: (row) => row.score,
+      cell: (row) => <NumberCell value={row.score} />,
     },
     {
       id: 'createdAt',
       header: 'Found',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'detail',
       value: (row) => row.createdAt,
-      cell: (row) => new Date(row.createdAt).toLocaleDateString(),
+      cell: (row) => <DateCell value={row.createdAt} />,
     },
     {
       id: 'actions',
       header: 'Actions',
+      kind: 'actions',
       priority: 'secondary',
       cell: (row) => {
         const trackedRowId = trackedRowIds.get(row.id) ?? null
@@ -402,6 +409,8 @@ function SprintDossierPage() {
         query={search.query}
         onQueryChange={onQueryChange}
         renderer={search.query.groupBy ? 'grouped' : 'table'}
+        // Avatar rows: the reference's identity density.
+        density="lg"
         rowTestId={(row) => `sprint-result-${row.id}`}
         status={status}
         error={{ message: errorMessage, onRetry: () => void load(search, appliedMinFollowers, false) }}

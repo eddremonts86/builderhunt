@@ -4,9 +4,30 @@ import { createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, Plus, Save, X } from 'lucide-react'
 import { requirePlatformAdminPage } from '~/shared/lib/auth/auth-session'
 import { Button, Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, EmptyCell, PrimaryCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import { emptyTableSearch } from '~/shared/lib/table/query-url'
 import type { ColumnDef } from '~/shared/lib/table/columns'
+
+/**
+ * Which of the five shared tones each severity and status reads as.
+ *
+ * Five is the reference's ceiling and it is not about the palette — it is that a reader holds five
+ * meanings at once and not nine. The exact word is in the chip's label either way, so grouping
+ * `identified` and `monitoring` under one tone loses nothing and makes "is anything on fire" a
+ * question the colour answers on its own.
+ */
+const SEVERITY_TONES: Record<string, StatusTone> = {
+  critical: 'danger',
+  major: 'warning',
+  minor: 'neutral',
+}
+
+const INCIDENT_STATUS_TONES: Record<string, StatusTone> = {
+  investigating: 'danger',
+  identified: 'warning',
+  monitoring: 'accent',
+  resolved: 'success',
+}
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
 
 type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
@@ -183,56 +204,53 @@ function AdminIncidentsPage() {
     {
       id: 'title',
       header: 'Incident',
+      kind: 'primary',
       priority: 'primary',
       value: (incident) => incident.title,
-      cell: (incident) => (
-        <span className="min-w-0">
-          <span className="block truncate font-medium">{incident.title}</span>
-          {incident.description && (
-            <span className="block truncate text-xs text-bh-text-muted">{incident.description}</span>
-          )}
-        </span>
-      ),
+      cell: (incident) => <PrimaryCell title={incident.title} meta={incident.description} />,
     },
     {
       id: 'severity',
       header: 'Severity',
+      // A chip rather than coloured uppercase text: the severity of an incident is the single most
+      // scanned value on this page, and bare red text at 10px is a whisper for something that has
+      // to read as a shout.
+      kind: 'status',
       value: (incident) => incident.severity,
-      cell: (incident) => (
-        <span className={`text-[10px] font-bold uppercase tracking-wider ${
-          incident.severity === 'critical' ? 'text-bh-danger'
-            : incident.severity === 'major' ? 'text-bh-warning' : 'text-bh-text-dim'
-        }`}>
-          {incident.severity}
-        </span>
-      ),
+      cell: (incident) => <StatusCell label={incident.severity} tone={SEVERITY_TONES[incident.severity] ?? 'neutral'} />,
     },
     {
       id: 'status',
       header: 'Status',
+      kind: 'status',
       groupable: true,
       value: (incident) => incident.status,
-      cell: (incident) => incident.status,
+      cell: (incident) => <StatusCell label={incident.status} tone={INCIDENT_STATUS_TONES[incident.status] ?? 'neutral'} />,
     },
     {
       id: 'components',
       header: 'Components',
+      kind: 'category',
       priority: 'detail',
       value: (incident) => incident.affectedComponents.join(', '),
-      cell: (incident) => incident.affectedComponents?.length > 0 ? incident.affectedComponents.join(', ') : '—',
+      cell: (incident) => incident.affectedComponents?.length > 0
+        ? <span className="truncate" title={incident.affectedComponents.join(', ')}>{incident.affectedComponents.join(', ')}</span>
+        : <EmptyCell label="No components recorded" />,
     },
     {
       id: 'startedAt',
       header: 'Started',
-      align: 'end',
+      kind: 'date',
       priority: 'secondary',
       value: (incident) => incident.startedAt,
-      cell: (incident) => new Date(incident.startedAt).toLocaleString(),
+      // With the time of day: an incident timeline is read to the minute, and "3d ago" alone is
+      // not a thing anyone can put in a postmortem.
+      cell: (incident) => <DateCell value={incident.startedAt} withTime />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       cell: (incident) => incident.status === 'resolved' ? null : (
         <span className="flex items-center gap-2">
           {incident.status === 'investigating' && (

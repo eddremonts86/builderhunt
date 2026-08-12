@@ -6,7 +6,7 @@ import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session
 import { sprintProgressPercent, type QueryVariant, type SprintCursor } from '~/shared/lib/sprints-shared'
 import { Button } from '~/components/ui/button'
 import { LinkButton } from '~/components/ui/link'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, NumberCell, PrimaryCell, RatioCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import {
   pickTableSearchParams,
@@ -49,6 +49,14 @@ const STATUS_LABEL: Record<SprintRow['status'], string> = {
   active: 'Active',
   paused: 'Paused',
   completed: 'Completed',
+}
+
+/** A running sprint is the one worth noticing; a completed one is done, and a paused one is muted. */
+const SPRINT_STATUS_TONES: Record<string, StatusTone> = {
+  active: 'accent',
+  completed: 'success',
+  paused: 'neutral',
+  failed: 'danger',
 }
 
 function sprintProgress(sprint: SprintRow): number {
@@ -138,56 +146,64 @@ function SprintsListPage() {
     {
       id: 'name',
       header: 'Sprint',
+      kind: 'primary',
       sortable: false,
       priority: 'primary',
       value: (sprint) => sprint.name,
       cell: (sprint) => (
         <Link to="/sprints/$sprintId" params={{ sprintId: sprint.id }} search={{}} className="min-w-0 block">
-          <span className="block truncate font-medium text-bh-text">{sprint.name}</span>
-          <span className="mt-1.5 block h-1 w-full max-w-xs rounded-full bg-bh-surface/60 overflow-hidden" data-testid="sprint-progress">
-            <span
-              className="block h-full rounded-full bg-bh-accent transition-all"
-              style={{ width: `${sprintProgress(sprint)}%` }}
-            />
-          </span>
+          <PrimaryCell title={sprint.name} />
         </Link>
       ),
     },
     {
+      // Progress was drawn as a bare bar under the sprint's name, which said "some" and never how
+      // much. Its own ratio column prints the number beside the bar — and the number is what makes
+      // the bar legal, since the fill alone is under the 3:1 SC 1.4.11 wants of a graphic.
+      id: 'progress',
+      header: 'Progress',
+      kind: 'ratio',
+      value: (sprint) => sprintProgress(sprint),
+      cell: (sprint) => <RatioCell value={sprintProgress(sprint) / 100} />,
+    },
+    {
       id: 'status',
       header: 'Status',
+      kind: 'status',
       value: (sprint) => sprint.status,
-      cell: (sprint) => STATUS_LABEL[sprint.status],
+      cell: (sprint) => <StatusCell label={STATUS_LABEL[sprint.status] ?? sprint.status} tone={SPRINT_STATUS_TONES[sprint.status] ?? 'neutral'} />,
     },
     {
       id: 'resultCount',
       header: 'Candidates',
-      align: 'end',
+      kind: 'number',
       value: (sprint) => sprint.resultCount,
-      cell: (sprint) => sprint.resultCount.toLocaleString(),
+      cell: (sprint) => <NumberCell value={sprint.resultCount} />,
     },
     {
       id: 'lastRunAt',
       header: 'Last run',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (sprint) => sprint.lastRunAt,
-      cell: (sprint) => sprint.lastRunAt ? new Date(sprint.lastRunAt).toLocaleString() : 'never',
+      // `DateCell` renders "Never run" rather than the word `never` in the row's own voice, and it
+      // says so to a screen reader instead of leaving the cell silent.
+      cell: (sprint) => <DateCell value={sprint.lastRunAt} withTime />,
     },
     {
       id: 'createdAt',
       header: 'Created',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (sprint) => sprint.createdAt,
-      cell: (sprint) => new Date(sprint.createdAt).toLocaleDateString(),
+      cell: (sprint) => <DateCell value={sprint.createdAt} />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       value: () => null,
       cell: (sprint) => (
         <span className="flex items-center justify-end gap-1">
