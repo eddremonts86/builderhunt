@@ -94,8 +94,24 @@ jobs:
       # The smoke creates and migrates `builderhunt_load_test_smoke` from this URL. It never touches the
       # database named here, and `safety.ts` refuses outright unless the *target* name carries the disposable
       # prefix and the host is loopback.
-      DATABASE_URL: postgresql://postgres:${{ github.run_id }}@127.0.0.1:5432/postgres
+      #
+      # `DATABASE_MIGRATION_URL` is the owner, deliberately: migrations create roles and take advisory locks,
+      # which is exactly what an owner is for, and `env.ts` expects this one to be privileged.
       DATABASE_MIGRATION_URL: postgresql://postgres:${{ github.run_id }}@127.0.0.1:5432/postgres
+      #
+      # `DATABASE_URL` is deliberately **absent** here, and that is the fix for the defect that kept this job
+      # from ever completing.
+      #
+      # It used to be the same owner URL as the line above, and a production build refuses that outright:
+      # `Production DATABASE_URL must use the non-owner application role`. The preview server died on its own
+      # env validation, the smoke reported `❌ the preview server never answered /api/health`, and the actual
+      # reason sat further down the log. `env.ts` is right to refuse — a superuser connection ignores GRANTs
+      # and RLS, and this repository has three defects that hid behind exactly that.
+      #
+      # It is exported from `$GITHUB_ENV` by the role-password step below instead, because the app role's
+      # password does not exist until that step mints it. Leaving it unset here means a future edit that drops
+      # that step fails with `DATABASE_URL is not set` from `smoke.ts` — the true statement — rather than
+      # silently falling back to the superuser and failing somewhere unrelated.
       APP_URL: http://127.0.0.1:3000
       VITE_APP_URL: http://127.0.0.1:3000
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
@@ -136,39 +152,101 @@ jobs:
       - name: Unit tests for the load harness
         run: pnpm vitest run tests/unit/scripts/load/
 
-      # The smoke serves `dist` deliberately — a harness that only works against `vite dev` proves nothing
-      # about the artifact that gets deployed.
-      - name: Build
-        run: pnpm build
-
-      - name: Load smoke — direct
-        run: pnpm test:load:smoke
-
-      # ── The pooled leg ───────────────────────────────────────────────────────────────────────────
+      # ── The five application roles ───────────────────────────────────────────────────────────────
       #
-      # The direct leg above proves the harness works. This one proves the *topology* production will run
-      # does, and it is the more faithful of the two: PgBouncer authenticates against a `userlist.txt` built
-      # from the five `builderhunt_*` roles, so the pooled run necessarily connects as those roles rather
-      # than as this job's superuser — which means RLS is actually in the path.
+      # Both legs need to connect as `builderhunt_app`, and giving a role a password requires the role to
+      # exist. The roles are created by `drizzle/0002` and `drizzle/0012`, which the smoke runs — *inside* the
+      # run that needs the password already set. So the migrations run once here first, and the roles they
+      # create are cluster-global and outlive the database.
       #
-      # The passwords are generated here and used in two places, the pooler's userlist and the app's URLs,
-      # from one variable each. They are throwaway values for an ephemeral service container and never
-      # leave the job.
-      - name: Give the five roles passwords the pooler can authenticate
+      # Deliberately not hand-rolled `CREATE ROLE` statements: role creation, the GRANTs and the RLS policies
+      # live in migrations and only in migrations, so a workflow that invents its own roles would be testing a
+      # cluster this application never runs on. The cost is one extra `drizzle-kit migrate` — the smoke drops
+      # and recreates this database and migrates it again — and that is the price of using the real path.
+      #
+      # `builderhunt_load_test_smoke` is the same name `scripts/load/smoke.ts` uses, so nothing here creates a
+      # database outside the disposable prefix `safety.ts` enforces.
+      - name: Create the application roles, by running the migrations that own them
         run: |
           set -euo pipefail
-          for role in app auth worker platform capability; do
+          PGPASSWORD=${{ github.run_id }} psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c 'drop database if exists builderhunt_load_test_smoke' \
+            -c 'create database builderhunt_load_test_smoke'
+          DATABASE_MIGRATION_URL=postgresql://postgres:${{ github.run_id }}@127.0.0.1:5432/builderhunt_load_test_smoke \
+            pnpm exec drizzle-kit migrate
+          missing=$(PGPASSWORD=${{ github.run_id }} psql -h 127.0.0.1 -U postgres -d postgres -Atc "
+            select string_agg(r.name, ', ')
+            from (values ('builderhunt_app'), ('builderhunt_auth'), ('builderhunt_worker'),
+                         ('builderhunt_platform'), ('builderhunt_capability')) as r(name)
+            where not exists (select 1 from pg_roles where rolname = r.name)")
+          if [ -n "$missing" ]; then
+            echo "::error::the migrations did not create: $missing — every step below authenticates as these"
+            exit 1
+          fi
+          echo 'all five builderhunt_* roles exist'
+
+      # The passwords are generated here and used in three places — the pooler's userlist, the app's URLs, and
+      # the direct leg's `DATABASE_URL` — from one variable each. They are throwaway values for an ephemeral
+      # service container and never leave the job.
+      #
+      # This step used to sit below the direct leg, under the pooled banner, which is why the direct leg had
+      # nothing but the superuser to offer the preview server.
+      - name: Give the five roles passwords, and hand the app role to both legs
+        run: |
+          set -euo pipefail
+          # `role:ENV_VAR` pairs rather than an associative array — `declare -A` needs bash 4+, and a
+          # workflow should not carry a shell-version dependency it can avoid in one line.
+          for pair in app:DATABASE_URL auth:DATABASE_AUTH_URL worker:DATABASE_WORKER_URL \
+                      platform:DATABASE_PLATFORM_URL capability:DATABASE_CAPABILITY_URL; do
+            role="${pair%%:*}"
+            url_var="${pair##*:}"
             var="BUILDERHUNT_$(echo "$role" | tr '[:lower:]' '[:upper:]')_PASSWORD"
             value="$(openssl rand -hex 16)"
             echo "::add-mask::$value"
             echo "$var=$value" >> "$GITHUB_ENV"
             PGPASSWORD=${{ github.run_id }} psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
               -c "ALTER ROLE builderhunt_${role} WITH PASSWORD '${value}'"
+            # Direct-leg URLs, one per role rather than four fallbacks to `DATABASE_URL`.
+            #
+            # `smoke.ts` defaults the other four to whatever `DATABASE_URL` holds, which would run the whole
+            # direct leg as `builderhunt_app` — including the auth and worker paths that exist precisely
+            # because they carry different privileges. The pooled leg already names each role separately; this
+            # makes the direct leg as faithful.
+            #
+            # The database is `postgres` here and not the disposable one on purpose: `smoke.ts` rewrites the
+            # database name itself via `withDatabase`, and naming the target here would state it in two places.
+            echo "${url_var}=postgresql://builderhunt_${role}:${value}@127.0.0.1:5432/postgres" >> "$GITHUB_ENV"
           done
           admin="$(openssl rand -hex 16)"
           echo "::add-mask::$admin"
           echo "PGBOUNCER_ADMIN_PASSWORD=$admin" >> "$GITHUB_ENV"
 
+      # The smoke serves `dist` deliberately — a harness that only works against `vite dev` proves nothing
+      # about the artifact that gets deployed.
+      #
+      # After the two steps above, not before them, and not because the build needs a database: it is so the
+      # build runs with `DATABASE_URL` present, exactly as it did when that variable was job-level env. Moving
+      # it earlier would have been a guess about whether anything in the build reads it, and a build that fails
+      # for a missing runtime variable is a confusing way to learn the answer.
+      - name: Build
+        run: pnpm build
+
+      # Both legs now connect as `builderhunt_app`, so RLS is in the path for both and the latencies mean the
+      # same thing. `smoke.ts` prints a warning when the application is about to connect as a superuser; that
+      # warning has never been reachable in CI, because the server refused to boot before it could be printed.
+      - name: Load smoke — direct
+        run: pnpm test:load:smoke
+
+      # ── The pooled leg ───────────────────────────────────────────────────────────────────────────
+      #
+      # The direct leg above proves the harness works. This one proves the *topology* production will run
+      # does: PgBouncer authenticates against a `userlist.txt` built from the five `builderhunt_*` roles, so
+      # the pooled run reaches PostgreSQL through the same pooler production sits behind.
+      #
+      # This used to be described as "the more faithful of the two", on the grounds that the direct leg
+      # connected as this job's superuser and so ran with RLS out of the path. That is no longer the
+      # difference — both legs authenticate as `builderhunt_app` now. What separates them is the pooler, which
+      # is the only thing this leg is here to exercise.
       - name: Build and start PgBouncer
         run: |
           set -euo pipefail

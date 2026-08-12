@@ -154,9 +154,29 @@ export async function startMonitor(options: MonitorOptions): Promise<MonitorRun>
   const failures = { postgres: 0, pgbouncer: 0, container: 0 }
 
   const db: Sql = postgres(options.databaseUrl, { max: 1, prepare: false, idle_timeout: 0 })
+  /**
+   * The admin console does not implement the extended query protocol, and `prepare: false` is not what
+   * arranges that.
+   *
+   * `prepare: false` turns off prepared-statement *caching*. The protocol is chosen per query, and
+   * `sql.unsafe(text)` with no bind parameters already picks the simple one — so `SHOW POOLS` and
+   * `SHOW STATS` were never the problem. What was: `fetch_types` defaults to true, so on connect
+   * postgres.js asks the server for array type OIDs, with the extended protocol, before any of this
+   * code runs a query. PgBouncer answers `extended query protocol not supported by admin console`.
+   *
+   * It surfaced as an **uncaught** rejection — `triggerUncaughtException(err, fromPromise)` out of the
+   * socket's read handler — which is why every `try`/`catch` and `.catch(() => null)` below missed it: the
+   * error belongs to a query this module never issued, so there was no pending promise to reject. The run
+   * died four seconds into the pooled leg, after the fifteenth sign-in, with the load never starting.
+   *
+   * postgres.js sets the same flag for the same class of reason in its own `subscribe.js`; a replication
+   * connection cannot run arbitrary queries either.
+   *
+   * Never reached CI before 2026-08-12, because the job died at the direct leg on an owner-role
+   * `DATABASE_URL` and never got here.
+   */
   const pooler: Sql | null = options.poolerAdminUrl
-    // The admin console does not implement the extended query protocol or prepared statements.
-    ? postgres(options.poolerAdminUrl, { max: 1, prepare: false, idle_timeout: 0 })
+    ? postgres(options.poolerAdminUrl, { max: 1, prepare: false, fetch_types: false, idle_timeout: 0 })
     : null
 
   let poolerConfig: PgBouncerConfigFacts | null = null
