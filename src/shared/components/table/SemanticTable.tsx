@@ -1,3 +1,6 @@
+// table-surface-ok: the semantic primitive itself. Its <table> is the one visible table element in
+// the app that is written by hand; every other one renders through this file, which is the rule
+// check-table-surfaces enforces.
 import type { ReactNode } from 'react'
 
 import { cn } from '~/shared/lib/utils'
