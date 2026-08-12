@@ -300,6 +300,9 @@ function SprintDossierPage() {
         const trackedRowId = trackedRowIds.get(row.id) ?? null
         return (
           <BuilderResultActions
+            // One icon action plus an overflow menu: the 44px actions track cannot hold two
+            // labelled buttons, and fifty rows of two is a hundred tab stops through the table.
+            layout="compact"
             builder={{
               id: row.id,
               source: row.source,

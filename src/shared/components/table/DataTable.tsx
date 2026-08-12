@@ -529,7 +529,10 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
                       <SortIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
                     </button>
                     )
-                  : <span className="truncate">{column.header}</span>}
+                  // A 44px actions track cannot hold a word, and "ACTI…" is worse than nothing —
+                  // the column is unmistakable from its contents. The label stays for a screen
+                  // reader, which navigates by column name and has no other way to find it.
+                  : <span className={cn(column.kind === 'actions' ? 'sr-only' : 'truncate')}>{column.header}</span>}
               </div>
             )
           })}

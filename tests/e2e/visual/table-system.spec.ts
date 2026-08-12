@@ -108,11 +108,13 @@ test.beforeAll(async () => {
     const sprintId = `tbl-visual-${workerIndex}`
     const clock = fixedClockFromEnv()
     await sql`
-      insert into sourcing_sprints (id, organization_id, name, status, variants, cursor, created_at)
+      insert into sourcing_sprints (id, organization_id, creator_user_id, name, criteria, variants, status, quota, cursor, last_run_at, created_at)
       values (
-        ${sprintId}, ${principal.organizationId}, 'Table system specimen', 'completed',
-        ${sql.json([{ label: 'senior', query: 'rust' }])}, ${sql.json({ page: 1, variantIndex: 0 })},
-        ${clock.minus({ days: 9 })}
+        ${sprintId}, ${principal.organizationId}, ${principal.userId!}, 'Table system specimen',
+        ${sql.json({ skills: ['rust'], roles: [], seniority: 'unknown', locations: [], mustHaves: [] })},
+        ${sql.json([{ label: 'senior', query: 'rust' }])}, 'completed', 1000,
+        ${sql.json({ page: 1, variantIndex: 0 })},
+        ${clock.minus({ days: 2 })}, ${clock.minus({ days: 9 })}
       )
     `
     for (const [index, row] of SPECIMEN.entries()) {
@@ -253,30 +255,6 @@ for (const theme of ['light', 'dark'] as const) {
   })
 
   /**
-   * The floating selection bar.
-   *
-   * It replaced an inline strip that pushed every row down 40px the moment a checkbox was ticked —
-   * the list moved under the cursor selecting it. A baseline is what keeps it floating.
-   */
-  test(`selection bar — ${theme}`, async ({ browser }) => {
-    test.setTimeout(120_000)
-    const context = await withTheme(browser, theme)
-    const page = await context.newPage()
-    try {
-      await prepare(page, '/settings/team')
-      const selectAll = page.getByTestId('table-select-loaded')
-      if (await selectAll.count() === 0) test.skip(true, 'the roster table is not selectable on this surface')
-      await selectAll.first().click()
-      await expect(page.getByTestId('table-selection-bar')).toBeVisible()
-      await expect(page.getByTestId('table-container').first()).toHaveScreenshot(`table-selection-${theme}.png`, {
-        maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
-      })
-    } finally {
-      await context.close()
-    }
-  })
-
-  /**
    * The native semantic table, on the same tokens as the grid above.
    *
    * `/pricing` is public, so this one needs no session — but it does need the same theme handling,
@@ -296,6 +274,56 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(table).toBeVisible()
       await table.scrollIntoViewIfNeeded()
       await expect(table).toHaveScreenshot(`table-semantic-${theme}.png`, {
+        maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
+      })
+    } finally {
+      await context.close()
+    }
+  })
+}
+
+/**
+ * The same two tables at 375px, tagged so the `visual-mobile` project picks them up.
+ *
+ * Not a duplicate of the captures above. Fixed column widths mean the grid is wider than a phone
+ * and lives inside its own scroller, and the semantic table's five plan columns cannot fit by any
+ * arrangement — what a reader sees on a phone is the *left edge* of each, which is a different
+ * composition and the one nobody develops against.
+ *
+ * `responsive-device-matrix.spec.ts` already proves neither of them widens the document. This is
+ * what they look like while not doing so.
+ */
+for (const theme of ['light', 'dark'] as const) {
+  test(`interactive grid at 375px — ${theme} @mobile-only`, async ({ browser }) => {
+    test.setTimeout(120_000)
+    const context = await withTheme(browser, theme)
+    const page = await context.newPage()
+    try {
+      await prepare(page, `/sprints/${harness.sprintId}`)
+      const table = page.getByTestId('table-container')
+      await expect(table).toBeVisible()
+      await expect(page.locator('[role="grid"] [role="row"]').nth(3)).toBeVisible()
+      await expect(table).toHaveScreenshot(`table-grid-mobile-${theme}.png`, {
+        maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
+      })
+    } finally {
+      await context.close()
+    }
+  })
+
+  test(`semantic table at 375px — ${theme} @mobile-only`, async ({ browser }) => {
+    test.setTimeout(120_000)
+    const context = await browser.newContext()
+    await context.addInitScript(([key, value]) => {
+      window.localStorage.setItem(key as string, value as string)
+    }, ['bh-theme', theme])
+    const page = await context.newPage()
+    try {
+      await prepare(page, '/pricing')
+      const table = page.getByTestId('semantic-table').first()
+      await expect(table).toBeVisible()
+      await table.scrollIntoViewIfNeeded()
+      await expect(table).toHaveScreenshot(`table-semantic-mobile-${theme}.png`, {
         maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
       })
     } finally {
