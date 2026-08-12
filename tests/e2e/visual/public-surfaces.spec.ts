@@ -23,7 +23,7 @@
  */
 import { expect, test } from 'playwright/test'
 import { installFixedBrowserClock } from '../harness/clock'
-import { gotoHydrated } from '../harness/browser'
+import { gotoHydrated, waitForFontsSettled } from '../harness/browser'
 
 /**
  * Routes that render fully for an anonymous visitor.
@@ -65,7 +65,7 @@ async function prepare(page: import('playwright/test').Page, path: string): Prom
     }`,
   })
   await gotoHydrated(page, path)
-  await page.evaluate(() => document.fonts.ready)
+  await waitForFontsSettled(page)
 }
 
 test.describe('public surfaces — desktop', () => {
