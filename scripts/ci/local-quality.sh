@@ -232,6 +232,18 @@ step step-parity node scripts/ci/check-step-parity.mjs
 step plans-links pnpm plans:check-links
 step plans-order pnpm plans:check-order
 step plans-implemented pnpm plans:check-implemented
+# And the two that were written, wired into `package.json`, and then never called from anywhere —
+# which is the same failure the paragraph above describes, one layer out. `plans:check-readiness`
+# guards the trio-and-header contract for phase 2 and phase 3 and chains `plans:check-tasks`, so a
+# plan landing without `Depends on`/`Blocks`/`Reality check`, or an open task with no Verify line,
+# now fails the gate instead of waiting to be noticed by hand.
+#
+# Running it by hand on 2026-08-12 found two real faults, both invisible until then: phase-2 plan 08
+# had shipped with three headers missing from `plan.md` and `tasks.md`, and the checker itself
+# resolved only `plans/<phase>/` for every phase but the first — so phase 3, whose plans 01-13 are
+# archived under `plans/implemented/phase-3/`, reported `14-unified-table-visual-style is position 14,
+# expected 1`. A correct number measured against a corpus missing thirteen entries.
+step plans-readiness pnpm plans:check-readiness
 
 step migration-integrity pnpm test:migration-integrity
 step deploy-imports pnpm test:deploy-imports

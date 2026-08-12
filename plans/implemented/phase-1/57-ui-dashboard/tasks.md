@@ -11,6 +11,13 @@
 > already express and keep a widget hidden after the workspace stopped being new, and "disabling either admin
 > surface" describes a capability this product does not have. The one item that was open inside a checked task —
 > bounding the legacy `/api/admin/metrics` response — was closed as code, not recounted.
+> **Depends on**: selected deliverables from [`plans/UI`](../56-UI/spec.md), [`saved-search-health`](../../../phase-4/saved-search-health/spec.md), and [`hiring-pipeline-kanban`](../../../phase-4/hiring-pipeline-kanban/spec.md)
+> **Blocks**: nothing. The dashboard consumes existing surfaces; no schema, API or migration in this
+> plan gates another one.
+> **Reality check**: the dashboard already had banners, four metric tiles, activity, sprints,
+> recommendations, alerts, saved searches, recent builders, plan usage and source mix. The problem was
+> never an empty dashboard — it was weak prioritization, ambiguous data semantics, disconnected
+> workflows, and incomplete failure and accessibility states.
 
 ## Wave 0 — Baseline and truth
 
