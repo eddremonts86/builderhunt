@@ -339,7 +339,16 @@ export function RoadmapManager() {
           <Button type="button" onClick={() => startEdit(item)} variant="secondary" size="sm" data-testid="admin-roadmap-edit">
             Edit
           </Button>
-          <Button type="button" onClick={() => void remove(item.id)} variant="secondary" size="sm" data-testid="admin-roadmap-delete">
+          <Button
+            type="button"
+            onClick={() => void remove(item.id)}
+            variant="secondary"
+            size="sm"
+            // An icon-only button has no inner text a screen reader can read, so without this it
+            // announced as "button" — fifty of them, one per row, and one of them deletes.
+            aria-label={`Delete ${item.title}`}
+            data-testid="admin-roadmap-delete"
+          >
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
         </span>

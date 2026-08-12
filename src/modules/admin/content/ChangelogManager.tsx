@@ -293,7 +293,16 @@ export function ChangelogManager() {
           <Button type="button" onClick={() => startEdit(entry)} variant="secondary" size="sm" data-testid="admin-changelog-edit">
             Edit
           </Button>
-          <Button type="button" onClick={() => void remove(entry.id)} variant="secondary" size="sm" data-testid="admin-changelog-delete">
+          <Button
+            type="button"
+            onClick={() => void remove(entry.id)}
+            variant="secondary"
+            size="sm"
+            // Same as the roadmap's: an icon-only button announces as "button" without this, and
+            // this one deletes a published changelog entry.
+            aria-label={`Delete ${entry.title}`}
+            data-testid="admin-changelog-delete"
+          >
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
         </span>

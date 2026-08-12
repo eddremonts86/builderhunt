@@ -464,6 +464,16 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         aria-colcount={visibleColumns.length + (selectable ? 1 : 0) + (expansion ? 1 : 0)}
         aria-busy={isLoading || undefined}
         onKeyDown={keyboard.onKeyDown}
+        /**
+         * Focusable only when it holds no rows.
+         *
+         * `.tbl-scroll` scrolls horizontally, and a scrollable region a keyboard cannot reach is a
+         * WCAG 2.1.1 failure (axe: `scrollable-region-focusable`, found on an empty
+         * `/admin/incidents`). With rows, the roving tabindex already puts one cell in the tab
+         * order and the region is reachable through it — adding a stop here as well would mean
+         * tabbing into the same table twice.
+         */
+        tabIndex={rows.length === 0 ? 0 : undefined}
         ref={scrollRef}
         onScroll={virtualized ? handleScroll : undefined}
         className="tbl-scroll"
@@ -479,8 +489,17 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
           className={cn(
             'tbl-header-row',
             usesGridTemplate ? 'grid items-center' : 'flex items-center gap-3',
-            // Hidden from sight, not from a screen reader: `aria-rowcount` counts this row.
-            chrome === 'minimal' && 'sr-only',
+            /**
+             * Hidden from sight, not from a screen reader: `aria-rowcount` counts this row, and a
+             * `role="grid"` whose first row is missing announces a sequence that does not exist.
+             *
+             * Hidden for the stacked and board layouts as well as for `minimal` chrome. Those
+             * arrangements have no columns for a header to head — each cell carries its own label
+             * inline — so the row degenerates into nine flex items squeezed into a phone, with the
+             * sort controls overlapping each other. axe measured one at 5.4px of unobscured width
+             * on `/admin/operations`, which is a control nobody can hit and a WCAG 2.5.8 failure.
+             */
+            (chrome === 'minimal' || !usesGridTemplate) && 'sr-only',
           )}
           style={usesGridTemplate
             ? {
@@ -515,7 +534,12 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
                 role="columnheader"
                 aria-colindex={ariaColIndex(columnIndex + (selectable ? 1 : 0))}
                 aria-sort={sortable ? (term ? (term.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
-                className={cn('tbl-header-cell', cellAlignmentClass(column), column.kind === 'actions' && 'tbl-actions-cell')}
+                // Deliberately *not* `.tbl-actions-cell`. The rows' actions column is sticky so it
+                // stays reachable while the fixed-width middle columns scroll under it — but the
+                // header's actions cell has an `sr-only` label and nothing to keep on screen, and
+                // pinning it made it overlay the header buttons beneath. axe measured the "Last
+                // run" sort control as 6.8px of unobscured width at 320px.
+                className={cn('tbl-header-cell', cellAlignmentClass(column))}
               >
                 {sortable
                   ? (

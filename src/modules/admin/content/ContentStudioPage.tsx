@@ -47,7 +47,12 @@ export function ContentStudioPage({ posts, tab, onTabChange }: ContentStudioPage
       </header>
 
       <div
-        className="flex items-center gap-1 border-b border-bh-border/40 mb-6"
+        // `overflow-x-auto` on the strip rather than `flex-wrap`: a wrapped tablist puts one tab on
+        // a second row under a border that no longer runs beneath it, and the three labels plus
+        // their icons want 359px at a 320px viewport. Scrolling keeps the row a row. Without it
+        // the document itself was 39px wider than the phone (found by `pnpm test:a11y` once
+        // `/admin/content` joined its route matrix).
+        className="flex items-center gap-1 overflow-x-auto border-b border-bh-border/40 mb-6"
         role="tablist"
         aria-label="Content type"
       >
@@ -63,7 +68,7 @@ export function ContentStudioPage({ posts, tab, onTabChange }: ContentStudioPage
               aria-controls={`content-panel-${key}`}
               id={`content-tab-${key}`}
               onClick={() => onTabChange(key)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
                 active
                   ? 'border-bh-accent text-bh-text'
                   : 'border-transparent text-bh-text-dim hover:text-bh-text-muted'
@@ -101,28 +106,34 @@ export function ContentStudioPage({ posts, tab, onTabChange }: ContentStudioPage
           not restored with a backup. The files under <code>content/</code> are the durable copy, and every
           deploy pushes them in.
         </p>
+        {/*
+          * Stacked below `sm`, side-by-side above it. A fixed 224px term beside a description with
+          * no `min-w-0` is a flex row whose min-content width exceeds a 320px phone: the `<dd>`
+          * refused to shrink and pushed the *document* 28px past the viewport, which `pnpm test:a11y`
+          * caught once `/admin/content` joined its route matrix.
+          */}
         <dl className="text-xs space-y-2">
-          <div className="flex gap-3">
-            <dt className="shrink-0 font-mono text-bh-accent w-56">pnpm content:sync</dt>
-            <dd className="text-bh-text-muted">
+          <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+            <dt className="shrink-0 font-mono text-bh-accent sm:w-56">pnpm content:sync</dt>
+            <dd className="min-w-0 text-bh-text-muted">
               Upserts every file into this database. Idempotent, and it runs automatically as part of
               <code> pnpm deploy:db</code> on every production deploy.
             </dd>
           </div>
-          <div className="flex gap-3">
-            <dt className="shrink-0 font-mono text-bh-accent w-56">pnpm content:sync:dry</dt>
-            <dd className="text-bh-text-muted">Prints what it would write, changes nothing.</dd>
+          <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+            <dt className="shrink-0 font-mono text-bh-accent sm:w-56">pnpm content:sync:dry</dt>
+            <dd className="min-w-0 text-bh-text-muted">Prints what it would write, changes nothing.</dd>
           </div>
-          <div className="flex gap-3">
-            <dt className="shrink-0 font-mono text-bh-accent w-56">pnpm content:export</dt>
-            <dd className="text-bh-text-muted">
+          <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+            <dt className="shrink-0 font-mono text-bh-accent sm:w-56">pnpm content:export</dt>
+            <dd className="min-w-0 text-bh-text-muted">
               The other direction: writes the current rows back out as files. Run this after drafting in the
               forms above, then review the diff and commit — that is how a draft becomes permanent.
             </dd>
           </div>
-          <div className="flex gap-3">
-            <dt className="shrink-0 font-mono text-bh-accent w-56">pnpm content:sync --prune</dt>
-            <dd className="text-bh-text-muted">
+          <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+            <dt className="shrink-0 font-mono text-bh-accent sm:w-56">pnpm content:sync --prune</dt>
+            <dd className="min-w-0 text-bh-text-muted">
               Also deletes rows whose file is gone. Only ever touches rows these files own — rows created in
               the forms above are left alone, and are the ones marked <span className="text-bh-cyan">in git</span> when they are not.
             </dd>

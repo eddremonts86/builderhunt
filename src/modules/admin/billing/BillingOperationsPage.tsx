@@ -244,7 +244,7 @@ function DeadLetterReplaySection() {
             onClick={() => setStatusFilter(s)}
             aria-pressed={statusFilter === s}
             data-testid={`billing-events-filter-${s}`}
-            className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${statusFilter === s ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'}`}
+            className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${statusFilter === s ? 'bg-bh-accent text-bh-accent-contrast' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'}`}
           >
             {s}
           </button>

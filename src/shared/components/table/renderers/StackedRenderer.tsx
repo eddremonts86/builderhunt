@@ -69,20 +69,31 @@ export function StackedRenderer<Row>({ context }: { context: RendererContext<Row
                   {column.cell(row)}
                 </div>
               ))}
-              <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {/*
+                * Divs, not a `<dl>`. A `role="row"` may only contain `gridcell`, `columnheader` or
+                * `rowheader`, and a definition list puts `dl`, `dt` and `dd` inside it — axe reports
+                * both `aria-required-children` (critical) and `definition-list` against the same
+                * markup, and a screen reader navigating the grid finds children it cannot place.
+                *
+                * The label moves *inside* the cell instead of standing beside it as a `<dt>`, which
+                * is also what makes the cell announce as "Last run, 3d ago" rather than as a bare
+                * value whose column header is off-screen at this width.
+                */}
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                 {rest.map((column, columnIndex) => (
-                  <div key={column.id} className="flex min-w-0 items-baseline gap-1.5">
-                    <dt className="tbl-cell-meta">{column.header}</dt>
-                    <dd
-                      role="gridcell"
-                      aria-colindex={ariaColIndex(identity.length + columnIndex + (selectable ? 1 : 0))}
-                      className={cn('tbl-stacked-value', isEndAligned(column) && 'tabular-nums')}
-                    >
+                  <div
+                    key={column.id}
+                    role="gridcell"
+                    aria-colindex={ariaColIndex(identity.length + columnIndex + (selectable ? 1 : 0))}
+                    className="flex min-w-0 items-baseline gap-1.5"
+                  >
+                    <span className="tbl-cell-meta">{column.header}</span>
+                    <span className={cn('tbl-stacked-value', isEndAligned(column) && 'tabular-nums')}>
                       {column.cell(row)}
-                    </dd>
+                    </span>
                   </div>
                 ))}
-              </dl>
+              </div>
             </div>
           </div>
         )

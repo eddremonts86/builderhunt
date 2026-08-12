@@ -318,7 +318,7 @@ export function IntegrationsPage() {
                   aria-pressed={selected}
                   data-testid={`integrations-filter-${f}`}
                   className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${
-                    selected ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
+                    selected ? 'bg-bh-accent text-bh-accent-contrast' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
                   }`}
                 >
                   {f}

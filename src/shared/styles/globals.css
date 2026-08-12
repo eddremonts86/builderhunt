@@ -1252,6 +1252,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   border-radius: 4px;
   color: inherit;
   transition: color var(--tbl-transition);
+  /* WCAG 2.2 SC 2.5.8: a touch target is at least 24x24. The header's own text is 11px, so
+     without this the hit area was 16.5px tall and axe said so — the label is the affordance, and
+     an affordance you cannot reliably hit is decoration. The 34px header has room. */
+  min-height: 24px;
+  padding-inline: 0.25rem;
 }
 .tbl-sort-button:hover { color: var(--tbl-header-active); }
 
@@ -1555,6 +1560,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
    One visible action and a menu. Three buttons per row across fifty rows is a
    hundred and fifty tab stops between the top of a table and the bottom. */
 .tbl-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.125rem; }
+/* Same 24px floor for a link used as a row action. `IntegrationsPage`'s "View" link measured
+   43.8x16 — wide enough and half the required height. */
+.tbl-actions-cell a { display: inline-flex; align-items: center; min-height: 24px; }
 .tbl-actions-overflow { position: relative; }
 .tbl-actions-trigger {
   display: inline-flex;

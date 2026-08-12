@@ -55,7 +55,7 @@ export function StatusFilterTabs<Status extends string>({
           {...({ to, search: { status: option.value } } as unknown as { to: string })}
           className={`rounded px-2.5 py-1 text-xs font-medium ${
             option.value === current
-              ? 'bg-bh-accent text-white'
+              ? 'bg-bh-accent text-bh-accent-contrast'
               : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
           }`}
           data-active={option.value === current ? 'true' : undefined}
