@@ -1,5 +1,5 @@
 /**
- * Deduplicated financial notifications (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Add financial
+ * Deduplicated financial notifications (plans/implemented/30-stripe-billing-platform/tasks.md §10 "Add financial
  * notifications, metrics, and alerts"). One sweep function, `runNotificationSweep`, covers all seven
  * message types the task names — renewal, grace, action-required, expiry-30/7/1 (three windows, one
  * message family), refund, dispute, reconciliation — using the SAME O(organizations) cross-org sweep

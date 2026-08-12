@@ -1,6 +1,6 @@
 /**
  * Re-embedding / backfill procedure for `builder_embeddings`
- * (plans/phase-1/43-solutions-intelligence Phase 2, "Unify embedding dimension and entity
+ * (plans/implemented/43-solutions-intelligence Phase 2, "Unify embedding dimension and entity
  * contracts": "build a safe re-embedding/backfill procedure").
  *
  * Needed whenever the vector meaning changes underneath the stored rows: the embedding model is

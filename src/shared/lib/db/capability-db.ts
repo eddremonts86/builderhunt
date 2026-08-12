@@ -19,7 +19,7 @@ import { poolOptions } from './pool-options'
  */
 const capabilityClient = postgres(
   env.DATABASE_CAPABILITY_URL ?? env.DATABASE_WORKER_URL ?? env.DATABASE_URL,
-  poolOptions(),
+  poolOptions('capability'),
 )
 
 export const capabilityDb = drizzle(capabilityClient)

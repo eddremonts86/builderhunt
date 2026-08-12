@@ -8,7 +8,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * Two requests per uncached search, both against a generous per-IP rate
  * limit — well under BuilderHunt's 5-minute search cache.
  *
- * Spec reference: plans/phase-1/17-bluesky-integration/spec.md
+ * Spec reference: plans/implemented/17-bluesky-integration/spec.md
  */
 interface BskyActor {
   did: string

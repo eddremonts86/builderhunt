@@ -1,6 +1,18 @@
 # Profiles:
 #   standalone — start just the DB when workspace-postgres is not running
 #                (handled automatically by `pnpm db:up`)
+#   load       — the PgBouncer pooler for plan 55's load work. Deliberately its own profile: a bare
+#                `docker compose up` must not change the topology a developer's app connects through,
+#                because a pooler in the path silently changes what session state survives a statement.
+#
+#                Start it with **both** profiles, because `pgbouncer` depends on `db` and Compose
+#                refuses a dependency whose profile is inactive:
+#
+#                  docker compose --profile standalone --profile load up -d
+#
+#                `--profile load` alone answers `depends on undefined service "db"`, which is Compose
+#                being right rather than a misconfiguration — a pooler with no database behind it would
+#                start, bind 6432 and refuse every connection.
 
 services:
   db:
@@ -19,6 +31,15 @@ services:
     # once by the combination of a running dev server + drizzle-kit +
     # vitest + ad-hoc tsx scripts, each opening their own postgres() pool.
     # Bumped for local headroom — not a production tuning recommendation.
+    #
+    # Deliberately 200 and not the 120 plan 55 specifies for the load topology. That 120 is a property
+    # of the isolated 4-vCPU certification host, where one app process talks to one database through
+    # PgBouncer. This service is shared with an 11-worker Playwright run, and Playwright starts a
+    # server per worker: five pools at E2E's `max: 3` is 15 connections per process, so 11 workers plus
+    # the config's own webServer is ~180 before the harness's admin clients. 120 here would not tighten
+    # anything — it would reintroduce `sorry, too many clients already` in whichever spec was unlucky,
+    # which is the exact failure `pool-options.ts` documents at 197 connections.
+    #
     # log_lock_failures=on: a migration that loses a lock race says so
     # in the log instead of timing out silently. See deploy-runbook.md
     # (PG18 observability surface). io_method is left as the default
@@ -43,6 +64,56 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # ── PgBouncer, for load work only (plan 55 phase 4) ────────────────────────────────────────────
+  #
+  # Bound to 127.0.0.1 on purpose. The pooler holds every role's password, and a container that publishes
+  # 6432 on all interfaces is one `docker run` on a café network away from being reachable.
+  #
+  # The five role passwords come from the environment rather than this file: a committed password is a
+  # committed password whatever the file is called.
+  #
+  # Plain `${VAR}` and not `${VAR:?...}`, which was the first attempt. Compose interpolates **every**
+  # service regardless of profile, so the required-variable form made `docker compose config` fail for
+  # anyone without load credentials in `.env` — a command that has nothing to do with load testing,
+  # broken by a guard for it.
+  #
+  # The refusal belongs in `entrypoint.sh` and is already there: `set -u` plus an explicit check per
+  # variable, so the container exits naming the missing one instead of writing an empty `userlist.txt`
+  # that fails hours later as an authentication problem.
+  pgbouncer:
+    profiles: ['load']
+    build:
+      context: ./docker/pgbouncer
+    container_name: builderhunt-pgbouncer
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BUILDERHUNT_APP_PASSWORD: ${BUILDERHUNT_APP_PASSWORD:-}
+      BUILDERHUNT_AUTH_PASSWORD: ${BUILDERHUNT_AUTH_PASSWORD:-}
+      BUILDERHUNT_WORKER_PASSWORD: ${BUILDERHUNT_WORKER_PASSWORD:-}
+      BUILDERHUNT_PLATFORM_PASSWORD: ${BUILDERHUNT_PLATFORM_PASSWORD:-}
+      BUILDERHUNT_CAPABILITY_PASSWORD: ${BUILDERHUNT_CAPABILITY_PASSWORD:-}
+      PGBOUNCER_ADMIN_PASSWORD: ${PGBOUNCER_ADMIN_PASSWORD:-}
+    ports:
+      - '127.0.0.1:6432:6432'
+    # tmpfs, so the generated auth file never touches a writable layer or a volume. It exists in memory
+    # for the life of the container and dies with it.
+    #
+    # Mounted at /run/pgbouncer, not /etc/pgbouncer. Mounting it over /etc/pgbouncer shadowed the
+    # `pgbouncer.ini` the image bakes there, and the container restarted forever on `could not load file
+    # "/etc/pgbouncer/pgbouncer.ini"` — while the image built clean, passed `buildx --check` on both
+    # architectures and answered `--version` correctly. Only `docker compose up` found it.
+    tmpfs:
+      - /run/pgbouncer:mode=0700,uid=10001,gid=10001
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -p 6432 -U pgbouncer -d pgbouncer || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
 
   redis:
     profiles: ['standalone']

@@ -1,6 +1,13 @@
 import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
 import { createDatabaseSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
+import {
+  INVITATION_SUGGESTED_QUERY,
+  normalizeInvitationIntent,
+  normalizeRoleTitle,
+  type InvitationIntent,
+  type InvitationPersonalization,
+} from '../organizations/invitation-personalization'
 import type { OrganizationRole, TenantPrincipal } from '../authorization/permissions'
 import type { PlanStatus } from '../billing-shared'
 import type { EntitlementTier } from '../repositories/entitlements'
@@ -98,6 +105,15 @@ export interface InvitationRecord {
   status: 'pending' | 'accepted' | 'rejected' | 'canceled'
   expiresAt: Date
   inviterId: string
+  /**
+   * Why the sender is inviting this person, and the role title they typed (plan 59).
+   *
+   * `intent` is already normalized — a `NULL` column and an unknown value both arrive as `other`, so
+   * no consumer has to remember to normalize and no consumer can forget. `roleTitle` stays nullable,
+   * because "no title" is a real state the card renders differently rather than an empty string.
+   */
+  intent: InvitationIntent
+  roleTitle: string | null
 }
 
 export interface OrganizationRecord {
@@ -127,6 +143,9 @@ export interface LifecycleDependencies {
     email: string
     role: InvitableRole
     inviterId: string
+    /** Already normalized by the caller — the dependency persists it, it does not validate it. */
+    intent: InvitationIntent
+    roleTitle: string | null
   }): Promise<InvitationRecord>
   getInvitation(invitationId: string): Promise<InvitationRecord | null>
   /**
@@ -138,7 +157,16 @@ export interface LifecycleDependencies {
    */
   findPendingInvitation?(organizationId: string, email: string): Promise<InvitationRecord | null>
   cancelInvitationRecord(invitationId: string): Promise<void>
-  acceptInvitationRecord(invitationId: string, userId: string): Promise<void>
+  /**
+   * Creates the membership and flips `pending` to `accepted`, atomically.
+   *
+   * Returns whether it actually transitioned the row. `void` is still accepted so every existing
+   * fake-deps test keeps its meaning — `undefined` is read as "transitioned", and only an explicit
+   * `false` is a lost race.
+   */
+  acceptInvitationRecord(invitationId: string, userId: string): Promise<void | boolean>
+  /** Flips `pending` to `rejected` and creates nothing. Returns whether it transitioned the row. */
+  rejectInvitationRecord(invitationId: string): Promise<boolean>
   removeMemberRecord(organizationId: string, userId: string): Promise<void>
   updateMemberRoleRecord(organizationId: string, userId: string, role: InvitableRole): Promise<void>
   transferOwnershipRecord(organizationId: string, fromUserId: string, toUserId: string): Promise<void>
@@ -147,7 +175,16 @@ export interface LifecycleDependencies {
   cancelOrganizationDeletionRecord(organizationId: string): Promise<{ id: string } | null>
   clearActiveOrganizationForUsers(organizationId: string, userIds: string[]): Promise<void>
   /** `devLink` is set only when no real email provider is configured (dev mode) — the invite/resend UI shows it as a manual-share fallback, since no email is actually going out. */
-  sendInvitationEmail(email: string, organizationName: string, invitationId: string): Promise<{ devLink?: string }>
+  /**
+   * `personalization` is optional so every existing fake-deps unit test keeps compiling, and so an
+   * email implementation that has not learned about intent still receives a well-formed call.
+   */
+  sendInvitationEmail(
+    email: string,
+    organizationName: string,
+    invitationId: string,
+    personalization?: InvitationPersonalization,
+  ): Promise<{ devLink?: string }>
   rateLimit(scope: string, id: string, limit: number, windowSeconds: number): Promise<{ allowed: boolean }>
   audit: SecurityAuditSink
   now(): Date
@@ -314,14 +351,25 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
 
   async function inviteMember(
     request: Request,
-    input: { organizationId: string; email: string; role: InvitableRole },
-  ): Promise<InvitationRecord & { devLink?: string }> {
+    input: {
+      organizationId: string
+      email: string
+      role: InvitableRole
+      /** Omitted by a caller that predates plan 59; normalized to `other` / `null` here. */
+      intent?: InvitationIntent
+      roleTitle?: string | null
+    },
+  ): Promise<InvitationRecord & { devLink?: string; deduplicated: boolean }> {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, input.organizationId)
     requireElevated(membership)
     await requireRateLimit(deps, 'org-invite', `${session.userId}:${input.organizationId}`, 20, 60 * 60)
 
     const email = normalizeInvitationEmail(input.email)
+    // Normalized once, here, so the insert, the email and the audit entry cannot disagree about what
+    // was recorded. A caller that never learned the field lands on `other`, which is a real intent.
+    const intent = normalizeInvitationIntent(input.intent)
+    const roleTitle = normalizeRoleTitle(input.roleTitle) ?? null
     let invitation: InvitationRecord
     try {
       invitation = await deps.createInvitation({
@@ -330,6 +378,8 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
         email,
         role: input.role,
         inviterId: session.userId,
+        intent,
+        roleTitle,
       })
     } catch (error) {
       if (error instanceof SeatLimitExceededError) {
@@ -352,6 +402,11 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
        *
        * Deliberately **no second email**: the winning request already sent one, and the whole point of the index is
        * that the invitee receives one working link instead of four, at most one of which still resolves.
+       *
+       * And deliberately **no overwrite of the winner's personalization**. The loser's intent and role title are
+       * discarded, because the email that already went out describes the winner's context and rewriting the row
+       * would leave the recipient's card saying something the email they received did not. `deduplicated: true`
+       * is how the sender's UI knows to say so rather than reporting a newly sent invitation.
        */
       if (isPendingInvitationConflict(error)) {
         const existing = await deps.findPendingInvitation?.(input.organizationId, email)
@@ -366,13 +421,18 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
             requestId: requestIdFrom(request),
             details: { deduplicated: true },
           })
-          return existing
+          return { ...existing, deduplicated: true }
         }
       }
       throw error
     }
 
-    const { devLink } = await deps.sendInvitationEmail(invitation.email, invitation.organizationName, invitation.id)
+    const { devLink } = await deps.sendInvitationEmail(
+      invitation.email,
+      invitation.organizationName,
+      invitation.id,
+      { intent: invitation.intent, roleTitle: invitation.roleTitle },
+    )
     await audit(deps, {
       organizationId: input.organizationId,
       actorUserId: session.userId,
@@ -382,7 +442,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       result: 'allowed',
       requestId: requestIdFrom(request),
     })
-    return { ...invitation, devLink }
+    return { ...invitation, devLink, deduplicated: false }
   }
 
   async function resendInvitation(request: Request, invitationId: string): Promise<InvitationRecord & { devLink?: string }> {
@@ -411,6 +471,11 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
         email: invitation.email,
         role: invitation.role,
         inviterId: session.userId,
+        // Copied, not re-derived. A resend is the same invitation with a working link; the recipient
+        // would otherwise get a second email describing a different reason for the same request, and a
+        // legacy row with no context would silently acquire some on its first resend.
+        intent: invitation.intent,
+        roleTitle: invitation.roleTitle,
       })
     } catch (error) {
       if (error instanceof SeatLimitExceededError) {
@@ -427,7 +492,12 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       }
       throw error
     }
-    const { devLink } = await deps.sendInvitationEmail(fresh.email, fresh.organizationName, fresh.id)
+    const { devLink } = await deps.sendInvitationEmail(
+      fresh.email,
+      fresh.organizationName,
+      fresh.id,
+      { intent: fresh.intent, roleTitle: fresh.roleTitle },
+    )
     await audit(deps, {
       organizationId: invitation.organizationId,
       actorUserId: session.userId,
@@ -468,9 +538,30 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
   // already accepted/rejected/canceled — returns the exact same error and
   // status so a caller can't use this endpoint to probe invitation state or
   // harvest the invited email address.
-  async function acceptInvitation(request: Request, invitationId: string): Promise<{ organizationId: string }> {
+  /**
+   * The one place that decides whether a caller may see or act on an invitation.
+   *
+   * Review, accept and reject share it, which is the point: three copies of these four conditions
+   * would be three chances for one of them to forget `emailVerified`, or to let an expired invitation
+   * through on the read path while the write path refuses it — and a read that reveals an
+   * organization's name is the leak, whether or not a membership follows.
+   *
+   * **Every failure is the same response.** Missing, expired, already used, rejected, cancelled,
+   * unverified, wrong account, and fabricated id all raise `GENERIC_INVITATION_ERROR` with 403. A
+   * distinguishable 404 would turn this endpoint into an oracle: hold a random id, read the status
+   * code, learn whether that invitation exists. The audit entry carries the detail instead, where only
+   * an operator can read it.
+   */
+  async function resolveEligibleInvitation(
+    request: Request,
+    invitationId: string,
+    action: 'organization.invite.review' | 'organization.invite.accept' | 'organization.invite.reject',
+    rateLimitKey: string,
+  ): Promise<{ session: LifecycleSession; invitation: InvitationRecord }> {
     const session = await requireSession(request, deps)
-    await requireRateLimit(deps, 'org-invite-accept', session.userId, 20, 60 * 60)
+    // Keyed on the authenticated user, not on the invitation id: keying on the id would let one
+    // account walk a list of guessed ids at the full budget each.
+    await requireRateLimit(deps, rateLimitKey, session.userId, 20, 60 * 60)
 
     const invitation = await deps.getInvitation(invitationId)
     const isValid =
@@ -484,7 +575,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       await audit(deps, {
         organizationId: invitation?.organizationId ?? null,
         actorUserId: session.userId,
-        action: 'organization.invite.accept',
+        action,
         targetType: 'invitation',
         targetId: invitationId,
         result: 'denied',
@@ -493,7 +584,116 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       throw new OrganizationLifecycleError(GENERIC_INVITATION_ERROR, 403)
     }
 
-    await deps.acceptInvitationRecord(invitation.id, session.userId)
+    return { session, invitation }
+  }
+
+  /**
+   * What a verified recipient may read before deciding.
+   *
+   * Allowlisted by construction — it names five fields rather than spreading the record — so a field
+   * added to `InvitationRecord` later cannot arrive here by accident. `inviterId`, `organizationId` and
+   * the invitee's own stored email are all absent: the first two are internal identifiers, and echoing
+   * the third would confirm to a wrong-account holder which address the invitation was for.
+   */
+  async function reviewInvitation(
+    request: Request,
+    invitationId: string,
+  ): Promise<{
+    organizationName: string
+    role: InvitableRole
+    intent: InvitationIntent
+    roleTitle: string | null
+    expiresAt: Date
+  }> {
+    const { invitation } = await resolveEligibleInvitation(
+      request,
+      invitationId,
+      'organization.invite.review',
+      'org-invite-review',
+    )
+    return {
+      organizationName: invitation.organizationName,
+      role: invitation.role,
+      intent: invitation.intent,
+      roleTitle: invitation.roleTitle,
+      expiresAt: invitation.expiresAt,
+    }
+  }
+
+  /**
+   * Declining. Moves `pending` to `rejected` and creates no membership.
+   *
+   * The same conditional-update race as accept: if the row is no longer `pending` by the time the
+   * update runs, the caller lost to an accept and gets the generic invalid response rather than a
+   * cheerful "declined" for something that was already joined.
+   */
+  async function rejectInvitation(request: Request, invitationId: string): Promise<void> {
+    const { session, invitation } = await resolveEligibleInvitation(
+      request,
+      invitationId,
+      'organization.invite.reject',
+      'org-invite-reject',
+    )
+
+    const transitioned = await deps.rejectInvitationRecord(invitation.id)
+    if (!transitioned) {
+      await audit(deps, {
+        organizationId: invitation.organizationId,
+        actorUserId: session.userId,
+        action: 'organization.invite.reject',
+        targetType: 'invitation',
+        targetId: invitation.id,
+        result: 'denied',
+        requestId: requestIdFrom(request),
+      })
+      throw new OrganizationLifecycleError(GENERIC_INVITATION_ERROR, 403)
+    }
+
+    await audit(deps, {
+      organizationId: invitation.organizationId,
+      actorUserId: session.userId,
+      action: 'organization.invite.reject',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  async function acceptInvitation(
+    request: Request,
+    invitationId: string,
+  ): Promise<{ organizationId: string; activeOrganization: boolean; suggestedQuery: string }> {
+    const { session, invitation } = await resolveEligibleInvitation(
+      request,
+      invitationId,
+      'organization.invite.accept',
+      'org-invite-accept',
+    )
+
+    const transitioned = await deps.acceptInvitationRecord(invitation.id, session.userId)
+    /**
+     * A lost race is not a success.
+     *
+     * `acceptInvitationRecord` updates conditionally on `pending`, so two accepts — or an accept
+     * against a reject — leave exactly one winner. The loser used to receive `{ ok: true }` with a
+     * membership it did not create, which is the worst of both: it reads as joined and is not.
+     *
+     * `undefined` counts as transitioned, so a fake-deps test whose `acceptInvitationRecord` returns
+     * nothing keeps its old meaning instead of every one of them suddenly failing.
+     */
+    if (transitioned === false) {
+      await audit(deps, {
+        organizationId: invitation.organizationId,
+        actorUserId: session.userId,
+        action: 'organization.invite.accept',
+        targetType: 'invitation',
+        targetId: invitation.id,
+        result: 'denied',
+        requestId: requestIdFrom(request),
+      })
+      throw new OrganizationLifecycleError(GENERIC_INVITATION_ERROR, 403)
+    }
     await audit(deps, {
       organizationId: invitation.organizationId,
       actorUserId: session.userId,
@@ -503,7 +703,35 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       result: 'allowed',
       requestId: requestIdFrom(request),
     })
-    return { organizationId: invitation.organizationId }
+
+    /**
+     * Activation is attempted after the membership is committed, and its failure is reported rather
+     * than thrown.
+     *
+     * The membership transaction has already succeeded at this point: the person *is* a member. Letting
+     * a failed session switch reject the whole call would tell them their acceptance failed when it did
+     * not, and the retry they would reasonably attempt then hits an invitation that is no longer
+     * `pending` and answers with the generic invalid error. `activeOrganization: false` sends them to
+     * `/dashboard`, where the organization switcher still works.
+     */
+    let activeOrganization = false
+    try {
+      await deps.setActiveOrganization(session, invitation.organizationId)
+      activeOrganization = true
+    } catch (error) {
+      // Redacted: the organization id is already in the audit entry above, and this line is for
+      // correlating a switch failure, not for carrying tenant data into the log.
+      console.error('Invitation accepted but organization activation failed', {
+        invitationId: invitation.id,
+        reason: error instanceof Error ? error.name : 'unknown',
+      })
+    }
+
+    return {
+      organizationId: invitation.organizationId,
+      activeOrganization,
+      suggestedQuery: INVITATION_SUGGESTED_QUERY[invitation.intent],
+    }
   }
 
   async function removeMember(request: Request, organizationId: string, targetUserId: string): Promise<void> {
@@ -659,6 +887,8 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     resendInvitation,
     cancelInvitation,
     acceptInvitation,
+    reviewInvitation,
+    rejectInvitation,
     removeMember,
     changeMemberRole,
     transferOwnership,
@@ -804,6 +1034,10 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
           status: 'pending',
           expiresAt,
           inviterId: input.inviterId,
+          // Already normalized by `inviteMember`; the CHECK constraints in 0165 are the backstop for
+          // anything that reaches this table another way.
+          invitationIntent: input.intent,
+          roleTitle: input.roleTitle,
         })
 
         const [row] = await tx
@@ -823,6 +1057,8 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         status: 'pending',
         expiresAt,
         inviterId: input.inviterId,
+        intent: input.intent,
+        roleTitle: input.roleTitle,
       }
     },
 
@@ -837,6 +1073,8 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
           status: organizationInvitations.status,
           expiresAt: organizationInvitations.expiresAt,
           inviterId: organizationInvitations.inviterId,
+          invitationIntent: organizationInvitations.invitationIntent,
+          roleTitle: organizationInvitations.roleTitle,
         })
         .from(organizationInvitations)
         .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
@@ -852,6 +1090,10 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         status: row.status as InvitationRecord['status'],
         expiresAt: row.expiresAt,
         inviterId: row.inviterId,
+        // Normalized at the boundary, so `NULL` on a pre-0165 row and an unrecognised value both become
+        // `other` once — and no consumer downstream has to remember to do it.
+        intent: normalizeInvitationIntent(row.invitationIntent),
+        roleTitle: row.roleTitle,
       }
     },
 
@@ -863,13 +1105,16 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
     },
 
     async acceptInvitationRecord(invitationId, userId) {
-      await authDb.transaction(async (tx) => {
+      // Returns the transition, rather than swallowing it. The conditional `WHERE status = 'pending'`
+      // already made this the single winner of any race; what was missing was telling the caller, which
+      // is why a loser used to receive `{ ok: true }` for a membership it did not create.
+      return authDb.transaction(async (tx) => {
         const [invitation] = await tx
           .update(organizationInvitations)
           .set({ status: 'accepted' })
           .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.status, 'pending')))
           .returning({ organizationId: organizationInvitations.organizationId, role: organizationInvitations.role })
-        if (!invitation) return
+        if (!invitation) return false
         await tx
           .insert(organizationMembers)
           .values({
@@ -879,7 +1124,19 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
             role: invitation.role ?? 'member',
           })
           .onConflictDoNothing()
+        return true
       })
+    },
+
+    async rejectInvitationRecord(invitationId) {
+      // Only `pending` may become `rejected`, so declining something already accepted changes nothing
+      // and reports false. No membership is touched: this row is the whole state a decline owns.
+      const rows = await authDb
+        .update(organizationInvitations)
+        .set({ status: 'rejected' })
+        .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.status, 'pending')))
+        .returning({ id: organizationInvitations.id })
+      return rows.length > 0
     },
 
     async removeMemberRecord(organizationId, userId) {
@@ -945,9 +1202,12 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         .where(and(eq(authSessions.activeOrganizationId, organizationId), inArray(authSessions.userId, userIds)))
     },
 
-    async sendInvitationEmail(email, organizationName, invitationId) {
+    async sendInvitationEmail(email, organizationName, invitationId, personalization) {
       const invitationUrl = new URL(`/team/invite/${encodeURIComponent(invitationId)}`, env.APP_URL).toString()
-      const result = await sendOrganizationInvitationEmail(email, organizationName, invitationUrl)
+      // Forwarded, not dropped. The parameter is optional on the contract so existing fake-deps keep
+      // compiling, and an optional parameter is exactly the shape a real implementation can silently
+      // ignore while the type checker stays quiet — so this line is the one that has to be right.
+      const result = await sendOrganizationInvitationEmail(email, organizationName, invitationUrl, personalization)
       if (!result.ok) throw new Error('Unable to deliver organization invitation')
       return { devLink: result.devLink }
     },
@@ -981,6 +1241,9 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         status: 'pending' as const,
         expiresAt: row.expiresAt,
         inviterId: row.inviterId,
+        // The winner's context, which is what the already-sent email describes.
+        intent: normalizeInvitationIntent(row.invitationIntent),
+        roleTitle: row.roleTitle,
       }
     },
 
@@ -1148,6 +1411,9 @@ export async function pageOrganizationMembers(
     .select({ id: authUsers.id, name: authUsers.name, email: authUsers.email })
     .from(authUsers)
     .where(inArray(authUsers.id, result.rows.map((row) => row.userId)))
+    // Model-bounded by the page above: `authUsers.id` is the primary key, so at most one row per
+    // member on this page.
+    .limit(result.rows.length)
   const byId = new Map(identities.map((identity) => [identity.id, identity]))
 
   return {
@@ -1284,6 +1550,8 @@ export async function pageOrganizationInvitations(
           status: organizationInvitations.status,
           expiresAt: organizationInvitations.expiresAt,
           inviterId: organizationInvitations.inviterId,
+          invitationIntent: organizationInvitations.invitationIntent,
+          roleTitle: organizationInvitations.roleTitle,
         },
         mapRow: (row) => ({
           id: row.id as string,
@@ -1293,6 +1561,8 @@ export async function pageOrganizationInvitations(
           status: row.status as InvitationRecord['status'],
           expiresAt: row.expiresAt as Date,
           inviterId: row.inviterId as string,
+          intent: normalizeInvitationIntent(row.invitationIntent),
+          roleTitle: (row.roleTitle as string | null) ?? null,
         }),
       },
     ))
@@ -1326,6 +1596,8 @@ export async function listInvitationsForEmail(email: string): Promise<Invitation
       status: organizationInvitations.status,
       expiresAt: organizationInvitations.expiresAt,
       inviterId: organizationInvitations.inviterId,
+      invitationIntent: organizationInvitations.invitationIntent,
+      roleTitle: organizationInvitations.roleTitle,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
@@ -1344,6 +1616,8 @@ export async function listInvitationsForEmail(email: string): Promise<Invitation
       email: row.email,
       role: (row.role ?? 'member') as InvitableRole,
       status: row.status as InvitationRecord['status'],
+      intent: normalizeInvitationIntent(row.invitationIntent),
+      roleTitle: row.roleTitle,
       expiresAt: row.expiresAt,
       inviterId: row.inviterId,
     }))
@@ -1519,7 +1793,7 @@ export interface ProcessPendingOrganizationDeletionsResult {
  * for the next run rather than losing track of it.
  *
  * The actual hard delete is delegated to `organizations/deletion.ts`'s
- * `finalizeOrganizationDeletion` (plans/phase-1/30-stripe-billing-platform/tasks.md §9
+ * `finalizeOrganizationDeletion` (plans/implemented/30-stripe-billing-platform/tasks.md §9
  * "Integrate subscription-safe organization deletion") — it force-cancels any
  * still-active subscription and writes a durable financial-retention snapshot
  * BEFORE the organization row (and its cascade) is removed, so this worker

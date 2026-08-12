@@ -719,14 +719,27 @@ test('an unverified user cannot accept an invitation', async ({ browser }) => {
   const context = await browser.newContext({ storageState: harness.unverified.storageState! })
   const page = await context.newPage()
   const guard = expectStrictBrowser(page)
-  // One expected 4xx: POST .../accept is denied (403, generic message).
+  // One expected 4xx: GET .../review is denied (403, generic message).
   guard.allowExpectedFailure(/Failed to load resource/)
   try {
     await gotoHydrated(page, url(`/team/invite/${invitationId}`))
     await dismissOverlays(page)
     await expect(page.getByTestId('invitation-page')).toBeVisible()
-    await page.getByTestId('invitation-accept-btn').click()
+
+    /**
+     * The refusal moved earlier, and that is the improvement.
+     *
+     * Before plan 59 the page rendered Accept immediately and the click was denied. It now fetches the
+     * review DTO first, and `resolveEligibleInvitation` refuses an unverified session with the same
+     * generic 403 that accept and reject answer with — so the control is never offered at all. The
+     * property under test is unchanged and asserted below; what changed is that the user is not invited
+     * to press a button that cannot work.
+     */
     await expect(page.getByTestId('invitation-error')).toContainText('no longer valid')
+    await expect(page.getByTestId('invitation-accept-btn')).toHaveCount(0)
+    await expect(page.getByTestId('invitation-decline-btn')).toHaveCount(0)
+    // And nothing about the organization leaked on the way — no name, no role, no card.
+    await expect(page.getByTestId('invitation-value-preview')).toHaveCount(0)
 
     // Denied means denied: no membership row appeared.
     const rows = await harness.sql<{ id: string }[]>`
@@ -776,8 +789,14 @@ test('a signed-out invitation link round-trips through sign-in back to the origi
     expect((await pageSession(page))?.email).toBe(harness.verified.email)
     await dismissOverlays(page)
     await expect(page.getByTestId('invitation-page')).toBeVisible()
+    // The control appears after the review fetch resolves (plan 59), so wait for it rather than for the
+    // page shell — clicking the shell's absence is how this would flake.
+    await expect(page.getByTestId('invitation-accept-btn')).toBeVisible()
     await page.getByTestId('invitation-accept-btn').click()
-    await page.waitForURL(/\/dashboard/)
+    // Either destination is a correct outcome: `/onboarding/search` when the organization switch
+    // succeeded, `/dashboard` when it did not. Asserting one would be asserting a race this test does
+    // not control.
+    await page.waitForURL(/\/(dashboard|onboarding\/search)/)
     await dismissOverlays(page)
 
     const rows = await harness.sql<{ role: string }[]>`
@@ -794,3 +813,34 @@ test('a signed-out invitation link round-trips through sign-in back to the origi
   }
 })
 
+test('the dashboard reads the degradation summary without putting a console error on the page', async ({ browser }) => {
+  /**
+   * Plan 57, Wave 5 — the property that got this feature reverted on 2026-08-06.
+   *
+   * The first version polled `/api/status`, which answers **503** when a dependency is degraded — correct for a
+   * monitor, and unusable from a browser: every non-2xx subresource is written to the console, so an incident put
+   * two console errors on every page load. The strict collector caught it, the feature was reverted, and the task
+   * was recorded as blocked on "a 200-answering degradation signal".
+   *
+   * `/api/status/summary` is that signal: the same computation, always 200, state in the body. This asserts both
+   * halves — the request happens, and the console stays clean whichever state the dependencies are in.
+   */
+  const context = await browser.newContext({ storageState: harness.owner.storageState! })
+  const tab = await context.newPage()
+  const guard = expectStrictBrowser(tab)
+  const summaryStatuses: number[] = []
+  tab.on('response', (response) => {
+    if (new URL(response.url()).pathname === '/api/status/summary') summaryStatuses.push(response.status())
+  })
+  try {
+    await gotoHydrated(tab, `${harness.baseURL}/dashboard`)
+    await dismissOverlays(tab)
+    await expect.poll(() => summaryStatuses.length, { timeout: 15_000 }).toBeGreaterThan(0)
+    // Always 200, whatever the dependencies are doing. That is the whole reason this endpoint exists.
+    expect(summaryStatuses.every((status) => status === 200)).toBe(true)
+  } finally {
+    // `expectStrictBrowser` throws on dispose if anything reached the console, which is the assertion.
+    guard.dispose()
+    await context.close()
+  }
+})

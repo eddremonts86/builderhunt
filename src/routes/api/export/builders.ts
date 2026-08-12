@@ -3,7 +3,7 @@ import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
-import { listOrganizationBuilders, listNotedOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
+import { drainOrganizationBuilders, listNotedOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
 import { listItemsForList } from '~/shared/lib/repositories/builder-lists'
 import { findVisibleSavedQueryById } from '~/shared/lib/repositories/saved-queries'
 import { SharedResourceError } from '~/shared/lib/shared-resources/contracts'
@@ -107,7 +107,9 @@ export const Route = createFileRoute('/api/export/builders')({
             const overDailyCapResult = detectSeatOveruse({ count: usage.count, cap: env.SEAT_DAILY_EXPORTS })
 
             if (scope === 'all') {
-              const builders = await listOrganizationBuilders(tx, principal.organizationId)
+              // Drained in chunks, not read in one statement: an export truncated at a ceiling is a
+              // customer receiving a file that silently omits their data.
+              const builders = await drainOrganizationBuilders(tx, principal.organizationId)
               const visible = await filterSuppressed(builders)
               return {
                 overDailyCap: overDailyCapResult,

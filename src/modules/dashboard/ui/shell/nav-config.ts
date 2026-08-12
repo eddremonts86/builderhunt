@@ -20,6 +20,8 @@ import {
   Search, Shield, ShieldAlert, ShieldCheck, Siren, Users, FlaskConical,
 } from 'lucide-react'
 
+import type { FileRouteTypes } from '~/routeTree.gen'
+
 type IconComponent = React.ComponentType<{ className?: string }>
 
 export interface NavItem {
@@ -54,6 +56,75 @@ export interface NavArea {
   /** Pinned to the bottom of the rail, above nothing else. */
   footer?: boolean
 }
+
+/**
+ * Every `/admin/*` route that exists, as a type.
+ *
+ * `FileRouteTypes['fullPaths']` is generated from the route files, so this union *is* the set of admin pages on
+ * disk. Extracting it here is what makes `ADMIN_DESTINATIONS` below a single authoritative registry rather than a
+ * second list that happens to agree: TypeScript requires an entry for every admin route and rejects an entry for
+ * a path that is not one.
+ *
+ * `import type` on purpose — the generated module imports every route, and every route imports its page, so a
+ * value import here would be a cycle. A type import is erased.
+ *
+ * `'/admin/'` is excluded explicitly, and the first version of this got it wrong: `/admin/${string}` matches the
+ * index's own full path, because `${string}` can be empty — so the compiler asked for a nav entry for the
+ * redirect. That is the type doing its job. `/admin` resolves to `/admin/metrics` and has no destination of its
+ * own, and the exclusion states that rather than a comment claiming it.
+ */
+type AdminFullPath = Exclude<Extract<FileRouteTypes['fullPaths'], `/admin/${string}`>, '/admin/'>
+
+/**
+ * The one authoritative Admin route registry (plan 57, Admin track — "Reconcile stale and future Admin
+ * destinations").
+ *
+ * ## What this replaces, and why a gate was not enough
+ *
+ * `nav-config.ts` and the route files were two lists that agreed, kept agreeing by
+ * `scripts/check-ui-route-graph.mjs` — which catches both directions and runs in `ci:local`. That gate is still
+ * worth having for the *reverse* case it also covers, but it is a check that runs after the fact. Typing the
+ * registry as `Record<AdminFullPath, …>` moves the same guarantee to compile time: adding
+ * `src/routes/_dashboard/admin/foo.tsx` breaks the build until somebody decides what it is called and where it
+ * belongs, which is the decision the gate could only remind you to make later.
+ *
+ * ## Why the routes are the source of truth and not this file
+ *
+ * A route file is the page's existence; a label and an icon are how it is presented. Existence cannot be
+ * declared in two places, and presentation cannot be derived from a filename — `solutions-gold-set` is "Gold
+ * set" and `abuse` is "Abuse console". So the union comes from disk and the rest is written down once.
+ *
+ */
+const ADMIN_DESTINATIONS: Record<AdminFullPath, Omit<NavItem, 'to'>> = {
+  '/admin/metrics': { label: 'Metrics', icon: Activity, group: 'Operations' },
+  '/admin/operations': { label: 'Operations', icon: Cog, group: 'Operations' },
+  '/admin/integrations': { label: 'Integrations', icon: Plug, group: 'Operations' },
+  '/admin/sources': { label: 'Sources', icon: Globe, group: 'Operations' },
+  // Registered rather than reachable only by URL: an admin page nobody can navigate to is a page nobody uses,
+  // and the gold set only produces value when a curator actually writes judgments into it.
+  '/admin/solutions-gold-set': { label: 'Gold set', icon: FlaskConical, group: 'Operations' },
+  '/admin/users': { label: 'Users', icon: Users, group: 'Operations' },
+  '/admin/incidents': { label: 'Incidents', icon: AlertTriangle, group: 'Operations' },
+  '/admin/claims': { label: 'Claims', icon: BadgeCheck, group: 'Operations' },
+  '/admin/access-requests': { label: 'Access requests', icon: DoorOpen, group: 'Operations' },
+  '/admin/abuse': { label: 'Abuse console', icon: Siren, group: 'Operations' },
+  '/admin/billing': { label: 'Billing ops', icon: Gauge, group: 'Money' },
+  '/admin/refunds': { label: 'Refunds', icon: RotateCcw, group: 'Money' },
+  '/admin/disputes': { label: 'Disputes', icon: ShieldAlert, group: 'Money' },
+  // Content is the hub over all three public surfaces; Changelog and Roadmap stay listed because they are the
+  // two people navigate to directly, and both render the same components the hub's tabs do.
+  '/admin/content': { label: 'Content', icon: Layers, group: 'Public', exact: true },
+  '/admin/changelog': { label: 'Changelog', icon: BookOpen, group: 'Public' },
+  '/admin/roadmap': { label: 'Roadmap', icon: Map, group: 'Public' },
+}
+
+/**
+ * Grouped in declaration order, which is the order the panel renders.
+ *
+ * Derived rather than written out a second time — the whole point of the registry above. `Object.entries` keeps
+ * insertion order for string keys, so "Operations before Money before Public" is the order in the literal.
+ */
+const ADMIN_NAV_ITEMS: readonly NavItem[] = Object.entries(ADMIN_DESTINATIONS).map(([to, item]) => ({ to, ...item }))
 
 export const NAV_AREAS: readonly NavArea[] = [
   // Every `to` below is a route that exists in src/routes — the level-2 panel
@@ -136,29 +207,8 @@ export const NAV_AREAS: readonly NavArea[] = [
     icon: Siren,
     adminOnly: true,
     routes: ['/admin'],
-    items: [
-      { to: '/admin/metrics', label: 'Metrics', icon: Activity, group: 'Operations' },
-      { to: '/admin/operations', label: 'Operations', icon: Cog, group: 'Operations' },
-      { to: '/admin/integrations', label: 'Integrations', icon: Plug, group: 'Operations' },
-      { to: '/admin/sources', label: 'Sources', icon: Globe, group: 'Operations' },
-      // Registered rather than reachable only by URL: an admin page nobody can navigate to is a page nobody
-      // uses, and the gold set only produces value when a curator actually writes judgments into it.
-      { to: '/admin/solutions-gold-set', label: 'Gold set', icon: FlaskConical, group: 'Operations' },
-      { to: '/admin/users', label: 'Users', icon: Users, group: 'Operations' },
-      { to: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, group: 'Operations' },
-      { to: '/admin/claims', label: 'Claims', icon: BadgeCheck, group: 'Operations' },
-      { to: '/admin/access-requests', label: 'Access requests', icon: DoorOpen, group: 'Operations' },
-      { to: '/admin/abuse', label: 'Abuse console', icon: Siren, group: 'Operations' },
-      { to: '/admin/billing', label: 'Billing ops', icon: Gauge, group: 'Money' },
-      { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw, group: 'Money' },
-      { to: '/admin/disputes', label: 'Disputes', icon: ShieldAlert, group: 'Money' },
-      // Content is the hub over all three public surfaces; Changelog and
-      // Roadmap stay listed because they are the two people navigate to
-      // directly, and both render the same components the hub's tabs do.
-      { to: '/admin/content', label: 'Content', icon: Layers, group: 'Public', exact: true },
-      { to: '/admin/changelog', label: 'Changelog', icon: BookOpen, group: 'Public' },
-      { to: '/admin/roadmap', label: 'Roadmap', icon: Map, group: 'Public' },
-    ],
+    // Derived from `ADMIN_DESTINATIONS`, which the compiler holds against the route files on disk.
+    items: ADMIN_NAV_ITEMS,
   },
 ]
 

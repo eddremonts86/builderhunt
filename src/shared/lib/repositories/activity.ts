@@ -261,18 +261,26 @@ async function attachTargetHrefs(
           .select({ id: builderLists.id, createdByUserId: builderLists.createdByUserId, visibility: builderLists.visibility })
           .from(builderLists)
           .where(and(eq(builderLists.organizationId, principal.organizationId), inArray(builderLists.id, [...listIds])))
+          // Model-bounded by the caller's own set: `id` is the primary key, so at most one row per
+          // id asked for, and `listIds` is collected from a page of activity rows that is already
+          // bounded upstream.
+          .limit(listIds.size)
       : Promise.resolve([]),
     queryIds.size > 0
       ? transaction
           .select({ id: savedQueries.id, userId: savedQueries.userId, visibility: savedQueries.visibility, keywords: savedQueries.keywords })
           .from(savedQueries)
           .where(and(eq(savedQueries.organizationId, principal.organizationId), inArray(savedQueries.id, [...queryIds])))
+          // Same ceiling, same reason as the lists above.
+          .limit(queryIds.size)
       : Promise.resolve([]),
     alertIds.size > 0
       ? transaction
           .select({ id: alerts.id })
           .from(alerts)
           .where(and(eq(alerts.organizationId, principal.organizationId), inArray(alerts.id, [...alertIds])))
+          // Same ceiling, same reason.
+          .limit(alertIds.size)
       : Promise.resolve([]),
   ])
   const listsById = new Map(listRows.map((r) => [r.id, r]))

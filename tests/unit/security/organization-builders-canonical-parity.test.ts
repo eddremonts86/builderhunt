@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 3, "Dual-read/write organization tracking".
+ * plans/implemented/43-solutions-intelligence Phase 3, "Dual-read/write organization tracking".
  * Verify line: "tracked notes/status remain tenant-private and intact through backfill, cutover, and
  * rollback."
  *

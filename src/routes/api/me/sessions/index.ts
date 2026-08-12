@@ -51,6 +51,8 @@ export const Route = createFileRoute('/api/me/sessions/')({
                 newDevice: sessionSignals.newDevice,
               }).from(sessionSignals)
               .where(inArray(sessionSignals.sessionIdHash, [...hashBySessionId.values()]))
+              // Model-bounded by this user's live sessions: one signal row per session hash.
+              .limit(hashBySessionId.size)
             : []
           const signalByHash = new Map(signalRows.map((row) => [row.sessionIdHash, row]))
 

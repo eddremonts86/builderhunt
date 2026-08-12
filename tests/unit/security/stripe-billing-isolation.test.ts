@@ -1,6 +1,6 @@
 /**
  * Stripe-specific isolation on the billing tables
- * (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Certify Stripe sandbox and Test Clock lifecycle" —
+ * (plans/implemented/30-stripe-billing-platform/tasks.md §10 "Certify Stripe sandbox and Test Clock lifecycle" —
  * one of its three named deliverables).
  *
  * ## Why this is not the fourth copy of a tenant-isolation test

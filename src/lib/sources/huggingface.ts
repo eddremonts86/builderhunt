@@ -36,7 +36,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * its own timeout, and a total failure leaves the result identical to the unenriched output. A search must not
  * get slower or emptier because a decoration endpoint is unavailable.
  *
- * Spec reference: plans/phase-1/13-huggingface-integration/spec.md
+ * Spec reference: plans/implemented/13-huggingface-integration/spec.md
  */
 interface HFModel {
   _id: string

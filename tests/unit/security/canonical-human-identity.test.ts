@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 3, "Add canonical human and source-link schema".
+ * plans/implemented/43-solutions-intelligence Phase 3, "Add canonical human and source-link schema".
  * Verify line: "migration/integrity/RLS tests cover duplicate links, conflicting facts, tenant
  * access, public DTO boundaries, and forward rollback."
  *

@@ -1,7 +1,7 @@
 # Hiring Pipeline Kanban (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md) (tenant-private `organization_builders` ownership, RLS, tenant principal — all shipped; that plan stays `in_progress` only for the legacy-column contraction, which this one does not touch, so nothing here waits on it); [`team-accounts`](../../phase-1/27-team-accounts/spec.md) (organization roles and seats — already implemented). Enhanced by [`activity-feed`](../../phase-1/29-activity-feed/spec.md) (stage-change events; not required).
+> **Depends on**: [`security-and-multitenancy`](../../implemented/phase-1/01-security-and-multitenancy/spec.md) (tenant-private `organization_builders` ownership, RLS, tenant principal — all shipped; that plan stays `in_progress` only for the legacy-column contraction, which this one does not touch, so nothing here waits on it); [`team-accounts`](../../implemented/phase-1/27-team-accounts/spec.md) (organization roles and seats — already implemented). Enhanced by [`activity-feed`](../../implemented/phase-1/29-activity-feed/spec.md) (stage-change events; not required).
 > **Blocks**: [`ats-integrations`](../ats-integrations/spec.md) (hard — the ATS sync maps its external status back onto this plan's stage model)
 > **Reality check**: `organization_builders` already exists (`src/shared/lib/db/schema.ts:240`) with a dead `status` check constraint nothing reads; tenant notes already exist (`builder_notes` + `src/routes/api/builders/$builderId/notes.ts`); there is no `/me/builders` page, only `GET /api/me/builders` consumed by `src/modules/dashboard/components/ExportsPage.tsx`; dashboard navigation is `src/modules/dashboard/ui/shell/nav-config.ts`'s `NAV_AREAS`, not a flat array in `DashboardLayout.tsx`.
 
@@ -562,3 +562,19 @@ post-hoc rename of the file + journal tag is needed.
   - Verify: `pnpm lint && pnpm type-check && pnpm test && pnpm test:migration-integrity && pnpm security:boundaries && pnpm security:route-coverage && pnpm test:rls:local && pnpm test:api-isolation:local`
     all green; manual pass: free org gets a working default board with locked customization, pro org
     customizes stages, team org receives a digest.
+
+## Dashboard integration — moved from plan 57 on 2026-08-11
+
+- [ ] **Integrate Pipeline Stage Distribution and aging into the dashboard**
+  - Files: pipeline dashboard adapter, `PipelineSnapshotWidget.tsx`, contract tests
+  - Do: Show canonical stage counts and supported aging/stuck indicators with exact values. Use
+    "distribution"; link to the filtered Kanban this plan builds.
+  - Verify: counts reconcile, missing stage-entry timestamps suppress aging, and no funnel/conversion
+    language exists without transition cohorts.
+  - **Moved from `plans/phase-1/57-ui-dashboard` Wave 5, where it could not be started.** There were no
+    canonical stages, no stage-entry timestamps and no Kanban to link a filtered view to. Aging was the
+    part that could not be approximated at all: the task requires that missing stage-entry timestamps
+    *suppress* aging, and before this plan every timestamp is missing — so the widget's only honest
+    output would have been an empty widget.
+  - Sequencing: after the stages and their entry timestamps exist, and after the board can accept a
+    filtered link. Nothing else in this plan depends on it.

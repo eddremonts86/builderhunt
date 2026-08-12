@@ -1,6 +1,6 @@
 /**
  * Pins the exact security/team-account contracts the Stripe billing plan
- * (plans/phase-1/30-stripe-billing-platform/tasks.md, "Verify organization billing
+ * (plans/implemented/30-stripe-billing-platform/tasks.md, "Verify organization billing
  * dependency contracts") is built on: active-organization resolution,
  * owner/admin/member roles, owner-only mutation vs. any-role read,
  * platform-admin separation, accepted-member-plus-invitation seat usage,
@@ -110,7 +110,7 @@ describe('billing dependency: canonical entitlement interface', () => {
 // is the first). readdir on a directory containing only *.test.ts files
 // yields an empty source-file list, so both checks below trivially pass
 // today — they start enforcing the instant the first real billing module
-// (plans/phase-1/30-stripe-billing-platform/tasks.md phase 1+) lands here.
+// (plans/implemented/30-stripe-billing-platform/tasks.md phase 1+) lands here.
 describe('billing module boundary', () => {
   const billingDir = join(process.cwd(), 'src/shared/lib/billing')
 

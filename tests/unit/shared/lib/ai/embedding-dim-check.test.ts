@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 2, "Unify embedding dimension and entity
+ * plans/implemented/43-solutions-intelligence Phase 2, "Unify embedding dimension and entity
  * contracts": validate the dimension "at startup and write time".
  *
  * Write time was already covered — `embeddings.ts` compares the provider's vector length against

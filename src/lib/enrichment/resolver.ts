@@ -1,6 +1,6 @@
 /**
  * Public Profile Enrichment — deterministic entity resolution.
- * Spec reference: plans/phase-1/42-stealth-scraping/spec.md §9. Pure, versioned, no LLM.
+ * Spec reference: plans/implemented/42-stealth-scraping/spec.md §9. Pure, versioned, no LLM.
  */
 
 import type { EnrichmentEvidencePayload, EnrichmentResolution, EnrichmentTarget } from './types'

@@ -35,6 +35,10 @@ function invitation(overrides: Partial<InvitationRecord> = {}): InvitationRecord
     status: 'pending',
     expiresAt: new Date('2026-07-29T12:00:00Z'),
     inviterId: 'user-a',
+    // `other` is the default rather than a per-test choice: it is what a pre-0165 row and a client
+    // that never sent an intent both normalize to, so it is the state most existing tests describe.
+    intent: 'other',
+    roleTitle: null,
     ...overrides,
   }
 }
@@ -50,7 +54,10 @@ function buildDeps(overrides: Partial<LifecycleDependencies> = {}): LifecycleDep
     createInvitation: vi.fn().mockResolvedValue(invitation()),
     getInvitation: vi.fn().mockResolvedValue(invitation()),
     cancelInvitationRecord: vi.fn().mockResolvedValue(undefined),
+    // `undefined` deliberately, not `true`: the lifecycle reads only an explicit `false` as a lost
+    // race, so every pre-existing test keeps the meaning it had before accept learned to report.
     acceptInvitationRecord: vi.fn().mockResolvedValue(undefined),
+    rejectInvitationRecord: vi.fn().mockResolvedValue(true),
     removeMemberRecord: vi.fn().mockResolvedValue(undefined),
     updateMemberRoleRecord: vi.fn().mockResolvedValue(undefined),
     transferOwnershipRecord: vi.fn().mockResolvedValue(undefined),
@@ -188,9 +195,130 @@ describe('inviteMember', () => {
     expect(second.status).toBe('rejected')
     expect((second as PromiseRejectedResult).reason).toMatchObject({ status: 409 })
   })
+
+  describe('personalization (plan 59)', () => {
+    it('normalizes intent and role title once, before they reach the insert', async () => {
+      const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      await lifecycle.inviteMember(request, {
+        organizationId: 'org-1',
+        email: 'x@example.com',
+        role: 'member',
+        intent: 'hiring',
+        roleTitle: '  Staff Engineer  ',
+      })
+
+      expect(deps.createInvitation).toHaveBeenCalledWith(
+        expect.objectContaining({ intent: 'hiring', roleTitle: 'Staff Engineer' }),
+      )
+    })
+
+    it('defaults a caller that sends no personalization at all to other/null', async () => {
+      // Every route and test that predates plan 59 is this caller. `other` is a real intent with its
+      // own copy, so their invitations still render a complete card.
+      const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      await lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member' })
+
+      expect(deps.createInvitation).toHaveBeenCalledWith(
+        expect.objectContaining({ intent: 'other', roleTitle: null }),
+      )
+    })
+
+    it('reports deduplicated: false on a newly created invitation', async () => {
+      const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      const result = await lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member' })
+
+      expect(result.deduplicated).toBe(false)
+    })
+
+    it('returns the winner untouched on a duplicate race, with deduplicated: true and no second email', async () => {
+      // The loser's context is discarded on purpose: the email that already went out describes the
+      // winner's intent, and rewriting the row would leave the recipient's card saying something the
+      // email they received did not.
+      const conflict = Object.assign(new Error('duplicate key'), { code: '23505', constraint_name: 'organization_invitations_one_pending_unique' })
+      const winner = invitation({ intent: 'hiring', roleTitle: 'Staff Engineer' })
+      const deps = buildDeps({
+        findMembership: vi.fn().mockResolvedValue(membership('admin')),
+        createInvitation: vi.fn().mockRejectedValue(conflict),
+        findPendingInvitation: vi.fn().mockResolvedValue(winner),
+      })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      const result = await lifecycle.inviteMember(request, {
+        organizationId: 'org-1',
+        email: 'x@example.com',
+        role: 'member',
+        intent: 'investing',
+        roleTitle: 'Partner',
+      })
+
+      expect(result.deduplicated).toBe(true)
+      expect(result.intent).toBe('hiring')
+      expect(result.roleTitle).toBe('Staff Engineer')
+      expect(deps.sendInvitationEmail).not.toHaveBeenCalled()
+    })
+
+    it('passes the stored personalization to the email, not the request body', async () => {
+      // The email describes what was persisted. If a normalization ever diverges between the two, the
+      // recipient's email and their review card disagree — so the email reads from the record.
+      const stored = invitation({ intent: 'building', roleTitle: 'Maintainer' })
+      const deps = buildDeps({
+        findMembership: vi.fn().mockResolvedValue(membership('admin')),
+        createInvitation: vi.fn().mockResolvedValue(stored),
+      })
+      const lifecycle = createOrganizationLifecycle(deps)
+
+      await lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member', intent: 'hiring' })
+
+      expect(deps.sendInvitationEmail).toHaveBeenCalledWith(
+        stored.email,
+        stored.organizationName,
+        stored.id,
+        { intent: 'building', roleTitle: 'Maintainer' },
+      )
+    })
+  })
 })
 
 describe('resendInvitation', () => {
+  it('copies the personalization onto the fresh row', async () => {
+    // A resend is the same invitation with a working link. Re-deriving the context would send a second
+    // email describing a different reason for the same request, and a legacy row with no context would
+    // silently acquire some on its first resend.
+    const original = invitation({ intent: 'investing', roleTitle: 'Partner' })
+    const deps = buildDeps({
+      findMembership: vi.fn().mockResolvedValue(membership('admin')),
+      getInvitation: vi.fn().mockResolvedValue(original),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await lifecycle.resendInvitation(request, 'invite-1')
+
+    expect(deps.createInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ intent: 'investing', roleTitle: 'Partner' }),
+    )
+  })
+
+  it('keeps a legacy invitation with no personalization at other/null on resend', async () => {
+    const legacy = invitation({ intent: 'other', roleTitle: null })
+    const deps = buildDeps({
+      findMembership: vi.fn().mockResolvedValue(membership('admin')),
+      getInvitation: vi.fn().mockResolvedValue(legacy),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await lifecycle.resendInvitation(request, 'invite-1')
+
+    expect(deps.createInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ intent: 'other', roleTitle: null }),
+    )
+  })
+
   it('cancels the pending invitation and creates a fresh one', async () => {
     const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
     const lifecycle = createOrganizationLifecycle(deps)
@@ -311,8 +439,134 @@ describe('acceptInvitation — enumeration safety', () => {
 
     const result = await lifecycle.acceptInvitation(request, 'invite-1')
 
-    expect(result).toEqual({ organizationId: 'org-1' })
+    // Three fields now (plan 59): the organization, whether it became active, and where to send them.
+    expect(result).toEqual({ organizationId: 'org-1', activeOrganization: true, suggestedQuery: 'open source builders' })
     expect(deps.acceptInvitationRecord).toHaveBeenCalledWith('invite-1', 'user-a')
+  })
+
+  it('returns the suggested query for the invitation own intent', async () => {
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com', intent: 'hiring' })),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    const result = await lifecycle.acceptInvitation(request, 'invite-1')
+
+    expect(result.suggestedQuery).toBe('backend engineers')
+  })
+
+  it('reports activeOrganization: false when the switch fails, rather than failing the acceptance', async () => {
+    // The membership transaction has already committed — the person *is* a member. Throwing here would
+    // tell them their acceptance failed, and the retry they would reasonably attempt then hits an
+    // invitation that is no longer pending and gets the generic invalid error.
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com' })),
+      setActiveOrganization: vi.fn().mockRejectedValue(new Error('session store unavailable')),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    const result = await lifecycle.acceptInvitation(request, 'invite-1')
+
+    expect(result.organizationId).toBe('org-1')
+    expect(result.activeOrganization).toBe(false)
+  })
+
+  it('refuses an accept that lost the pending-state race, instead of reporting success', async () => {
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com' })),
+      acceptInvitationRecord: vi.fn().mockResolvedValue(false),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.acceptInvitation(request, 'invite-1'))
+      .rejects.toMatchObject({ status: 403, message: 'This invitation is no longer valid' })
+  })
+})
+
+describe('reviewInvitation', () => {
+  it('returns only the five allowlisted fields', async () => {
+    // Allowlisted by construction, not by omission: the invitee's own stored email, the inviter id and
+    // the organization id must not be here. Echoing the email would confirm to a wrong-account holder
+    // which address the invitation was for.
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com', intent: 'building', roleTitle: 'Maintainer' })),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    const dto = await lifecycle.reviewInvitation(request, 'invite-1')
+
+    expect(Object.keys(dto).sort()).toEqual(['expiresAt', 'intent', 'organizationName', 'role', 'roleTitle'])
+    expect(dto).toMatchObject({ organizationName: 'Acme', role: 'member', intent: 'building', roleTitle: 'Maintainer' })
+  })
+
+  it('normalizes a legacy row with no intent to other', async () => {
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com' })),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    expect((await lifecycle.reviewInvitation(request, 'invite-1')).intent).toBe('other')
+  })
+
+  it.each([
+    ['a signed-in visitor whose email does not match', { email: 'someone-else@example.com' }, {}],
+    ['an unverified account', { email: 'invitee@example.com', emailVerified: false }, {}],
+  ])('answers the same generic 403 for %s', async (_label, sessionOverrides, invitationOverrides) => {
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session(sessionOverrides)),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com', ...invitationOverrides })),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.reviewInvitation(request, 'invite-1'))
+      .rejects.toMatchObject({ status: 403, message: 'This invitation is no longer valid' })
+  })
+
+  it('answers the same generic 403 for an invitation that does not exist', async () => {
+    // Not a 404. A distinguishable status turns this into an oracle: hold a random id, read the code,
+    // learn whether that invitation exists.
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(null),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.reviewInvitation(request, 'nope'))
+      .rejects.toMatchObject({ status: 403, message: 'This invitation is no longer valid' })
+  })
+})
+
+describe('rejectInvitation', () => {
+  it('declines a valid invitation without creating a membership', async () => {
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com' })),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await lifecycle.rejectInvitation(request, 'invite-1')
+
+    expect(deps.rejectInvitationRecord).toHaveBeenCalledWith('invite-1')
+    expect(deps.acceptInvitationRecord).not.toHaveBeenCalled()
+  })
+
+  it('refuses a decline that lost to an accept', async () => {
+    // Exactly one pending-state transition wins. The loser gets the generic invalid response rather
+    // than a cheerful "declined" for something that was already joined.
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(session({ email: 'invitee@example.com' })),
+      getInvitation: vi.fn().mockResolvedValue(invitation({ email: 'invitee@example.com' })),
+      rejectInvitationRecord: vi.fn().mockResolvedValue(false),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.rejectInvitation(request, 'invite-1'))
+      .rejects.toMatchObject({ status: 403, message: 'This invitation is no longer valid' })
   })
 })
 

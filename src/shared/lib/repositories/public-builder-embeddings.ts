@@ -34,7 +34,7 @@ export interface UpsertBuilderEmbeddingStubInput {
  * re-reading the row. `TRUE` for a fresh insert (the existing row's hash is
  * `NULL`, which `IS DISTINCT FROM` a non-null value), `TRUE` after a content
  * edit, `FALSE` for an identical re-index. See
- * `plans/phase-1/03-postgres-18-upgrade/spec.md` §3B.
+ * `plans/implemented/03-postgres-18-upgrade/spec.md` §3B.
  */
 export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingStubInput): Promise<boolean> {
   // The RETURNING clause of an UPSERT cannot reference the `excluded`

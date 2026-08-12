@@ -20,6 +20,7 @@ const publicAllowlist = new Map([
   ['src/routes/api/changelog/$slug.ts', 'reads only via findPublicChangelogEntryBySlug, an explicit public DTO repository'],
   ['src/routes/api/incidents/index.ts', 'reads only via listPublicIncidents, an explicit public DTO repository'],
   ['src/routes/api/status/index.ts', 'operational health check; touches no tenant or account data'],
+  ['src/routes/api/status/summary.ts', 'the always-200 half of the /api/status split, built so a browser can poll it without writing a console error during an incident — component names and booleans only, never a check\'s error text, and no tenant or account data. Public for the same reason /status is: the people who most need to know whether it is them or us are the ones who cannot sign in'],
   ['src/routes/api/ai/config.ts', 'documented public-safe AI feature-flag config, no secrets'],
   ['src/routes/api/solutions/config.ts', 'documented public-safe Solutions feature-flag readiness config, no secrets — same pattern as ai/config.ts'],
   ['src/routes/api/feeds/$searchId.ts', 'documented public RSS feed, gated by a capability token rather than a session'],

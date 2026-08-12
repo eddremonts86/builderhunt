@@ -34,6 +34,46 @@ tenant transaction exists. It is intentionally unable to read `organization_buil
 queries, alerts, entitlements, AI artifacts, or any other product tenant data. Product code importing
 `auth-db.ts` outside the two reviewed auth modules fails `pnpm security:boundaries`.
 
+## Role settings are not inherited through membership
+
+`drizzle/0168_role_timeouts.sql` gives each role a `statement_timeout` and an
+`idle_in_transaction_session_timeout` — 5s/10s for `app`, `auth` and `capability`, 30s/30s for `worker`,
+15s/10s for `platform`. `builderhunt_readonly` is deliberately absent: it is the restore and inspection
+identity, driven by a human at a psql prompt, and a bound there turns a legitimate long analytical query
+into a mystery cancellation.
+
+**`ALTER ROLE … SET` does not apply through role membership.** Table privileges and RLS policies do,
+which is what makes the opposite assumption so plausible. PostgreSQL writes a `pg_db_role_setting` row
+keyed on the role that *authenticates*, and it never consults that role's grantors.
+
+This is not a footnote. Both test harnesses create per-database login roles that are members of the base
+roles, and every one of them started with `statement_timeout = 0` while the migration and the verifier
+both passed — so the E2E suite, the only place the application actually serves requests, served all of
+them on unbounded connections. `create-disposable-test-database.ts` and `prepare-rls-fixture.mjs` now
+copy the base role's catalog rows onto the member role, replayed from `pg_db_role_setting` rather than
+restated, so the numbers stay in the migration.
+
+Evidence: `pnpm run test:db-role-timeouts` connects as each real role and cancels a query one second past
+its budget (SQLSTATE 57014); `tests/e2e/api/database-role-timeouts.spec.ts` does the same through the
+harness's own URLs. A timeout that is set but not enforced looks identical to a correct one until
+something hangs.
+
+The settings survive a transaction pooler, which is not obvious either — PgBouncer may hand out a backend
+opened earlier for a different client. `tests/e2e/api/pgbouncer-compatibility.spec.ts` asserts all five
+through port 6432.
+
+## Pooled connections and the tenant boundary
+
+Under transaction pooling the tenant boundary rests on one boolean. `withTenantContext` sets its GUC with
+`set_config(…, true)` — transaction-*local*. Were it session-scoped, the value would stay on the backend
+after the transaction ended and the next client handed that backend would inherit another tenant's
+context: a cross-tenant read that no application code is wrong about. That property is asserted directly
+in `tests/e2e/api/pgbouncer-compatibility.spec.ts`.
+
+Related: PgBouncer authenticates against a `userlist.txt` built from the five *base* roles, so the
+per-database member roles the harnesses create cannot authenticate through it at all. A pooled test has
+to use the base roles.
+
 ## Billing tables (stripe-billing-platform)
 
 The 14 `billing_*` tables (`drizzle/0027_overconfident_angel.sql`, RLS/grants in

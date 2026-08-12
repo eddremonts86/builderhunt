@@ -6,7 +6,7 @@ import { billingRiskEvents, billingRiskExceptions } from '../db/schema'
 import { ANALYTICS_WINDOW_LIMIT, USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
- * Data access for fraud/high-volume exception controls (plans/phase-1/30-stripe-billing-platform/tasks.md §8
+ * Data access for fraud/high-volume exception controls (plans/implemented/30-stripe-billing-platform/tasks.md §8
  * "Add fraud and high-volume exception controls"). `billing_risk_events`/`billing_risk_exceptions`
  * are tenant-private (RLS-scoped by `organization_id`), so the tenant/worker-context functions below
  * take an already-scoped `TenantTransaction` like every other repository in this codebase.

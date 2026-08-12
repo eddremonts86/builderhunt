@@ -1,7 +1,7 @@
 /**
  * Denmark-canary certification, split by what test mode can actually prove.
  *
- * `plans/phase-1/30-stripe-billing-platform/tasks.md` §15 "Run live Denmark canary and staged rollout" asks for
+ * `plans/implemented/30-stripe-billing-platform/tasks.md` §15 "Run live Denmark canary and staged rollout" asks for
  * nine observations: a successful charge, an invoice, a tax result, a credit/entitlement grant, a refund,
  * payout/FX facts, reconciliation, rollback, and EU countries staying disabled. Treated as one atomic task it is
  * blocked on `sk_live_` and a real volunteer customer — which is phase-5 — and that blocked seven observations

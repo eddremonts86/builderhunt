@@ -1,6 +1,6 @@
 /**
  * The platform-admin authorization boundary, over every admin route (plan 53, task 2 —
- * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`).
+ * `plans/implemented/53-exhaustive-local-e2e-design/tasks.md`).
  *
  * `/api/admin/*` is the largest concentration of privilege in the product: it revokes claims, replays billing
  * events, runs workers, edits public content, and reads cross-tenant metrics. Membership of that set is not
@@ -146,6 +146,8 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'alerts/run-worker.ts', method: 'POST', path: '/api/admin/alerts/run-worker' },
   { file: 'analytics/run-retention.ts', method: 'POST', path: '/api/admin/analytics/run-retention' },
   { file: 'billing/accounting-export.ts', method: 'GET', path: '/api/admin/billing/accounting-export' },
+  { file: 'billing/beta-mode.ts', method: 'GET', path: '/api/admin/billing/beta-mode' },
+  { file: 'billing/beta-mode.ts', method: 'PUT', path: '/api/admin/billing/beta-mode' },
   { file: 'billing/configuration.ts', method: 'GET', path: '/api/admin/billing/configuration' },
   { file: 'billing/configuration.ts', method: 'PUT', path: '/api/admin/billing/configuration' },
   { file: 'billing/disputes.ts', method: 'GET', path: '/api/admin/billing/disputes' },
@@ -184,6 +186,13 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'legal/run-worker.ts', method: 'POST', path: '/api/admin/legal/run-worker' },
   { file: 'metrics/conversion.ts', method: 'GET', path: '/api/admin/metrics/conversion' },
   { file: 'metrics/index.ts', method: 'GET', path: '/api/admin/metrics' },
+  // The split sections (plan 57). `sections.ts` is probed with a valid section, because an invalid one is
+  // a 400 for *everybody* and would pass this table without ever reaching the authorization guard.
+  { file: 'metrics/overview.ts', method: 'GET', path: '/api/admin/metrics/overview' },
+  { file: 'preferences.ts', method: 'GET', path: '/api/admin/preferences' },
+  { file: 'preferences.ts', method: 'PUT', path: '/api/admin/preferences' },
+  { file: 'metrics/run-retention.ts', method: 'POST', path: '/api/admin/metrics/run-retention' },
+  { file: 'metrics/sections.ts', method: 'GET', path: '/api/admin/metrics/sections?section=runtime' },
   { file: 'metrics/trust.ts', method: 'GET', path: '/api/admin/metrics/trust' },
   { file: 'operations/$jobKey.ts', method: 'PATCH', path: '/api/admin/operations/absent-job' },
   { file: 'operations/$jobKey/run.ts', method: 'POST', path: '/api/admin/operations/absent-job/run' },
@@ -234,6 +243,7 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'enrichment/run-worker.ts', method: 'GET', path: '/api/admin/enrichment/run-worker' },
   { file: 'interviews/run-retention.ts', method: 'GET', path: '/api/admin/interviews/run-retention' },
   { file: 'legal/run-worker.ts', method: 'GET', path: '/api/admin/legal/run-worker' },
+  { file: 'metrics/run-retention.ts', method: 'GET', path: '/api/admin/metrics/run-retention' },
   { file: 'sprints/run-worker.ts', method: 'GET', path: '/api/admin/sprints/run-worker' },
   { file: 'status/snapshot.ts', method: 'GET', path: '/api/admin/status/snapshot' },
 ]
@@ -330,5 +340,256 @@ test.describe('a platform admin', () => {
     const billingBody = await billing.json()
     expect(Array.isArray(billingBody.alerts), 'alerts must be a list, so empty can mean "checked"').toBe(true)
     expect(billingBody).toHaveProperty('organizationsScanned')
+  })
+  test('the split metrics sections answer per section, and refuse a bad request rather than defaulting', async () => {
+    /**
+     * Plan 57, Admin track — the per-section split.
+     *
+     * Four properties, and the first two are the ones the monolith could not have. A section with no
+     * backing store answers `unavailable` with a code instead of zeroes, because "0 pending" reads as an
+     * empty queue rather than a shut door. And a caller mistake is a 400, not an `unavailable` envelope —
+     * telling a typo it was a service outage sends somebody to look at the wrong thing.
+     */
+    const overview = await harness.admin.api!.fetch('/api/admin/metrics/overview')
+    expect(overview.status()).toBe(200)
+    const overviewBody = await overview.json()
+    expect(overviewBody.section).toBe('overview')
+    expect(overviewBody.schemaVersion).toBe(1)
+    expect(overviewBody.payload.status).toBe('ready')
+    // Freshness and a window are mandatory on anything carrying data: an aggregate without a time is a
+    // claim about *now*, and one without a timezone does not say which day "yesterday" was.
+    expect(typeof overviewBody.payload.generatedAt).toBe('string')
+    expect(typeof overviewBody.payload.window.timezone).toBe('string')
+    for (const value of overviewBody.payload.data.values) {
+      expect(value, `${value.key} must carry a unit`).toHaveProperty('unit')
+      expect(value, `${value.key} must carry a scope`).toHaveProperty('scope')
+    }
+
+    /**
+     * The runtime section, and the scope rule the contract exists for.
+     *
+     * `metrics.get()` counters are per-instance and zero at boot. Every value here must say so and must
+     * carry the process it came from — the shape that would let one instance's counter be read as the
+     * platform's number is refused by the schema, and this asserts the wire actually looks like that.
+     */
+    const runtime = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=runtime')
+    expect(runtime.status()).toBe(200)
+    const runtimeBody = await runtime.json()
+    expect(runtimeBody.payload.status).toBe('ready')
+    for (const value of runtimeBody.payload.data.values) {
+      expect(value.scope, `${value.key} is an in-process counter`).toBe('process')
+      expect(value.platformTotal, `${value.key} must not claim the platform`).toBeUndefined()
+      expect(value.processIdentity?.pid, `${value.key} must name its process`).toBeGreaterThan(0)
+    }
+
+    /**
+     * Traffic, which now has a store behind it — so this asserts the *rule*, not one of its two outcomes.
+     *
+     * `service_metric_buckets` is written by a thirty-second flush that deliberately leaves the minute in
+     * progress behind, so whether a spec run has rows yet depends on how long the run has been going. An
+     * assertion pinned to `unavailable` would have passed on a fresh database and started failing once the
+     * suite got slower, for no product reason. What must hold either way is that the section never invents
+     * a zero: it is `unavailable: insufficient_history` with no data at all, or it is real numbers that say
+     * they came from the database and are platform totals.
+     */
+    const traffic = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=traffic')
+    expect(traffic.status()).toBe(200)
+    const trafficBody = await traffic.json()
+    if (trafficBody.payload.status === 'unavailable') {
+      expect(trafficBody.payload.code).toBe('insufficient_history')
+      expect(trafficBody.payload.data).toBeUndefined()
+    } else {
+      expect(trafficBody.payload.status).toBe('ready')
+      for (const value of trafficBody.payload.data.values) {
+        expect(value.scope, `${value.key} is read from the buckets table`).toBe('database')
+        // The claim the per-instance rows plus the summing query earn, and the runtime section cannot make.
+        expect(value.platformTotal, `${value.key} sums every instance`).toBe(true)
+        expect(value.processIdentity, `${value.key} is not one process's counter`).toBeUndefined()
+      }
+      // Fourteen families, ten rows: the ranking is capped in the payload, not trimmed by the client.
+      expect((trafficBody.payload.data.ranked ?? []).length).toBeLessThanOrEqual(10)
+    }
+
+    /**
+     * The conversion endpoint's range validation (plan 57, "Optimize and render Conversion metrics").
+     *
+     * Three refusals, each for a stated reason. A reversed range is refused rather than swapped, because
+     * swapping answers a question the caller did not ask and a reversed range is far more likely a bug in their
+     * tooling than a typo they want corrected. An oversized one is refused because raw events are deleted after
+     * thirty days, so a longer window is a scan over a range that provably holds nothing — and it would return
+     * a table of zeros that reads as a collapse in conversion rather than as retention having done its job. A
+     * bad variant is refused because there are exactly two arms.
+     */
+    const validRange = await harness.admin.api!.fetch('/api/admin/metrics/conversion?start=2026-08-01&end=2026-08-10')
+    expect(validRange.status()).toBe(200)
+    expect((await validRange.json()).start).toBe('2026-08-01')
+
+    for (const query of [
+      'start=2026-08-10&end=2026-08-01',
+      'start=2020-01-01&end=2026-08-01',
+      'variant=control',
+      'start=08-01-2026',
+    ]) {
+      const bad = await harness.admin.api!.fetch(`/api/admin/metrics/conversion?${query}`)
+      expect(bad.status(), query).toBe(400)
+    }
+
+    /**
+     * Platform-admin console preferences (plan 57, "Persist isolated platform-admin preferences").
+     *
+     * Four properties, and the isolation is the one that needs a real database rather than a unit test.
+     */
+    const prefsBefore = await harness.admin.api!.fetch('/api/admin/preferences')
+    expect(prefsBefore.status()).toBe(200)
+    expect((await prefsBefore.json()).landing.section).toBe('overview')
+
+    const saved = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { section: 'traffic', range: '7d', variant: 'latency' },
+    })
+    expect(saved.status()).toBe(200)
+    expect((await saved.json()).landing).toMatchObject({ section: 'traffic', range: '7d', variant: 'latency' })
+    // Persisted, not echoed: a fresh read returns it.
+    expect((await (await harness.admin.api!.fetch('/api/admin/preferences')).json()).landing.section).toBe('traffic')
+
+    /**
+     * A required widget cannot be hidden, and the refusal is a 422 rather than a silent filter.
+     *
+     * The action queue is the panel that says a webhook is dead-lettered or a removal request is past its legal
+     * date, and it is *already* absent whenever it has nothing to say — so a control to hide it would only ever be
+     * used on a day it had a row. Silently dropping the id would report success and then not honour it, and the
+     * next read would disagree with what the control showed.
+     */
+    const refused = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { hiddenWidgetIds: ['action_queue'] },
+    })
+    expect(refused.status()).toBe(422)
+    expect((await refused.json()).error).toBe('required_widget_hidden')
+
+    // An unknown section falls back rather than 400ing: a preference naming a section a later build removed is
+    // expected, not exceptional.
+    const normalized = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { section: 'surveillance' },
+    })
+    expect(normalized.status()).toBe(200)
+    expect((await normalized.json()).landing.section).toBe('overview')
+
+    // A body with an unknown key is refused outright — `.strict()`, so a typo is not silently ignored.
+    const strict = await harness.admin.api!.fetch('/api/admin/preferences', {
+      method: 'PUT',
+      data: { landingSection: 'traffic' },
+    })
+    expect(strict.status()).toBe(400)
+
+    /**
+     * The legacy compatibility endpoint's key set, asserted so it cannot quietly re-monolith.
+     *
+     * `/api/admin/metrics` is what the page read on a fifteen-second timer to render everything at once. Three
+     * widgets still read it — the interview capability grid, the discovery worker's current-run state, and the
+     * process diagnostics — because those are booleans and strings the numeric section contract cannot carry.
+     * What must not happen is a fourth thing being added here instead of to a section: the endpoint's whole
+     * problem was that it grew. Pinning the top-level keys makes an addition fail a gate.
+     */
+    const legacy = await harness.admin.api!.fetch('/api/admin/metrics')
+    expect(legacy.status()).toBe(200)
+    const legacyBody = await legacy.json()
+    expect(Object.keys(legacyBody).sort()).toEqual(
+      // `removals` is conditional on `PROFILE_REMOVAL_ENABLED`, so it is allowed to be absent but not extra.
+      Object.keys(legacyBody).includes('removals')
+        ? ['db', 'discovery', 'generatedAt', 'interviews', 'inProcess', 'removals', 'server'].sort()
+        : ['db', 'discovery', 'generatedAt', 'interviews', 'inProcess', 'server'].sort(),
+    )
+    // And nothing in it is a collection whose length is decided by how much data exists.
+    for (const [key, value] of Object.entries(legacyBody)) {
+      expect(Array.isArray(value), `${key} must not be a row collection`).toBe(false)
+    }
+
+    /**
+     * `?fields=` bounds the *work*, not just the shape (plan 57, Admin track).
+     *
+     * The key set above was already fixed; what every request still did was compute all of it — two platform
+     * aggregates, a discovery read, and a removal read when that feature is on. The three section widgets each
+     * read exactly one field, and `server` and `interviews` need no database at all, so opening the Runtime
+     * disclosure ran two platform aggregates to report a Node version.
+     *
+     * Asserted as *absence of the other keys* rather than by timing a query count: the response is the observable
+     * contract, and a key that is not there could not have been computed.
+     */
+    const serverOnly = await harness.admin.api!.fetch('/api/admin/metrics?fields=server')
+    expect(serverOnly.status()).toBe(200)
+    const serverBody = await serverOnly.json()
+    expect(Object.keys(serverBody).sort()).toEqual(['generatedAt', 'server'])
+    // The field it asked for is real, not an empty stub.
+    expect(serverBody.server).toHaveProperty('nodeVersion')
+
+    const twoFields = await harness.admin.api!.fetch('/api/admin/metrics?fields=discovery,interviews')
+    expect(twoFields.status()).toBe(200)
+    expect(Object.keys(await twoFields.json()).sort()).toEqual(['discovery', 'generatedAt', 'interviews'])
+
+    /**
+     * An unknown field is a 400, and a typo is the case that matters.
+     *
+     * Dropping it silently would answer 200 without the key, and the caller would wait for something it was
+     * never told was refused — the same reason `sections.ts` refuses an unknown section rather than defaulting.
+     */
+    const typo = await harness.admin.api!.fetch('/api/admin/metrics?fields=sever')
+    expect(typo.status()).toBe(400)
+    const typoBody = await typo.json()
+    expect(typoBody.error).toBe('invalid_request')
+    expect(typoBody.unknownFields).toEqual(['sever'])
+
+    // Empty is a request for nothing, which is a caller bug rather than an instruction.
+    const empty = await harness.admin.api!.fetch('/api/admin/metrics?fields=')
+    expect(empty.status()).toBe(400)
+
+    /**
+     * The comparison, which doubles the section's cost when asked for.
+     *
+     * `compare` is refused rather than coerced for a reason specific to it: defaulting a typo to "on" doubles
+     * the query cost of a page that refreshes on a timer, and defaulting it to "off" returns numbers with no
+     * comparison while the caller's URL says there is one.
+     */
+    const compared = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=traffic&compare=true')
+    expect(compared.status()).toBe(200)
+    const badCompare = await harness.admin.api!.fetch('/api/admin/metrics/sections?section=traffic&compare=yes')
+    expect(badCompare.status()).toBe(400)
+    expect((await badCompare.json()).error).toBe('invalid_request')
+
+    // Caller mistakes: unknown section, unknown range, and a variant that belongs to another section.
+    for (const query of ['section=surveillance', 'section=traffic&range=18mo', 'section=search&variant=latency']) {
+      const bad = await harness.admin.api!.fetch(`/api/admin/metrics/sections?${query}`)
+      expect(bad.status(), query).toBe(400)
+      expect((await bad.json()).error, query).toBe('invalid_request')
+    }
+
+    /**
+     * The retention pass, which is the only path to a DELETE on the buckets.
+     *
+     * `builderhunt_app` writes the minutes and is not granted DELETE; `builderhunt_worker` is. So a 200 here
+     * is the evidence that the worker role's grant is actually in place — a unit test cannot produce it,
+     * because unit tests connect as a superuser and would succeed with no grant at all.
+     */
+    const retention = await harness.admin.api!.fetch('/api/admin/metrics/run-retention', { method: 'POST' })
+    expect(retention.status()).toBe(200)
+    const retentionBody = await retention.json()
+    expect(retentionBody.retainDays).toBe(30)
+    expect(typeof retentionBody.deletedCount).toBe('number')
+    // Nothing in a fresh window is old enough to remove, and the pass must say so rather than fail.
+    expect(retentionBody.deletedCount).toBeGreaterThanOrEqual(0)
+
+    // And the guard is on all three routes, which is the failure eight copies of it would have hidden.
+    for (const path of ['/api/admin/metrics/overview', '/api/admin/metrics/sections?section=runtime']) {
+      const asTenant = await harness.tenant.api!.fetch(path)
+      expect([401, 403], `${path} must refuse a tenant`).toContain(asTenant.status())
+      const anonymous = await harness.anonymous.fetch(path)
+      expect([401, 403], `${path} must refuse an anonymous caller`).toContain(anonymous.status())
+    }
+    // The retention trigger refuses the same callers, by POST — the method that actually deletes.
+    const tenantRetention = await harness.tenant.api!.fetch('/api/admin/metrics/run-retention', { method: 'POST' })
+    expect([401, 403]).toContain(tenantRetention.status())
+    const anonRetention = await harness.anonymous.fetch('/api/admin/metrics/run-retention', { method: 'POST' })
+    expect([401, 403]).toContain(anonRetention.status())
   })
 })

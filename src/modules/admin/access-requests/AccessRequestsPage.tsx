@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Loader2, Mail, ShieldOff, UserPlus, X } from 'lucide-react'
 
 import { Button, Input } from '~/components/ui'
+import { StatusFilterTabs } from '~/modules/admin/StatusFilterTabs'
 
 type Status = 'pending' | 'approved' | 'rejected' | 'revoked'
 
@@ -37,7 +38,11 @@ const STATUS_STYLE: Record<Status, string> = {
   revoked: 'bg-bh-danger/15 text-bh-danger',
 }
 
-const FILTERS: Array<{ value: Status | 'all'; label: string }> = [
+/**
+ * The filter vocabulary, exported so the route builds its validator from the same list — one source, so a status
+ * added here reaches both the strip and the URL allowlist with no second place to forget.
+ */
+export const ACCESS_STATUS_FILTERS: ReadonlyArray<{ value: Status | 'all'; label: string }> = [
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
@@ -45,8 +50,7 @@ const FILTERS: Array<{ value: Status | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
 ]
 
-export function AccessRequestsPage() {
-  const [filter, setFilter] = useState<Status | 'all'>('pending')
+export function AccessRequestsPage({ status: filter }: { status: Status | 'all' }) {
   const [requests, setRequests] = useState<AccessRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -168,18 +172,13 @@ export function AccessRequestsPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {FILTERS.map((option) => (
-          <Button
-            key={option.value}
-            variant={filter === option.value ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => setFilter(option.value)}
-            data-testid={`access-filter-${option.value}`}
-          >
-            {option.label}
-          </Button>
-        ))}
+      <div className="mb-4">
+        <StatusFilterTabs
+          to="/admin/access-requests"
+          current={filter}
+          options={ACCESS_STATUS_FILTERS}
+          testIdPrefix="access-filter"
+        />
       </div>
 
       {notice && (

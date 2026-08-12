@@ -154,7 +154,7 @@ describe('stripe billing security (plan: stripe-billing-platform)', () => {
 
   /**
    * The Stripe key mode must agree with the database the process is pointed at
-   * (`plans/phase-1/30-stripe-billing-platform/staging-test-plan.md` §7).
+   * (`plans/implemented/30-stripe-billing-platform/staging-test-plan.md` §7).
    *
    * `NODE_ENV` cannot carry this, which is the whole reason the check exists: staging is *built* with
    * `NODE_ENV=production`, so the pre-existing "live key outside production" guard waves a copy-pasted

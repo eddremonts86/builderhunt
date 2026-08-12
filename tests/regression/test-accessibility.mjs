@@ -1,5 +1,5 @@
 /**
- * Accessibility release gate (plans/phase-1/48-audit-accessibility/tasks.md).
+ * Accessibility release gate (plans/implemented/48-audit-accessibility/tasks.md).
  *
  * Runs axe-core against a deterministic public + authenticated route matrix
  * at two viewports, waits for real React hydration (never a fixed delay —
@@ -73,6 +73,28 @@ const AUTH_ROUTES = [
   '/team',
   '/interviews',
   '/solutions',
+  /**
+   * The Admin console, added 2026-08-11 (plan 57, "Add Admin Metrics accessibility, performance, and regression
+   * gates").
+   *
+   * **No `/admin/*` route had ever had an axe pass.** This list held eleven tenant surfaces and nothing behind the
+   * platform-admin guard, so the console — the one screen read under time pressure, by someone who cannot
+   * choose to come back later — was the least audited part of the app. The gate already resolves
+   * `ADMIN_USER_IDS` from the seeded admin (see `local-quality.sh`), so these render rather than redirect.
+   *
+   * Five *renders* of the metrics page rather than one URL, because the sections do not share markup: the
+   * overview carries the action queue and the removal panel, traffic carries a ranked list with proportional
+   * bars, operations and trust carry threshold-coloured tiles, and runtime carries a `<details>` disclosure.
+   * One URL would audit the default tab and claim the page.
+   *
+   * `compare=false` is written out because `validateSearch` normalizes it in and `beforeLoad` would otherwise
+   * redirect — an axe run against a redirect measures the destination and reports it under the wrong name.
+   */
+  '/admin/metrics?section=overview&range=24h&variant=summary&compare=false',
+  '/admin/metrics?section=traffic&range=24h&variant=latency&compare=false',
+  '/admin/metrics?section=operations&range=24h&variant=integrations&compare=false',
+  '/admin/metrics?section=trust&range=30d&variant=abuse&compare=false',
+  '/admin/metrics?section=runtime&range=24h&variant=freshness&compare=false',
 ]
 
 // Every entry needs a reason and a date — this is a debt ledger, not a
@@ -130,12 +152,33 @@ function isExpected(_route, violationNode) {
 // different, non-token color on repeated runs — a timing race, not a real
 // bug — and no fixed wait reliably outlasts every transition under CI-like
 // load. Freeze all CSS animations/transitions instead of guessing a delay.
+//
+// The four declarations below reach CSS animations and CSS transitions, and nothing else — which is
+// the gap the note above did not know about. The dashboard's widget entrance is a Framer Motion
+// stagger driven through the Web Animations API, writing `opacity` and `transform` inline, and it
+// sailed straight through all four. Same symptom the note describes, one layer down: `/dashboard`
+// reported `#404044` at 1.86:1, which is `--color-bh-text-dim` (`#a4a4ab`, 7.2:1 against every dark
+// surface) composited at about a third of full opacity.
+//
+// `settleAnimations` finishes those animations, but finishing is a moment and mounting is not: a
+// widget whose section data arrives late starts its entrance after the call, and that race is exactly
+// how this gate failed under the full local run while passing twice in isolation. So the tiles are
+// also pinned to their resting values here. A stylesheet `!important` rule beats an inline value and
+// applies to whatever mounts next, which is what makes it a fix rather than a wider window.
+//
+// Scoped to `[data-bento-tile]` rather than to every element with an inline opacity: forcing opacity
+// to 1 anywhere raises contrast, so a blanket rule could hide a genuinely-too-dim disabled control —
+// it would make this gate pass by making it blind.
 const FREEZE_ANIMATIONS_CSS = `
   *, *::before, *::after {
     animation-duration: 0s !important;
     animation-delay: 0s !important;
     transition-duration: 0s !important;
     transition-delay: 0s !important;
+  }
+  [data-bento-tile] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 `
 
@@ -163,6 +206,58 @@ async function waitForSkeletonsToClear(page) {
   await page
     .waitForFunction(() => document.querySelectorAll('.animate-pulse').length === 0, { timeout: 8_000 })
     .catch(() => {})
+}
+
+/**
+ * Runs every finite animation to its end state before anything is measured.
+ *
+ * `FREEZE_ANIMATIONS_CSS` above sets `animation-duration: 0s` and `transition-duration: 0s`, and
+ * those two declarations govern CSS animations and CSS transitions — nothing else. The dashboard's
+ * widget entrance is a Framer Motion stagger driven through the Web Animations API, which they do not
+ * reach, so it was still mid-flight when axe sampled the page.
+ *
+ * What that produced, on 2026-08-12: four `serious` colour-contrast violations on `/dashboard` at all
+ * three viewports, reporting foregrounds of `#404044` and `#797980`. Neither is a token in this
+ * codebase. `#404044` is `--color-bh-text-dim` (`#a4a4ab`, which clears 7.2:1) composited at roughly
+ * a third of full opacity over the card; `#797980` is `--color-bh-text-muted` at about
+ * three-quarters. The gate was measuring a fade, and reporting the fade as a design defect — with a
+ * ratio of 1.86:1, which no reviewer would read as anything but a real and severe fault.
+ *
+ * Finishing rather than waiting, because waiting is what the skeleton pulse makes impossible: an
+ * infinite animation never completes, and `finish()` throws on one, which is exactly the signal
+ * needed to leave it alone. The resting state is also the honest thing to audit — it is the state a
+ * reader spends their time in.
+ */
+async function settleAnimations(page, route, viewportName) {
+  const deadline = Date.now() + 5_000
+  for (;;) {
+    const pending = await page
+      .evaluate(() => {
+        const runsForever = (animation) => animation.effect?.getComputedTiming?.().iterations === Infinity
+        for (const animation of document.getAnimations()) {
+          if (!runsForever(animation)) animation.finish()
+        }
+        // Re-read: finishing one can mount markup that starts another (a widget whose section data
+        // arrived while the first pass was running).
+        return document
+          .getAnimations()
+          .filter((a) => !runsForever(a) && a.playState === 'running')
+          .map((a) => a.effect?.target?.tagName?.toLowerCase() ?? 'unknown')
+      })
+      .catch(() => [])
+    if (pending.length === 0) return
+    if (Date.now() >= deadline) {
+      // Said out loud rather than returned quietly. Whatever is still moving is being measured, and a
+      // composited mid-animation colour reads as a severe contrast defect — so the log has to name the
+      // reason the numbers below might not be about the palette.
+      console.warn(
+        `   ⚠ ${route} @ ${viewportName}: ${pending.length} animation(s) still running after 5s `
+          + `(${[...new Set(pending)].join(', ')}) — colour measurements on this route may be composited`,
+      )
+      return
+    }
+    await page.waitForTimeout(100)
+  }
 }
 
 async function dismissOverlays(page) {
@@ -202,6 +297,9 @@ async function auditRoute(page, route, viewportName) {
   await waitForHydration(page)
   await dismissOverlays(page)
   await waitForSkeletonsToClear(page)
+  // After the skeletons, not before: a widget whose section data arrives late mounts late, and its
+  // entrance starts then.
+  await settleAnimations(page, route, viewportName)
 
   // `target-size` (WCAG 2.2 SC 2.5.8, pointer target minimums) isn't in
   // axe-core's default rule set (confirmed by enumerating every rule id the

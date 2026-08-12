@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 4 — the catalog repository and the per-source kill
+ * plans/implemented/43-solutions-intelligence Phase 4 — the catalog repository and the per-source kill
  * switch.
  *
  * `solutions-catalog-schema.test.ts` proves the database refuses the wrong writes. This proves the

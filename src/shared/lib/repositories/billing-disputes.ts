@@ -8,7 +8,7 @@ import type { PageRequest, PageResult, TableQuery } from '../table/types'
 import { OPERATOR_LIST_LIMIT } from '../db/read-bounds'
 
 /**
- * Data access for chargeback tracking (plans/phase-1/30-stripe-billing-platform/tasks.md §8 "Implement dispute
+ * Data access for chargeback tracking (plans/implemented/30-stripe-billing-platform/tasks.md §8 "Implement dispute
  * freeze, outcome, and alerts"). Entirely worker/webhook-written — see `billing/disputes.ts`'s
  * module comment; this file only inserts/reads/updates, all invariants live one layer up.
  */

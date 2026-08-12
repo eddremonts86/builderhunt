@@ -25,7 +25,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * Quota: no documented limit. The registry is CORS-friendly. We cap at
  * 20 packages per search to be polite.
  *
- * Spec reference: plans/phase-1/12-npm-registry-integration/spec.md. Migrated off
+ * Spec reference: plans/implemented/12-npm-registry-integration/spec.md. Migrated off
  * npms.io (shut down/unreliable) to this endpoint 2026-07-25 — one real
  * deviation from the migration task's own assumption worth flagging:
  * `score.final` on THIS endpoint is an unbounded relevance/ranking score

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
 import { fadeInUpVariants, staggerContainer } from '~/shared/lib/motion/tokens'
 import {
   SPAN_CLASS,
@@ -54,13 +54,31 @@ import {
  * remedy is to band widgets of similar height together in the registry, which is a
  * choice an author can make and a reader can see, unlike a runtime cascade.
  */
+/**
+ * ## Why there is no `useReducedMotion()` branch here any more
+ *
+ * There was one, on both this container and the tile: `initial={reduceMotion ? false : 'hidden'}`
+ * and `variants={reduceMotion ? undefined : fadeInUpVariants}`. It did not work, and it left the
+ * grid **permanently invisible** for exactly the viewers it was meant to accommodate.
+ *
+ * `useReducedMotion()` snapshots a module-level global with `useState` and never updates it, and on
+ * the server that global is its default `false`. So the server rendered the `hidden` keyframe inline
+ * — `opacity: 0`, `translateY(12px)` — and the hydrating client, now correctly told to reduce
+ * motion, dropped the variants that were the only thing that would have animated it to `opacity: 1`.
+ * Nothing remained to clear the inline style, so nine widgets stayed at zero opacity indefinitely
+ * while holding their full height: invisible without being absent, which no screenshot diff and no
+ * height comparison can describe.
+ *
+ * The preference is now honoured by `MotionConfig reducedMotion="user"` at the root, which is read
+ * when an animation runs rather than when a component mounts. Keeping the variants unconditional is
+ * what guarantees `opacity` always has something driving it to its resting value.
+ */
 export function BentoGrid({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  const reduceMotion = useReducedMotion()
   return (
     <motion.div
       className={`grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 gap-4 items-stretch ${className}`}
       variants={staggerContainer()}
-      initial={reduceMotion ? false : 'hidden'}
+      initial="hidden"
       animate="visible"
     >
       {children}
@@ -94,12 +112,23 @@ interface BentoTileProps {
 export function BentoTile({
   span, glow = false, bare = false, className = '', children, widgetId,
 }: BentoTileProps) {
-  const reduceMotion = useReducedMotion()
   const surface = bare ? '' : glow ? 'card-glow p-6' : 'card card-hover'
 
   return (
+    // Unconditional variants — see `BentoGrid` for what the reduced-motion branch here cost.
     <motion.div
-      variants={reduceMotion ? undefined : fadeInUpVariants}
+      variants={fadeInUpVariants}
+      /**
+       * The animation library writes `opacity` and `transform` inline here, and this attribute is how
+       * a harness addresses that without guessing at the DOM shape.
+       *
+       * `tests/regression/test-accessibility.mjs` pins these to their resting values with an
+       * `!important` rule, because racing the entrance is what made that gate intermittent: it
+       * sampled a fade and reported the composite as a 1.86:1 contrast defect. A stylesheet rule wins
+       * over an inline value and applies to tiles that mount later too, which is the half a one-shot
+       * "finish all animations" call cannot cover.
+       */
+      data-bento-tile=""
       className={`${SPAN_CLASS[span]} min-w-0`}
     >
       {/*

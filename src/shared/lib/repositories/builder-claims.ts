@@ -334,6 +334,8 @@ export async function listBuilderClaimsForAdmin(
   const subjects = subjectIds.length > 0
     ? await (authDbOverride ?? authDb).select({ id: authUsers.id, name: authUsers.name, email: authUsers.email })
       .from(authUsers).where(inArray(authUsers.id, subjectIds))
+      // Model-bounded by the de-duplicated ids of this page: `authUsers.id` is the primary key.
+      .limit(subjectIds.length)
     : []
   const subjectById = new Map(subjects.map((s) => [s.id, s]))
 

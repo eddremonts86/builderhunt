@@ -39,7 +39,7 @@ import { startWorkerServer, stopWorkerServer } from '../harness/server'
 import { e2eEnv } from '../harness/env'
 import { ensureFixedTimeEnv, fixedClockFromEnv, installFixedBrowserClock } from '../harness/clock'
 import { createOwnerPrincipal, disposePrincipal, type FixtureContext, type Principal } from '../harness/fixtures/principals'
-import { dismissOverlays, gotoHydrated } from '../harness/browser'
+import { dismissOverlays, gotoHydrated, waitForTilesSettled } from '../harness/browser'
 
 interface Harness {
   workerIndex: number
@@ -161,7 +161,52 @@ async function prepare(page: import('playwright/test').Page, path: string): Prom
   // The cookie banner and the ToS modal sit above the page. Left up, every baseline would be a
   // screenshot of the banner and none of them would be a screenshot of the empty state.
   await dismissOverlays(page)
+
+  /**
+   * Wait for the dashboard to finish filling in before capturing it.
+   *
+   * Until Wave 1 this was unnecessary: `DashboardPage` returned a whole-page skeleton until every core fetch had
+   * resolved, so a screenshot caught either the skeleton or the finished page and never anything between. Removing
+   * that early return — which is what makes the shell usable during a slow request — also means the page now paints
+   * its chrome first and fills the widget grid as data arrives.
+   *
+   * A capture taken right after hydration therefore lands mid-fill, and on a CI runner it did: the regenerated
+   * Linux baseline was missing the three metric tiles, the action queue, recency, sprints, recommendations and
+   * alerts, with a 650 px hole where they belong and the sidebar cut off at the same height. It reproduced twice,
+   * so the refresh workflow's stability check accepted it — a half-rendered page can be perfectly stable.
+   *
+   * `data-dashboard-state="ready"` is the signal the page already publishes for exactly this question, and it is
+   * the same one `auth-and-sessions.spec.ts` waits on before navigating away. Scoped to the dashboard route
+   * because no other empty state has it.
+   */
+  if (path === '/dashboard') {
+    await page.locator('[data-dashboard-state="ready"]').waitFor({ state: 'attached', timeout: 20_000 })
+    /**
+     * And then wait for the grid to actually arrive.
+     *
+     * `ready` was not enough, and the way it failed is worth keeping: the Linux gate captured a 751px
+     * band of bare page background where macOS captured six widgets, at the same page height, twice,
+     * byte-identically. Tiles mid-entrance hold their height at `opacity: 0`, so neither the diff
+     * ratio nor the height comparison could say which widgets were missing — see
+     * `waitForTilesSettled`, which names them instead.
+     */
+    await waitForTilesSettled(page)
+  }
+
   await page.evaluate(() => document.fonts.ready)
+}
+
+/**
+ * Uncaught page errors, asserted before the screenshot.
+ *
+ * A thrown render leaves the surface incomplete, and `toHaveScreenshot` reports that as a diff ratio —
+ * a number that names neither the widget that vanished nor the exception that removed it. Checking
+ * first means the failure says what happened.
+ */
+function collectCrashes(page: import('playwright/test').Page): string[] {
+  const crashes: string[] = []
+  page.on('pageerror', (error) => crashes.push(error.message))
+  return crashes
 }
 
 test.describe('empty states — desktop', () => {
@@ -169,8 +214,10 @@ test.describe('empty states — desktop', () => {
     test(`${route.name} matches its baseline`, async ({ browser }) => {
       const context = await browser.newContext({ storageState: harness.principal.storageState! })
       const page = await context.newPage()
+      const crashes = collectCrashes(page)
       try {
         await prepare(page, route.path)
+        expect(crashes, 'the page threw while rendering').toEqual([])
         await expect(page).toHaveScreenshot(`${route.name}.png`, {
           fullPage: true,
           maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
@@ -189,8 +236,10 @@ test.describe('empty states — mobile', () => {
     test(`${route.name} matches its baseline @mobile-only`, async ({ browser }) => {
       const context = await browser.newContext({ storageState: harness.principal.storageState! })
       const page = await context.newPage()
+      const crashes = collectCrashes(page)
       try {
         await prepare(page, route.path)
+        expect(crashes, 'the page threw while rendering').toEqual([])
         await expect(page).toHaveScreenshot(`${route.name}.png`, {
           fullPage: true,
           maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,

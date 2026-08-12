@@ -85,10 +85,26 @@ afterAll(async () => {
   await drop()
 })
 
-/** A thenable that also exposes `.limit()` — matches BOTH shapes `operations-metrics.ts` uses on a raw `transaction.select({...}).from(...).where(...)` result: awaited directly (stale reservations, auto-recharge rules) or chained with `.limit(1)` (the payment-blocked check). */
-function whereResult(rows: unknown[]) {
-  const promise = Promise.resolve(rows) as Promise<unknown[]> & { limit: (n: number) => Promise<unknown[]> }
+/**
+ * A thenable that also exposes `.limit()` and `.groupBy()` — every shape `operations-metrics.ts` uses
+ * on a raw `transaction.select({...}).from(...).where(...)` result: awaited directly, chained with
+ * `.limit(n)`, or grouped and then bounded.
+ *
+ * `.groupBy()` returns another `whereResult`, so a chain can group *and* bound. The rows a test
+ * supplies are already the grouped shape it wants back — this fake does not aggregate, because the
+ * grouping is the database's job and the assertions here are about how many queries run and what the
+ * caller does with the answer.
+ */
+function whereResult(rows: unknown[]): Promise<unknown[]> & {
+  limit: (n: number) => Promise<unknown[]>
+  groupBy: (...columns: unknown[]) => Promise<unknown[]> & { limit: (n: number) => Promise<unknown[]> }
+} {
+  const promise = Promise.resolve(rows) as Promise<unknown[]> & {
+    limit: (n: number) => Promise<unknown[]>
+    groupBy: (...columns: unknown[]) => ReturnType<typeof whereResult>
+  }
   promise.limit = (n: number) => Promise.resolve(rows.slice(0, n))
+  promise.groupBy = () => whereResult(rows)
   return promise
 }
 
@@ -196,7 +212,9 @@ describe('getBillingOperationsMetrics — cross-organization aggregation', () =>
       organizationId === 'org-a' ? [{ id: 'x1', organizationId, revokedAt: null, expiresAt: null } as never] : [],
     )
     mocks.withWorkerOrganization.mockImplementation(async (organizationId: string, fn: (tx: unknown) => unknown) => {
-      const tx = { select: () => ({ from: () => ({ where: () => whereResult(organizationId === 'org-b' ? [{ id: 'res-1' }] : []) }) }) }
+      // `{ total }`, not `[{ id }]`: the stale-reservation count is a `count()` in SQL now, so what
+      // comes back is one aggregate row rather than a row per reservation to measure with `.length`.
+      const tx = { select: () => ({ from: () => ({ where: () => whereResult(organizationId === 'org-b' ? [{ total: 1 }] : [{ total: 0 }]) }) }) }
       return fn(tx)
     })
 
@@ -243,7 +261,11 @@ describe('getBillingOperationsMetrics — §10 checkout/recovery/auto-recharge/l
     mocks.listWorkerOrganizationIds.mockResolvedValue([{ id: 'org-a' }, { id: 'org-b' }])
     mocks.withWorkerOrganization.mockImplementation(async (organizationId: string, fn: (tx: unknown) => unknown) =>
       fn(tableAwareFakeTransaction(new Map([
-        [billingCheckoutAttempts, organizationId === 'org-a' ? [{ status: 'complete' }, { status: 'expired' }] : [{ status: 'complete' }]],
+        // One row per status with its count, which is what `GROUP BY status` returns — org-a's two
+        // attempts arrive as two grouped rows rather than as two raw ones.
+        [billingCheckoutAttempts, organizationId === 'org-a'
+          ? [{ status: 'complete', total: 1 }, { status: 'expired', total: 1 }]
+          : [{ status: 'complete', total: 1 }]],
       ]))),
     )
 

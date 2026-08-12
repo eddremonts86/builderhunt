@@ -22,7 +22,7 @@ import {
 } from '../repositories/billing-ledger'
 
 /**
- * Atomic credit reservation lifecycle (plans/phase-1/30-stripe-billing-platform/tasks.md
+ * Atomic credit reservation lifecycle (plans/implemented/30-stripe-billing-platform/tasks.md
  * §4 "Implement atomic reservation lifecycle"; spec.md §Credit authorization
  * contract). A provider-backed operation must never begin before
  * `reserveCredits` succeeds, and must stop if `extendReservation` fails.
@@ -71,6 +71,7 @@ async function allocateFromEarliestExpiryGrants(
   unitsNeeded: number,
   ledgerIdempotencyKeyPrefix: string,
   now: Date,
+  activeBetaSourceReference: string | null,
 ): Promise<AllocationWalkResult> {
   const allocations: BillingCreditAllocationRecord[] = []
   let remaining = unitsNeeded
@@ -84,7 +85,7 @@ async function allocateFromEarliestExpiryGrants(
    * locks on nothing more than it needed. An organization with more grants than one batch is now
    * served correctly instead of being served from however many rows happened to fit in memory.
    */
-  await drainActiveCreditGrants(transaction, organizationId, { locked: true, notExpiredAt: now }, async (grants) => {
+  await drainActiveCreditGrants(transaction, organizationId, { locked: true, notExpiredAt: now, activeBetaSourceReference }, async (grants) => {
   for (const grant of grants) {
     if (remaining <= 0) break
     const take = Math.min(grant.remainingUnits, remaining)
@@ -138,6 +139,13 @@ export interface ReserveCreditsInput {
   idempotencyKey: string
   maximumUnits: number
   maxDurationSeconds: number
+  /**
+   * The beta window whose promotional grant may be spent, or null (plan 58).
+   *
+   * Supplied by `feature-authorization.reserveCredits`, which is the only caller — product code never
+   * reaches this module directly. Absent is the safe reading: no beta grant is eligible.
+   */
+  activeBetaSourceReference?: string | null
 }
 
 export async function reserveCredits(transaction: TenantTransaction, input: ReserveCreditsInput, now: Date = new Date()): Promise<ReservationResult> {
@@ -164,6 +172,7 @@ export async function reserveCredits(transaction: TenantTransaction, input: Rese
 
   const { allocations } = await allocateFromEarliestExpiryGrants(
     transaction, input.organizationId, reservation.id, input.maximumUnits, input.idempotencyKey, now,
+    input.activeBetaSourceReference ?? null,
   )
 
   return { reservation, allocations, replayed: false }
@@ -190,6 +199,8 @@ async function replayIfAlreadyProcessed(
 }
 
 export interface ExtendReservationInput {
+  /** Re-read by the facade for this call, never carried over from the original reservation. */
+  activeBetaSourceReference?: string | null
   organizationId: string
   reservationId: string
   additionalMaximumUnits: number
@@ -214,8 +225,17 @@ export async function extendReservation(transaction: TenantTransaction, input: E
     throw new ReservationError('Reservation deadline has already passed — abandoned, cannot extend', 'deadline_passed')
   }
 
+  /**
+   * An extension allocates against the state that is authoritative **now**, not the one the reservation
+   * was created under.
+   *
+   * A long-running provider task has to stop when beta mode ends mid-flight; reusing the original
+   * reference would let it keep drawing on an allowance an operator has already switched off. That is
+   * plan 58's eighth acceptance criterion, and it is the one a cached value silently breaks.
+   */
   await allocateFromEarliestExpiryGrants(
     transaction, input.organizationId, reservation.id, input.additionalMaximumUnits, `${input.idempotencyKey}-alloc`, now,
+    input.activeBetaSourceReference ?? null,
   )
   await insertLedgerEntry(transaction, {
     id: `${input.idempotencyKey}-marker`,

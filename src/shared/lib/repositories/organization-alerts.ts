@@ -272,10 +272,14 @@ export async function pageOrganizationTriggers(
 
   if (result.rows.length === 0) return { ...result, rows: [] }
 
+  const alertIds = [...new Set(result.rows.map((row) => row.alertId))]
   const names = await transaction
     .select({ id: alerts.id, name: alerts.name })
     .from(alerts)
-    .where(inArray(alerts.id, [...new Set(result.rows.map((row) => row.alertId))]))
+    .where(inArray(alerts.id, alertIds))
+    // Model-bounded by the distinct alert ids on this page: `alerts.id` is the primary key. Hoisted
+    // into a variable so the ceiling and the predicate cannot drift apart.
+    .limit(alertIds.length)
   const byId = new Map(names.map((row) => [row.id, row.name]))
 
   return {

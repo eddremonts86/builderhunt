@@ -1,7 +1,7 @@
 # Saved Search Health (plan)
 
 > **Status**: `pending`
-> **Depends on**: [`smart-alerts`](../../phase-1/34-smart-alerts/plan.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../phase-1/41-ai-sourcing-sprints/plan.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
+> **Depends on**: [`smart-alerts`](../../implemented/phase-1/34-smart-alerts/plan.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../implemented/phase-1/41-ai-sourcing-sprints/plan.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
 > **Blocks**: nothing
 > **Reality check**: Builds on `src/routes/api/queries/index.ts` (saved-search CRUD), `src/routes/api/alerts/index.ts` + `src/routes/api/alerts/$id.ts` + `src/shared/lib/repositories/organization-alerts.ts` (alerts, `read_at`, and an already-existing `PATCH /api/alerts/$id`), `src/lib/sprints/service.ts` (`createSprint`), `src/modules/dashboard/components/DashboardPage.tsx` (existing saved-searches card) and `src/modules/dashboard/ui/shell/nav-config.ts` (`NAV_AREAS`, the registry the whole shell derives from). `/saved-searches` does not exist yet and is added here; `/alerts` keeps owning alert config + the trigger inbox.
 

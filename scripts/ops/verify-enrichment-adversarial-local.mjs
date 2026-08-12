@@ -1,6 +1,6 @@
 // Public Profile Enrichment — runtime adversarial matrix.
 //
-// plans/phase-1/42-stealth-scraping/task.md Phase 7, "Run runtime adversarial matrix": exercise
+// plans/implemented/42-stealth-scraping/task.md Phase 7, "Run runtime adversarial matrix": exercise
 // each hostile/edge case against a running instance with enrichment enabled in a NON-production
 // environment, and record the job id and log event for each. This script is that run, and its JSON
 // output is the evidence that gets summarized into

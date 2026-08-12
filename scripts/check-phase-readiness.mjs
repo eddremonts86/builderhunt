@@ -36,17 +36,37 @@ function localLinks(file, text) {
     .map((target) => ({ target, absolute: resolve(dirname(file), target) }))
 }
 
+/**
+ * Phase 1's plans live in two directories, and its build order spans both.
+ *
+ * `plans/implemented/` holds the finished ones and `plans/phase-1/` the rest, split by *state* rather
+ * than by order — a plan's two-digit prefix never changes when it moves. So the position-contiguity
+ * check has to see the union, exactly as `check-plan-order.mjs` does. Scanning one directory alone
+ * produced 57 failures of the form "is position 44, expected 38": every number was correct and the
+ * expectation was computed from a partial corpus.
+ *
+ * Any other phase is a single directory and resolves to itself.
+ */
+const ROOTS_FOR = (phase) =>
+  phase === 'phase-1' || phase === 'implemented'
+    ? [join(ROOT, 'plans', 'phase-1'), join(ROOT, 'plans', 'implemented')]
+    : [join(ROOT, 'plans', phase)]
+
 for (const phase of phases) {
-  const phaseRoot = join(ROOT, 'plans', phase)
-  if (!existsSync(phaseRoot)) {
+  const roots = ROOTS_FOR(phase).filter((root) => existsSync(root))
+  if (roots.length === 0) {
     fail(`plans/${phase} does not exist`)
     continue
   }
 
-  const directories = readdirSync(phaseRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
+  /** Directory name -> the root holding it, so a message can name the real path. */
+  const rootFor = new Map()
+  for (const root of roots) {
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (entry.isDirectory()) rootFor.set(entry.name, root)
+    }
+  }
+  const directories = [...rootFor.keys()].sort()
 
   const positions = new Map()
   directories.forEach((directory, index) => {
@@ -64,7 +84,7 @@ for (const phase of phases) {
   })
 
   for (const directory of directories) {
-    const planRoot = join(phaseRoot, directory)
+    const planRoot = join(rootFor.get(directory), directory)
     const markdown = readdirSync(planRoot)
       .filter((entry) => entry.endsWith('.md') && statSync(join(planRoot, entry)).isFile())
       .sort()

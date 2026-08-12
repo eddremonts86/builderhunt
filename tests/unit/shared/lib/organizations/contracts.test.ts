@@ -23,6 +23,10 @@ describe('organization contracts', () => {
       status: 'pending',
       expiresAt: new Date('2026-08-01T00:00:00Z'),
       inviterId: 'user-a',
+      // Present on the record and deliberately absent from the DTO below — this test's whole point is
+      // that extra fields do not reach it, and personalization is now two more of them.
+      intent: 'hiring',
+      roleTitle: 'Staff Engineer',
     }
     const dto = toInvitationSummaryDto(record)
     expect(dto).toEqual({
@@ -48,7 +52,7 @@ describe('organization contracts', () => {
 })
 
 describe('team-account module boundary (forward-looking ratchet)', () => {
-  it('no plans/phase-1/27-team-accounts UI module imports db/schema directly or compares role to a literal', async () => {
+  it('no plans/implemented/27-team-accounts UI module imports db/schema directly or compares role to a literal', async () => {
     const dirs = ['src/modules/dashboard', 'src/routes/_dashboard/settings']
     for (const dir of dirs) {
       const files = await collectTsFiles(dir).catch(() => [])

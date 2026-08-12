@@ -44,7 +44,7 @@ async function run() {
   const page = await context.newPage()
 
   // ====================================================================
-  // /pricing — public (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 3 — real
+  // /pricing — public (plans/implemented/30-stripe-billing-platform/tasks.md §9 task 3 — real
   // catalog.ts-driven page: Free/Pro/Pro Max/Team, real Stripe amounts, a pack
   // table, and an account-aware Checkout CTA — replaces the old $99 Team /
   // manual-payment content this script used to assert against.)

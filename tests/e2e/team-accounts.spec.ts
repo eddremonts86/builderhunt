@@ -173,6 +173,11 @@ async function seedTeamEntitlement(teamName: string, seatLimit: number) {
 async function inviteAndGetDevLink(page: Page, email: string): Promise<string> {
   await goto(page, '/settings/team')
   await page.getByTestId('invite-email-input').fill(email)
+  // Two steps since plan 59: Review shows the card the recipient will see, then Send. The intent
+  // defaults to `other`, so a caller that only wants to invite somebody presses through unchanged.
+  await page.getByTestId('invite-review-btn').click()
+  await expect(page.getByTestId('invite-review-step')).toBeVisible()
+  await expect(page.getByTestId('invitation-value-preview')).toBeVisible()
   await page.getByTestId('invite-submit-btn').click()
   const copyLink = page.locator('[data-testid^="copy-invitation-link-"]').first()
   await expect(copyLink).toBeVisible()
@@ -232,8 +237,37 @@ test.describe('team accounts release matrix', () => {
     const path = new URL(devLink).pathname
     await goto(pageB, path)
     await expect(pageB.getByTestId('invitation-page')).toBeVisible()
+
+    // Plan 59: the page now shows the value card before the buttons, and both Accept and Decline are
+    // present. The invitation came from the plain inline form with no intent, so it is the `other`
+    // experience — which is exactly the legacy path that has to keep working.
+    const preview = pageB.getByTestId('invitation-value-preview')
+    await expect(preview).toBeVisible()
+    await expect(preview).toHaveAttribute('data-intent', 'other')
+    await expect(pageB.getByTestId('invitation-preview-organization')).toContainText(teamName)
+    await expect(pageB.getByTestId('invitation-decline-btn')).toBeVisible()
+    // No role title was given, so that line must be absent rather than empty.
+    await expect(pageB.getByTestId('invitation-preview-role-title')).toHaveCount(0)
+
+    // Three real builders, from `builder_identities` rather than from the federated pipeline. Asserted
+    // as "0 or 3, never 1 or 2" plus safe links: the harness database may hold no person-kind rows with
+    // an avatar, and an empty result must render no section rather than an empty heading. Demanding 3
+    // unconditionally would make this spec fail on a freshly seeded cluster for no product reason.
+    const builders = pageB.getByTestId('invitation-preview-builders')
+    if (await builders.count() > 0) {
+      const links = builders.locator('a')
+      await expect(links).toHaveCount(3)
+      for (const link of await links.all()) {
+        expect(await link.getAttribute('rel')).toContain('noopener')
+        expect(await link.getAttribute('target')).toBe('_blank')
+      }
+    }
+
     await pageB.getByTestId('invitation-accept-btn').click()
-    await pageB.waitForURL(/\/dashboard/)
+    // Acceptance lands on the onboarding search with the intent's suggested query prefilled, not on
+    // `/dashboard` — `/dashboard` is now only the fallback for a failed organization switch.
+    await pageB.waitForURL(/\/onboarding\/search/)
+    await expect(pageB.getByTestId('onboarding-query-input')).toHaveValue('open source builders')
   })
 
   test('A sees B as a member and promotes them to admin', async () => {
@@ -262,11 +296,80 @@ test.describe('team accounts release matrix', () => {
     await expect(pageA.getByTestId('billing-settings-content')).toBeVisible()
     await expect(pageA.getByTestId('open-portal-button')).toBeVisible()
 
+    // B is on `/onboarding/search` after accepting (plan 59), and onboarding routes are outside the
+    // dashboard shell — so there is no organization switcher on the page yet. Go to the dashboard
+    // first, which is where a real new member would find it.
+    await goto(pageB, '/dashboard')
     await switchToOrg(pageB, teamName)
     await goto(pageB, '/settings/billing')
     await expect(pageB.getByTestId('billing-settings-content')).toBeVisible()
     await expect(pageB.getByTestId('open-portal-button')).toHaveCount(0)
     await expect(pageB.getByTestId('plan-picker')).toHaveCount(0)
+  })
+
+  test('a third invitee declines, and the decline is a real outcome rather than a message', async () => {
+    /**
+     * The gap this closes.
+     *
+     * Two specs referenced `invitation-decline-btn` before this one and neither pressed it: one asserted
+     * it was visible, the other that it was absent on an invalid invitation. So the button was known to
+     * render and its outcome was never exercised — the `POST …/reject` call, the declined state, and
+     * whether anything was left behind. Found while writing the plan's closing evidence, by checking a
+     * coverage claim instead of trusting it.
+     *
+     * A third invitee rather than reusing B: B is a member by now, and re-inviting a member to decline
+     * would test a different path than the one a real declining recipient takes.
+     */
+    const emailC = uniqueEmail('decliner')
+    const link = await inviteAndGetDevLink(pageA, emailC)
+
+    const contextC = await pageA.context().browser()!.newContext()
+    const pageC = await contextC.newPage()
+    try {
+      await signUp(pageC, emailC, 'Invitee C')
+      await goto(pageC, new URL(link).pathname)
+      await expect(pageC.getByTestId('invitation-page')).toBeVisible()
+      await expect(pageC.getByTestId('invitation-decline-btn')).toBeVisible()
+
+      await pageC.getByTestId('invitation-decline-btn').click()
+
+      // The declined state replaces the card and both buttons — declining is terminal on this page, so
+      // leaving Accept clickable would offer an action the invitation can no longer satisfy.
+      await expect(pageC.getByTestId('invitation-declined')).toBeVisible()
+      await expect(pageC.getByTestId('invitation-accept-btn')).toHaveCount(0)
+      await expect(pageC.getByTestId('invitation-decline-btn')).toHaveCount(0)
+      await expect(pageC.getByTestId('invitation-value-preview')).toHaveCount(0)
+
+      // And it is an outcome in the database, not only in the DOM: no membership in *A's team*, and
+      // nothing left pending that a later accept could still redeem.
+      const sql = observerSql()
+      try {
+        /**
+         * Scoped to the team, not to the user.
+         *
+         * The first version asserted C had no membership rows at all and failed on
+         * `org_personal_…:owner`: sign-up gives every user their own personal organization, so "no
+         * memberships" is never true of a signed-up user and the assertion was about the wrong thing.
+         * Declining an invitation means not joining *that* organization.
+         */
+        const members = await sql`
+          select m.id from organization_members m
+          join auth_users u on u.id = m.user_id
+          join organizations o on o.id = m.organization_id
+          where u.email = ${emailC} and o.name = ${teamName}
+        `
+        expect(members).toHaveLength(0)
+        const pending = await sql`
+          select id from organization_invitations
+          where email = ${emailC} and status = 'pending'
+        `
+        expect(pending).toHaveLength(0)
+      } finally {
+        await sql.end({ timeout: 5 }).catch(() => undefined)
+      }
+    } finally {
+      await contextC.close()
+    }
   })
 
   test('A removes B from the team', async () => {
@@ -280,11 +383,15 @@ test.describe('team accounts release matrix', () => {
     const path = new URL(devLink).pathname
     await goto(pageB, path)
     await pageB.getByTestId('invitation-accept-btn').click()
-    await pageB.waitForURL(/\/dashboard/)
-    // Being removed (previous test) cleared B's active-org pointer
-    // (`clearActiveOrganizationForUsers`) and accepting an invitation adds
-    // the membership without activating it — switch explicitly, same as any
-    // real user would from the dashboard after accepting.
+    // Either destination is a correct outcome of one acceptance, which is the point of the branch:
+    // `/onboarding/search` when the organization switch succeeded, `/dashboard` when it did not. Being
+    // removed in the previous test cleared B's active-org pointer, so which one happens here depends on
+    // whether `setActiveOrganization` succeeds for a re-added member — and the test must not assert a
+    // guess about that.
+    await pageB.waitForURL(/\/(dashboard|onboarding\/search)/)
+    // Onboarding routes sit outside the dashboard shell and carry no organization switcher, so come
+    // back to the dashboard first — which is what a real user would do — then switch explicitly.
+    await goto(pageB, '/dashboard')
     await switchToOrg(pageB, teamName)
 
     await goto(pageA, '/settings/team')

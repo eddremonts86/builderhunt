@@ -1,7 +1,7 @@
-import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicDb, TenantTransaction } from '../db/client'
 import { builderIdentityIdFor } from './builder-identity-id'
-import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
+import { drainSweep, ENTITY_DETAIL_LIMIT, OPERATOR_LIST_LIMIT, SWEEP_BATCH } from '../db/read-bounds'
 import {
   builderIdentities,
   builderNotes,
@@ -71,12 +71,49 @@ export async function getTrackedBuilderIds(
   return new Map(rows.map((row) => [trackedKey(row.source, row.sourceId), row.id]))
 }
 
+/**
+ * One organization's tracked builders, most-recently-seen first, for a surface that renders a list.
+ *
+ * **`organizationBuilders.id` is a tiebreaker, not decoration.** `lastSeenAt` is not unique — it comes
+ * from a connector's own timestamps, and a discovery run stamps a batch of rows with the same value —
+ * so `ORDER BY last_seen_at DESC` alone is not a total order, and phase-3's fourth principle says a
+ * ceiling or a page boundary landing inside a tie duplicates or drops rows.
+ *
+ * **The export does not use this.** It needs every row, and `read-bounds.ts` is explicit that a
+ * ceiling on an export is silent data loss — so it calls `drainOrganizationBuilders` below. One read
+ * cannot serve both a bounded list and a complete export, which is what it was doing.
+ */
 export function listOrganizationBuilders(transaction: TenantTransaction, organizationId: string) {
   return transaction.select(privateBuilderFields)
     .from(organizationBuilders)
     .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
     .where(eq(organizationBuilders.organizationId, organizationId))
-    .orderBy(desc(builderIdentities.lastSeenAt))
+    .orderBy(desc(builderIdentities.lastSeenAt), desc(organizationBuilders.id))
+    .limit(OPERATOR_LIST_LIMIT)
+}
+
+/**
+ * Every tracked builder in one organization, in chunks, for the "all" export scope.
+ *
+ * Ordered by `organizationBuilders.id` rather than by `lastSeenAt` because a keyset cursor needs a
+ * unique key and an export has no meaningful order to preserve — the caller writes a file. The rows
+ * still all arrive; what changes is that no single statement has to return them.
+ */
+export function drainOrganizationBuilders(transaction: TenantTransaction, organizationId: string) {
+  return drainSweep(
+    (after, limit) => {
+      const conditions = [eq(organizationBuilders.organizationId, organizationId)]
+      if (after) conditions.push(gt(organizationBuilders.id, after))
+      return transaction.select(privateBuilderFields)
+        .from(organizationBuilders)
+        .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
+        .where(and(...conditions))
+        .orderBy(asc(organizationBuilders.id))
+        .limit(limit)
+    },
+    (row) => row.id,
+    SWEEP_BATCH,
+  )
 }
 
 /**
@@ -90,16 +127,32 @@ export function listOrganizationBuilders(transaction: TenantTransaction, organiz
  * write path, not an invariant — see the correction on `builderNotes.builderId` in schema.ts.
  */
 export async function listNotedOrganizationBuilders(transaction: TenantTransaction, organizationId: string) {
-  const noted = await transaction.selectDistinct({ builderId: builderNotes.builderId })
-    .from(builderNotes)
-    .where(eq(builderNotes.organizationId, organizationId))
+  // Drained, because this feeds the "note collection" export scope and an export must be complete.
+  // `selectDistinct` is a list read like any other — it was invisible to the read-path detector until
+  // the detector learned the name, which is why only the second query below was ever reported.
+  const noted = await drainSweep(
+    (after, limit) => {
+      const conditions = [eq(builderNotes.organizationId, organizationId)]
+      if (after) conditions.push(gt(builderNotes.builderId, after))
+      return transaction.selectDistinct({ builderId: builderNotes.builderId })
+        .from(builderNotes)
+        .where(and(...conditions))
+        .orderBy(asc(builderNotes.builderId))
+        .limit(limit)
+    },
+    (row) => row.builderId,
+    SWEEP_BATCH,
+  )
   if (noted.length === 0) return []
   const ids = noted.map((row) => row.builderId)
   return transaction.select(privateBuilderFields)
     .from(organizationBuilders)
     .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
     .where(and(eq(organizationBuilders.organizationId, organizationId), inArray(organizationBuilders.id, ids)))
-    .orderBy(desc(builderIdentities.lastSeenAt))
+    .orderBy(desc(builderIdentities.lastSeenAt), desc(organizationBuilders.id))
+    // Model-bounded by the ids the drain above collected: `id` is the primary key, so at most one row
+    // per id. Not a ceiling — the whole noted set still comes back.
+    .limit(ids.length)
 }
 
 export function listRecentOrganizationBuilders(
@@ -592,7 +645,11 @@ export function listOrganizationBuildersByCanonicalHuman(
       eq(organizationBuilders.organizationId, organizationId),
       eq(organizationBuilders.canonicalHumanId, canonicalHumanId),
     ))
-    .orderBy(desc(builderIdentities.lastSeenAt))
+    // Same tiebreaker as `listOrganizationBuilders`, for the same reason: `lastSeenAt` is not unique.
+    .orderBy(desc(builderIdentities.lastSeenAt), desc(organizationBuilders.id))
+    // The tracked rows one organization holds for a single canonical human — "the children of this
+    // row". More than this many is a merge defect to investigate, not a list to paginate.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 export async function updateOrganizationBuilder(
@@ -745,12 +802,30 @@ export async function getOrganizationDashboardStats(
   }
 }
 
+/**
+ * Every `(source, sourceId) -> id` pair in one organization, drained in chunks.
+ *
+ * This one must be complete rather than bounded, and a ceiling here would be the worst kind of
+ * silent: both callers build a `Map` used to decide whether a builder is *already tracked*. A pair
+ * missing from that map does not truncate a list — it makes a duplicate look like a new discovery,
+ * and the duplicate is then written.
+ */
 function trackedRows(transaction: TenantTransaction, organizationId: string) {
-  return transaction.select({
-    id: organizationBuilders.id,
-    source: builderIdentities.source,
-    sourceId: builderIdentities.sourceId,
-  }).from(organizationBuilders)
-    .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
-    .where(eq(organizationBuilders.organizationId, organizationId))
+  return drainSweep(
+    (after, limit) => {
+      const conditions = [eq(organizationBuilders.organizationId, organizationId)]
+      if (after) conditions.push(gt(organizationBuilders.id, after))
+      return transaction.select({
+        id: organizationBuilders.id,
+        source: builderIdentities.source,
+        sourceId: builderIdentities.sourceId,
+      }).from(organizationBuilders)
+        .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
+        .where(and(...conditions))
+        .orderBy(asc(organizationBuilders.id))
+        .limit(limit)
+    },
+    (row) => row.id,
+    SWEEP_BATCH,
+  )
 }

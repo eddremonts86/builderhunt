@@ -104,7 +104,7 @@ light-first.
 
 ## Known gaps (not done this session)
 
-- **No committed visual-regression baseline.** `plans/phase-1/50-audit-visual-system/tasks.md`'s "Capture a
+- **No committed visual-regression baseline.** `plans/implemented/phase-1/50-audit-visual-system/tasks.md`'s "Capture a
   deterministic visual inventory and baseline" task (Playwright screenshot specs pinning `/`,
   `/pricing`, `/dashboard`, `/search`, and a builder profile at three viewports) was not built this
   session — it's a real, separate testing-infrastructure investment (synthetic fixtures, frozen

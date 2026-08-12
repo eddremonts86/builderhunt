@@ -6,6 +6,7 @@ import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { TeamSettingsPage } from '~/modules/dashboard/components/TeamSettingsPage'
 import type { InvitableRole, OrganizationSummaryDto, TeamSnapshotDto } from '~/shared/lib/organizations/contracts'
+import type { InvitationIntent } from '~/shared/lib/organizations/invitation-personalization'
 import type { InvitationRow, MemberRow } from '~/modules/dashboard/components/TeamSettingsPage'
 import { emptyTableSearch, tableSearchToParams } from '~/shared/lib/table/query-url'
 import type { PageResult, TableSearch } from '~/shared/lib/table/types'
@@ -91,6 +92,9 @@ function TeamSettingsRoute() {
   // (dev mode) — the invitation exists but nothing was actually sent, so
   // TeamSettingsPage shows a manual-share fallback for exactly that invitation.
   const [devLinks, setDevLinks] = React.useState<Record<string, string>>({})
+  // Not an error and not a success — a third outcome the sender has to be told about, because the
+  // response for a deduplicated create is otherwise indistinguishable from a fresh send.
+  const [inviteNotice, setInviteNotice] = React.useState<string | null>(null)
 
   const [membersSearch, setMembersSearch] = React.useState<TableSearch>(() => emptyTableSearch())
   const [invitationsSearch, setInvitationsSearch] = React.useState<TableSearch>(() => emptyTableSearch())
@@ -255,17 +259,36 @@ function TeamSettingsRoute() {
       leaveOrganizationContext,
     )
 
-  const handleInvite = (email: string, role: InvitableRole) =>
+  const handleInvite = (
+    email: string,
+    role: InvitableRole,
+    personalization?: { intent: InvitationIntent; roleTitle: string | null },
+  ) =>
     runMutation(
       () => fetch('/api/organizations/invitations', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, role }),
+        // Spread conditionally: the create schema is `.strict()`, so sending `intent: undefined`
+        // would be an unknown-key rejection rather than an omitted field.
+        body: JSON.stringify({ email, role, ...(personalization ? personalization : {}) }),
       }),
       'Could not send the invitation. Check the email and the role, then try again.',
       async (body) => {
         captureDevLink(body)
+        /**
+         * A deduplicated create is reported as what it was.
+         *
+         * The winning row comes back either way, so without this the sender sees the same success as a
+         * fresh send — and believes the context they just typed reached the recipient. It did not: the
+         * email that went out describes the *first* invitation's intent, and the row was deliberately
+         * not overwritten.
+         */
+        if (body && typeof body === 'object' && (body as { deduplicated?: boolean }).deduplicated) {
+          setInviteNotice('An invitation to this address was already pending, so no new email was sent and your new context was not applied.')
+        } else {
+          setInviteNotice(null)
+        }
         await refreshSnapshot()
       },
     )
@@ -334,6 +357,7 @@ function TeamSettingsRoute() {
       error={mutationError}
       devLinkByInvitationId={devLinks}
       dangerZoneReferenceId={dangerZoneReferenceId}
+      inviteNotice={inviteNotice}
       onInvite={handleInvite}
       onCancelInvite={handleCancelInvite}
       onResendInvite={handleResendInvite}

@@ -1,7 +1,7 @@
 # Saved Search Health (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`smart-alerts`](../../phase-1/34-smart-alerts/tasks.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../phase-1/41-ai-sourcing-sprints/tasks.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
+> **Depends on**: [`smart-alerts`](../../implemented/phase-1/34-smart-alerts/tasks.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../implemented/phase-1/41-ai-sourcing-sprints/tasks.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
 > **Blocks**: nothing
 > **Reality check**: Touches existing `src/shared/lib/db/schema.ts`, `src/routes/api/alerts/index.ts`, `src/routes/api/alerts/$id.ts`, `src/shared/lib/repositories/organization-alerts.ts`, `src/shared/lib/repositories/saved-queries.ts`, `src/routes/api/sprints/index.ts`, `src/lib/sprints/service.ts`, `src/shared/lib/sprints-shared.ts`, `src/modules/dashboard/components/DashboardPage.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `scripts/db/verify-api-isolation-local.mjs`. `/saved-searches` is a new route; `/alerts` (`src/routes/_dashboard/alerts.tsx`) is not modified.
 
@@ -459,3 +459,20 @@ below say to let drizzle-kit allocate the index and to read the actual value bac
     (record the number in plan.md's risk row if it is above the flip trigger of 500 ms).
   - Verify: all green; the degradation matrix (no Redis, no MiniMax, `AI_DISABLED=true`) leaves
     verdicts and counters unchanged.
+
+## Dashboard integration — moved from plan 57 on 2026-08-11
+
+- [ ] **Integrate Saved-Search Health into the dashboard without fabricated history**
+  - Files: saved-search health dashboard adapter, `SavedSearchHealthWidget.tsx`, contract tests
+  - Do: Show current healthy/tune/kill/unmonitored/too-new counts and a bounded issue list with
+    tune/inspect/retire continuations. Do not persist dashboard-owned snapshots or draw a trend.
+  - Verify: dashboard totals reconcile with the canonical health endpoint exposed by this plan, and no
+    trend/time-series UI exists.
+  - **Moved from `plans/phase-1/57-ui-dashboard` Wave 5, where it could not be started.** It was blocked
+    on this plan, not deferred by effort: its Verify line requires reconciling against a canonical health
+    endpoint, and this plan is the one that builds it. Building the widget first would have meant
+    inventing the health model inside a dashboard adapter — which is precisely the fabricated history the
+    title forbids. It lives here now so that whoever ships the endpoint ships the widget that reads it,
+    while the model is still in their head.
+  - Sequencing: after `GET /api/saved-searches/health` exists and its verdicts are stable. Nothing else
+    in this plan depends on it.

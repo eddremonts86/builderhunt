@@ -16,6 +16,7 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 import { canonicalHumans, humanMergeEvents, humanSourceLinks } from '../db/schema'
 import { chooseFieldValue, decideLink, isActiveState, type LinkMethod, type LinkSignal } from '~/shared/lib/human-identity/link-policy'
 import { randomId } from '~/lib/utils'
@@ -275,6 +276,11 @@ export async function mergeCanonicalHumans(
     const [source] = await tx.select().from(canonicalHumans).where(eq(canonicalHumans.id, input.sourceCanonicalHumanId)).limit(1)
     if (!target || !source) throw new Error('Both canonical humans must exist to merge')
 
+    // unbounded-read-ok: every link must move or the merge corrupts the identity graph — a link left
+    // pointing at the merged-away human is orphaned, and `restoreSnapshot` below would not know to
+    // put it back. This is the "if you are reaching for a ceiling to bound something that must be
+    // complete, the answer is a loop" case in read-bounds.ts, and the loop is the enclosing
+    // transaction: the whole merge is one atomic unit, so a chunked sweep would gain nothing.
     const movable = await tx
       .select({ id: humanSourceLinks.id })
       .from(humanSourceLinks)
@@ -447,6 +453,10 @@ export async function findCanonicalHuman(
       inArray(humanSourceLinks.reviewState, ['auto_approved', 'approved']),
     ))
     .orderBy(asc(humanSourceLinks.builderIdentityId))
+    // The source accounts of one canonical human — "the children of this row", rendered whole. A
+    // person linked to more than this many source accounts is a merge defect to investigate rather
+    // than a profile to paginate.
+    .limit(ENTITY_DETAIL_LIMIT)
   return {
     id: human.id,
     displayName: human.displayName,

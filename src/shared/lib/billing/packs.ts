@@ -1,5 +1,5 @@
 /**
- * Pack Checkout — one-shot credit-pack purchases (plans/phase-1/30-stripe-billing-platform/tasks.md §8 task 1
+ * Pack Checkout — one-shot credit-pack purchases (plans/implemented/30-stripe-billing-platform/tasks.md §8 task 1
  * "Build pack Checkout and successful grant"; spec.md §Packs and auto-recharge). Mirrors
  * `checkout.ts`'s subscription Checkout shape (duplicate-idempotency-key replay, return-URL
  * allowlist, seller-profile country gate) with pack-specific differences:

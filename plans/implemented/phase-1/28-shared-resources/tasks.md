@@ -1,0 +1,84 @@
+# Tasks: Shared Searches and Builder Lists
+
+> **Status**: `implemented` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
+> **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md), [`team-accounts`](../27-team-accounts/tasks.md)
+> **Blocks**: [`activity-feed`](../29-activity-feed/tasks.md)
+> **Reality check**: (verified 2026-07-29 — the hold is lifted) this said "do not implement until
+> canonical tenant context, global builder identity, organization tracking, entitlements, RLS, and
+> Team organization-keyed cache are verified". All six were checked and hold: `withTenantContext`
+> (`src/shared/lib/db/tenant-context.ts`), the `builder_identities` and `organization_builders`
+> tables, `src/shared/lib/repositories/entitlements.ts`, RLS forced on 64 tables, and the
+> organization-keyed dashboard cache. `01` and `27` are closed apart from `01`'s legacy-column drop,
+> which touches nothing here. **Start at task 1.**
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `done`, a synonym no gate can read. Unblocked and delivered 2026-07-29.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
+
+- [x] **Define shared-resource contracts and characterization tests**
+  - Files: `src/shared/lib/shared-resources/contracts.ts`, `tests/unit/shared/lib/shared-resources/contracts.test.ts`, `tests/unit/security/shared-resources-characterization.test.ts`
+  - Do: Define allowlisted query/list/item DTOs, `private | organization` visibility, creator attribution, permission actions, and typed errors. Characterize current personal query/alert behavior before switching repositories; forbid organization authority in request DTOs.
+  - Verify: contract/characterization tests pass and reject unknown/private ORM/provider fields.
+
+- [x] **Verify normalized tenant schema and RLS for shared resources**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` foundation migrations, `tests/unit/security/shared-resource-schema.test.ts`, `scripts/db/verify-rls-local.mjs`
+  - Do: Confirm saved queries/keyword/source associations, alerts, lists/items, organization builders, and notes have mandatory organization keys, candidate keys, composite tenant FKs, indexes, checks, and command policies. Add no competing nullable tenant model.
+  - Verify: app-role SQL rejects A alert→B query and A item→B list; missing/A/B contexts pass the manifest RLS suite.
+  - Reality check (2026-07-31): the `tests/unit/security/rls.test.ts` this task cited never existed
+    — RLS needs a live DB connection under distinct per-role credentials, which is exactly what
+    `scripts/db/verify-rls-local.mjs` (run via `pnpm test:rls:local`) already provides; a mocked vitest
+    unit test would bypass the grants/RLS it's meant to prove. Citation corrected to the real file.
+
+- [x] **Implement tenant saved-query repository**
+  - Files: `src/shared/lib/repositories/saved-queries.ts`, `tests/unit/shared/lib/repositories/saved-queries.test.ts`, `src/shared/lib/authorization/permissions.ts`
+  - Do: Accept `TenantTransaction` plus principal; list private creator rows and organization-visible rows only inside active organization; create/update/delete/change visibility via centralized permissions; maintain normalized keywords/sources atomically; return DTOs.
+  - Verify: tests cover creator/member/admin/owner and tenant A/B for every operation, concurrent visibility change, and no global DB import.
+
+- [x] **Implement tenant builder-list repository**
+  - Files: `src/shared/lib/repositories/builder-lists.ts`, `tests/unit/shared/lib/repositories/builder-lists.test.ts`
+  - Do: Implement list/get/create/update/delete and add/remove item using canonical `builderIdentityId`, tenant composite FKs, creator/admin permissions, idempotent unique item insertion, and `trackedByOrganization`/allowed user attribution from organization tracking. Return no source snapshot/private artifact.
+  - Verify: repository tests cover duplicate add, roles, deleted identity handling, A/B IDs, and DB rejection of cross-tenant parent references.
+
+- [x] **Migrate query APIs to tenant repository and DTO boundary**
+  - Files: `src/routes/api/queries/index.ts`, `src/routes/api/queries/$id/visibility.ts`, `tests/unit/security/shared-query-api.test.ts`
+  - Do: Resolve principal/context, validate inputs, call saved-query repository, map typed non-enumerating errors, return explicit DTOs, and emit redacted activity hook. Organization ID in body/query/header is rejected or ignored as data, never authority.
+  - Verify: own/private/shared/role/A-B/spoofed-tenant/CSRF/rate tests pass using non-owner app role.
+
+- [x] **Add list and item APIs through tenant repository**
+  - Files: `src/routes/api/lists/index.ts`, `src/routes/api/lists/$listId.ts`, `src/routes/api/lists/$listId/items/index.ts`, `src/routes/api/lists/$listId/items/$itemId.ts`, `tests/unit/security/builder-list-api.test.ts`
+  - Do: Add zod bodies for names/descriptions/visibility and canonical `builderIdentityId`; enforce active Team entitlement and permissions; return allowlisted DTOs and generic other-tenant/not-found behavior; rate-limit mutations by user+organization.
+  - Verify: full role and A/B matrix, duplicate item, invalid identity, spoofed tenant, and plan lapse tests pass.
+
+- [x] **Preserve tenant integrity when creating alerts from shared queries**
+  - Files: `src/routes/api/alerts/index.ts`, `src/shared/lib/repositories/alerts.ts`, `tests/unit/shared/lib/repositories/alerts.test.ts`, `tests/unit/security/shared-alerts.test.ts`
+  - Do: Allow an authorized member to opt into their own alert from an organization-visible query; copy validated keywords while composite FK preserves organization. Sharing alone creates no alert/delivery. Query visibility/deletion follows documented snapshot retention.
+  - Verify: A member opt-in sends only that recipient; no share email; A cannot reference B query; PostgreSQL rejects forged composite relation.
+
+- [x] **Replace raw saved-query RSS access with a public feed capability**
+  - Files: `src/shared/lib/db/schema.ts`, `src/shared/lib/repositories/public-feeds.ts`, `src/routes/api/feeds/$feedId.ts`, `plans/implemented/phase-1/35-rss-feeds/{spec,plan,tasks}.md`, `tests/unit/security/public-feed-capabilities.test.ts`
+  - Do: Create a hashed/revocable/rotatable public feed capability or publication record referencing tenant query internally; resolve it under authorized service logic and emit a minimized public feed. Raw saved query IDs no longer grant public access; revocation/plan lapse/organization deletion behavior is explicit.
+  - Verify: guessing query/list IDs returns no feed; valid capability exposes only approved results; rotation/revocation/tenant deletion/lapse tests pass without revealing tenant metadata.
+
+- [x] **Build organization-scoped shared-resource UI**
+  - Files: `src/modules/search/components/SearchPage.tsx`, `src/modules/dashboard/components/DashboardPage.tsx`, `src/routes/_dashboard/lists/index.tsx`, `src/routes/_dashboard/lists/$listId.tsx`, `src/modules/dashboard/components/ListsPage.tsx`, `src/modules/dashboard/components/ListDetailPage.tsx`, `src/modules/search/components/PersonResultCard.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`
+  - Do: Add private/organization visibility, creator attribution, lists/detail, canonical add-to-list, and permission-aware actions through Team's tenant query provider. Keep notes explicitly private. All query/cache/optimistic keys contain active organization and cancel on switch.
+  - Verify: component/browser tests cover A→B switch with in-flight responses, role actions, canonical identity list add, duplicate notice, notes non-disclosure, keyboard/mobile/accessibility.
+
+- [x] **Run shared-resource isolation and release gates**
+  - Files: `tests/e2e/shared-resources.spec.ts`, `tests/unit/security/shared-resource-isolation.test.ts`, `docs/operations/shared-resources.md`, `.github/workflows/quality.yml`
+  - Do: Seed A/B with multi-membership users; exercise queries, visibility, lists/items, alerts, feed capabilities, exports, switches, removal, plan lapse, stale tabs, direct SQL, and migration upgrade. Require foundation and Team security gates before deploy.
+  - Verify: `pnpm test:security && pnpm test:rls && pnpm test:migrations:local && pnpm test:e2e -- tests/e2e/shared-resources.spec.ts && pnpm lint && pnpm type-check && pnpm test && pnpm build` passes.
+
+## Future
+
+- Shared comments/contact state, list export, numeric list limits, and redacted organization digest.

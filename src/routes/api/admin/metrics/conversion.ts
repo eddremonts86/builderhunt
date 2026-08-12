@@ -9,13 +9,45 @@ import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { computeConversionRate, CONVERSION_VARIANTS } from '~/shared/lib/conversion-events'
-import { countConversionSessions, utcDay } from '~/shared/lib/repositories/conversion-events'
+import { countConversionSessionsByEvent, utcDay } from '~/shared/lib/repositories/conversion-events'
 
-const querySchema = z.object({
-  start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  variant: z.enum(CONVERSION_VARIANTS).default('baseline'),
-})
+/**
+ * The widest window this endpoint will read (plan 57, Admin track).
+ *
+ * Ninety days, and the cap is not arbitrary: raw events are deleted after thirty
+ * (`deleteExpiredConversionEvents`), so anything past that is a scan over a range that provably holds nothing.
+ * A caller asking for eighteen months would get a sequential scan and a table of zeros that reads as a
+ * collapse in conversion rather than as retention having done its job.
+ */
+const MAX_RANGE_DAYS = 90
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+
+const querySchema = z
+  .object({
+    start: z.string().regex(DAY).optional(),
+    end: z.string().regex(DAY).optional(),
+    variant: z.enum(CONVERSION_VARIANTS).default('baseline'),
+  })
+  /**
+   * `start <= end`, refused rather than swapped.
+   *
+   * Swapping would answer a question the caller did not ask, and the two orders mean different things to
+   * whoever built the URL — a reversed range is far more likely a bug in their tooling than a typo they want
+   * silently corrected. Both bounds are UTC calendar days, so the string comparison is the date comparison.
+   */
+  .refine((query) => !query.start || !query.end || query.start <= query.end, {
+    message: 'start must not be after end',
+    path: ['start'],
+  })
+  .refine(
+    (query) => {
+      if (!query.start || !query.end) return true
+      const spanDays = (Date.parse(`${query.end}T00:00:00Z`) - Date.parse(`${query.start}T00:00:00Z`)) / 86_400_000
+      return spanDays <= MAX_RANGE_DAYS
+    },
+    { message: `range must not exceed ${MAX_RANGE_DAYS} days`, path: ['end'] },
+  )
 
 // Primary/secondary funnel metrics, per spec §"Metrics" — each is a ratio of
 // two named events' distinct-session counts within the requested range.
@@ -55,14 +87,29 @@ export const Route = createFileRoute('/api/admin/metrics/conversion')({
           const end = parsed.data.end ?? utcDay(now)
           const variant = parsed.data.variant
 
+          /**
+           * One query for every metric, not two per metric.
+           *
+           * This loop used to `await` a pair of counts per definition — twelve sequential round trips for six
+           * metrics, growing by two with every metric added. The event names are collected first (deduplicated,
+           * because `landing_view` is the denominator of three of them and `signup_complete` is a numerator
+           * twice), counted in a single grouped query, and the rates computed from the map.
+           *
+           * So the query count is 1 whatever `METRIC_DEFINITIONS` grows to, which is what makes adding a funnel
+           * step free rather than a cost an admin page pays on every load.
+           */
+          const eventNames = [
+            ...new Set(METRIC_DEFINITIONS.flatMap((def) => [def.numeratorEvent, def.denominatorEvent])),
+          ]
+          const counts = await countConversionSessionsByEvent(eventNames, variant, start, end)
+
           const metrics: Record<string, ReturnType<typeof computeConversionRate> & { numeratorEvent: string; denominatorEvent: string }> = {}
           for (const def of METRIC_DEFINITIONS) {
-            const [numerator, denominator] = await Promise.all([
-              countConversionSessions(def.numeratorEvent, variant, start, end),
-              countConversionSessions(def.denominatorEvent, variant, start, end),
-            ])
             metrics[def.key] = {
-              ...computeConversionRate(numerator.sessions, denominator.sessions),
+              ...computeConversionRate(
+                counts.get(def.numeratorEvent)?.sessions ?? 0,
+                counts.get(def.denominatorEvent)?.sessions ?? 0,
+              ),
               numeratorEvent: def.numeratorEvent,
               denominatorEvent: def.denominatorEvent,
             }

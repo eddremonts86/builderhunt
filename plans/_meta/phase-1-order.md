@@ -1,7 +1,11 @@
 # Phase 1 — canonical build order (01→54)
 
-Every directory in `plans/phase-1/` carries a two-digit prefix that is its position in this
-order. The number answers one question: **if BuilderHunt had to be built again from an empty
+Every plan directory carries a two-digit prefix that is its position in this order. Since 2026-08-11
+those directories live in **two** places: `plans/implemented/` for the 47 that are done and tested, and
+`plans/phase-1/` for the 12 that are not (see [`../implemented/README.md`](../implemented/README.md)).
+The split is about *state*, not about order — a plan's number never changes when it moves, and
+`scripts/check-plan-order.mjs` reads the union of both directories so the contiguity and
+dependencies-point-backward guarantees are exactly what they were. The number answers one question: **if BuilderHunt had to be built again from an empty
 repository, in what sequence would these 53 plans be executed so that no plan is ever started
 before something it depends on exists?**
 
@@ -97,11 +101,11 @@ exists because the UI presented synthetic evidence as measured fact.
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 01 | [`security-and-multitenancy`](../phase-1/01-security-and-multitenancy/spec.md) | 0/19 | — | Blocks 7 plans directly. Canonical tenant cutover shipped 2026-07-27 (`organization_id` `NOT NULL` on all seven tenant-private tables, `drizzle/0081`). Only leftover: `TENANT_READ_MODE` still defaults to `legacy` and no contract migration drops the legacy columns. (Reality check 2026-07-31: was 1/18 — "Classify the 45 unclassified tables" is now `[x]`, done 2026-07-31 in the same phase-1 audit's fix pass.) |
-| 02 | [`production-infrastructure`](../phase-1/02-production-infrastructure/spec.md) | 3/16 | 01 | Backup cron, log rotation, and off-site copy need production SSH — not more code. (Reality check 2026-07-31: was 2/17; the log-rotation task's own text says "not executed" but its checkbox was `[x]` — recounted as `[~]` in tasks.md, which moves it into Open.) |
-| 03 | [`postgres-18-upgrade`](../phase-1/03-postgres-18-upgrade/spec.md) | 39/0 | — (ordered, see below) | Moved here from `phase-2` on 2026-07-28. Its own case for going early: the cutover cost is a function of data size and of how many tenants are writing, and today nobody is billed, so this is the cheapest this will ever be. Phases 0–4 contain zero PG18-only SQL — images, docs, rehearsal, cutover. Every image must be a `pgvector/pgvector:*` one. |
-| 04 | [`legal-and-compliance`](../phase-1/04-legal-and-compliance/spec.md) | 0/17 | — | Hard deletion + external-AI disclosure. Must precede any production MiniMax traffic (`21`). |
-| 05 | [`project-hygiene`](../phase-1/05-project-hygiene/spec.md) | 0/8 | — | **Closed 2026-07-28.** Fabricated `Math.random()` evidence removed; real GitHub signals plus an on-screen "estimated" label. |
+| 01 | [`security-and-multitenancy`](../implemented/phase-1/01-security-and-multitenancy/spec.md) | 0/19 | — | Blocks 7 plans directly. Canonical tenant cutover shipped 2026-07-27 (`organization_id` `NOT NULL` on all seven tenant-private tables, `drizzle/0081`). Only leftover: `TENANT_READ_MODE` still defaults to `legacy` and no contract migration drops the legacy columns. (Reality check 2026-07-31: was 1/18 — "Classify the 45 unclassified tables" is now `[x]`, done 2026-07-31 in the same phase-1 audit's fix pass.) |
+| 02 | [`production-infrastructure`](../implemented/phase-1/02-production-infrastructure/spec.md) | 3/16 | 01 | Backup cron, log rotation, and off-site copy need production SSH — not more code. (Reality check 2026-07-31: was 2/17; the log-rotation task's own text says "not executed" but its checkbox was `[x]` — recounted as `[~]` in tasks.md, which moves it into Open.) |
+| 03 | [`postgres-18-upgrade`](../implemented/phase-1/03-postgres-18-upgrade/spec.md) | 39/0 | — (ordered, see below) | Moved here from `phase-2` on 2026-07-28. Its own case for going early: the cutover cost is a function of data size and of how many tenants are writing, and today nobody is billed, so this is the cheapest this will ever be. Phases 0–4 contain zero PG18-only SQL — images, docs, rehearsal, cutover. Every image must be a `pgvector/pgvector:*` one. |
+| 04 | [`legal-and-compliance`](../implemented/phase-1/04-legal-and-compliance/spec.md) | 0/17 | — | Hard deletion + external-AI disclosure. Must precede any production MiniMax traffic (`21`). |
+| 05 | [`project-hygiene`](../implemented/phase-1/05-project-hygiene/spec.md) | 0/8 | — | **Closed 2026-07-28.** Fabricated `Math.random()` evidence removed; real GitHub signals plus an on-screen "estimated" label. |
 
 ## Wave 1 — shell and design foundation (06–08)
 
@@ -110,9 +114,9 @@ them before new UI is stacked on top.
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 06 | [`design-modernization`](../phase-1/06-design-modernization/spec.md) | 0/17 | — | Unfinished dark→warm-light migration; feeds all five audits (`48`–`52`). |
-| 07 | [`responsive-mobile-design`](../phase-1/07-responsive-mobile-design/spec.md) | 0/10 | — | Overlaps `50-audit-visual-system`'s unchecked "dashboard shell" task on the same file. |
-| 08 | [`onboarding-flow`](../phase-1/08-onboarding-flow/spec.md) | 0/13 | — | `implemented`; the one plan whose status has never been in question. |
+| 06 | [`design-modernization`](../implemented/phase-1/06-design-modernization/spec.md) | 0/17 | — | Unfinished dark→warm-light migration; feeds all five audits (`48`–`52`). |
+| 07 | [`responsive-mobile-design`](../implemented/phase-1/07-responsive-mobile-design/spec.md) | 0/10 | — | Overlaps `50-audit-visual-system`'s unchecked "dashboard shell" task on the same file. |
+| 08 | [`onboarding-flow`](../implemented/phase-1/08-onboarding-flow/spec.md) | 0/13 | — | `implemented`; the one plan whose status has never been in question. |
 
 ## Wave 2 — source connectors (09–20)
 
@@ -121,34 +125,34 @@ hosts → package registries → community platforms → credential/decision-gat
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 09 | [`gitlab-integration`](../phase-1/09-gitlab-integration/spec.md) | 0/9 | — | **Closed 2026-07-28**: `GITLAB_TOKEN` is documented in `.env.example`. |
-| 10 | [`codeberg-integration`](../phase-1/10-codeberg-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: both Codeberg env vars documented. |
-| 11 | [`sourcehut-integration`](../phase-1/11-sourcehut-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
-| 12 | [`npm-registry-integration`](../phase-1/12-npm-registry-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: search runs on `registry.npmjs.org`, not npms.io. |
-| 13 | [`huggingface-integration`](../phase-1/13-huggingface-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
-| 14 | [`stack-overflow-integration`](../phase-1/14-stack-overflow-integration/spec.md) | 0/10 | — | **Closed 2026-07-28**: env documented and quota exhaustion logged. |
-| 15 | [`lobsters-integration`](../phase-1/15-lobsters-integration/spec.md) | 0/6 | — | **Closed 2026-07-28**: JSON-only by decision; scraping enrichment is a closed non-goal. |
-| 16 | [`hashnode-integration`](../phase-1/16-hashnode-integration/spec.md) | 1/8 | — | Paused on a paid-API vendor decision (decided: paused). |
-| 17 | [`bluesky-integration`](../phase-1/17-bluesky-integration/spec.md) | 0/6 | — | Ships without credentials. |
-| 18 | [`producthunt-integration`](../phase-1/18-producthunt-integration/spec.md) | 0/6 | — | Wired but dormant until a token is provisioned. |
-| 19 | [`devpost-integration`](../phase-1/19-devpost-integration/spec.md) | 0/3 | — | Implemented, dark by default. |
-| 20 | [`indiehackers-integration`](../phase-1/20-indiehackers-integration/spec.md) | 2/1 | — | Closed by decision; the two open boxes are optional follow-ups that inflate every count. |
+| 09 | [`gitlab-integration`](../implemented/phase-1/09-gitlab-integration/spec.md) | 0/9 | — | **Closed 2026-07-28**: `GITLAB_TOKEN` is documented in `.env.example`. |
+| 10 | [`codeberg-integration`](../implemented/phase-1/10-codeberg-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: both Codeberg env vars documented. |
+| 11 | [`sourcehut-integration`](../rejected/phase-1/11-sourcehut-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
+| 12 | [`npm-registry-integration`](../implemented/phase-1/12-npm-registry-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: search runs on `registry.npmjs.org`, not npms.io. |
+| 13 | [`huggingface-integration`](../implemented/phase-1/13-huggingface-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
+| 14 | [`stack-overflow-integration`](../implemented/phase-1/14-stack-overflow-integration/spec.md) | 0/10 | — | **Closed 2026-07-28**: env documented and quota exhaustion logged. |
+| 15 | [`lobsters-integration`](../implemented/phase-1/15-lobsters-integration/spec.md) | 0/6 | — | **Closed 2026-07-28**: JSON-only by decision; scraping enrichment is a closed non-goal. |
+| 16 | [`hashnode-integration`](../rejected/phase-1/16-hashnode-integration/spec.md) | 1/8 | — | Paused on a paid-API vendor decision (decided: paused). |
+| 17 | [`bluesky-integration`](../implemented/phase-1/17-bluesky-integration/spec.md) | 0/6 | — | Ships without credentials. |
+| 18 | [`producthunt-integration`](../implemented/phase-1/18-producthunt-integration/spec.md) | 0/6 | — | Wired but dormant until a token is provisioned. |
+| 19 | [`devpost-integration`](../implemented/phase-1/19-devpost-integration/spec.md) | 0/3 | — | Implemented, dark by default. |
+| 20 | [`indiehackers-integration`](../rejected/phase-1/20-indiehackers-integration/spec.md) | 2/1 | — | Closed by decision; the two open boxes are optional follow-ups that inflate every count. |
 
 ## Wave 3 — the one AI platform (21)
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 21 | [`ai-expansion`](../phase-1/21-ai-expansion/spec.md) | 0/19 | 01 | The only provider integration layer: task registry, Chrome capability UX, MiniMax client, structured-output validation, cache, budgets, kill switches. No feature-specific AI endpoint may exist before this. |
+| 21 | [`ai-expansion`](../implemented/phase-1/21-ai-expansion/spec.md) | 0/19 | 01 | The only provider integration layer: task registry, Chrome capability UX, MiniMax client, structured-output validation, cache, budgets, kill switches. No feature-specific AI endpoint may exist before this. |
 
 ## Wave 4 — first AI value and search core (22–26)
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 22 | [`semantic-search`](../phase-1/22-semantic-search/spec.md) | 0/16 | 01, 21 (+23, cycle) | Embeddings, pgvector, global external-profile index, cold-start fallback to federated search. |
-| 23 | [`proactive-discovery`](../phase-1/23-proactive-discovery/spec.md) | 0/10 | 21, 22 | Populates the global index via an idempotent HTTP-cron worker. |
-| 24 | [`ai-profile-enrichment`](../phase-1/24-ai-profile-enrichment/spec.md) | 0/8 | 21 | Persona Card shipped for tracked builders; header says claim-triggered auto-refresh was deferred, yet zero tasks are open. |
-| 25 | [`code-fingerprinting`](../phase-1/25-code-fingerprinting/spec.md) | 0/11 | 21 | Header says v1 heuristic shipped and v2 AI analysis pending, yet zero tasks are open. |
-| 26 | [`outreach-generator`](../phase-1/26-outreach-generator/spec.md) | 0/9 | 21 | v1 rule-based + v2 AI both shipped; rule-based stays the final fallback. |
+| 22 | [`semantic-search`](../implemented/phase-1/22-semantic-search/spec.md) | 0/16 | 01, 21 (+23, cycle) | Embeddings, pgvector, global external-profile index, cold-start fallback to federated search. |
+| 23 | [`proactive-discovery`](../implemented/phase-1/23-proactive-discovery/spec.md) | 0/10 | 21, 22 | Populates the global index via an idempotent HTTP-cron worker. |
+| 24 | [`ai-profile-enrichment`](../implemented/phase-1/24-ai-profile-enrichment/spec.md) | 0/8 | 21 | Persona Card shipped for tracked builders; header says claim-triggered auto-refresh was deferred, yet zero tasks are open. |
+| 25 | [`code-fingerprinting`](../implemented/phase-1/25-code-fingerprinting/spec.md) | 0/11 | 21 | Header says v1 heuristic shipped and v2 AI analysis pending, yet zero tasks are open. |
+| 26 | [`outreach-generator`](../implemented/phase-1/26-outreach-generator/spec.md) | 0/9 | 21 | v1 rule-based + v2 AI both shipped; rule-based stays the final fallback. |
 
 ## Wave 5 — organizations and shared ownership (27–29)
 
@@ -157,31 +161,31 @@ mutations on top; none of them may create a competing organization model.
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 27 | [`team-accounts`](../phase-1/27-team-accounts/spec.md) | 0/9 | 01 | **Closed 2026-07-28.** Switcher, Team settings and the full `api/organizations/` surface verified live. One known follow-up stays out of scope: a hook-ordering race can leave a fresh sign-up's session with `active_organization_id: null`. |
-| 28 | [`shared-resources`](../phase-1/28-shared-resources/spec.md) | 10/0 | 01, 27 | Its header carries a "do not implement until…" note — re-read it before starting; the tenant-context half of the dependency is now satisfied. |
-| 29 | [`activity-feed`](../phase-1/29-activity-feed/spec.md) | 7/0 | 01, 27, 28 | Append-only organization events over the mutations added by `27`/`28`. |
+| 27 | [`team-accounts`](../implemented/phase-1/27-team-accounts/spec.md) | 0/9 | 01 | **Closed 2026-07-28.** Switcher, Team settings and the full `api/organizations/` surface verified live. One known follow-up stays out of scope: a hook-ordering race can leave a fresh sign-up's session with `active_organization_id: null`. |
+| 28 | [`shared-resources`](../implemented/phase-1/28-shared-resources/spec.md) | 10/0 | 01, 27 | Its header carries a "do not implement until…" note — re-read it before starting; the tenant-context half of the dependency is now satisfied. |
+| 29 | [`activity-feed`](../implemented/phase-1/29-activity-feed/spec.md) | 7/0 | 01, 27, 28 | Append-only organization events over the mutations added by `27`/`28`. |
 
 ## Wave 6 — money and integrity (30–32)
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 30 | [`stripe-billing-platform`](../phase-1/30-stripe-billing-platform/spec.md) | 2/49 | 01, 27 | Owns Stripe and the credit ledger for the whole product. Remaining: sandbox/Test-Clock certification and the Denmark canary. |
-| 31 | [`pricing-and-billing`](../phase-1/31-pricing-and-billing/spec.md) | 0/3 | (superseded by 30) | Read-only record. |
-| 32 | [`abuse-and-usage-integrity`](../phase-1/32-abuse-and-usage-integrity/spec.md) | 1/32 | 01, 27, 30 | Enforcement rollout closed out at "warn" by user decision. |
+| 30 | [`stripe-billing-platform`](../implemented/phase-1/30-stripe-billing-platform/spec.md) | 2/49 | 01, 27 | Owns Stripe and the credit ledger for the whole product. Remaining: sandbox/Test-Clock certification and the Denmark canary. |
+| 31 | [`pricing-and-billing`](../rejected/phase-1/31-pricing-and-billing/spec.md) | 0/3 | (superseded by 30) | Read-only record. |
+| 32 | [`abuse-and-usage-integrity`](../implemented/phase-1/32-abuse-and-usage-integrity/spec.md) | 1/32 | 01, 27, 30 | Enforcement rollout closed out at "warn" by user decision. |
 
 ## Wave 7 — product surfaces on the platform (33–41)
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 33 | [`unified-timeline`](../phase-1/33-unified-timeline/spec.md) | 0/13 | 21 | Non-AI core; its optional summary task plugs into `21`. Header says `pending` with 13/13 done. |
-| 34 | [`smart-alerts`](../phase-1/34-smart-alerts/spec.md) | 1/13 | 21 | Leftover AI-digest wiring touches the reserved `src/shared/lib/email.ts`; task registered and inert. |
-| 35 | [`rss-feeds`](../phase-1/35-rss-feeds/spec.md) | 0/7 | — | Real URL is `/api/feeds/{searchId}`, not the `.xml` path earlier drafts promised. |
-| 36 | [`claimable-profiles`](../phase-1/36-claimable-profiles/spec.md) | 2/12 | — | The open trust boundary: the claim email proves mailbox access, not ownership of the indexed source identity. |
-| 37 | [`portfolio-builder`](../phase-1/37-portfolio-builder/spec.md) | 5/8 | 36 | Composes verified claims (+ optional `24`/`33` artifacts) into an explicitly published surface. |
-| 38 | [`work-sample`](../phase-1/38-work-sample/spec.md) | 1/8 | 21, 25 | Leftover needs a real `GITHUB_TOKEN` / `MINIMAX_API_KEY`; neither configured. |
-| 39 | [`technical-sandbox`](../phase-1/39-technical-sandbox/spec.md) | 0/0 | (superseded by 38) | Never implement real-person roleplay. |
-| 40 | [`team-synergy`](../phase-1/40-team-synergy/spec.md) | 1/6 | 21, 24, 25, 27 | Phase 5 carries its own "do not start" note. |
-| 41 | [`ai-sourcing-sprints`](../phase-1/41-ai-sourcing-sprints/spec.md) | 1/22 | 01, 21, 22, 23, 27 | Phases 1–5 shipped and live-verified; Phase 6 has one dedicated item — see the plan header. |
+| 33 | [`unified-timeline`](../implemented/phase-1/33-unified-timeline/spec.md) | 0/13 | 21 | Non-AI core; its optional summary task plugs into `21`. Header says `pending` with 13/13 done. |
+| 34 | [`smart-alerts`](../implemented/phase-1/34-smart-alerts/spec.md) | 1/13 | 21 | Leftover AI-digest wiring touches the reserved `src/shared/lib/email.ts`; task registered and inert. |
+| 35 | [`rss-feeds`](../implemented/phase-1/35-rss-feeds/spec.md) | 0/7 | — | Real URL is `/api/feeds/{searchId}`, not the `.xml` path earlier drafts promised. |
+| 36 | [`claimable-profiles`](../implemented/phase-1/36-claimable-profiles/spec.md) | 2/12 | — | The open trust boundary: the claim email proves mailbox access, not ownership of the indexed source identity. |
+| 37 | [`portfolio-builder`](../implemented/phase-1/37-portfolio-builder/spec.md) | 5/8 | 36 | Composes verified claims (+ optional `24`/`33` artifacts) into an explicitly published surface. |
+| 38 | [`work-sample`](../implemented/phase-1/38-work-sample/spec.md) | 1/8 | 21, 25 | Leftover needs a real `GITHUB_TOKEN` / `MINIMAX_API_KEY`; neither configured. |
+| 39 | [`technical-sandbox`](../rejected/phase-1/39-technical-sandbox/spec.md) | 0/0 | (superseded by 38) | Never implement real-person roleplay. |
+| 40 | [`team-synergy`](../implemented/phase-1/40-team-synergy/spec.md) | 1/6 | 21, 24, 25, 27 | Phase 5 carries its own "do not start" note. |
+| 41 | [`ai-sourcing-sprints`](../implemented/phase-1/41-ai-sourcing-sprints/spec.md) | 1/22 | 01, 21, 22, 23, 27 | Phases 1–5 shipped and live-verified; Phase 6 has one dedicated item — see the plan header. |
 
 ## Wave 8 — heavy programs (42–44)
 
@@ -190,17 +194,17 @@ why they are last among the feature plans rather than first among the ambitious 
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 42 | [`stealth-scraping`](../phase-1/42-stealth-scraping/spec.md) | 3/30 | 01, 04 | Directory name is legacy: the feature is **Public Profile Enrichment** and must never claim evasion. Code complete, `ENRICHMENT_ENABLED=false`; needs deploy-dark → 7-day canary → approval. Uses `task.md`/`implementation_plan.md` instead of the trio. (Reality check 2026-07-31: recounted `task.md`'s checkboxes — was 9/30.) |
-| 43 | [`solutions-intelligence`](../phase-1/43-solutions-intelligence/spec.md) | 27/3 | 01, 21, 30, 42 | Blocked on `42` being live plus a 60-brief gold-set quality bar. Still `implementation authorized: no`. (Reality check 2026-07-31: 3 Phase-1 prep tasks are real, shipped work with cited files — `src/shared/lib/solutions/contracts.ts`, `src/shared/lib/solutions/config.ts`, and the non-provider product shell `src/modules/solutions/*` + `src/routes/_dashboard/solutions/index.tsx` — though tasks.md's own checkboxes for them stay unchecked pending formal authorization. Was 30/0, "Largest untouched plan", which undercounted this.) |
-| 44 | [`calendar-scheduling-interview-intelligence`](../phase-1/44-calendar-scheduling-interview-intelligence/spec.md) | 9/69 | 01, 21, 30 | Was the biggest plan in the backlog; now 69 of 78 tasks are done. Remaining work is the sensitive tail: private documents, live transcription, retention, rollout. |
+| 42 | [`stealth-scraping`](../implemented/phase-1/42-stealth-scraping/spec.md) | 3/30 | 01, 04 | Directory name is legacy: the feature is **Public Profile Enrichment** and must never claim evasion. Code complete, `ENRICHMENT_ENABLED=false`; needs deploy-dark → 7-day canary → approval. Uses `task.md`/`implementation_plan.md` instead of the trio. (Reality check 2026-07-31: recounted `task.md`'s checkboxes — was 9/30.) |
+| 43 | [`solutions-intelligence`](../implemented/phase-1/43-solutions-intelligence/spec.md) | 27/3 | 01, 21, 30, 42 | Blocked on `42` being live plus a 60-brief gold-set quality bar. Still `implementation authorized: no`. (Reality check 2026-07-31: 3 Phase-1 prep tasks are real, shipped work with cited files — `src/shared/lib/solutions/contracts.ts`, `src/shared/lib/solutions/config.ts`, and the non-provider product shell `src/modules/solutions/*` + `src/routes/_dashboard/solutions/index.tsx` — though tasks.md's own checkboxes for them stay unchecked pending formal authorization. Was 30/0, "Largest untouched plan", which undercounted this.) |
+| 44 | [`calendar-scheduling-interview-intelligence`](../implemented/phase-1/44-calendar-scheduling-interview-intelligence/spec.md) | 9/69 | 01, 21, 30 | Was the biggest plan in the backlog; now 69 of 78 tasks are done. Remaining work is the sensitive tail: private documents, live transcription, retention, rollout. |
 
 ## Wave 9 — public surface and content (45–47)
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 45 | [`public-landing-pages`](../phase-1/45-public-landing-pages/spec.md) | 0/14 | — | SEO surface largely live; **public radars are built** (`publicRadars` in `schema.ts`, table `public_radars`, `drizzle/0054`). Blocks `46` and `54`. (Reality check 2026-07-31: was 0/13, "no public radars — not in schema.ts", both stale.) |
-| 46 | [`content-marketing`](../phase-1/46-content-marketing/spec.md) | 6/11 | 45 | |
-| 47 | [`status-and-trust`](../phase-1/47-status-and-trust/spec.md) | 1/15 | — | Missing uptime *history* and incident subscriptions; the leftover is optional and touches a reserved file. |
+| 45 | [`public-landing-pages`](../implemented/phase-1/45-public-landing-pages/spec.md) | 0/14 | — | SEO surface largely live; **public radars are built** (`publicRadars` in `schema.ts`, table `public_radars`, `drizzle/0054`). Blocks `46` and `54`. (Reality check 2026-07-31: was 0/13, "no public radars — not in schema.ts", both stale.) |
+| 46 | [`content-marketing`](../implemented/phase-1/46-content-marketing/spec.md) | 6/11 | 45 | |
+| 47 | [`status-and-trust`](../implemented/phase-1/47-status-and-trust/spec.md) | 1/15 | — | Missing uptime *history* and incident subscriptions; the leftover is optional and touches a reserved file. |
 
 ## Wave 10 — release gates (48–53)
 
@@ -210,18 +214,18 @@ measure.
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 48 | [`audit-accessibility`](../phase-1/48-audit-accessibility/spec.md) | 0/14 | — | WCAG 2.2 AA gate. Header says `partially-implemented` with 14/14 done. |
-| 49 | [`audit-performance-qa`](../phase-1/49-audit-performance-qa/spec.md) | 1/9 | 45 | Lighthouse/Playwright harness + CI quality gate. Unblocked 2026-07-27. |
-| 50 | [`audit-visual-system`](../phase-1/50-audit-visual-system/spec.md) | 2/8 | 48, 49 | Needs new e2e infra and a production check. Unblocked 2026-07-27. |
-| 51 | [`audit-conversion`](../phase-1/51-audit-conversion/spec.md) | 3/13 | 04, 45 | Waiting on ≥14 real days and 1,000 sessions with `CONVERSION_EVENTS_ENABLED=true`, then a rollout decision. |
-| 52 | [`audit-trust`](../phase-1/52-audit-trust/spec.md) | 2/8 | 04, 31, 36, 49 | Only meaningful once a maintainer turns `PROFILE_REMOVAL_ENABLED` on. |
-| 53 | [`exhaustive-local-e2e-design`](../phase-1/53-exhaustive-local-e2e-design/tasks.md) | 10/3 | 01, 27, 30 | Design waves 4+5 of the e2e suite; entirely additive. Only file is `tasks.md` — no `spec.md`/`plan.md`. New Playwright files now belong in `tests/e2e` after the 2026-07-27 test-layout unification. |
+| 48 | [`audit-accessibility`](../implemented/phase-1/48-audit-accessibility/spec.md) | 0/14 | — | WCAG 2.2 AA gate. Header says `partially-implemented` with 14/14 done. |
+| 49 | [`audit-performance-qa`](../implemented/phase-1/49-audit-performance-qa/spec.md) | 1/9 | 45 | Lighthouse/Playwright harness + CI quality gate. Unblocked 2026-07-27. |
+| 50 | [`audit-visual-system`](../implemented/phase-1/50-audit-visual-system/spec.md) | 2/8 | 48, 49 | Needs new e2e infra and a production check. Unblocked 2026-07-27. |
+| 51 | [`audit-conversion`](../implemented/phase-1/51-audit-conversion/spec.md) | 3/13 | 04, 45 | Waiting on ≥14 real days and 1,000 sessions with `CONVERSION_EVENTS_ENABLED=true`, then a rollout decision. |
+| 52 | [`audit-trust`](../implemented/phase-1/52-audit-trust/spec.md) | 2/8 | 04, 31, 36, 49 | Only meaningful once a maintainer turns `PROFILE_REMOVAL_ENABLED` on. |
+| 53 | [`exhaustive-local-e2e-design`](../implemented/phase-1/53-exhaustive-local-e2e-design/tasks.md) | 10/3 | 01, 27, 30 | Design waves 4+5 of the e2e suite; entirely additive. Only file is `tasks.md` — no `spec.md`/`plan.md`. New Playwright files now belong in `tests/e2e` after the 2026-07-27 test-layout unification. |
 
 ## Wave 11 — launch (54)
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 54 | [`waitlist-launch`](../phase-1/54-waitlist-launch/spec.md) | 9/0 | 02, 04, 31, 45, 46, 47 | Manual go-to-market (Show HN, social, Search Console) — the founder's runbook, not code. The product keeps open signup and adds no artificial waitlist. |
+| 54 | [`waitlist-launch`](../implemented/phase-1/54-waitlist-launch/spec.md) | 9/0 | 02, 04, 31, 45, 46, 47 | Manual go-to-market (Show HN, social, Search Console) — the founder's runbook, not code. The product keeps open signup and adds no artificial waitlist. |
 
 ## Divergences found while building this order (2026-07-28)
 

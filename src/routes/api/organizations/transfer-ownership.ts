@@ -35,7 +35,7 @@ export const Route = createFileRoute('/api/organizations/transfer-ownership')({
           const result = await lifecycle.transferOwnership(request, principal.organizationId, parsed.data.targetUserId)
 
           // Best-effort — the transfer itself already committed; a notification failure never
-          // reverses it or fails this request (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 5:
+          // reverses it or fails this request (plans/implemented/30-stripe-billing-platform/tasks.md §9 task 5:
           // "notify both parties", not "notification must succeed for the transfer to count").
           notifyOwnershipTransfer(principal.organizationId, principal.userId, parsed.data.targetUserId).catch((error) => {
             console.error('Ownership transfer notification error:', error)

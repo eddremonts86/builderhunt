@@ -110,7 +110,7 @@ The following are still open, deliberately not attempted in this pass:
   `test/fixtures/stripe/`** (this task's remaining originally-scoped files) — a real browser-driven
   Checkout redirect flow through Stripe's own hosted payment page, and signed webhook
   duplicate/reordering fixtures replayed against the real adapter. This repo currently has a
-  separate, actively in-progress local-e2e effort (`plans/phase-1/53-exhaustive-local-e2e-design/`,
+  separate, actively in-progress local-e2e effort (`plans/implemented/phase-1/53-exhaustive-local-e2e-design/`,
   `tests/e2e/harness/`, `scripts/e2e/` — all present as untracked work at the time of writing) that owns
   the Playwright/e2e surface, and that plan's own scope explicitly defers "optional sandbox contract
   checks against the real Stripe test account" as a "additive CI job, not a replacement" for its

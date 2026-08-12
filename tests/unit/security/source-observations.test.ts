@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 3, "Persist approved source observations".
+ * plans/implemented/43-solutions-intelligence Phase 3, "Persist approved source observations".
  * Verify line: "unchanged observations do not create duplicates; changed, deleted, stale, and
  * restricted sources produce the expected version/projection."
  *

@@ -229,6 +229,9 @@ export const auth = betterAuth({
         after: async (session, context) => {
           const device = context ? pendingSessionDevices.get(context) : undefined
           if (!device) return
+          // unbounded-read-ok: one-in-one-out revocation picks which session to end from this set, so
+          // an incomplete set revokes the wrong session — or none — and the concurrent-session limit
+          // stops holding. Scoped to one user's unexpired sessions.
           const liveSessions = await authDb.select({
             id: authSessions.id,
             token: authSessions.token,

@@ -135,6 +135,38 @@ test.describe('admin claims', () => {
     }
   })
 
+  test('the status filter is in the URL, so a narrowed view is shareable and reloadable', async ({ browser }) => {
+    /**
+     * The filter used to be `useState`, and the failure was specific: an operator narrows claims to `pending`,
+     * pastes the URL into an incident channel, and everyone else opens the unfiltered list — believing they are
+     * looking at what was described. Reload lost it too, and Back was connected to neither click.
+     */
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/admin/claims?status=verified`)
+      await expect(page.getByTestId('admin-claims-page')).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('admin-claims-filter-verified')).toHaveAttribute('data-active', 'true')
+
+      // Clicking a filter changes the URL, which is what makes it shareable at all.
+      await page.getByTestId('admin-claims-filter-pending').click()
+      await expect(page.getByTestId('admin-claims-filter-pending')).toHaveAttribute('data-active', 'true')
+      expect(new URL(page.url()).searchParams.get('status')).toBe('pending')
+
+      // And Back returns to the previous filter rather than leaving the page.
+      await page.goBack()
+      await expect(page.getByTestId('admin-claims-filter-verified')).toHaveAttribute('data-active', 'true')
+
+      // An unrecognised status falls back and the URL is corrected, so nobody shares a link that lies about
+      // what it shows.
+      await gotoHydrated(page, `${harness.baseURL}/admin/claims?status=nonsense`)
+      await expect(page.getByTestId('admin-claims-filter-all')).toHaveAttribute('data-active', 'true')
+      await expect.poll(() => new URL(page.url()).searchParams.get('status'), { timeout: 10_000 }).toBe('all')
+    } finally {
+      await context.close()
+    }
+  })
+
   test('the API is unavailable to a non-platform-admin organization owner', async () => {
     const listResponse = await harness.owner.api!.get('/api/admin/builder-claims')
     expect(listResponse.status()).toBe(403)

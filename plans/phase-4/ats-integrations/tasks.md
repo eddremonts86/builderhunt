@@ -1,7 +1,7 @@
 # ATS Integrations (Greenhouse, Lever, Ashby) (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/tasks.md) (hard — the pipeline stage model this plan maps external ATS status onto); [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/tasks.md) (per-organization third-party credentials, RLS, tenant-scoped sync state); [`stripe-billing-platform`](../../phase-1/30-stripe-billing-platform/tasks.md) (the Team-tier gate this feature sells into does not bill anyone yet); [`legal-and-compliance`](../../phase-1/04-legal-and-compliance/tasks.md) (candidate data leaving the product to a third-party processor).
+> **Depends on**: [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/tasks.md) (hard — the pipeline stage model this plan maps external ATS status onto); [`security-and-multitenancy`](../../implemented/phase-1/01-security-and-multitenancy/tasks.md) (per-organization third-party credentials, RLS, tenant-scoped sync state); [`stripe-billing-platform`](../../implemented/phase-1/30-stripe-billing-platform/tasks.md) (the Team-tier gate this feature sells into does not bill anyone yet); [`legal-and-compliance`](../../implemented/phase-1/04-legal-and-compliance/tasks.md) (candidate data leaving the product to a third-party processor).
 > **Blocks**: nothing
 > **Reality check**: Touches `src/shared/lib/{env.ts,log.ts,billing-shared.ts,email.ts}`, `src/shared/lib/db/schema.ts`, `src/shared/lib/authorization/permissions.ts`, `src/shared/lib/operational-schedules.ts`, `src/shared/lib/repositories/account-privacy.ts`, `src/modules/dashboard/ui/shell/nav-config.ts`, `scripts/db/verify-api-isolation-local.mjs`, `docs/architecture/{data-classification.md,authorization-matrix.md}`, `docs/operations/{database-roles.md,deploy-runbook.md}`. Everything under `src/lib/ats/` and `src/shared/lib/repositories/ats*.ts` is new. `src/shared/lib/crypto/webhook-payload.ts` is left **untouched** — Phase 0 adapts its AES-256-GCM algorithm into a new sibling `crypto/secret-box.ts` (versioned envelope + AAD + its own key) rather than changing the Stripe call site. Phase 4 widens `builderhunt_worker`'s grants on the existing `organization_builders` table (today `SELECT`-only, `drizzle/0018_enrichment_worker_target_access.sql`) and on [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/tasks.md)'s `organization_builder_stage_events` (that plan grants the worker `SELECT`, not `INSERT`).
 
@@ -132,7 +132,7 @@ of ATS waits. Exit criteria are in [`plan.md`](./plan.md) §Phase 0.
     so the journal entry and snapshot exist — `scripts/db/verify-migration-integrity.mjs` hard-fails
     unless the SQL set exactly equals the journal tags with matching snapshots, and `drizzle-kit
     migrate` never applies an un-journaled file (follow
-    [`abuse-and-usage-integrity`](../../phase-1/32-abuse-and-usage-integrity/tasks.md)'s
+    [`abuse-and-usage-integrity`](../../implemented/phase-1/32-abuse-and-usage-integrity/tasks.md)'s
     `0043_abuse_usage_integrity_tables.sql` / `0044_abuse_usage_integrity_rls_grants.sql` precedent,
     including its rename-the-tag convention). Then write the body, mirroring
     `drizzle/0044_abuse_usage_integrity_rls_grants.sql`'s structure and header comment:

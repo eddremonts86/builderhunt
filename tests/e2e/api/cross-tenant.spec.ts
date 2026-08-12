@@ -347,21 +347,20 @@ test.describe('routes that ignore client-supplied tenancy', () => {
     expect(after[0]?.role, "B's role in B's own organization is untouched").toBe('owner')
   })
 
-  test('creating an invitation ignores an organizationId in the body', async () => {
+  test('creating an invitation refuses an organizationId in the body', async () => {
     const { a, b } = harness
-    // The route's zod schema has no `organizationId`, so the field is stripped
-    // rather than honoured. Asserting the *effect* — the invitation lands in A —
-    // is what matters; asserting the schema would only restate the source.
+    // The route's zod schema is `.strict()` since plan 59, so an `organizationId` is a rejected request
+    // rather than a silently stripped field. What this test protects is unchanged and is asserted below:
+    // no row lands in B, and — now — none lands in A either, because nothing was written at all.
     const email = `xt-${uniqueId('inv').slice(-10)}@test.invalid`
     const response = await a.principal.api!.post('/api/organizations/invitations', {
       data: { email, role: 'member', organizationId: b.organization.organizationId },
     })
-    expect(response.status(), await response.text()).toBeLessThan(400)
+    expect(response.status(), await response.text()).toBe(400)
 
-    const [row] = await harness.sql<{ organization_id: string }[]>`
+    const rows = await harness.sql<{ organization_id: string }[]>`
       select organization_id from organization_invitations where email = ${email}
     `
-    expect(row?.organization_id).toBe(a.organization.organizationId)
-    expect(row?.organization_id).not.toBe(b.organization.organizationId)
+    expect(rows, 'a refused body must not write to either organization').toHaveLength(0)
   })
 })

@@ -67,6 +67,11 @@ test('an admin invites someone and sees the invitation appear as pending', async
     // "the list never showed the invitation", which is three inferences away from "the input was
     // empty when the form submitted".
     await expect(page.getByTestId('invite-email-input')).toHaveValue(email)
+    // Two steps since plan 59: Review shows the card the recipient will see, then Send. The intent
+    // defaults to `other`, so an admin who only wants to invite somebody presses straight through — but
+    // the review step is a real gate and nothing is sent from the first one.
+    await page.getByTestId('invite-review-btn').click()
+    await expect(page.getByTestId('invite-review-step')).toBeVisible()
     await page.getByTestId('invite-submit-btn').click()
 
     // The row, not a toast: a toast disappears, and the admin's question is "is it pending *now*".
