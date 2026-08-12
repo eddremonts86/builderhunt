@@ -224,6 +224,15 @@ step env-fidelity node scripts/ci/check-env-fidelity.mjs
 # And the other half of the same claim: same environment, same list of checks.
 step step-parity node scripts/ci/check-step-parity.mjs
 
+# The plan record, which is documentation only until something reads it. Both are seconds and both
+# guard a claim this repository now makes out loud: `plans/implemented/` means done and tested, and a
+# plan's two-digit prefix is its position in the build order. Neither check ran anywhere before
+# 2026-08-11, which is how eight unreadable status values and four plans sitting at 100% of their tasks
+# while labelled `pending` survived for weeks.
+step plans-links pnpm plans:check-links
+step plans-order pnpm plans:check-order
+step plans-implemented pnpm plans:check-implemented
+
 step migration-integrity pnpm test:migration-integrity
 step deploy-imports pnpm test:deploy-imports
 step drizzle-check pnpm exec drizzle-kit check
@@ -307,6 +316,7 @@ step security-route-coverage pnpm security:route-coverage
 # Phase 3's two gates, beside the route-coverage step they were modelled on: no list read without a
 # declared bound, and no data grid without a registered capability.
 step check-unbounded pnpm check:unbounded
+step check-admin-metrics pnpm check:admin-metrics
 step check-table-surfaces pnpm check:table-surfaces
 step security-ui-route-graph pnpm security:ui-route-graph
 # Added 2026-07-28 after an exported route helper put the postgres driver in the client bundle and every

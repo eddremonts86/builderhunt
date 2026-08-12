@@ -7,7 +7,7 @@ import { USER_SCOPED_LIMIT } from '../db/read-bounds'
 
 /**
  * Platform-admin-only seller/country/tax configuration (spec.md §Seller,
- * country, currency, and tax configuration; plans/phase-1/30-stripe-billing-platform/
+ * country, currency, and tax configuration; plans/implemented/30-stripe-billing-platform/
  * tasks.md §3 "Build private seller and country configuration"). Versioned,
  * insert-only history over `billing_seller_profiles` — no `organization_id`,
  * no RLS, `builderhunt_platform` gets SELECT+INSERT only (never UPDATE; see

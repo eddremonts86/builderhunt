@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 3, "Implement reversible identity linking".
+ * plans/implemented/43-solutions-intelligence Phase 3, "Implement reversible identity linking".
  * Verify line: "collision/adversarial fixtures prove username similarity cannot merge people and
  * unmerge restores every source account and organization reference."
  *

@@ -38,17 +38,16 @@ function baseOverview(): OrgAdminOverview {
         generatedAt: '2026-08-07T12:00:00.000Z',
         actions: [],
         data: {
-          totalMembers: 5,
-          activeSeats: 4,
-          pendingInvitations: 1,
+          total: 5,
           byRole: { owner: 1, admin: 1, member: 3 },
+          seatLimit: 10,
         },
       },
       billing: {
         state: 'ready',
         generatedAt: '2026-08-07T12:00:00.000Z',
         actions: [],
-        data: { tier: 'team', approachingCap: false, renewalDaysRemaining: 12 },
+        data: { tier: 'team', status: 'active', seatLimit: 10, approachingSeatCap: false, renewalDays: 12 },
       },
       blockedWorkflows: {
         state: 'ready',
@@ -72,7 +71,7 @@ function baseOverview(): OrgAdminOverview {
         state: 'ready',
         generatedAt: '2026-08-07T12:00:00.000Z',
         actions: [],
-        data: { pending: 2, allowedStatuses: ['pending', 'processing'] },
+        data: { byKind: { deletion: { pending: 2 }, export: { processing: 1 } } },
       },
     },
   }
@@ -130,13 +129,62 @@ describe('<OrganizationAdminSection />', () => {
 
   it('renders ready-state content with members block', () => {
     render(<OrganizationAdminSection overview={baseOverview()} />)
-    expect(document.body.textContent).toMatch(/5 total members/i)
-    expect(document.body.textContent).toMatch(/1 pending invitation/i)
+    expect(document.body.textContent).toMatch(/5 members of 10 seats/i)
+    expect(document.body.textContent).toMatch(/1 owner · 1 admin · 3 member/i)
   })
 
   it('renders billing plan with renewal', () => {
     render(<OrganizationAdminSection overview={baseOverview()} />)
-    expect(document.body.textContent).toMatch(/12 days to renewal/i)
+    expect(document.body.textContent).toMatch(/Plan: team · active/i)
+    expect(document.body.textContent).toMatch(/Renews in 12 days/i)
+  })
+
+  /**
+   * The regression test for the defect that shipped: every noun in a ready card has its number.
+   *
+   * The previous component read `data.totalMembers` and `data.renewalDaysRemaining` — fields the projection had
+   * renamed — so React rendered `undefined` as nothing and the cards read "total members · active seats" and
+   * "· days to renewal". Both were *grammatical*, which is why five passing tests and a type-check did not notice:
+   * the old assertions matched `/5 total members/` against a fixture that still used the old field names, so the
+   * test data agreed with the test rather than with the projection.
+   *
+   * This asserts the property directly instead of a phrase: in a ready section, no unit word appears without a
+   * digit in front of it. It fails on exactly the shape that shipped, whatever the field is called next time.
+   */
+  it('never renders a unit word without its number', () => {
+    render(<OrganizationAdminSection overview={baseOverview()} />)
+    // Card bodies only. The heading "Members and seats" contains a unit word by design, so handing the whole card
+    // to this check reports the title as a violation.
+    const bodies = Array.from(document.querySelectorAll('[data-testid="org-admin-card-body"]'))
+    expect(bodies).toHaveLength(6)
+
+    for (const body of bodies) {
+      const text = body.textContent ?? ''
+      expect(text).not.toContain('undefined')
+      expect(text).not.toContain('NaN')
+      for (const unit of ['members', 'seats', 'days', 'blocked workflow']) {
+        const orphaned = new RegExp(`(?:^|[^0-9]\\s|·\\s)${unit}\\b`, 'i')
+        expect(orphaned.test(text), `"${unit}" rendered without a preceding number in: ${text}`).toBe(false)
+      }
+    }
+  })
+
+  /**
+   * `dependency-missing` must not read as an outage.
+   *
+   * Three of the six cards carry this reason permanently — two have no table in any migration and the third would
+   * need a privilege the tenant connection is deliberately not granted. The copy was "A required service is not
+   * available right now", so a brand-new workspace opened its dashboard to what looked like a partial failure of
+   * the product, and the honest reading would have sent the admin to the status page for a feature that was never
+   * built.
+   */
+  it('says an unbuilt section is unbuilt, not broken', () => {
+    const o = baseOverview()
+    o.sections.blockedWorkflows = { state: 'unavailable', reason: 'dependency-missing' }
+    render(<OrganizationAdminSection overview={o} />)
+    const text = document.querySelector('[data-testid="org-admin-section"]')!.textContent ?? ''
+    expect(text).toMatch(/not available yet/i)
+    expect(text).not.toMatch(/required service|right now|try again|outage|error/i)
   })
 
   it('does not leak any of the 8 forbidden member-data markers into the DOM', () => {

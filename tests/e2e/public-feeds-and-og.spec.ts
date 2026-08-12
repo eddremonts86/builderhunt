@@ -415,6 +415,22 @@ test.describe('explore', () => {
         /\/auth\/sign-up/,
       )
 
+      /**
+       * Wait for the people tab to actually *be* selected before reading the JSON-LD below.
+       *
+       * The two assertions above cannot carry this. The sign-up CTA is rendered on both tabs, so its href
+       * satisfies `toHaveAttribute` while the resources list is still on screen — and the `ItemList` is built from
+       * whichever result set is rendered. That is exactly how this failed inside the full suite on 2026-08-12:
+       * `numberOfItems` came back **2**, the resources count, while the test had already clicked back to people.
+       * It passes three times out of three on its own, which is what makes it a load-dependent race rather than a
+       * product bug.
+       *
+       * `aria-selected` is the right signal because it is derived from the same `resultType` the list and the
+       * structured data are: when it says people, there is nothing left in flight for the count to disagree with.
+       */
+      await expect(page.getByTestId('explore-tab-people')).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByTestId(`person-card-${people[0].id}`)).toBeVisible()
+
       // Structured data for crawlers — the root document carries its own
       // site-wide JSON-LD, so find the ItemList among all blocks.
       const jsonLdBlocks = await page

@@ -3,7 +3,7 @@ import { interviewOperatorCounters, metrics } from '~/shared/lib/metrics'
 
 /**
  * `interviewOperatorCounters` feeds `GET /api/admin/metrics` → `interviews.counters`, which the admin
- * page renders (plans/phase-1/44-calendar-scheduling-interview-intelligence, "Add redacted metrics and
+ * page renders (plans/implemented/44-calendar-scheduling-interview-intelligence, "Add redacted metrics and
  * operator dashboards").
  *
  * The first case is the one worth having. This module already carries a comment about `reset()` having

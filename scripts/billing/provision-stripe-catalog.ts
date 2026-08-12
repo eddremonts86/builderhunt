@@ -2,7 +2,7 @@
  * Provision (create-or-validate) the BuilderHunt Stripe billing catalog.
  *
  * Fulfils the plan task "Validate Stripe Products and Prices before mutation"
- * (plans/phase-1/30-stripe-billing-platform/tasks.md §1): it fetches existing objects
+ * (plans/implemented/30-stripe-billing-platform/tasks.md §1): it fetches existing objects
  * read-only, compares amount / currency / interval / product / tax behavior /
  * livemode / archive state / metadata against src/shared/lib/billing/catalog.ts,
  * and REFUSES to mutate anything that already exists but diverges. It only

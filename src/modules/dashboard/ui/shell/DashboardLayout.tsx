@@ -8,6 +8,7 @@ import { AreaRail } from './AreaRail'
 import { BreadcrumbProvider, useCurrentEntityBreadcrumbLabel } from './breadcrumb-context'
 import { resolveBreadcrumbSegments } from './breadcrumbs'
 import { ContextTopbar } from './ContextTopbar'
+import { ServiceDegradationNotice } from './ServiceDegradationNotice'
 import { MobileNavDrawer } from './MobileNavDrawer'
 import { resolveActiveArea, visibleAreas } from './nav-config'
 
@@ -55,6 +56,33 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   // noisy 403 in the console and on the network panel (saas-review F6).
   const [signingOut, setSigningOut] = React.useState(false)
   const [navOpen, setNavOpen] = React.useState(false)
+
+  /**
+   * Beta mode, read once per shell mount (plan 58).
+   *
+   * `/api/beta-mode` returns `{ enabled, revision }` off a five-second cache, so this costs one cheap
+   * request for the whole session rather than one per page — which is what a `useEffect` inside
+   * `UserMenu` would have cost, since that component mounts on every dashboard route.
+   *
+   * A failure leaves the badge absent. It is a label; it must never be able to break the shell that
+   * carries the navigation.
+   */
+  const [betaModeEnabled, setBetaModeEnabled] = React.useState(false)
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await fetch('/api/beta-mode', { credentials: 'include' })
+        if (!response.ok || cancelled) return
+        const body = await response.json() as { enabled?: unknown }
+        if (!cancelled) setBetaModeEnabled(body.enabled === true)
+      } catch {
+        // Deliberately silent: no badge is the correct outcome, and a console error here would fail the
+        // strict browser collectors on every dashboard spec.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
   const [unreadAlertsCount, setUnreadAlertsCount] = React.useState(0)
 
   React.useEffect(() => {
@@ -112,6 +140,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-h-[100dvh] min-w-0 flex-col">
         <ContextTopbar
+          betaModeEnabled={betaModeEnabled}
           crumbs={crumbs}
           signingOut={signingOut}
           onSignOut={handleSignOut}
@@ -119,6 +148,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           onOpenNav={() => setNavOpen(true)}
         />
         <main className="dashboard-canvas flex-1 px-4 pb-10 pt-6 lg:px-6">
+          {/*
+            Above the page's own content, and absent when nothing is degraded.
+
+            Inside `<main>` rather than in the topbar because it is about the work on this page — "things may be
+            slow or fail to save" — and a topbar banner reads as chrome that has always been there. There is no
+            permanent widget: healthy renders nothing at all, which is what makes it worth reading when it appears.
+          */}
+          <ServiceDegradationNotice />
           {children}
         </main>
       </div>

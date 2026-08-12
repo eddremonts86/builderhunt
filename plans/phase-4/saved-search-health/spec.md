@@ -1,7 +1,7 @@
 # Saved Search Health (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`smart-alerts`](../../phase-1/34-smart-alerts/spec.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../phase-1/41-ai-sourcing-sprints/spec.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
+> **Depends on**: [`smart-alerts`](../../implemented/phase-1/34-smart-alerts/spec.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../implemented/phase-1/41-ai-sourcing-sprints/spec.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
 > **Blocks**: nothing
 > **Reality check**: `saved_queries`, `alerts`, `alert_triggers`, `sourcing_sprints`, `sprint_results`, `public_radars` all exist in `src/shared/lib/db/schema.ts`; saved searches are created/listed/deleted by `src/routes/api/queries/index.ts` and rendered as a Bento card (`SavedSearchRow`) inside `src/modules/dashboard/components/DashboardPage.tsx`. **There is no `/saved-searches` route** — `src/routes/_dashboard/` contains `route.tsx`, `alerts.tsx`, `admin/`, `builder/`, `calendar/`, `dashboard/`, `exports/`, `me/`, `search/`, `settings/`, `solutions/`, `sprints/`. `/alerts` (`src/routes/_dashboard/alerts.tsx`) already owns alert configuration + the trigger inbox and must not be duplicated.
 
@@ -26,7 +26,7 @@ two "cannot judge yet" states (`unmonitored`, `too-new`). A weekly two-minute tr
 - **No LLM verdict.** The verdict is a pure function. AI appears only as an optional,
   additive "suggested keyword rewrite" rung that never changes the verdict.
 - **No cross-member roll-up.** An owner/admin does not get to see a colleague's saved-search
-  health; org-visible saved searches are owned by [`shared-resources`](../../phase-1/28-shared-resources/spec.md)
+  health; org-visible saved searches are owned by [`shared-resources`](../../implemented/phase-1/28-shared-resources/spec.md)
   (`blocked`).
 - **No automatic deletion**, no auto-pausing of alerts. Every destructive action stays a click.
 - **No backfill** of the attribution columns Phase 0 starts populating. Pre-existing alerts and
@@ -69,7 +69,7 @@ Re-verified at HEAD (2026-07-27) against `src/shared/lib/db/schema.ts`,
    tasks.md.
    *Partially mitigated elsewhere, not fixed*: `hardDeleteAccountSubject`
    (`src/shared/lib/repositories/account-privacy.ts`) already deletes `alerts` before
-   `saved_queries` to dodge exactly this FK (see `plans/phase-1/04-legal-and-compliance/tasks.md`,
+   `saved_queries` to dodge exactly this FK (see `plans/implemented/phase-1/04-legal-and-compliance/tasks.md`,
    "Purge cascade covers the new data"). That covers account deletion only. The
    `DELETE /api/queries` path — the one this plan's `kill` action uses — is still unprotected.
 3. New nullable `sourcing_sprints.saved_query_id text` + composite tenant FK

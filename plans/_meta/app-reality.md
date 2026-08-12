@@ -36,7 +36,7 @@ contradicts this document, the plan is wrong.
   (`builder_embeddings.embedding`, HNSW index); image pinned to
   `pgvector/pgvector:0.8.5-pg18` for local dev and CI, with the matching pg16 leg still in
   `.github/workflows/quality.yml` ahead of the production cutover
-  (`plans/phase-1/03-postgres-18-upgrade` Phase 4). Multi-tenant: Better Auth
+  (`plans/implemented/phase-1/03-postgres-18-upgrade` Phase 4). Multi-tenant: Better Auth
   Organizations, tenant-scoped RLS on every private table,
   non-owner runtime/auth/worker/platform/capability database roles
   (`DATABASE_URL`/`DATABASE_AUTH_URL`/`DATABASE_WORKER_URL`/`DATABASE_PLATFORM_URL`/`DATABASE_CAPABILITY_URL`),

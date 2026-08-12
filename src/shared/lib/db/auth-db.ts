@@ -3,7 +3,7 @@ import postgres from 'postgres'
 import { env } from '../env'
 import { poolOptions } from './pool-options'
 
-const authClient = postgres(env.DATABASE_AUTH_URL ?? env.DATABASE_URL, poolOptions())
+const authClient = postgres(env.DATABASE_AUTH_URL ?? env.DATABASE_URL, poolOptions('auth'))
 
 // This adapter is restricted to Better Auth and organization lifecycle tables.
 // Product repositories must never import it.

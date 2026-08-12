@@ -1,6 +1,6 @@
 /**
  * The account-subject routes over real HTTP (plan 53, task 1 —
- * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`).
+ * `plans/implemented/53-exhaustive-local-e2e-design/tasks.md`).
  *
  * Everything under `/api/me` is keyed by the *session user*, not by an active organization. That single fact
  * is what makes this file different from the other three in the matrix: there is no tenant to scope against,

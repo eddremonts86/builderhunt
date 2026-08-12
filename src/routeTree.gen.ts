@@ -30,6 +30,7 @@ import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as AuthResetRouteImport } from './routes/auth/reset'
 import { Route as AuthForgotRouteImport } from './routes/auth/forgot'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiBetaModeRouteImport } from './routes/api/beta-mode'
 import { Route as LandingStatusRouteImport } from './routes/_landing/status'
 import { Route as LandingSecurityRouteImport } from './routes/_landing/security'
 import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
@@ -67,6 +68,7 @@ import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite
 import { Route as ApiWorkSamplesAnalyzeRouteImport } from './routes/api/work-samples/analyze'
 import { Route as ApiWorkSamplesIdRouteImport } from './routes/api/work-samples/$id'
 import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/stripe'
+import { Route as ApiStatusSummaryRouteImport } from './routes/api/status/summary'
 import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
 import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
@@ -101,6 +103,7 @@ import { Route as ApiE2eBillingProviderRouteImport } from './routes/api/e2e/bill
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
 import { Route as ApiDashboardPreferencesRouteImport } from './routes/api/dashboard/preferences'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
+import { Route as ApiDashboardOrganizationAdminRouteImport } from './routes/api/dashboard/organization-admin'
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiCalendarNotificationsRouteImport } from './routes/api/calendar/notifications'
 import { Route as ApiCalendarFeedRouteImport } from './routes/api/calendar/feed'
@@ -121,6 +124,7 @@ import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
 import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
 import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
 import { Route as ApiAdminSearchSourcesRouteImport } from './routes/api/admin/search-sources'
+import { Route as ApiAdminPreferencesRouteImport } from './routes/api/admin/preferences'
 import { Route as LandingPrivacyRemoveRouteImport } from './routes/_landing/privacy/remove'
 import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
 import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
@@ -233,6 +237,9 @@ import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadma
 import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
 import { Route as ApiAdminOperationsJobKeyRouteImport } from './routes/api/admin/operations/$jobKey'
 import { Route as ApiAdminMetricsTrustRouteImport } from './routes/api/admin/metrics/trust'
+import { Route as ApiAdminMetricsSectionsRouteImport } from './routes/api/admin/metrics/sections'
+import { Route as ApiAdminMetricsRunRetentionRouteImport } from './routes/api/admin/metrics/run-retention'
+import { Route as ApiAdminMetricsOverviewRouteImport } from './routes/api/admin/metrics/overview'
 import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
 import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
 import { Route as ApiAdminInterviewsRunRetentionRouteImport } from './routes/api/admin/interviews/run-retention'
@@ -253,6 +260,7 @@ import { Route as ApiAdminBillingReconcileRouteImport } from './routes/api/admin
 import { Route as ApiAdminBillingMetricsRouteImport } from './routes/api/admin/billing/metrics'
 import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/billing/disputes'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
+import { Route as ApiAdminBillingBetaModeRouteImport } from './routes/api/admin/billing/beta-mode'
 import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
 import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/admin/analytics/run-retention'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
@@ -277,6 +285,8 @@ import { Route as ApiPublicSchedulingInvitationIdRescheduleRouteImport } from '.
 import { Route as ApiPublicSchedulingInvitationIdDeclineRouteImport } from './routes/api/public/scheduling/$invitationId/decline'
 import { Route as ApiPublicSchedulingInvitationIdCancelRouteImport } from './routes/api/public/scheduling/$invitationId/cancel'
 import { Route as ApiPublicSchedulingInvitationIdBookRouteImport } from './routes/api/public/scheduling/$invitationId/book'
+import { Route as ApiOrganizationsInvitationsInvitationIdReviewRouteImport } from './routes/api/organizations/invitations/$invitationId/review'
+import { Route as ApiOrganizationsInvitationsInvitationIdRejectRouteImport } from './routes/api/organizations/invitations/$invitationId/reject'
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
@@ -397,6 +407,11 @@ const AuthForgotRoute = AuthForgotRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBetaModeRoute = ApiBetaModeRouteImport.update({
+  id: '/api/beta-mode',
+  path: '/api/beta-mode',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LandingStatusRoute = LandingStatusRouteImport.update({
@@ -585,6 +600,11 @@ const ApiWebhooksStripeRoute = ApiWebhooksStripeRouteImport.update({
   path: '/api/webhooks/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStatusSummaryRoute = ApiStatusSummaryRouteImport.update({
+  id: '/api/status/summary',
+  path: '/api/status/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStatusSubscribeRoute = ApiStatusSubscribeRouteImport.update({
   id: '/api/status/subscribe',
   path: '/api/status/subscribe',
@@ -761,6 +781,12 @@ const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   path: '/api/dashboard/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDashboardOrganizationAdminRoute =
+  ApiDashboardOrganizationAdminRouteImport.update({
+    id: '/api/dashboard/organization-admin',
+    path: '/api/dashboard/organization-admin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiChangelogSlugRoute = ApiChangelogSlugRouteImport.update({
   id: '/api/changelog/$slug',
   path: '/api/changelog/$slug',
@@ -860,6 +886,11 @@ const ApiAiCompleteRoute = ApiAiCompleteRouteImport.update({
 const ApiAdminSearchSourcesRoute = ApiAdminSearchSourcesRouteImport.update({
   id: '/api/admin/search-sources',
   path: '/api/admin/search-sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminPreferencesRoute = ApiAdminPreferencesRouteImport.update({
+  id: '/api/admin/preferences',
+  path: '/api/admin/preferences',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LandingPrivacyRemoveRoute = LandingPrivacyRemoveRouteImport.update({
@@ -1480,6 +1511,22 @@ const ApiAdminMetricsTrustRoute = ApiAdminMetricsTrustRouteImport.update({
   path: '/api/admin/metrics/trust',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminMetricsSectionsRoute = ApiAdminMetricsSectionsRouteImport.update({
+  id: '/api/admin/metrics/sections',
+  path: '/api/admin/metrics/sections',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMetricsRunRetentionRoute =
+  ApiAdminMetricsRunRetentionRouteImport.update({
+    id: '/api/admin/metrics/run-retention',
+    path: '/api/admin/metrics/run-retention',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminMetricsOverviewRoute = ApiAdminMetricsOverviewRouteImport.update({
+  id: '/api/admin/metrics/overview',
+  path: '/api/admin/metrics/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminMetricsConversionRoute =
   ApiAdminMetricsConversionRouteImport.update({
     id: '/api/admin/metrics/conversion',
@@ -1594,6 +1641,11 @@ const ApiAdminBillingConfigurationRoute =
     path: '/api/admin/billing/configuration',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminBillingBetaModeRoute = ApiAdminBillingBetaModeRouteImport.update({
+  id: '/api/admin/billing/beta-mode',
+  path: '/api/admin/billing/beta-mode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminBillingAccountingExportRoute =
   ApiAdminBillingAccountingExportRouteImport.update({
     id: '/api/admin/billing/accounting-export',
@@ -1736,6 +1788,18 @@ const ApiPublicSchedulingInvitationIdBookRoute =
     path: '/api/public/scheduling/$invitationId/book',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiOrganizationsInvitationsInvitationIdReviewRoute =
+  ApiOrganizationsInvitationsInvitationIdReviewRouteImport.update({
+    id: '/review',
+    path: '/review',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
+  } as any)
+const ApiOrganizationsInvitationsInvitationIdRejectRoute =
+  ApiOrganizationsInvitationsInvitationIdRejectRouteImport.update({
+    id: '/reject',
+    path: '/reject',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
+  } as any)
 const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
   ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
     id: '/accept',
@@ -1860,6 +1924,7 @@ export interface FileRoutesByFullPath {
   '/roadmap': typeof LandingRoadmapRoute
   '/security': typeof LandingSecurityRoute
   '/status': typeof LandingStatusRoute
+  '/api/beta-mode': typeof ApiBetaModeRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
@@ -1905,6 +1970,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
   '/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/preferences': typeof ApiAdminPreferencesRoute
   '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
@@ -1925,6 +1991,7 @@ export interface FileRoutesByFullPath {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -1959,6 +2026,7 @@ export interface FileRoutesByFullPath {
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
+  '/api/status/summary': typeof ApiStatusSummaryRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
@@ -1996,6 +2064,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
+  '/api/admin/billing/beta-mode': typeof ApiAdminBillingBetaModeRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
@@ -2016,6 +2085,9 @@ export interface FileRoutesByFullPath {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/metrics/overview': typeof ApiAdminMetricsOverviewRoute
+  '/api/admin/metrics/run-retention': typeof ApiAdminMetricsRunRetentionRoute
+  '/api/admin/metrics/sections': typeof ApiAdminMetricsSectionsRoute
   '/api/admin/metrics/trust': typeof ApiAdminMetricsTrustRoute
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2109,6 +2181,8 @@ export interface FileRoutesByFullPath {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/organizations/invitations/$invitationId/reject': typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  '/api/organizations/invitations/$invitationId/review': typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
   '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
   '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
   '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
@@ -2145,6 +2219,7 @@ export interface FileRoutesByTo {
   '/roadmap': typeof LandingRoadmapRoute
   '/security': typeof LandingSecurityRoute
   '/status': typeof LandingStatusRoute
+  '/api/beta-mode': typeof ApiBetaModeRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
@@ -2189,6 +2264,7 @@ export interface FileRoutesByTo {
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
   '/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/preferences': typeof ApiAdminPreferencesRoute
   '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
@@ -2209,6 +2285,7 @@ export interface FileRoutesByTo {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -2243,6 +2320,7 @@ export interface FileRoutesByTo {
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
+  '/api/status/summary': typeof ApiStatusSummaryRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
@@ -2280,6 +2358,7 @@ export interface FileRoutesByTo {
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
+  '/api/admin/billing/beta-mode': typeof ApiAdminBillingBetaModeRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
@@ -2300,6 +2379,9 @@ export interface FileRoutesByTo {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/metrics/overview': typeof ApiAdminMetricsOverviewRoute
+  '/api/admin/metrics/run-retention': typeof ApiAdminMetricsRunRetentionRoute
+  '/api/admin/metrics/sections': typeof ApiAdminMetricsSectionsRoute
   '/api/admin/metrics/trust': typeof ApiAdminMetricsTrustRoute
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2393,6 +2475,8 @@ export interface FileRoutesByTo {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/organizations/invitations/$invitationId/reject': typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  '/api/organizations/invitations/$invitationId/review': typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
   '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
   '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
   '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
@@ -2432,6 +2516,7 @@ export interface FileRoutesById {
   '/_landing/roadmap': typeof LandingRoadmapRoute
   '/_landing/security': typeof LandingSecurityRoute
   '/_landing/status': typeof LandingStatusRoute
+  '/api/beta-mode': typeof ApiBetaModeRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
@@ -2478,6 +2563,7 @@ export interface FileRoutesById {
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
   '/_landing/legal/terms': typeof LandingLegalTermsRoute
   '/_landing/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/preferences': typeof ApiAdminPreferencesRoute
   '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
@@ -2498,6 +2584,7 @@ export interface FileRoutesById {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -2532,6 +2619,7 @@ export interface FileRoutesById {
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
+  '/api/status/summary': typeof ApiStatusSummaryRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
@@ -2569,6 +2657,7 @@ export interface FileRoutesById {
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
+  '/api/admin/billing/beta-mode': typeof ApiAdminBillingBetaModeRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
@@ -2589,6 +2678,9 @@ export interface FileRoutesById {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/metrics/overview': typeof ApiAdminMetricsOverviewRoute
+  '/api/admin/metrics/run-retention': typeof ApiAdminMetricsRunRetentionRoute
+  '/api/admin/metrics/sections': typeof ApiAdminMetricsSectionsRoute
   '/api/admin/metrics/trust': typeof ApiAdminMetricsTrustRoute
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2682,6 +2774,8 @@ export interface FileRoutesById {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/organizations/invitations/$invitationId/reject': typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  '/api/organizations/invitations/$invitationId/review': typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
   '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
   '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
   '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
@@ -2721,6 +2815,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/security'
     | '/status'
+    | '/api/beta-mode'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
@@ -2766,6 +2861,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/privacy/remove'
+    | '/api/admin/preferences'
     | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
@@ -2786,6 +2882,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
@@ -2820,6 +2917,7 @@ export interface FileRouteTypes {
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
+    | '/api/status/summary'
     | '/api/webhooks/stripe'
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
@@ -2857,6 +2955,7 @@ export interface FileRouteTypes {
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
+    | '/api/admin/billing/beta-mode'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
     | '/api/admin/billing/metrics'
@@ -2877,6 +2976,9 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/metrics/overview'
+    | '/api/admin/metrics/run-retention'
+    | '/api/admin/metrics/sections'
     | '/api/admin/metrics/trust'
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
@@ -2970,6 +3072,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/organizations/invitations/$invitationId/reject'
+    | '/api/organizations/invitations/$invitationId/review'
     | '/api/public/scheduling/$invitationId/book'
     | '/api/public/scheduling/$invitationId/cancel'
     | '/api/public/scheduling/$invitationId/decline'
@@ -3006,6 +3110,7 @@ export interface FileRouteTypes {
     | '/roadmap'
     | '/security'
     | '/status'
+    | '/api/beta-mode'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
@@ -3050,6 +3155,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/privacy/remove'
+    | '/api/admin/preferences'
     | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
@@ -3070,6 +3176,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
@@ -3104,6 +3211,7 @@ export interface FileRouteTypes {
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
+    | '/api/status/summary'
     | '/api/webhooks/stripe'
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
@@ -3141,6 +3249,7 @@ export interface FileRouteTypes {
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
+    | '/api/admin/billing/beta-mode'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
     | '/api/admin/billing/metrics'
@@ -3161,6 +3270,9 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/metrics/overview'
+    | '/api/admin/metrics/run-retention'
+    | '/api/admin/metrics/sections'
     | '/api/admin/metrics/trust'
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
@@ -3254,6 +3366,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/organizations/invitations/$invitationId/reject'
+    | '/api/organizations/invitations/$invitationId/review'
     | '/api/public/scheduling/$invitationId/book'
     | '/api/public/scheduling/$invitationId/cancel'
     | '/api/public/scheduling/$invitationId/decline'
@@ -3292,6 +3406,7 @@ export interface FileRouteTypes {
     | '/_landing/roadmap'
     | '/_landing/security'
     | '/_landing/status'
+    | '/api/beta-mode'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
@@ -3338,6 +3453,7 @@ export interface FileRouteTypes {
     | '/_landing/legal/privacy'
     | '/_landing/legal/terms'
     | '/_landing/privacy/remove'
+    | '/api/admin/preferences'
     | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
@@ -3358,6 +3474,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
     | '/api/dashboard/stats'
@@ -3392,6 +3509,7 @@ export interface FileRouteTypes {
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
+    | '/api/status/summary'
     | '/api/webhooks/stripe'
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
@@ -3429,6 +3547,7 @@ export interface FileRouteTypes {
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
+    | '/api/admin/billing/beta-mode'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
     | '/api/admin/billing/metrics'
@@ -3449,6 +3568,9 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/metrics/overview'
+    | '/api/admin/metrics/run-retention'
+    | '/api/admin/metrics/sections'
     | '/api/admin/metrics/trust'
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
@@ -3542,6 +3664,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/organizations/invitations/$invitationId/reject'
+    | '/api/organizations/invitations/$invitationId/review'
     | '/api/public/scheduling/$invitationId/book'
     | '/api/public/scheduling/$invitationId/cancel'
     | '/api/public/scheduling/$invitationId/decline'
@@ -3574,12 +3698,14 @@ export interface RootRouteChildren {
   OnboardingRouteRoute: typeof OnboardingRouteRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiBetaModeRoute: typeof ApiBetaModeRoute
   ApiHealthRoute: typeof ApiHealthRoute
   BlogAtomDotxmlRoute: typeof BlogAtomDotxmlRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
   PortfolioClaimIdRoute: typeof PortfolioClaimIdRoute
   RSlugRoute: typeof RSlugRoute
   ScheduleInvitationIdRoute: typeof ScheduleInvitationIdRoute
+  ApiAdminPreferencesRoute: typeof ApiAdminPreferencesRoute
   ApiAdminSearchSourcesRoute: typeof ApiAdminSearchSourcesRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
@@ -3600,6 +3726,7 @@ export interface RootRouteChildren {
   ApiCalendarFeedRoute: typeof ApiCalendarFeedRoute
   ApiCalendarNotificationsRoute: typeof ApiCalendarNotificationsRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
+  ApiDashboardOrganizationAdminRoute: typeof ApiDashboardOrganizationAdminRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
   ApiDashboardPreferencesRoute: typeof ApiDashboardPreferencesRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
@@ -3634,6 +3761,7 @@ export interface RootRouteChildren {
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
   ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
   ApiStatusSubscribeRoute: typeof ApiStatusSubscribeRoute
+  ApiStatusSummaryRoute: typeof ApiStatusSummaryRoute
   ApiWebhooksStripeRoute: typeof ApiWebhooksStripeRoute
   ApiWorkSamplesIdRoute: typeof ApiWorkSamplesIdRoute
   ApiWorkSamplesAnalyzeRoute: typeof ApiWorkSamplesAnalyzeRoute
@@ -3656,6 +3784,7 @@ export interface RootRouteChildren {
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminAnalyticsRunRetentionRoute: typeof ApiAdminAnalyticsRunRetentionRoute
   ApiAdminBillingAccountingExportRoute: typeof ApiAdminBillingAccountingExportRoute
+  ApiAdminBillingBetaModeRoute: typeof ApiAdminBillingBetaModeRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
   ApiAdminBillingDisputesRoute: typeof ApiAdminBillingDisputesRoute
   ApiAdminBillingMetricsRoute: typeof ApiAdminBillingMetricsRoute
@@ -3676,6 +3805,9 @@ export interface RootRouteChildren {
   ApiAdminInterviewsRunRetentionRoute: typeof ApiAdminInterviewsRunRetentionRoute
   ApiAdminLegalRunWorkerRoute: typeof ApiAdminLegalRunWorkerRoute
   ApiAdminMetricsConversionRoute: typeof ApiAdminMetricsConversionRoute
+  ApiAdminMetricsOverviewRoute: typeof ApiAdminMetricsOverviewRoute
+  ApiAdminMetricsRunRetentionRoute: typeof ApiAdminMetricsRunRetentionRoute
+  ApiAdminMetricsSectionsRoute: typeof ApiAdminMetricsSectionsRoute
   ApiAdminMetricsTrustRoute: typeof ApiAdminMetricsTrustRoute
   ApiAdminOperationsJobKeyRoute: typeof ApiAdminOperationsJobKeyRouteWithChildren
   ApiAdminOperationsSyncSchedulesRoute: typeof ApiAdminOperationsSyncSchedulesRoute
@@ -3903,6 +4035,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/beta-mode': {
+      id: '/api/beta-mode'
+      path: '/api/beta-mode'
+      fullPath: '/api/beta-mode'
+      preLoaderRoute: typeof ApiBetaModeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_landing/status': {
@@ -4164,6 +4303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/status/summary': {
+      id: '/api/status/summary'
+      path: '/api/status/summary'
+      fullPath: '/api/status/summary'
+      preLoaderRoute: typeof ApiStatusSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/status/subscribe': {
       id: '/api/status/subscribe'
       path: '/api/status/subscribe'
@@ -4402,6 +4548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDashboardOverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dashboard/organization-admin': {
+      id: '/api/dashboard/organization-admin'
+      path: '/api/dashboard/organization-admin'
+      fullPath: '/api/dashboard/organization-admin'
+      preLoaderRoute: typeof ApiDashboardOrganizationAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/changelog/$slug': {
       id: '/api/changelog/$slug'
       path: '/api/changelog/$slug'
@@ -4540,6 +4693,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/search-sources'
       fullPath: '/api/admin/search-sources'
       preLoaderRoute: typeof ApiAdminSearchSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/preferences': {
+      id: '/api/admin/preferences'
+      path: '/api/admin/preferences'
+      fullPath: '/api/admin/preferences'
+      preLoaderRoute: typeof ApiAdminPreferencesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_landing/privacy/remove': {
@@ -5326,6 +5486,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminMetricsTrustRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/metrics/sections': {
+      id: '/api/admin/metrics/sections'
+      path: '/api/admin/metrics/sections'
+      fullPath: '/api/admin/metrics/sections'
+      preLoaderRoute: typeof ApiAdminMetricsSectionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/run-retention': {
+      id: '/api/admin/metrics/run-retention'
+      path: '/api/admin/metrics/run-retention'
+      fullPath: '/api/admin/metrics/run-retention'
+      preLoaderRoute: typeof ApiAdminMetricsRunRetentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/overview': {
+      id: '/api/admin/metrics/overview'
+      path: '/api/admin/metrics/overview'
+      fullPath: '/api/admin/metrics/overview'
+      preLoaderRoute: typeof ApiAdminMetricsOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/metrics/conversion': {
       id: '/api/admin/metrics/conversion'
       path: '/api/admin/metrics/conversion'
@@ -5464,6 +5645,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/billing/configuration'
       fullPath: '/api/admin/billing/configuration'
       preLoaderRoute: typeof ApiAdminBillingConfigurationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/beta-mode': {
+      id: '/api/admin/billing/beta-mode'
+      path: '/api/admin/billing/beta-mode'
+      fullPath: '/api/admin/billing/beta-mode'
+      preLoaderRoute: typeof ApiAdminBillingBetaModeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/billing/accounting-export': {
@@ -5633,6 +5821,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/scheduling/$invitationId/book'
       preLoaderRoute: typeof ApiPublicSchedulingInvitationIdBookRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/invitations/$invitationId/review': {
+      id: '/api/organizations/invitations/$invitationId/review'
+      path: '/review'
+      fullPath: '/api/organizations/invitations/$invitationId/review'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdReviewRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
+    }
+    '/api/organizations/invitations/$invitationId/reject': {
+      id: '/api/organizations/invitations/$invitationId/reject'
+      path: '/reject'
+      fullPath: '/api/organizations/invitations/$invitationId/reject'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRejectRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
     }
     '/api/organizations/invitations/$invitationId/accept': {
       id: '/api/organizations/invitations/$invitationId/accept'
@@ -6151,12 +6353,18 @@ const ApiMeBuilderBuilderIdRouteWithChildren =
 
 interface ApiOrganizationsInvitationsInvitationIdRouteChildren {
   ApiOrganizationsInvitationsInvitationIdAcceptRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  ApiOrganizationsInvitationsInvitationIdRejectRoute: typeof ApiOrganizationsInvitationsInvitationIdRejectRoute
+  ApiOrganizationsInvitationsInvitationIdReviewRoute: typeof ApiOrganizationsInvitationsInvitationIdReviewRoute
 }
 
 const ApiOrganizationsInvitationsInvitationIdRouteChildren: ApiOrganizationsInvitationsInvitationIdRouteChildren =
   {
     ApiOrganizationsInvitationsInvitationIdAcceptRoute:
       ApiOrganizationsInvitationsInvitationIdAcceptRoute,
+    ApiOrganizationsInvitationsInvitationIdRejectRoute:
+      ApiOrganizationsInvitationsInvitationIdRejectRoute,
+    ApiOrganizationsInvitationsInvitationIdReviewRoute:
+      ApiOrganizationsInvitationsInvitationIdReviewRoute,
   }
 
 const ApiOrganizationsInvitationsInvitationIdRouteWithChildren =
@@ -6240,12 +6448,14 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRouteRoute: OnboardingRouteRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiBetaModeRoute: ApiBetaModeRoute,
   ApiHealthRoute: ApiHealthRoute,
   BlogAtomDotxmlRoute: BlogAtomDotxmlRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
   PortfolioClaimIdRoute: PortfolioClaimIdRoute,
   RSlugRoute: RSlugRoute,
   ScheduleInvitationIdRoute: ScheduleInvitationIdRoute,
+  ApiAdminPreferencesRoute: ApiAdminPreferencesRoute,
   ApiAdminSearchSourcesRoute: ApiAdminSearchSourcesRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
@@ -6266,6 +6476,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCalendarFeedRoute: ApiCalendarFeedRoute,
   ApiCalendarNotificationsRoute: ApiCalendarNotificationsRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
+  ApiDashboardOrganizationAdminRoute: ApiDashboardOrganizationAdminRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
   ApiDashboardPreferencesRoute: ApiDashboardPreferencesRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
@@ -6302,6 +6513,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
   ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
   ApiStatusSubscribeRoute: ApiStatusSubscribeRoute,
+  ApiStatusSummaryRoute: ApiStatusSummaryRoute,
   ApiWebhooksStripeRoute: ApiWebhooksStripeRoute,
   ApiWorkSamplesIdRoute: ApiWorkSamplesIdRoute,
   ApiWorkSamplesAnalyzeRoute: ApiWorkSamplesAnalyzeRoute,
@@ -6324,6 +6536,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminAnalyticsRunRetentionRoute: ApiAdminAnalyticsRunRetentionRoute,
   ApiAdminBillingAccountingExportRoute: ApiAdminBillingAccountingExportRoute,
+  ApiAdminBillingBetaModeRoute: ApiAdminBillingBetaModeRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
   ApiAdminBillingDisputesRoute: ApiAdminBillingDisputesRoute,
   ApiAdminBillingMetricsRoute: ApiAdminBillingMetricsRoute,
@@ -6344,6 +6557,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminInterviewsRunRetentionRoute: ApiAdminInterviewsRunRetentionRoute,
   ApiAdminLegalRunWorkerRoute: ApiAdminLegalRunWorkerRoute,
   ApiAdminMetricsConversionRoute: ApiAdminMetricsConversionRoute,
+  ApiAdminMetricsOverviewRoute: ApiAdminMetricsOverviewRoute,
+  ApiAdminMetricsRunRetentionRoute: ApiAdminMetricsRunRetentionRoute,
+  ApiAdminMetricsSectionsRoute: ApiAdminMetricsSectionsRoute,
   ApiAdminMetricsTrustRoute: ApiAdminMetricsTrustRoute,
   ApiAdminOperationsJobKeyRoute: ApiAdminOperationsJobKeyRouteWithChildren,
   ApiAdminOperationsSyncSchedulesRoute: ApiAdminOperationsSyncSchedulesRoute,

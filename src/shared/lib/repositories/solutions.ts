@@ -202,6 +202,8 @@ export async function findRun(
 
   const routes = await transaction.select().from(solutionRunRoutes)
     .where(and(eq(solutionRunRoutes.organizationId, principal.organizationId), eq(solutionRunRoutes.runId, runId)))
+    // The routes of one run — "the children of this row", rendered whole on the run detail page.
+    .limit(ENTITY_DETAIL_LIMIT)
   return { run, routes }
 }
 

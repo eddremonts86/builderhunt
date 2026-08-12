@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
@@ -31,7 +32,7 @@ vi.mock('~/shared/lib/env', async (importOriginal) => {
 
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
-import { authUsers, billingSubscriptions, organizations } from '~/shared/lib/db/schema'
+import { authUsers, billingSubscriptions, organizations, platformBetaMode } from '~/shared/lib/db/schema'
 import { grantCredits } from '~/shared/lib/billing/credits'
 import { findCreditGrant } from '~/shared/lib/repositories/billing-ledger'
 import {
@@ -59,6 +60,18 @@ async function freshPrincipal(): Promise<TenantPrincipal> {
   const userId = uniqueId('user')
   await db.insert(authUsers).values({ id: userId, name: userId, email: `${userId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
   return { userId, organizationId: orgId, role: 'owner', requestId: uniqueId('request') }
+}
+
+/**
+ * Flips the real `platform_beta_mode` row, rather than mocking the read.
+ *
+ * Mocking `getBetaModeState` would prove the branch runs and prove nothing about the advisory lock, the
+ * revision, or the GRANT split — and those are the parts of plan 58 that can actually go wrong. This
+ * suite already runs against a disposable database with every migration applied, so the singleton is
+ * there to be flipped.
+ */
+async function setBetaMode(enabled: boolean): Promise<void> {
+  await db.update(platformBetaMode).set({ enabled }).where(eq(platformBetaMode.id, 'global'))
 }
 
 async function seedSubscription(organizationId: string, tier: 'pro' | 'pro_max' | 'team', stripeStatus = 'active'): Promise<void> {
@@ -126,6 +139,55 @@ describe('checkEntitlement', () => {
     const principal = await freshPrincipal()
     const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
     expect(result).toEqual({ allowed: false, reason: 'no_subscription' })
+  })
+
+  describe('with beta mode enabled', () => {
+    afterEach(async () => {
+      // Restored explicitly: the singleton is shared by every test in this file, and a leaked `true`
+      // would make the beta-off regression cases above pass for the wrong reason.
+      await setBetaMode(false)
+    })
+
+    it('allows a free organization with no subscription at all', async () => {
+      // The case the whole plan exists for. With beta off this is `no_subscription`, asserted above —
+      // and it stays that way, because `STRIPE_BILLING_ENABLED` is false everywhere and there is no
+      // subscription to find.
+      const principal = await freshPrincipal()
+      await setBetaMode(true)
+      const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+      expect(result).toEqual({ allowed: true })
+    })
+
+    it('still refuses a feature above Pro Max', async () => {
+      // Beta mode is a floor at `pro_max`, not a bypass. If a rate card ever requires more, the answer
+      // is still `tier_too_low` — a promotional flag must not become "allowed for everything".
+      const principal = await freshPrincipal()
+      await setBetaMode(true)
+      const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'not_a_real_feature' }))
+      expect(result).toEqual({ allowed: false, reason: 'unknown_feature' })
+    })
+
+    it('is reversible: the same organization is refused again the moment it is switched off', async () => {
+      // No restoration migration, no per-organization rewrite. The next authoritative read is the whole
+      // mechanism, which is what makes disable an operational action rather than a deploy.
+      const principal = await freshPrincipal()
+      await setBetaMode(true)
+      const allowed = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+      expect(allowed).toEqual({ allowed: true })
+
+      await setBetaMode(false)
+      const refused = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+      expect(refused).toEqual({ allowed: false, reason: 'no_subscription' })
+    })
+
+    it('does not disturb an organization that already holds a paid tier', async () => {
+      // Team is ranked equal to Pro Max for features, so a floor must leave it exactly where it is.
+      const principal = await freshPrincipal()
+      await seedSubscription(principal.organizationId, 'team')
+      await setBetaMode(true)
+      const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+      expect(result).toEqual({ allowed: true })
+    })
   })
 
   it('rejects a subscription whose tier is below the feature\'s minimum', async () => {

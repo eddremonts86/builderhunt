@@ -121,12 +121,24 @@ const classifications: Classification[] = [
   // organization or the user cascades it away.
   tenant('dashboard_preferences', 'organization_id + user_id (composite primary key)', ['ui-dashboard'], { organizationColumn: true }),
 
+  // `platform_admin_preferences` is the same kind of row with a different subject, and the difference is the
+  // reason it is a second table rather than a nullable column: a platform admin has no organization in the admin
+  // console, so there is no tenant to scope it to and no predicate RLS could express. It is `account-subject`
+  // rather than `tenant-private` for that reason — the owner is a person, keyed on `user_id`, and the row dies
+  // with the account via `ON DELETE CASCADE`.
+  //
+  // It holds no subject data either: three short landing strings and a list of widget ids. What makes it worth a
+  // classification entry at all is the *isolation* claim — `builderhunt_app` has no grant on it, which is what
+  // makes "platform and tenant preferences cannot read each other" a property of the database rather than of a
+  // code review. See drizzle/0170 and tests/e2e/api/preference-store-isolation.spec.ts.
+  account('platform_admin_preferences', 'user_id', ['ui-dashboard'], 'account lifetime; cascade-deleted with the account'),
+
   // Status subscribers (plan 47-status-and-trust, Phase 2). System-operational, no owning subject —
   // same anti-enumeration shape as `feed_capabilities`: the row is keyed by the SHA-256 of a random
   // unsubscribe token, the raw token only ever appears once, in the unsubscribe URL.
   operational('status_subscribers', 'email_lower (unsubscribe_token_hash is the only bearer secret)', ['status-and-trust']),
 
-  // Calendar and scheduling (plans/phase-1/44-calendar-scheduling-interview-intelligence).
+  // Calendar and scheduling (plans/implemented/44-calendar-scheduling-interview-intelligence).
   //
   // Classified ahead of the rest of the unclassified set — roughly fifty tables across billing,
   // enrichment, sprints and abuse still have no entry — because these ten already carry RLS and
@@ -247,7 +259,7 @@ const classifications: Classification[] = [
     retention: 'retention_expires_at; keyed to the event rather than the session so a report survives its session being reclaimed',
   }),
 
-  // Semantic search and proactive discovery (plans/phase-1/22-semantic-search, 23-proactive-discovery).
+  // Semantic search and proactive discovery (plans/implemented/22-semantic-search, 23-proactive-discovery).
   //
   // `builder_embeddings` is the global pgvector index, written by the write-through path that fires
   // after every search/track request and by the proactive-discovery worker. The data inside is a
@@ -362,6 +374,21 @@ const classifications: Classification[] = [
   // /legal/privacy — none of which exists yet (tracked in the plan-54 task list, and this comment is
   // deliberately blunt so the gap cannot be mistaken for a decision).
   operational('access_requests', 'email (plaintext, platform-owned; no tenant scope)', ['waitlist-launch']),
+
+  // Beta mode (plan 58). One global row, `id = 'global'`, pinned by a CHECK alongside the primary key.
+  // It holds no tenant column and no personal data beyond the operator id that made the last change —
+  // so there is no predicate an RLS policy could express, and access is controlled entirely by GRANT:
+  // SELECT for app/readonly/worker, SELECT+INSERT+UPDATE for platform, DELETE for nobody. Same
+  // RLS-exception rationale as `status_checks` and `access_requests` above.
+  operational('platform_beta_mode', 'updated_by (platform operator id, no FK so history survives account deletion)', ['beta-mode-global-pro-max-grant']),
+
+  // Per-minute service metrics (plan 57). No tenant column and no personal data: the only free-text values
+  // are a route *family* from a fourteen-value allowlist, an instance name and a deployment id, so there is
+  // no predicate an RLS policy could express. Same RLS exception as `status_checks` and `platform_beta_mode`.
+  // The reason the family is an allowlist rather than a path is itself a privacy decision —
+  // `/api/sprints/<id>` names a real sprint, and a path column would put tenant identifiers in an operator
+  // table and in every export of it.
+  operational('service_metric_buckets', 'route_family (allowlisted, never a path), instance, deployment', ['ui-dashboard']),
 
   operational('profile_removal_requests', 'source + source_id (hashed challenge, no PII)', ['audit-trust']),
   operational('profile_suppressions', 'source + source_id (revoked/active, audited admin action)', ['audit-trust']),

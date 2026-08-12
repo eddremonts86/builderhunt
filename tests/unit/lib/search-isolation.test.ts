@@ -1,5 +1,5 @@
 /**
- * plans/phase-1/43-solutions-intelligence Phase 2, "Isolate connectors and correct identity
+ * plans/implemented/43-solutions-intelligence Phase 2, "Isolate connectors and correct identity
  * candidates". Verify line: "one/two/all connector failures, same username/different people, same
  * person/different source, stable ordering, timeout, and partial-result tests pass."
  *

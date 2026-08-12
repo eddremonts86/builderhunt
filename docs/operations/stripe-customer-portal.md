@@ -6,7 +6,7 @@ spec.md: "Customer Portal is owner-only and limited to payment methods, tax iden
 receipts. All plan changes/cancellation remain BuilderHunt-owned." The Portal exists purely as a
 Stripe-hosted surface for account-and-payment housekeeping — it is never how an organization changes
 tier, interval, or cancels. Every plan-change/cancellation flow lives in this app's own
-subscription-change endpoints (plans/phase-1/30-stripe-billing-platform/tasks.md §7), not the Portal.
+subscription-change endpoints (plans/implemented/phase-1/30-stripe-billing-platform/tasks.md §7), not the Portal.
 
 ## What our code does and does not control
 

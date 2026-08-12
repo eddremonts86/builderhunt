@@ -1,7 +1,7 @@
 # Paste-a-JD Candidate Matching (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`semantic-search`](../../phase-1/22-semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW query path — already shipped); [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md) (task registry, budgets, zod validation, kill switches — already shipped); [`stripe-billing-platform`](../../phase-1/30-stripe-billing-platform/spec.md) (the Pro Max tier this feature is gated on does not bill anyone yet). Enhanced by [`match-evidence-panel`](../match-evidence-panel/spec.md) and [`availability-signals`](../availability-signals/spec.md) — **dashed, never blocking** (see "Optional enhancers" below).
+> **Depends on**: [`semantic-search`](../../implemented/phase-1/22-semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW query path — already shipped); [`ai-expansion`](../../implemented/phase-1/21-ai-expansion/spec.md) (task registry, budgets, zod validation, kill switches — already shipped); [`stripe-billing-platform`](../../implemented/phase-1/30-stripe-billing-platform/spec.md) (the Pro Max tier this feature is gated on does not bill anyone yet). Enhanced by [`match-evidence-panel`](../match-evidence-panel/spec.md) and [`availability-signals`](../availability-signals/spec.md) — **dashed, never blocking** (see "Optional enhancers" below).
 > **Blocks**: nothing
 > **Optional enhancers — exactly what is borrowed**: `match-evidence-panel` ships
 > `src/modules/search/components/MatchEvidencePanel.tsx` (new in that plan), a presentational
@@ -38,7 +38,7 @@ public profile text. Runs are saved so the answer can be re-read without paying 
 - **Not `solutions-intelligence`.** That plan turns a *structured `SolutionBrief`* into up to
   three Human/AI/Hybrid **solution routes** over a capability catalog, typed compatibility edges
   and versioned `agent`/`model`/`mcp_server`/`tool`/`service` components
-  ([`solutions-intelligence`](../../phase-1/43-solutions-intelligence/spec.md)). This plan turns
+  ([`solutions-intelligence`](../../implemented/phase-1/43-solutions-intelligence/spec.md)). This plan turns
   *unstructured pasted prose* into **people, ranked**. No catalog, no compatibility graph, no
   route composition, no `SolutionBrief`, no non-human components, no clarification dialogue, no
   `solutions.*` credit operation, and **no changes to `builder_identities` / the canonical-human
@@ -385,7 +385,7 @@ never the JD, a prompt, or a model response.
 
 **The privacy page needs less than this plan originally assumed.**
 `src/routes/_landing/legal/privacy.tsx` §3 "Subprocessors" (kept accurate by
-[`legal-and-compliance`](../../phase-1/04-legal-and-compliance/spec.md)) already names MiniMax M3 and
+[`legal-and-compliance`](../../implemented/phase-1/04-legal-and-compliance/spec.md)) already names MiniMax M3 and
 already says *"we only send public profile data and your own submitted inputs (e.g. a job
 description)"*. What is genuinely missing is the **retention** half, which is this plan's own
 invention: that JD text is discarded by default and kept only on explicit opt-in, for at most 90

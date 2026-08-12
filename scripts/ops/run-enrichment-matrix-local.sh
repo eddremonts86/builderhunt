@@ -5,7 +5,7 @@
 #
 # This is the same setup `pnpm ci:local` performs for its `api-isolation` step, reduced to the parts
 # the matrix needs. It is a separate entry point rather than a step inside ci:local on purpose: the
-# matrix is evidence production for a plan gate (plans/phase-1/42-stealth-scraping Phase 7), it takes
+# matrix is evidence production for a plan gate (plans/implemented/42-stealth-scraping Phase 7), it takes
 # ~30s of which 10s is a deliberate timeout, and it touches the live network once. A quality gate
 # should not do any of those things on every run.
 #

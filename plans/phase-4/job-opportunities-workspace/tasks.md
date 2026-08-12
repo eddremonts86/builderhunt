@@ -1,7 +1,7 @@
 # Tareas — workspace interno de ofertas de trabajo
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md), [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md), [`stealth-scraping`](../../phase-1/42-stealth-scraping/spec.md), [`stripe-billing-platform`](../../phase-1/30-stripe-billing-platform/spec.md)
+> **Depends on**: [`security-and-multitenancy`](../../implemented/phase-1/01-security-and-multitenancy/spec.md), [`ai-expansion`](../../implemented/phase-1/21-ai-expansion/spec.md), [`stealth-scraping`](../../implemented/phase-1/42-stealth-scraping/spec.md), [`stripe-billing-platform`](../../implemented/phase-1/30-stripe-billing-platform/spec.md)
 > **Blocks**: [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), [`delegated-job-applications`](../delegated-job-applications/spec.md)
 > **Reality check**: Todo el dominio (`src/shared/lib/jobs/`, `src/lib/jobs/`, `src/modules/jobs/`, `src/routes/api/jobs/`, cuatro tablas) es nuevo. Se reutilizan tal cual: `safeFetch` (`src/lib/enrichment/network.ts`), `isPathAllowedByRobots` (`src/lib/enrichment/robots.ts`), `HARD_BLOCKED_CONNECTOR_IDS` (`src/lib/enrichment/policies.ts`), `validateExternalHttpUrl` (`src/shared/lib/security/url-policy.ts`), `wrapUntrusted`/`AI_TASKS` (`src/shared/lib/ai/tasks.ts`), `tenantAiCacheKey` (`src/shared/lib/ai/cache.ts`), `reserveCredits`/`settleReservation`/`releaseReservation` (`src/shared/lib/billing/feature-authorization.ts`), `ensurePersonalOrganization` (`src/shared/lib/auth/personal-organization.ts`), `withTenantContext` (`src/shared/lib/db/tenant-context.ts`) y el patrón de worker de `src/routes/api/admin/alerts/run-worker.ts`.
 

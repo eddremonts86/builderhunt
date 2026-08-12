@@ -54,6 +54,10 @@ const SCRIPTS_CREATED_BY_PLANS = new Map([
   ['test:load:smoke', '55-load-1000-concurrent-users'],
   ['test:db-role-timeouts', '55-load-1000-concurrent-users'],
   ['load:pooler:preflight', '55-load-1000-concurrent-users'],
+  // Phase-2 plan 08 creates this one itself, in a task that is still open: "Wire the gate into
+  // `pnpm audit:landing`" adds it to package.json. The plan naming a script it is about to build is
+  // correct; the checker's own failure message says to register it here rather than to change the plan.
+  ['audit:landing', '08-homing-page-content-and-sections'],
   // Phase 4's two career plans specify these as exit criteria for their own phases, and both plans say plainly that
   // nothing creates them yet. Registered so the checker stops reporting a gap the plans already declare, while still
   // failing if any *other* document starts telling someone to run them.

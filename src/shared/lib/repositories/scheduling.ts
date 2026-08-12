@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
+import { ENTITY_DETAIL_LIMIT, USER_SCOPED_LIMIT } from '../db/read-bounds'
 import {
   availabilityOverrides,
   availabilityPolicies,
@@ -70,6 +71,10 @@ export async function listAvailabilityRules(transaction: TenantTransaction, orga
     .from(availabilityRules)
     .where(and(eq(availabilityRules.organizationId, organizationId), eq(availabilityRules.ownerUserId, ownerUserId)))
     .orderBy(asc(availabilityRules.localStart))
+    // One owner's weekly availability policy, rendered whole by the editor on `/calendar`. Bounded
+    // by what a person sets by hand: `PUT /api/calendar/availability` replaces the policy wholesale,
+    // so this grows only when somebody adds another window.
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export async function listAvailabilityOverrides(transaction: TenantTransaction, organizationId: string, ownerUserId: string) {
@@ -78,6 +83,8 @@ export async function listAvailabilityOverrides(transaction: TenantTransaction, 
     .from(availabilityOverrides)
     .where(and(eq(availabilityOverrides.organizationId, organizationId), eq(availabilityOverrides.ownerUserId, ownerUserId)))
     .orderBy(asc(availabilityOverrides.localDate))
+    // Same ceiling and the same reason as the rules above: one owner's hand-entered exceptions.
+    .limit(USER_SCOPED_LIMIT)
 }
 
 /**
@@ -226,6 +233,10 @@ export async function listInvitationsForOwner(transaction: TenantTransaction, or
     .from(schedulingInvitations)
     .where(and(eq(schedulingInvitations.organizationId, organizationId), eq(schedulingInvitations.ownerUserId, ownerUserId)))
     .orderBy(asc(schedulingInvitations.createdAt))
+    // The invitations one organizer has issued, listed whole on their scheduling surface. An
+    // organizer past this ceiling needs a filter, which is a product question rather than a query
+    // one — and the surface has no "load more" to page into.
+    .limit(USER_SCOPED_LIMIT)
 }
 
 export async function findInvitationForOwner(
@@ -542,6 +553,9 @@ export async function listLinksForSubmission(transaction: TenantTransaction, org
     .from(candidateLinks)
     .where(and(eq(candidateLinks.organizationId, organizationId), eq(candidateLinks.submissionId, submissionId)))
     .orderBy(asc(candidateLinks.createdAt))
+    // The links attached to one submission — "the children of this row". A submission with more
+    // than this many is not a detail view any more.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 /** Idempotent on `(organization, submission, normalizedUrl)` — resubmitting the same link updates its label rather than duplicating it. */
@@ -721,6 +735,9 @@ export async function listConsentsForInvitation(
       eq(privacyConsents.invitationId, invitationId),
     ))
     .orderBy(asc(privacyConsents.decidedAt), asc(privacyConsents.id))
+    // The consent receipts of one invitation. Bounded for the same reason as the links above, and
+    // the ordering is already total (`decidedAt`, then `id`), so the ceiling cannot land inside a tie.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 /**
@@ -745,6 +762,10 @@ export async function findConsentsByIds(
       eq(privacyConsents.invitationId, invitationId),
       inArray(privacyConsents.id, [...consentIds]),
     ))
+    // Model-bounded by the caller's own array: `id` is the primary key, so the result cannot exceed
+    // the ids asked for. Stated rather than assumed, because "it is an inArray" is the reasoning a
+    // future `inArray` over a non-unique column would inherit without earning.
+    .limit(consentIds.length)
 }
 
 /**

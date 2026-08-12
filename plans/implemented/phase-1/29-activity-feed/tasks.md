@@ -1,0 +1,66 @@
+# Tasks: Tenant Activity Feed
+
+> **Status**: `implemented` — unblocked 2026-07-29. It still runs *after* `28-shared-resources`, whose
+> mutations it records, but that plan is executable now, so this is sequencing rather than a hold
+> **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md), [`team-accounts`](../27-team-accounts/tasks.md), [`shared-resources`](../28-shared-resources/tasks.md)
+> **Blocks**: nothing
+> **Reality check**: (verified 2026-07-29) the prerequisites it listed — canonical tenant
+> transactions, activity/security-audit separation, non-owner roles, RLS, and the tenant A/B harness —
+> all exist. The one still to come is `28-shared-resources`'s services, whose mutations this plan
+> records, so run it after that plan and not before. That is an order, not a blocker.
+
+
+## Status reconciliation (2026-08-11)
+
+Moved to `plans/implemented/` on the strength of this, so the folder means one thing: **every task checked,
+and `pnpm ci:local` green at 34/34 steps** (6,543 unit tests, 996 e2e) on commit `90527722e`.
+
+Why the status changed: was `done`, a synonym no gate can read.
+
+The eight status values previously in use across phase-1 — `complete`, `done`, `in_progress`, `retired`,
+`closed — skipped`, `engineering-complete`, `code-complete-dark`, `pending — implementation-ready` — are
+outside the five `scripts/check-phase-readiness.mjs` accepts, and that script only ran against phase-2 and
+phase-3. A status no gate reads is a status that drifts, which is how four plans sat at 100% of their tasks
+while still labelled `pending`.
+
+- [x] **Define versioned event and redaction registry**
+  - Files: `src/shared/lib/activity/contracts.ts`, `tests/unit/shared/lib/activity/contracts.test.ts`, `docs/architecture/activity-events.md`
+  - Do: Define approved event types, version, criticality, target integrity mode, zod metadata allowlist, formatter, retention, and security-audit mapping. Reject unknown keys and sensitive canaries; define deterministic idempotency key input.
+  - Verify: one test per type/version/formatter/redaction plus unknown/email/token/note/query/prompt payload rejection passes.
+
+- [x] **Add tenant activity schema, RLS, grants, and indexes**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/`, `tests/unit/security/activity-schema.test.ts`, `scripts/db/verify-rls-local.mjs`
+  - Do: Add organization activity table with candidate key, idempotency uniqueness, checked type/version, actor FK, keyset index, live-target composite FKs where applicable, force-RLS, app insert/select only, and worker bounded-delete policy. Keep security audit separate and unreadable to ordinary app feed queries.
+  - Verify: app-role missing/A/B contexts, update denial, duplicate idempotency, cross-tenant target, and worker-grant tests pass.
+  - Reality check (2026-07-31): the `tests/unit/security/rls.test.ts` this task cited never existed —
+    same correction as `shared-resources` task 2: RLS needs a live per-role DB connection, which is
+    `scripts/db/verify-rls-local.mjs` (`pnpm test:rls:local`), not a mockable vitest unit test.
+
+- [x] **Implement transaction-bound activity repository**
+  - Files: `src/shared/lib/repositories/activity.ts`, `tests/unit/shared/lib/repositories/activity.test.ts`
+  - Do: Implement `emitActivity(tx, principal, event)` and `listActivity(tx, principal, options)`; derive organization/actor/request from principal, validate metadata, use idempotency upsert/no-op, and keyset pagination. No global DB import or optional organization input.
+  - Verify: atomic rollback, retry duplicate, A/B, missing context, equal timestamp pagination, actor deletion, and DTO allowlist tests pass.
+
+- [x] **Instrument canonical organization and shared-resource services**
+  - Files: `src/shared/lib/auth/organization-lifecycle.ts`, `src/shared/lib/repositories/saved-queries.ts`, `src/shared/lib/repositories/organization-builders.ts`, `src/shared/lib/repositories/builder-notes.ts`, `src/shared/lib/repositories/builder-lists.ts`, `src/shared/lib/repositories/alerts.ts`, `tests/unit/security/activity-emission.test.ts`
+  - Do: Emit only after authorized mutation inside the same tenant transaction; include minimized display metadata; classify membership/ownership/sharing/export/deletion events as transaction-critical. Avoid route-level duplicate emission and never include note/query/contact contents.
+  - Verify: each mutation and retry yields expected exact event count; injected event failure rolls back critical mutation; sensitive canaries absent from DB/log/DTO.
+
+- [x] **Add tenant activity API and UI**
+  - Files: `src/routes/api/organizations/activity.ts`, `src/routes/_dashboard/team/activity.tsx`, `src/modules/dashboard/components/TeamActivityPage.tsx`, `src/modules/dashboard/components/TeamActivityWidget.tsx`, `src/shared/lib/query-keys.ts`
+  - Do: Resolve tenant principal/context, validate cursor/filter, return feed DTOs, and use organization-keyed cache. Render day groups, version-aware formatter, actor fallback, filters, load more, and no feed while context is switching/stale.
+  - Verify: API role/A-B/spoof tests and component/browser switch/removal/in-flight/keyboard/mobile/accessibility tests pass.
+
+- [x] **Add bounded retention worker and privacy/export integration**
+  - Files: `src/shared/lib/workers/activity-retention.ts`, `src/routes/api/admin/activity/prune.ts`, `src/shared/lib/legal.ts`, `tests/unit/security/activity-retention.test.ts`, `tests/unit/security/activity-privacy.test.ts`
+  - Do: Authenticate worker, select server-side tenant batches, delete only expired product activity with worker role, checkpoint/retry safely, and emit operational metrics. Organization export uses allowed events; account export/deletion applies actor privacy without deleting organization history incorrectly.
+  - Verify: recent/expired/A-B/idempotent/partial failure worker tests and owner/member/account export/deletion matrix pass.
+
+- [x] **Run activity release and performance gates**
+  - Files: `tests/e2e/activity-feed.spec.ts`, `docs/operations/activity-feed.md`, `.github/workflows/quality.yml`
+  - Do: Seed 10k events per tenant and run keyset query plans, two-tenant API/direct-SQL, retries, equal timestamps, role/removal/switch, retention, privacy, and critical browser flows under production-like roles.
+  - Verify: query meets recorded budget using organization keyset index; `pnpm test:security && pnpm test:rls && pnpm test:e2e -- tests/e2e/activity-feed.spec.ts && pnpm lint && pnpm type-check && pnpm test && pnpm build` passes.
+
+## Future
+
+- Realtime, configurable retention/filters, and redacted weekly AI digest.

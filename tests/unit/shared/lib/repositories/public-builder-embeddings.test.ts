@@ -13,7 +13,7 @@ import { searchBuilderEmbeddings, similarBuilderEmbeddingsQuery } from '~/shared
  * HNSW index can only answer an ordering expressed as the bare distance
  * operator — the planner cannot match a monotonic transform of it back to the
  * index — so every semantic query fell back to `Seq Scan + Sort` over the
- * whole table while the doc comment (and plans/phase-1/22-semantic-search/spec.md's
+ * whole table while the doc comment (and plans/implemented/22-semantic-search/spec.md's
  * "warm-index semantic query p95 < 100 ms (local HNSW)" target) claimed an
  * index scan.
  *
@@ -151,7 +151,7 @@ describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
   })
 
   /**
-   * plans/phase-1/43-solutions-intelligence Phase 2, "Honor semantic filters and pagination".
+   * plans/implemented/43-solutions-intelligence Phase 2, "Honor semantic filters and pagination".
    *
    * The two defects these pin: the `sources` filter was accepted by `/api/search/semantic` and
    * never applied to local vector matches at all, and `hasMore` was inferred from

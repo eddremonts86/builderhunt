@@ -5,9 +5,9 @@
 > [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md),
 > [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md),
 > [`06-landing-segmentada`](../06-landing-segmentada/spec.md),
-> [`phase-1/36-claimable-profiles`](../../phase-1/36-claimable-profiles/spec.md),
-> [`phase-1/37-portfolio-builder`](../../phase-1/37-portfolio-builder/spec.md), and
-> [`phase-1/38-work-sample`](../../phase-1/38-work-sample/spec.md)
+> [`phase-1/36-claimable-profiles`](../../implemented/phase-1/36-claimable-profiles/spec.md),
+> [`phase-1/37-portfolio-builder`](../../implemented/phase-1/37-portfolio-builder/spec.md), and
+> [`phase-1/38-work-sample`](../../implemented/phase-1/38-work-sample/spec.md)
 > **Blocks**: nothing
 > **Reality check**: The original 83-item checklist predated the current schema tip (`0154`), the
 > production document pipeline in `src/lib/storage/`, the account data-export API, and the removal

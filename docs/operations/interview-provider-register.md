@@ -8,7 +8,7 @@
 > Companion to [`src/shared/lib/env.ts`](../../src/shared/lib/env.ts) (the compile-time
 > enforcement point — production boot **fails closed** if a flag is on and its provider config is
 > missing or in the wrong region) and
-> [`plans/phase-1/44-calendar-scheduling-interview-intelligence/spec.md`](../../plans/phase-1/44-calendar-scheduling-interview-intelligence/spec.md).
+> [`plans/implemented/phase-1/44-calendar-scheduling-interview-intelligence/spec.md`](../../plans/implemented/phase-1/44-calendar-scheduling-interview-intelligence/spec.md).
 >
 > **Never commit a secret value here.** This register records account identity, region, DPA status
 > and owner — never keys. Secrets live in Coolify environment variables only.

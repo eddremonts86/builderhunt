@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, eq, gt, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import { ENTITY_DETAIL_LIMIT } from '../db/read-bounds'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import type { CapabilityTransaction } from '../db/capability-db'
 import { candidateLinks, candidateWebImports, organizations } from '../db/schema'
@@ -159,7 +160,12 @@ export async function listLinksForSubmission(
       eq(candidateLinks.organizationId, params.organizationId),
       eq(candidateLinks.submissionId, params.submissionId),
     ))
-    .orderBy(candidateLinks.createdAt)
+    .orderBy(candidateLinks.createdAt, candidateLinks.id)
+    // The links of one submission — "the children of this row", rendered whole by both the candidate's
+    // intake view and the organizer's review. `id` joins the ordering because `createdAt` is not
+    // unique: a batch of links submitted together shares a timestamp, and a boundary inside that tie
+    // would reorder the view between reads.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 /**

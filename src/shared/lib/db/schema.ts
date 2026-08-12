@@ -133,6 +133,19 @@ export const organizationInvitations = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     inviterId: text('inviter_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    /**
+     * Why the sender is inviting this person, and the role title they typed (plan 59).
+     *
+     * Both nullable, and they stay nullable: every invitation created before this column existed has
+     * `NULL` here, and the read path normalizes that to the `other` intent rather than backfilling.
+     * A backfill would have to invent a sender's reason.
+     *
+     * No index. They are read only after locating an invitation by primary key, or inside a
+     * tenant-scoped query that is already indexed — so an index here would be a write cost with no
+     * reader.
+     */
+    invitationIntent: text('invitation_intent'),
+    roleTitle: text('invitee_role_title'),
   },
   (table) => [
     index('organization_invitations_email_idx').on(table.organizationId, table.email),
@@ -648,6 +661,32 @@ export const builderClaims = pgTable(
     check('builder_claims_status_check', sql`${table.status} in ('pending', 'verified', 'rejected', 'revoked', 'expired')`),
   ],
 )
+
+/**
+ * Platform-admin console preferences (plan 57, Admin track).
+ *
+ * Deliberately *not* a column on `dashboard_preferences`. That table is keyed `(organization_id, user_id)` with
+ * RLS scoping every row to `app.organization_id`, which is right for a tenant preference and wrong for a platform
+ * one: a platform admin has no organization in the admin console, and the same human is also a member of
+ * organizations. Sharing the table would need either a nullable `organization_id` the RLS predicate silently
+ * drops — so the preference would never load — or a sentinel organization row any tenant policy bug would expose.
+ *
+ * Two tables, two roles. `builderhunt_app` has no grant here at all, which is what makes "platform and tenant
+ * preferences cannot read each other" a property of the database rather than of a review. Grants and the reasoning
+ * live in `drizzle/0170_platform_admin_preferences.sql`, not here — drizzle-kit does not manage either.
+ */
+export const platformAdminPreferences = pgTable('platform_admin_preferences', {
+  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+  /** Where the console opens. Validated against the contracts' allowlists in the application, never here. */
+  landingSection: text('landing_section').notNull().default('overview'),
+  landingRange: text('landing_range').notNull().default('24h'),
+  landingVariant: text('landing_variant').notNull().default('summary'),
+  /** Widget ids this admin hid. Ids only; the application refuses to hide a required one. */
+  hiddenWidgetIds: jsonb('hidden_widget_ids').$type<string[]>().notNull().default([]),
+  /** Bumped when a stored shape stops being readable. A future version is ignored, never migrated in place. */
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
 
 export const publishedBuilderProfiles = pgTable('published_builder_profiles', {
   builderIdentityId: text('builder_identity_id').primaryKey().references(() => builderIdentities.id, { onDelete: 'cascade' }),
@@ -1274,7 +1313,7 @@ export const discoveryState = pgTable('discovery_state', {
 // ---------------------------------------------------------------------------
 // Devpost Ingestion (plan: devpost-integration) — global, non-tenant scraped
 // store. Devpost has no API and bot-challenges plain server-side fetch (see
-// plans/phase-1/19-devpost-integration/spec.md), so a headless-browser worker
+// plans/implemented/19-devpost-integration/spec.md), so a headless-browser worker
 // (src/lib/devpost/worker.ts) populates this table on a cron cadence; the
 // `devpost` source connector (src/lib/sources/devpost.ts) only ever reads
 // it, never scrapes live inside a search request. Deliberately a table of
@@ -1403,7 +1442,7 @@ export const sprintResults = pgTable(
 // ---------------------------------------------------------------------------
 // Public Profile Enrichment (plan: stealth-scraping) — organization-scoped
 // job queue + evidence, plus one platform-scoped subject-restriction table.
-// Spec: plans/phase-1/42-stealth-scraping/spec.md §7. Reuses the organization_builders
+// Spec: plans/implemented/42-stealth-scraping/spec.md §7. Reuses the organization_builders
 // composite-FK convention (organization_id, builder_identity_id) so a job can
 // never reference a builder identity the organization hasn't tracked.
 // ---------------------------------------------------------------------------
@@ -1529,7 +1568,7 @@ export const builderProcessingRestrictions = pgTable(
 )
 
 // ---------------------------------------------------------------------------
-// Stripe Billing Platform Tables (plans/phase-1/30-stripe-billing-platform/spec.md §Data model)
+// Stripe Billing Platform Tables (plans/implemented/30-stripe-billing-platform/spec.md §Data model)
 // ---------------------------------------------------------------------------
 
 export const billingCustomers = pgTable(
@@ -1882,7 +1921,7 @@ export const billingRefunds = pgTable(
 )
 
 /**
- * Chargeback tracking (plans/phase-1/30-stripe-billing-platform/tasks.md §8 "Implement dispute freeze,
+ * Chargeback tracking (plans/implemented/30-stripe-billing-platform/tasks.md §8 "Implement dispute freeze,
  * outcome, and alerts"). Pack disputes only (see `billing/disputes.ts`'s module comment for why
  * subscription disputes are a documented, separate gap) — `grantId` is therefore always set for a
  * row this app itself created.
@@ -1924,7 +1963,7 @@ export const billingDisputes = pgTable(
 )
 
 /**
- * Verified billing contact (plans/phase-1/30-stripe-billing-platform/tasks.md §9 "Add verified billing contact
+ * Verified billing contact (plans/implemented/30-stripe-billing-platform/tasks.md §9 "Add verified billing contact
  * management") — one current contact email per organization, owner-set and self-verified (mirrors
  * `billing_auto_recharge_rules`' shape: PK'd directly on `organization_id`, no surrogate id, since
  * this is mutable current state, not an append-only ledger). Setting a NEW email while a PREVIOUS one
@@ -1953,7 +1992,7 @@ export const billingContacts = pgTable(
 /**
  * Durable compliance snapshot written just before an organization row (and its full cascade —
  * members, resources, `billing_customers`/`billing_subscriptions`/etc.) is hard-deleted, whether via
- * the 30-day scheduled path or the owner-initiated immediate path (plans/phase-1/30-stripe-billing-platform/
+ * the 30-day scheduled path or the owner-initiated immediate path (plans/implemented/30-stripe-billing-platform/
  * tasks.md §9 "Integrate subscription-safe organization deletion" — "retains only approved financial
  * records"). Deliberately NOT a foreign key to `organizations`: by the time this row is read back,
  * the organization it describes no longer exists. No RLS tenant-scoping either, for the same
@@ -1980,7 +2019,7 @@ export const organizationDeletionFinancialRecords = pgTable(
 )
 
 /**
- * Append-only velocity signal for fraud/high-volume exception controls (plans/phase-1/30-stripe-billing-platform/
+ * Append-only velocity signal for fraud/high-volume exception controls (plans/implemented/30-stripe-billing-platform/
  * tasks.md §8 "Add fraud and high-volume exception controls"). Every known payment failure is
  * recorded here by its own call site (`packs.ts`'s Checkout decline, `auto-recharge.ts`'s off-session
  * decline) — `risk.ts` only ever reads this table, never writes it directly, mirroring
@@ -2046,7 +2085,7 @@ export const billingReconciliationRuns = pgTable(
 )
 
 /**
- * Deduplication ledger for financial notifications (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Add
+ * Deduplication ledger for financial notifications (plans/implemented/30-stripe-billing-platform/tasks.md §10 "Add
  * financial notifications, metrics, and alerts") — the general "have we already sent notification X
  * for entity Y in policy window W" answer every message type in that task needs. `organizationId` has
  * no FK (mirrors `organization_deletion_financial_records`): the `'platform'` sentinel value is used
@@ -2323,7 +2362,7 @@ export const conversionEvents = pgTable(
     // via a skip scan on the composite `(name, server_day)` index with the
     // same Index Searches count (8) and the same row count, so the single
     // column is redundant. See `scripts/db/pg18/explain-skip-scan.mjs` and
-    // `plans/phase-1/03-postgres-18-upgrade/tasks.md` Phase 5 tasks 5+6.
+    // `plans/implemented/03-postgres-18-upgrade/tasks.md` Phase 5 tasks 5+6.
     index('conversion_events_name_server_day_idx').on(table.name, table.serverDay),
     index('conversion_events_created_at_idx').on(table.createdAt),
     check(
@@ -2467,7 +2506,7 @@ export const profileSuppressions = pgTable(
 
 // ---------------------------------------------------------------------------
 // Calendar, Scheduling, and Interview Intelligence
-// (plans/phase-1/44-calendar-scheduling-interview-intelligence/spec.md §Data model)
+// (plans/implemented/44-calendar-scheduling-interview-intelligence/spec.md §Data model)
 //
 // Conventions from that spec's "Normative persistence contract": uuid PK with
 // `gen_random_uuid()`, `organization_id text not null`, created/updated timestamptz, every
@@ -4306,5 +4345,92 @@ export const securityAuditEvents = pgTable(
     index('security_audit_events_actor_idx').on(table.actorUserId, table.createdAt),
     index('security_audit_events_action_idx').on(table.action, table.createdAt),
     check('security_audit_events_result_check', sql`${table.result} in ('allowed', 'denied', 'failed')`),
+  ],
+)
+
+/**
+ * The one global beta-mode switch (plan 58, drizzle/0167).
+ *
+ * Exactly one row, `id = 'global'`, enforced by a CHECK alongside the primary key — otherwise "the
+ * flag" becomes "whichever row came back first". No RLS: the table holds no tenant column, so there is
+ * no predicate a policy could express, and access is controlled entirely by GRANT.
+ *
+ * `revision` counts writes so a stale admin screen is refused rather than allowed to overwrite someone
+ * else's decision. `updatedBy` has no foreign key on purpose: the record of who enabled beta mode has
+ * to survive that operator's account being deleted.
+ */
+/**
+ * Per-minute service metrics, persisted as **deltas** rather than read from cumulative counters
+ * (plan 57, Admin track — "Add truthful historical service-metric storage or adapter").
+ *
+ * ## Why deltas, which is the whole point of the table
+ *
+ * `metrics.get()` is cumulative-since-boot and per-instance. Deriving history from it by subtracting
+ * consecutive reads breaks in the two cases that matter most: a deploy resets the counter, so the next
+ * subtraction is negative and reads as a huge negative rate or gets clamped to zero and silently loses a
+ * window; and with two instances the two series interleave, so a subtraction crosses instances and
+ * produces a number that describes neither. Each row here is "what this instance saw during this minute",
+ * which sums across instances and survives a restart because a restart just starts a new row.
+ *
+ * ## Why a fixed-boundary histogram and not a mean
+ *
+ * A p95 cannot be recovered from stored means — averaging averages loses the distribution, and averaging
+ * percentiles is not a percentile of anything. Raw samples would be unbounded. So each row carries counts
+ * against one code-owned boundary list (`LATENCY_BOUNDARIES_MS`), which makes p50/p95/p99 a matter of
+ * summing the arrays elementwise across whichever rows the window covers — across instances and across
+ * restarts alike, which is exactly what this task's Verify line asks to reconcile.
+ *
+ * ## Why `route_family` and not a path
+ *
+ * `/api/sprints/<id>` names a real sprint. A path column would publish tenant identifiers into an
+ * operator table and let traffic rather than design decide its cardinality; the family comes from the
+ * closed allowlist in `admin-metrics/contracts.ts` and anything unrecognised becomes `other`.
+ *
+ * No tenant column, no RLS: there is no predicate a policy could express. Access is GRANT-only —
+ * `builderhunt_app` writes its own minutes, `builderhunt_platform` reads, and `builderhunt_worker` is the
+ * only role that may delete. The app's write is an *additive* upsert (`requests + excluded.requests`),
+ * because a flush lands mid-minute: no code path sets a past value, it only adds what just happened to the
+ * minute it happened in.
+ */
+export const serviceMetricBuckets = pgTable(
+  'service_metric_buckets',
+  {
+    /** Truncated to the minute, UTC. One row per (minute, family, instance). */
+    bucketStart: timestamp('bucket_start', { withTimezone: true }).notNull(),
+    /** From the closed allowlist; never a raw path. */
+    routeFamily: text('route_family').notNull(),
+    /** Which process produced this minute, so two instances are summed rather than confused. */
+    instance: text('instance').notNull(),
+    /** Which release, so a rate change can be attributed to a deploy rather than to traffic. */
+    deployment: text('deployment').notNull(),
+    requests: integer('requests').notNull().default(0),
+    errors: integer('errors').notNull().default(0),
+    searches: integer('searches').notNull().default(0),
+    searchCacheHits: integer('search_cache_hits').notNull().default(0),
+    /** Counts aligned to `LATENCY_BOUNDARIES_MS`, plus one overflow slot. Summable across rows. */
+    latencyBuckets: jsonb('latency_buckets').notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.bucketStart, table.routeFamily, table.instance] }),
+    /** The read shape: a window, then everything in it. Retention deletes by the same leading column. */
+    index('service_metric_buckets_window_idx').on(table.bucketStart),
+    check('service_metric_buckets_requests_check', sql`${table.requests} >= 0 and ${table.errors} >= 0`),
+    check('service_metric_buckets_searches_check', sql`${table.searches} >= 0 and ${table.searchCacheHits} >= 0`),
+  ],
+)
+
+export const platformBetaMode = pgTable(
+  'platform_beta_mode',
+  {
+    id: text('id').primaryKey(),
+    enabled: boolean('enabled').notNull().default(false),
+    revision: integer('revision').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedBy: text('updated_by'),
+  },
+  (table) => [
+    check('platform_beta_mode_singleton_check', sql`${table.id} = 'global'`),
+    check('platform_beta_mode_revision_check', sql`${table.revision} >= 0`),
   ],
 )

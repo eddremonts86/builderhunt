@@ -160,6 +160,10 @@ async function loadProjectableComponents(
     .limit(options.limit ?? DEFAULT_LIMIT)
   if (rows.length === 0) return []
 
+  // unbounded-read-ok: the capabilities of the components the bounded query above returned. A
+  // projection assembled from *some* of a component's capabilities is wrong rather than slow, and the
+  // component set is already capped by `options.limit ?? DEFAULT_LIMIT` one statement up — so the
+  // ceiling exists, it just belongs to the query that chose the components.
   const claims = await db
     .select({
       componentId: solutionComponentCapabilities.componentId,

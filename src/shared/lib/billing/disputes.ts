@@ -1,5 +1,5 @@
 /**
- * Dispute freeze, outcome, and alerts (plans/phase-1/30-stripe-billing-platform/tasks.md §8 task 5
+ * Dispute freeze, outcome, and alerts (plans/implemented/30-stripe-billing-platform/tasks.md §8 task 5
  * "Implement dispute freeze, outcome, and alerts"; spec.md §Failed payments and disputes:
  * "A subscription chargeback bypasses grace, immediately blocks new premium work, and freezes
  * linked included grants. Winning restores still-valid state; losing ends paid entitlement and

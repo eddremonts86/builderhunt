@@ -660,6 +660,30 @@
     "0164_reseed_solution_source_register": {
       "sql": "321f0d50a82c6715777b61a9c43f939e3d1a4cf8f08a7b1552bdb1d897909434",
       "snapshot": "18b3f6cbeed6be002d7cc28df16276bb1489a11c859895bcb7cc863ae4dead88"
+    },
+    "0165_invitation_personalization": {
+      "sql": "18a7f3401499b521dfeeb5a33f0f93ebbb8c024f0118111cd390a69f7f4ccd93",
+      "snapshot": "43d4910da737d290200da23f101e0246c7adb51c3d15dac35f1e2a11cac8cf4a"
+    },
+    "0166_invitation_preview_builders_index": {
+      "sql": "466a5d286f09464e183adaa43b9a019b8c1a39b0eca415fd614f3dcd85a9581a",
+      "snapshot": "212c921bd34aa91cf7853f22d8ccb54916bb3fc26abb7f2f4d26048f62eaed49"
+    },
+    "0167_platform_beta_mode": {
+      "sql": "0bff95e9945433dca10d619f44473c63e6118147d4ed4fe28f3bc2a10bee339f",
+      "snapshot": "eeb6fab22d1f85667d8faf4d0331983b607c000de4bb6f2b3f08a0d99911a0d6"
+    },
+    "0168_role_timeouts": {
+      "sql": "031601abb37397b4d69d82bc7adf52e65a076eb8bf98c8c78f0b1e7587b10aa7",
+      "snapshot": "be2fcc998f988b23aab0665603c887ecb2665154cd5b19a238670b67d987bf11"
+    },
+    "0169_service_metric_buckets": {
+      "sql": "87eb094a4ad0bf4ee00686275c3f406c01e3eb9578610798079856156288eda8",
+      "snapshot": "7d67c749f21b4118049dbd82eaa2254c93c059b3e201a224dcec7b3f844cf3ca"
+    },
+    "0170_platform_admin_preferences": {
+      "sql": "7d23933a5f8fbc1b0a5e128c15eb1d645673c428c9039eb2a3b96f774f7a7b4a",
+      "snapshot": "4220c498ccd04dda96bc315915154a306029dae05d7070e8a5b302316421b429"
     }
   }
 }

@@ -42,6 +42,28 @@ try {
       connectAs = `${baseRole}_rls_${roleSuffix}`
       await owner.unsafe(`drop role if exists ${connectAs}`)
       await owner.unsafe(`create role ${connectAs} login inherit password '${password}' in role ${baseRole}`)
+      /**
+       * Role settings are not inherited through membership, so a member role starts with
+       * `statement_timeout = 0` however the base role was configured. `test:rls:local` is evidence
+       * about privileges and policies; without this it would also silently drop the timeouts that
+       * `drizzle/0168_role_timeouts.sql` gave the base roles.
+       *
+       * Replayed from the catalog rather than restated, so the numbers live in one place.
+       */
+      const settings = await owner.unsafe(
+        `select s.setconfig from pg_db_role_setting s
+         join pg_roles r on r.oid = s.setrole
+         where r.rolname = $1 and s.setdatabase = 0`,
+        [baseRole],
+      )
+      for (const entry of settings[0]?.setconfig ?? []) {
+        const separator = entry.indexOf('=')
+        if (separator <= 0) continue
+        const key = entry.slice(0, separator)
+        if (!/^[a-z_][a-z0-9_.]*$/.test(key)) continue
+        const value = entry.slice(separator + 1).replaceAll("'", "''")
+        await owner.unsafe(`alter role ${connectAs} set ${key} = '${value}'`)
+      }
     }
     await owner.unsafe(`grant connect on database ${databaseName} to ${connectAs}`)
     roles[baseRole] = connectAs

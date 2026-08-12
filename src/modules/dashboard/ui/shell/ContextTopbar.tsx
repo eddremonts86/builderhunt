@@ -17,12 +17,14 @@ import type { BreadcrumbSegment } from './breadcrumbs'
  * every route.
  */
 export function ContextTopbar({
-  crumbs, signingOut, onSignOut, pathname, onOpenNav,
+  crumbs, signingOut, onSignOut, pathname, onOpenNav, betaModeEnabled,
 }: {
   crumbs: readonly BreadcrumbSegment[]
   signingOut: boolean
   onSignOut: () => void
   pathname: string
+  /** Threaded through to `UserMenu`; the layout owns the read. */
+  betaModeEnabled?: boolean
   /** Opens the flattened mobile drawer. Hidden from `lg` up. */
   onOpenNav: () => void
 }) {
@@ -69,6 +71,7 @@ export function ContextTopbar({
         <ThemeToggle />
         <OrganizationSwitcher />
         <UserMenu
+          betaModeEnabled={betaModeEnabled}
           pathname={pathname}
           signingOut={signingOut}
           onSignOut={onSignOut}

@@ -36,6 +36,14 @@ interface UserMenuProps {
   pathname: string
   signingOut: boolean
   onSignOut: () => void
+  /**
+   * Whether the global beta mode is on (plan 58).
+   *
+   * A prop, not a fetch of its own. This menu renders on every dashboard page, so a `useEffect` inside
+   * it would issue one request per mount, per navigation — for a label. `DashboardLayout` already owns
+   * the once-per-shell reads, so the menu stays presentational and testable without a network stub.
+   */
+  betaModeEnabled?: boolean
 }
 
 /**
@@ -48,7 +56,7 @@ interface UserMenuProps {
  * remove. Session-scoped actions stay, since they belong to the avatar and not
  * to any area.
  */
-export function UserMenu({ pathname, signingOut, onSignOut }: UserMenuProps) {
+export function UserMenu({ pathname, signingOut, onSignOut, betaModeEnabled = false }: UserMenuProps) {
   const [open, setOpen] = React.useState(false)
   const [coords, setCoords] = React.useState({ top: 0, right: 0 })
   const [mounted, setMounted] = React.useState(false)
@@ -130,6 +138,25 @@ export function UserMenu({ pathname, signingOut, onSignOut }: UserMenuProps) {
               exit={{ opacity: 0, y: reduceMotion ? 0 : -8, scale: reduceMotion ? 1 : 0.97 }}
               transition={{ duration: motionTokens.duration.fast, ease: motionTokens.easing.smooth }}
             >
+              {/*
+                Text, not a coloured dot.
+                A member seeing Pro Max capabilities they did not pay for needs to know *why* they have
+                them and that it is temporary — a dot says "something is on" and leaves them guessing.
+                The allowance is in the copy for the same reason the admin control carries it: it is the
+                part that changes what they can actually do.
+
+                Absent when off, not rendered muted. There is nothing to tell someone about a promotion
+                that is not running.
+              */}
+              {betaModeEnabled && (
+                <p
+                  className="mx-1 mb-1 rounded-lg bg-bh-accent-soft px-2.5 py-1.5 text-xs font-bold text-bh-accent"
+                  data-testid="beta-mode-badge"
+                >
+                  Beta · 700 credits/month
+                </p>
+              )}
+
               <MenuLink to="/me" icon={CircleUser} label="Account" active={isAccountActive} onNavigate={closeMenu} />
 
               <div className="mt-1 pt-1 border-t border-bh-border/60">

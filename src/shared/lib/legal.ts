@@ -37,7 +37,7 @@ export function parseDocumentVersion(version: string): ParsedDocumentVersion | n
 }
 
 /**
- * A major bump (`v1.x` -> `v2.0`) is a material change to a legal document — plans/phase-1/30-stripe-billing-platform/
+ * A major bump (`v1.x` -> `v2.0`) is a material change to a legal document — plans/implemented/30-stripe-billing-platform/
  * spec.md: "Material changes require fresh acceptance." A minor bump (`v1.0` -> `v1.1`, e.g. a typo or
  * clarification) is not: an existing acceptance of an earlier minor version stays valid. An unparseable
  * version on either side is always treated as material — fail closed, never silently skip reacceptance
@@ -152,7 +152,7 @@ export interface ProcessPendingDeletionsResult {
  * Executes the deletion right the request/grace-period flow only promises:
  * finds every `deletion_requests` row past its grace period, hard-deletes the
  * subject, then marks the compliance row `completed`. Meant to be invoked by
- * `POST /api/admin/legal/run-worker` on a daily cron — see plans/phase-1/04-legal-and-compliance.
+ * `POST /api/admin/legal/run-worker` on a daily cron — see plans/implemented/04-legal-and-compliance.
  * Idempotent: a request already completed/cancelled, or still within its grace
  * period, is never selected again.
  */

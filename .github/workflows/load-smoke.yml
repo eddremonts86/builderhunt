@@ -1,0 +1,212 @@
+name: Load smoke
+
+# The load harness itself, exercised end to end on every change to it.
+#
+# ## What this is for, and what it deliberately is not
+#
+# It is not a capacity measurement. A GitHub runner is a shared two-core machine with unpredictable
+# neighbours, so its percentiles describe the runner and would fail or pass for reasons that have nothing to
+# do with the change under test. `scripts/load/smoke.ts` therefore gates on correctness only — requests
+# happened, none 5xx'd, the observability samples have data behind them, neither artifact carries a credential
+# — and prints the thresholds without gating on them.
+#
+# What it protects is the harness's own habit of producing *plausible* artifacts. Every bug found while
+# building it was of that shape: a preflight that passed against an unseeded database, a monitor whose every
+# sample failed while the report printed "0 connections ✅", a route table that sent all nine requests to one
+# endpoint, a drain window that aborted any run longer than thirty seconds. None of those fail loudly. All of
+# them are caught by running the thing and reading what comes out, which is what this job does.
+#
+# ## Why it is its own workflow rather than a step in Quality
+#
+# Quality is ~55 runner minutes and already gates every push. Adding a build-plus-server-plus-database smoke
+# to it would slow the gate everyone waits on, to protect files almost no change touches. Scoped by `paths`,
+# this runs when the harness changes and stays silent otherwise.
+on:
+  pull_request:
+    paths:
+      - 'scripts/load/**'
+      - 'docker/pgbouncer/**'
+      - 'tests/unit/scripts/load/**'
+      - '.github/workflows/load-smoke.yml'
+  push:
+    branches: [master, dev]
+    paths:
+      - 'scripts/load/**'
+      - 'docker/pgbouncer/**'
+      - 'tests/unit/scripts/load/**'
+      - '.github/workflows/load-smoke.yml'
+  # The harness is also the thing an operator reaches for at 02:00, so it has to be runnable on demand
+  # without pushing a commit to trigger it.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    # The build is the long pole. A hung job otherwise bills the six-hour runner default.
+    timeout-minutes: 20
+    services:
+      postgres:
+        # The same pin as Quality and as the production resource. A plain `postgres:18` makes
+        # `CREATE EXTENSION vector` fail inside migration 0013, which rolls back every migration in the same
+        # transaction — and the smoke migrates a database of its own, so it would hit exactly that.
+        image: pgvector/pgvector:0.8.5-pg18
+        env:
+          POSTGRES_USER: postgres
+          # Per-run, not the literal `postgres` the other workflows use.
+          #
+          # GitGuardian's generic-password detector flagged the hardcoded pair and failed a required check on the
+          # pull request. It is not wrong about the shape, even though this database lives for one job and is
+          # reachable only from that job's network — so the fix removes the constant rather than suppressing the
+          # detector, which would have weakened it for every future file too. `github.run_id` is unique per run and
+          # available in both `services.*.env` and the job `env` below, so the two connection strings still match.
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # Provisioned because the application expects it, not because the smoke asserts on it. Without Redis,
+      # `rate-limit.ts` falls back to its in-memory counter — which works, and means the run measures a code
+      # path production does not take. The service costs seconds; the fidelity is the point.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # 127.0.0.1 and not `localhost`: on some runners `localhost` resolves to `::1` first while the service
+      # container publishes on IPv4, and the failure reads as "database refused the connection".
+      #
+      # The smoke creates and migrates `builderhunt_load_test_smoke` from this URL. It never touches the
+      # database named here, and `safety.ts` refuses outright unless the *target* name carries the disposable
+      # prefix and the host is loopback.
+      DATABASE_URL: postgresql://postgres:${{ github.run_id }}@127.0.0.1:5432/postgres
+      DATABASE_MIGRATION_URL: postgresql://postgres:${{ github.run_id }}@127.0.0.1:5432/postgres
+      APP_URL: http://127.0.0.1:3000
+      VITE_APP_URL: http://127.0.0.1:3000
+      BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      REDIS_URL: redis://127.0.0.1:6379
+      NODE_OPTIONS: --max-old-space-size=4096
+      # Fifteen, not the twenty-five the plan's task asked for.
+      #
+      # `better-auth.ts` caps `/sign-in/email` at 20 per minute per IP, and all fifteen virtual users sign in
+      # from the runner. Twenty-five aborts on the 21st with a `429` — verified locally, and correct
+      # behaviour from the application. The alternative is raising a brute-force guard to make a smoke pass,
+      # which is not a trade worth making for a larger number in a correctness check. Fifteen users over
+      # thirty seconds still reaches every route from the traffic mix and collects several five-second
+      # observability samples.
+      LOAD_SMOKE_USERS: '15'
+      LOAD_SMOKE_SECONDS: '30'
+    steps:
+      - uses: actions/checkout@v4
+
+      # `@v6` with an explicit `version`, matching every other workflow here.
+      #
+      # This was `@v4` with no `version` and no `packageManager` in `package.json` for the action to read, so the
+      # job died on its third step with "No pnpm version is specified" — every time, from the moment it was
+      # written. It had simply never run: this workflow only fires on a pull request, and the branch it was added
+      # on had none until now. A CI job that has never executed is not a gate, whatever its file says.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # First, because they are seconds and they catch the unit-testable half of a regression before the
+      # build spends minutes on the rest.
+      - name: Unit tests for the load harness
+        run: pnpm vitest run tests/unit/scripts/load/
+
+      # The smoke serves `dist` deliberately — a harness that only works against `vite dev` proves nothing
+      # about the artifact that gets deployed.
+      - name: Build
+        run: pnpm build
+
+      - name: Load smoke — direct
+        run: pnpm test:load:smoke
+
+      # ── The pooled leg ───────────────────────────────────────────────────────────────────────────
+      #
+      # The direct leg above proves the harness works. This one proves the *topology* production will run
+      # does, and it is the more faithful of the two: PgBouncer authenticates against a `userlist.txt` built
+      # from the five `builderhunt_*` roles, so the pooled run necessarily connects as those roles rather
+      # than as this job's superuser — which means RLS is actually in the path.
+      #
+      # The passwords are generated here and used in two places, the pooler's userlist and the app's URLs,
+      # from one variable each. They are throwaway values for an ephemeral service container and never
+      # leave the job.
+      - name: Give the five roles passwords the pooler can authenticate
+        run: |
+          set -euo pipefail
+          for role in app auth worker platform capability; do
+            var="BUILDERHUNT_$(echo "$role" | tr '[:lower:]' '[:upper:]')_PASSWORD"
+            value="$(openssl rand -hex 16)"
+            echo "::add-mask::$value"
+            echo "$var=$value" >> "$GITHUB_ENV"
+            PGPASSWORD=${{ github.run_id }} psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+              -c "ALTER ROLE builderhunt_${role} WITH PASSWORD '${value}'"
+          done
+          admin="$(openssl rand -hex 16)"
+          echo "::add-mask::$admin"
+          echo "PGBOUNCER_ADMIN_PASSWORD=$admin" >> "$GITHUB_ENV"
+
+      - name: Build and start PgBouncer
+        run: |
+          set -euo pipefail
+          docker build -t builderhunt-pgbouncer ./docker/pgbouncer
+          docker run -d --name builderhunt-pgbouncer --network host \
+            --tmpfs /run/pgbouncer:mode=0700,uid=10001,gid=10001 \
+            -e BUILDERHUNT_APP_PASSWORD -e BUILDERHUNT_AUTH_PASSWORD -e BUILDERHUNT_WORKER_PASSWORD \
+            -e BUILDERHUNT_PLATFORM_PASSWORD -e BUILDERHUNT_CAPABILITY_PASSWORD \
+            -e PGBOUNCER_ADMIN_PASSWORD \
+            -e PGBOUNCER_UPSTREAM_HOST=127.0.0.1 \
+            builderhunt-pgbouncer
+          # `--network host` so `127.0.0.1:5432` inside the container is the service container's Postgres,
+          # and so the smoke reaches the pooler on 6432 without a published-port dance.
+          for _ in $(seq 1 30); do
+            if PGPASSWORD="$PGBOUNCER_ADMIN_PASSWORD" psql -h 127.0.0.1 -p 6432 -U pgbouncer -d pgbouncer \
+                 -Atc 'SHOW CONFIG' >/dev/null 2>&1; then
+              echo 'pgbouncer answering on 6432'; exit 0
+            fi
+            sleep 2
+          done
+          echo 'pgbouncer never answered on 6432'; docker logs builderhunt-pgbouncer; exit 1
+
+      - name: Load smoke — pooled
+        env:
+          LOAD_SMOKE_POOLED: 'true'
+        run: pnpm test:load:smoke
+
+      - name: PgBouncer logs
+        if: always()
+        run: docker logs builderhunt-pgbouncer 2>&1 | tail -40 || true
+
+      # Uploaded on success too, and not only on failure: the report *is* the evidence a run happened and
+      # what it observed, and a green run whose artifact nobody kept is a green run nobody can check.
+      - name: Upload the load report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-smoke-reports
+          path: tests/artifacts/load/
+          if-no-files-found: ignore
+          retention-days: 7

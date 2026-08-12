@@ -13,7 +13,20 @@ export const Route = createFileRoute('/api/organizations/invitations/$invitation
         try {
           const lifecycle = await getOrganizationLifecycle()
           const result = await lifecycle.acceptInvitation(request, params.invitationId)
-          return Response.json({ ok: true, organizationId: result.organizationId })
+          /**
+           * `activeOrganization: false` is a 200, not an error.
+           *
+           * The membership committed before the session switch was attempted, so the person is a
+           * member either way. A 500 here would tell them their acceptance failed, and the retry
+           * would hit an invitation that is no longer pending and answer with the generic invalid
+           * error — turning a succeeded join into an apparently permanent failure.
+           */
+          return Response.json({
+            ok: true,
+            organizationId: result.organizationId,
+            activeOrganization: result.activeOrganization,
+            suggestedQuery: result.suggestedQuery,
+          })
         } catch (error) {
           const response = lifecycleErrorResponse(error)
           if (response) return response

@@ -18,6 +18,7 @@ import { env } from '~/shared/lib/env'
 import { CREDENTIAL_ENV_VARS, CREDENTIAL_MANDATORY_SOURCES } from '~/shared/lib/source-credentials'
 import { log } from '~/shared/lib/log'
 import { metrics } from '~/shared/lib/metrics'
+import { serviceMetricRecorder } from '~/shared/lib/admin-metrics/recorder'
 import { filterSuppressed } from '~/shared/lib/profile-suppression'
 import { TABLE_PAGE_SIZE } from '~/shared/lib/table/constants'
 import {
@@ -306,6 +307,9 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   const cacheKeyStr = cacheKey(opts)
   const start = Date.now()
   metrics.increment('searches')
+  // The same observation, per minute and per family, for the search section's windowed cache-hit rate.
+  // `metrics.ts` is cumulative-since-boot and cannot answer "last 24 hours"; see `admin-metrics/recorder.ts`.
+  serviceMetricRecorder.recordSearch()
 
   const { contacted: sources, notContacted } = await resolveContactableSources(requestedSources)
   if (sources.length === 0) {
@@ -317,6 +321,7 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     const visible = restrictToSources(await filterSuppressed(cached.results), sources)
     metrics.increment('searchCacheHits')
+    serviceMetricRecorder.recordSearchCacheHit()
     log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'memory' })
     return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources, cached.statuses), ...notContacted] }
   }
@@ -338,6 +343,7 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
         cache.set(cacheKeyStr, { results: parsed, statuses, timestamp: Date.now() })
         const visible = restrictToSources(await filterSuppressed(parsed), sources)
         metrics.increment('searchCacheHits')
+        serviceMetricRecorder.recordSearchCacheHit()
         log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'redis' })
         return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources, statuses), ...notContacted] }
       }

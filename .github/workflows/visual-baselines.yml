@@ -129,6 +129,50 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
 
+      # ── The database this job judges against ────────────────────────────────────────────────────
+      #
+      # These four steps are copied from `advisory.yml`'s visual job, and their absence is what made
+      # this workflow produce baselines nobody should commit.
+      #
+      # The header above claims "same services and env as advisory.yml's visual job". The services and
+      # the env were the same; the *database state* was not. `advisory.yml` runs the role migrations,
+      # the RLS fixture, `drizzle-kit migrate` and the admin seed before it screenshots. This ran none
+      # of them, so its Postgres had no application tables — `event_participants`,
+      # `privacy_consents` and `scheduling_invitations` were all reported missing in its own logs.
+      #
+      # What that produced, on 2026-08-12: a regenerated `empty-dashboard` baseline with the three
+      # headline tiles, the action queue, builder recency, sourcing sprints, recommendations, alerts
+      # and source coverage all *absent*, and a 650 px hole where they belong. Every one of those reads
+      # the dashboard projection, which cannot answer from a database with no tables. The refresh's own
+      # stability check passed it twice, because a page missing half its widgets renders identically
+      # every time.
+      #
+      # So the gate compared a fully-migrated render against a baseline captured from an empty
+      # database, and the only way to make that comparison pass would have been to commit the broken
+      # one. A refresh workflow that regenerates against a different database than the gate judges
+      # against is worse than no refresh workflow: it launders a degraded render into the expected
+      # state, and from then on the gate defends it.
+      - run: pnpm test:migrations:local
+      - run: node scripts/db/prepare-rls-fixture.mjs
+
+      - name: Migrate and seed, so the baselines come from the same state the gate judges
+        run: |
+          pnpm exec drizzle-kit migrate
+          pnpm db:seed:admin
+
+          # Same read-back as `advisory.yml`: `seed-admin.ts` mints a fresh id per run, so the
+          # platform-admin env list cannot be hardcoded. `empty-states.spec.ts` does not visit an
+          # `/admin/*` route, but `ui-coverage.spec.ts` does and shares this job when no `-g` narrows
+          # it — without this, three admin baselines would regenerate as the dashboard they redirect
+          # to, which is the same class of laundering as the hole above.
+          ADMIN_ID="$(psql "$DATABASE_MIGRATION_URL" -Atc "select id from auth_users where email = 'edd_admin@local.com'")"
+          if [ -z "$ADMIN_ID" ]; then
+            echo "Seeded admin not found — every /admin/* gate would redirect." >&2
+            exit 1
+          fi
+          echo "ADMIN_USER_IDS=$ADMIN_ID" >> "$GITHUB_ENV"
+          echo "Platform admin: $ADMIN_ID"
+
       # `=all`, and the mode is the whole point.
       #
       # A bare `--update-snapshots` presets to `changed`, and Playwright's idea of "changed" is

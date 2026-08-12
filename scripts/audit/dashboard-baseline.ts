@@ -19,11 +19,27 @@
  *   - docs/ui-audit/evidence/dashboard-baseline/<viewport>/*.png
  *   - docs/ui-audit/evidence/dashboard-baseline/metrics.json
  *
- * Usage:
- *   pnpm dev  # in another terminal, on port 3010 (matches APP_URL)
+ * Usage — against a **production preview**, not `pnpm dev`:
+ *   pnpm build && pnpm preview --port 3010
  *   SAAS_REVIEW_BASE_URL=http://localhost:3010 \
  *     SAAS_REVIEW_ROLES=platform-admin \
  *     pnpm tsx --env-file-if-exists=.env scripts/audit/dashboard-baseline.ts
+ *
+ * ## Why a preview and not the dev server
+ *
+ * It used to say `pnpm dev` here, and the numbers it recorded were meaningless as budgets. Vite's dev
+ * server serves every module unbundled, so a cold `/dashboard` load measured **708 requests and
+ * 27.9 MB** — against budgets of 100 and 5 MB. The same page from a production build is 4.2 MB of
+ * JavaScript across 430 already-code-split chunks.
+ *
+ * So the budget could never pass in dev and passes trivially in prod: it measured the module count of
+ * a development tool, and `check-dashboard-budgets.ts` reported a bundle problem that did not exist
+ * while the real payload problem — 14 MB of PNG, 8.3 MB of it referenced by nothing — sat unmeasured
+ * because images are not modules.
+ *
+ * `assertNotDevServer` below refuses to record against a dev server rather than trusting the caller
+ * to read this comment. `/@vite/client` is requested by every dev page and by no built one, which
+ * makes the check structural rather than a port convention.
  *
  * Reproducibility:
  *   The baseline is recorded against the platform-admin fixture (who has
@@ -97,6 +113,31 @@ async function signIn(page: Page): Promise<void> {
     )
   } catch {
     throw new Error('sign-in failed; check SAAS_REVIEW_PLATFORM_ADMIN_* env vars and dev server')
+  }
+}
+
+/**
+ * Refuses to record a baseline against a Vite dev server.
+ *
+ * `/@vite/client` is fetched by every page the dev server serves and by no page a build serves, so
+ * this is a structural check rather than a port or an env-var convention. It runs before any sample is
+ * written, because a dev-server baseline is not a slightly-off baseline — it is a measurement of the
+ * development tool, and it is the reason the request and byte budgets have been failing on a number
+ * that describes nothing about what a user downloads.
+ */
+async function assertNotDevServer(page: Page): Promise<void> {
+  const seen: string[] = []
+  const record = (url: string) => { if (url.includes('/@vite/') || url.includes('/@react-refresh')) seen.push(url) }
+  page.on('request', (req) => record(req.url()))
+  await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
+  page.off('request', (req) => record(req.url()))
+  if (seen.length > 0) {
+    throw new Error(
+      `${BASE_URL} is a Vite dev server (it served ${seen[0]}).\n`
+      + 'A dev-server baseline measures unbundled modules, not the payload a user downloads — the\n'
+      + 'request and byte budgets cannot be met by it and are meaningless against it.\n'
+      + 'Run `pnpm build && pnpm preview --port 3010` and point SAAS_REVIEW_BASE_URL at that instead.',
+    )
   }
 }
 
@@ -237,6 +278,16 @@ async function main() {
   const browser = await chromium.launch({ headless: true })
   const samples: BaselineSample[] = []
   const stamp = new Date().toISOString().slice(0, 10)
+
+  // Checked once, before any sample is written, and it throws rather than warning: a baseline appended
+  // to `development.md` outlives the session that recorded it, so a wrong one is worse than none.
+  const probeContext = await browser.newContext()
+  const probePage = await probeContext.newPage()
+  try {
+    await assertNotDevServer(probePage)
+  } finally {
+    await probeContext.close()
+  }
 
   for (const vp of VIEWPORTS) {
     const ctx = await browser.newContext({

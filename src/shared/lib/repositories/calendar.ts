@@ -262,7 +262,15 @@ export async function searchEvents(
         and (p.display_name ilike ${'%' + filter.participant + '%'} or p.external_email ilike ${'%' + filter.participant + '%'})
     )`)
   }
-  return transaction.select(eventColumns).from(calendarEvents).where(and(...conditions)).orderBy(asc(calendarEvents.startsAt))
+  return transaction
+    .select(eventColumns)
+    .from(calendarEvents)
+    .where(and(...conditions))
+    .orderBy(asc(calendarEvents.startsAt))
+    // `from` and `to` are required, not optional, so the window is the real bound and this is the
+    // backstop for a window denser than the surface expected — the same reasoning, and the same
+    // ceiling, as `listBusyRanges` above.
+    .limit(ANALYTICS_WINDOW_LIMIT)
 }
 
 export async function insertEvent(
@@ -389,6 +397,9 @@ export async function listOccurrencesInRange(
       gte(calendarEventOccurrences.endsAt, range.from),
     ))
     .orderBy(asc(calendarEventOccurrences.startsAt))
+    // Window-scoped for the same reason: `range` is required, and a recurring event materialised
+    // densely enough to reach this is not a calendar anybody can read.
+    .limit(ANALYTICS_WINDOW_LIMIT)
 }
 
 /**
@@ -516,6 +527,8 @@ export async function listParticipants(transaction: TenantTransaction, organizat
     .from(eventParticipants)
     .where(and(eq(eventParticipants.organizationId, organizationId), eq(eventParticipants.eventId, eventId)))
     .orderBy(asc(eventParticipants.id))
+    // The participants of one event — "the children of this row", rendered whole with no load-more.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 export async function insertParticipants(
@@ -655,6 +668,8 @@ export async function listRemindersForEvent(transaction: TenantTransaction, orga
     .from(calendarEventReminders)
     .where(and(eq(calendarEventReminders.organizationId, organizationId), eq(calendarEventReminders.eventId, eventId)))
     .orderBy(asc(calendarEventReminders.offsetMinutes))
+    // Same ceiling: the reminders of one event.
+    .limit(ENTITY_DETAIL_LIMIT)
 }
 
 export async function insertReminders(

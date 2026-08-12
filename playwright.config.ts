@@ -59,7 +59,20 @@ const PORT = new URL(baseURL).port || '80'
 // Pre-compute a single REDIS_URL pointing at the local Redis container.
 // The container is expected to be running on the standard 6379 port (the
 // repo's docker-compose.yml's `redis` service publishes it).
-const redisURL = process.env.REDIS_URL ?? `redis://localhost:${process.env.REDIS_PORT ?? '6379'}`
+/**
+ * `127.0.0.1`, not `localhost`, and the difference is a whole afternoon.
+ *
+ * This file is evaluated by a bare `playwright test` with no dotenvx wrapper (see the comment above),
+ * so `.env`'s `REDIS_URL=redis://127.0.0.1:6379` is often **not** in `process.env` yet and this
+ * fallback is what the webServer actually gets. On macOS `localhost` resolves to `::1` first, while
+ * docker-compose publishes Redis on IPv4 — so the app cannot reach Redis, and
+ * `rate-limit.ts` **fails closed under E2E_MODE by design**.
+ *
+ * The symptom is nothing like the cause: every sign-up is refused with "Too many accounts created
+ * from this device recently", while every counter in Redis reads 1. The message describes a limit that
+ * was never consulted.
+ */
+const redisURL = process.env.REDIS_URL ?? `redis://127.0.0.1:${process.env.REDIS_PORT ?? '6379'}`
 // Wave 1 Task 1 — single global prefix for this run is the baseline;
 // per-worker prefixes are derived inside `tests/e2e/harness/cache.ts` and
 // written into the test process's process.env.E2E_REDIS_PREFIX by the
@@ -174,6 +187,21 @@ export default defineConfig({
       // instead of switching it off to make fixtures pass.
       REDIS_URL: redisURL,
       E2E_RUN_ID: e2eRunId,
+      /**
+       * The per-device signup limit, raised for the harness only.
+       *
+       * `SIGNUP_DEVICE_DAILY_LIMIT` defaults to **3** and keys on a hash of the device cookie, the UA
+       * family and `BETTER_AUTH_SECRET` over a 24-hour window. `team-accounts.spec.ts` alone signs up
+       * three accounts from one machine by design, so a full run exhausts the budget and the *next*
+       * test to sign up fails with "Too many accounts created from this device recently" — a failure
+       * that looks like a broken sign-up flow and is a working abuse control doing its job.
+       *
+       * Raised rather than disabled: the gate stays in the request path, so a regression that breaks it
+       * still surfaces. And it is safe to pin here for the reason the comment above explains in the
+       * negative — dotenvx overrides only keys that exist in `.env`, and this one lives only as a
+       * default in `env.ts`.
+       */
+      SIGNUP_DEVICE_DAILY_LIMIT: '500',
     },
   },
 })

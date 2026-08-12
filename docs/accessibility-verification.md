@@ -1,7 +1,7 @@
 # Accessibility verification record
 
 Tracks the manual assistive-technology release gate required by
-`plans/phase-1/48-audit-accessibility/spec.md`. Every entry is either a real, dated verification run or
+`plans/implemented/phase-1/48-audit-accessibility/spec.md`. Every entry is either a real, dated verification run or
 explicitly marked as not yet done — never inferred or assumed.
 
 ## How to use this document

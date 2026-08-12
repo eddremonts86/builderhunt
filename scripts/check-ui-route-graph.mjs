@@ -45,6 +45,21 @@ const EXTRACTION_PATTERNS = [
   /\bsourceRoute:\s*['"]([^'"]+)['"]/g,
 ]
 
+/**
+ * The navigation registry, whose destinations are object *keys* rather than `to:` values.
+ *
+ * `nav-config.ts` declares the admin panel as `Record<AdminFullPath, …>` — `'/admin/metrics': { label: … }` —
+ * so that an admin route with no nav entry fails `tsc` instead of failing this check later. That refactor made
+ * every one of those paths invisible to the `to:` patterns above, and this script immediately reported five
+ * perfectly-navigable pages as orphans. It was right about what it could see; it just could no longer see them.
+ *
+ * Scoped to this one file rather than added to the shared list, and that is the point: a path-shaped object key
+ * is an extremely common shape — `'/sign-up/email'` in `better-auth.ts` is an API path, not a destination — so
+ * matching it everywhere trades five false orphans for a different false positive. Narrow beats clever.
+ */
+const NAV_REGISTRY_FILE = 'src/modules/dashboard/ui/shell/nav-config.ts'
+const NAV_REGISTRY_KEY_PATTERN = /^\s*['"](\/[^'"]+)['"]\s*:/gm
+
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const nested = await Promise.all(entries.map(async (entry) => {
@@ -147,7 +162,10 @@ async function main() {
     const relativePath = relative(root, absolutePath)
     const source = await readFile(absolutePath, 'utf8')
 
-    for (const pattern of EXTRACTION_PATTERNS) {
+    const patterns = relativePath === NAV_REGISTRY_FILE
+      ? [...EXTRACTION_PATTERNS, NAV_REGISTRY_KEY_PATTERN]
+      : EXTRACTION_PATTERNS
+    for (const pattern of patterns) {
       for (const match of source.matchAll(pattern)) {
         const raw = match[1]
         const candidate = normalizeCandidate(raw)

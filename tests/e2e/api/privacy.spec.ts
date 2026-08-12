@@ -1,6 +1,6 @@
 /**
  * The data-export routes over real HTTP (plan 53, task 1 —
- * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`).
+ * `plans/implemented/53-exhaustive-local-e2e-design/tasks.md`).
  *
  * A data export is a GDPR right and, at the same time, the single most concentrated pile of one person's data
  * the product ever produces. Three properties carry it, and each fails differently:

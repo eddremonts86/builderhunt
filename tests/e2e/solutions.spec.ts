@@ -26,6 +26,7 @@
 import { expect, test } from 'playwright/test'
 
 import {
+  addSecondOrganization,
   grantInterviewCredits,
   readCreditBalance,
   seedActiveSubscription,
@@ -211,6 +212,117 @@ test.describe('solutions generation', () => {
       expect(afterSave.count).toBe(1)
     } finally {
       await context.close()
+    }
+  })
+
+  /**
+   * The three cases plan 56-UI names as having no browser coverage.
+   *
+   * The plan says a second organization "needs a second organization in the harness, which
+   * `startInterviewHarness` does not currently mint". That note is stale: `addSecondOrganization` has been
+   * in `harness/fixtures/interviews.ts` for a while, so the blocker it declares no longer exists.
+   */
+  test('insufficient credit is refused by the server, with nothing reserved', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: harness.owner.storageState ?? undefined })
+    try {
+      const before = (await reservations()).length
+      // Spend the balance down *inside* the run rather than seeding a zero-credit organization: a zero
+      // balance is the free-tier case already covered above, and what is untested is an entitled
+      // organization that runs out mid-flight. Expiring the grants is the cheapest honest way to get there
+      // without settling a real reservation.
+      await harness.sql`
+        update billing_credit_grants set state = 'expired'
+        where organization_id = ${harness.organization.organizationId} and state = 'active'
+      `
+      expect(await readCreditBalance(harness)).toBe(0)
+
+      const response = await context.request.post(`${harness.baseURL}/api/solutions/generate`, {
+        data: {
+          briefText: 'Translate 200 product pages into German',
+          confirmation: { acceptedUnits: 10, acceptedRateCardVersion: 1 },
+          idempotencyKey: `e2e-${Date.now()}-nocredit`,
+        },
+      })
+      expect(await response.text()).toContain('insufficient_credits')
+      // The part that matters: refusing must not leave a reservation holding a customer's credits, which
+      // looks like success on screen while the balance is gone.
+      expect(await reservations()).toHaveLength(before)
+    } finally {
+      await harness.sql`
+        update billing_credit_grants set state = 'active'
+        where organization_id = ${harness.organization.organizationId} and state = 'expired'
+      `
+      await context.close()
+    }
+  })
+
+  test('a Team-tier organization can generate, not only a pro one', async ({ browser }) => {
+    // The spec seeds `pro` throughout. Team sits above Pro Max in the catalog and is ranked equal to it for
+    // features, so "entitled" must not be something only `pro` happens to satisfy.
+    const context = await browser.newContext({ storageState: harness.owner.storageState ?? undefined })
+    try {
+      await harness.sql`
+        update billing_subscriptions set tier = 'team'
+        where organization_id = ${harness.organization.organizationId}
+      `
+      const response = await context.request.post(`${harness.baseURL}/api/solutions/generate`, {
+        data: {
+          briefText: 'Translate 200 product pages into German',
+          confirmation: { acceptedUnits: 10, acceptedRateCardVersion: 1 },
+          idempotencyKey: `e2e-${Date.now()}-team`,
+        },
+      })
+      const body = await response.text()
+      // Whatever else happens, it is not an entitlement refusal.
+      expect(body).not.toContain('insufficient_entitlement')
+    } finally {
+      await harness.sql`
+        update billing_subscriptions set tier = 'pro'
+        where organization_id = ${harness.organization.organizationId}
+      `
+      await context.close()
+    }
+  })
+
+  test('another organization cannot read this one\'s run', async ({ browser }) => {
+    const other = await addSecondOrganization(harness)
+    const otherContext = await browser.newContext({ storageState: other.principal.storageState ?? undefined })
+    const runId = `e2e-xt-${Date.now()}`
+    try {
+      /**
+       * Seeded by SQL, not by driving the UI.
+       *
+       * Saving a run is a click on `save-run-button` after a full generation — the journey the test above
+       * already covers. Re-driving it here would make a tenant-isolation assertion depend on the
+       * generation pipeline staying green, which is the wrong coupling: what is under test is whether
+       * organization B can read organization A's row, and the row is the fixture.
+       */
+      await harness.sql`
+        insert into solution_runs (
+          id, organization_id, brief_snapshot, ranking_mode, retrieval_query_hash, composition_hash,
+          composer_version, component_version_ids, evidence_ids, source_statuses, warnings
+        ) values (
+          ${runId}, ${harness.organization.organizationId},
+          ${harness.sql.json({ briefText: 'A private run', title: 'A private run' })},
+          -- composer_version is text, not an integer; the two id columns are text[] while the two
+          -- status columns are jsonb. Mixing those up is what the first attempt at this fixture did.
+          -- 'recommended', not 'balanced': the CHECK in drizzle/0137 allows only
+          -- recommended | maximum_quality | lower_cost_time.
+          'recommended', 'hash-a', 'hash-b', '1',
+          ${harness.sql.array<string[]>([])}, ${harness.sql.array<string[]>([])},
+          ${harness.sql.json([])}, ${harness.sql.json([])}
+        )
+      `
+
+      // B holds a valid session and a real organization of its own. What it must not hold is A's run.
+      const stolen = await otherContext.request.get(`${harness.baseURL}/api/solutions/runs/${runId}`)
+      expect([403, 404], `answered ${stolen.status()}`).toContain(stolen.status())
+      // And the body must not confirm the run exists: a response that distinguishes "not yours" from
+      // "not found" is an existence oracle for run ids.
+      expect(await stolen.text()).not.toContain('A private run')
+    } finally {
+      await harness.sql`delete from solution_runs where id = ${runId}`
+      await otherContext.close()
     }
   })
 

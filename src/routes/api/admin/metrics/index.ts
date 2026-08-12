@@ -8,10 +8,56 @@ import { env } from '~/shared/lib/env'
 import { getRemovalRequestMetrics } from '~/shared/lib/repositories/profile-removal'
 
 /**
- * Platform metrics for `/admin/metrics` (plans/ui-dashboard, Admin track "`/admin/metrics`
- * optimization").
+ * The bounded legacy compatibility response for `/admin/metrics` (plan 57, Admin track — "Split the
+ * monolithic Admin Metrics API").
  *
- * ## What this endpoint deliberately does not return
+ * ## This endpoint is legacy, and these are its three remaining consumers
+ *
+ * The page no longer reads it on a timer, and no longer reads it at all to render numbers. The eight sections
+ * come from `sections.ts` and `overview.ts`, which return a versioned contract. What still comes from here is
+ * exactly three things, each on the one tab that needs it:
+ *
+ * - `interviews.capabilities` — the Reliability tab's per-flag grid.
+ * - `discovery` — the Discovery tab's current-run state disclosure.
+ * - `server` — the Runtime tab's process diagnostics, fetched only when that disclosure is opened.
+ *
+ * ## What has to be true before it can be deleted
+ *
+ * All three are facts the section contract cannot currently carry: `metricValueSchema` accepts a finite
+ * `number` and nothing else, and these are booleans and strings. Two ways out, and neither is free:
+ *
+ * - The capability flags could collapse into `unavailable: 'not_enabled'`, which is what that code is for —
+ *   but that loses *which* door is shut, and the flags are reported individually precisely because they fail
+ *   independently. Transcription can be off while scheduling is on, and an operator reading
+ *   `transcriptReconnects: 0` needs to know which of those two it is.
+ * - The contract could grow a non-numeric field, which is a schema-version bump for a capability grid, a
+ *   worker cursor and a Node version.
+ *
+ * Until one of those is decided, this stays. What is *not* acceptable is it growing: the response is a fixed
+ * set of keys over scalars and small aggregates, with no collection whose length is decided by how much data
+ * exists. `tests/e2e/api/admin.spec.ts` asserts that key set, so adding one here fails a gate rather than
+ * quietly re-monolithing the endpoint.
+ *
+ * ## `?fields=` — the payload was bounded, the *work* was not
+ *
+ * The response shape has been a fixed key set since the split. What every request still did was compute all of
+ * it: two platform DB aggregates, a discovery-state read, and a removal-metrics read when that feature is on.
+ * Set against what the three callers actually read, that was almost entirely waste —
+ *
+ * - `server` is `process.version`, `process.platform`, `process.pid` and `process.memoryUsage()`. **No database
+ *   at all.** Opening the Runtime tab's diagnostics disclosure ran two platform aggregates and a discovery read
+ *   to answer a question about the current process.
+ * - `interviews` is five environment flags plus counters already held in memory. Also no database.
+ * - `discovery` needs `getDiscoveryState` and nothing else.
+ *
+ * So a caller names the fields it reads and the route computes only those. `fields` is an allowlist over a closed
+ * vocabulary and an unknown name is a **400**, matching what `sections.ts` does with an unknown section: silently
+ * dropping it would answer 200 with a key the caller is waiting for and never told was refused.
+ *
+ * Omitting `fields` still returns everything, and that is the compatibility half of a legacy compatibility
+ * endpoint — an external caller, and the e2e gate that pins the full key set, keep working unchanged.
+ *
+ * ## What it deliberately does not return, and still will not
  *
  * It used to include a `billing` block from `getBillingOperationsMetrics`, which walks **every
  * organization serially** — one transaction and nine queries each, plus one more per active credit
@@ -30,6 +76,18 @@ import { getRemovalRequestMetrics } from '~/shared/lib/repositories/profile-remo
  * forbids. Three tiles that never had a value are better removed than powered by a new read policy
  * over other people's notes.
  */
+
+/**
+ * The fields this endpoint can compute, and what each one costs.
+ *
+ * `generatedAt` is not in here: it describes the response rather than being part of it, so it is always present.
+ * Every other key is opt-out-able, including the two nobody currently reads — `db` and `inProcess` are what an
+ * external caller of a legacy endpoint is most likely to want, and removing them is a separate decision from
+ * making them optional.
+ */
+const METRIC_FIELDS = ['inProcess', 'db', 'removals', 'interviews', 'discovery', 'server'] as const
+type MetricField = (typeof METRIC_FIELDS)[number]
+
 export const Route = createFileRoute('/api/admin/metrics/')({
   component: () => null,
   server: {
@@ -41,20 +99,50 @@ export const Route = createFileRoute('/api/admin/metrics/')({
         try {
           await requirePlatformAdminPrincipal(request)
 
-          // In-process metrics
-          const inProcess = metrics.get()
+          /**
+           * Which fields to compute. Absent means all of them.
+           *
+           * Refused rather than filtered, for the same reason `sections.ts` refuses an unknown section: a caller
+           * that asked for `?fields=sever` and got a 200 without it would wait for a key it was never told was
+           * dropped. An empty `?fields=` is also a 400 — it is a request for nothing, which is a bug at the
+           * caller rather than an instruction.
+           */
+          const requested = new URL(request.url).searchParams.get('fields')
+          let fields: ReadonlySet<MetricField> = new Set(METRIC_FIELDS)
+          if (requested !== null) {
+            const names = requested.split(',').map((name) => name.trim()).filter(Boolean)
+            const unknown = names.filter((name) => !(METRIC_FIELDS as readonly string[]).includes(name))
+            if (names.length === 0 || unknown.length > 0) {
+              return Response.json(
+                { error: 'invalid_request', unknownFields: unknown, allowed: METRIC_FIELDS },
+                { status: 400 },
+              )
+            }
+            fields = new Set(names as MetricField[])
+          }
+
+          // In-process metrics. Free — a read of counters already in memory — but `interviews.counters` derives
+          // from it, so it is computed whenever either field is asked for.
+          const needsInProcess = fields.has('inProcess') || fields.has('interviews')
+          const inProcess = needsInProcess ? metrics.get() : null
 
           // DB aggregates
           const now = new Date()
           const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
           const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-          // Concurrent, not sequential: they share no data and the page waits for all three, so
-          // awaiting them in a row just adds the two faster round trips to the slowest one.
+          /**
+           * Concurrent, not sequential: they share no data and a caller that wants several waits for all of
+           * them, so awaiting them in a row just adds the faster round trips to the slowest one.
+           *
+           * Each is now conditional on being asked for. This is the whole point of `fields`: `?fields=server`
+           * reaches the database zero times, where it previously ran both platform aggregates and the discovery
+           * read to report a Node version.
+           */
           const [accountMetrics, onboardingMetrics, discovery] = await Promise.all([
-            getPlatformAccountMetrics(oneDayAgo, oneWeekAgo),
-            getOnboardingActivationMetrics(oneWeekAgo),
-            getDiscoveryState().catch(() => null),
+            fields.has('db') ? getPlatformAccountMetrics(oneDayAgo, oneWeekAgo) : null,
+            fields.has('db') ? getOnboardingActivationMetrics(oneWeekAgo) : null,
+            fields.has('discovery') ? getDiscoveryState().catch(() => null) : null,
           ])
 
           /**
@@ -65,7 +153,7 @@ export const Route = createFileRoute('/api/admin/metrics/')({
            * operator would conclude the queue is empty rather than that the door is shut. Omitting the key is
            * the only answer that cannot be misread.
            */
-          const removals = env.PROFILE_REMOVAL_ENABLED === 'true'
+          const removals = fields.has('removals') && env.PROFILE_REMOVAL_ENABLED === 'true'
             ? await getRemovalRequestMetrics().catch(() => null)
             : null
 
@@ -92,7 +180,7 @@ export const Route = createFileRoute('/api/admin/metrics/')({
           }
           const anyInterviewCapability = Object.values(interviewCapabilities).some(Boolean)
 
-          const activationRate7d = accountMetrics.newUsersLast7d > 0
+          const activationRate7d = accountMetrics && onboardingMetrics && accountMetrics.newUsersLast7d > 0
             ? onboardingMetrics.onboardingCompletedLast7d / accountMetrics.newUsersLast7d
             : null
 
@@ -106,35 +194,59 @@ export const Route = createFileRoute('/api/admin/metrics/')({
              * this is the same claim for this page.
              */
             generatedAt: now.toISOString(),
-            inProcess,
-            db: {
-              ...accountMetrics,
-              onboardingCompleted: onboardingMetrics.onboardingCompleted,
-              onboardingSkipped: onboardingMetrics.onboardingSkipped,
-              activationRate7d,
-            },
-            // plans/phase-1/52-audit-trust §"Add trust runtime gates and redacted metrics" — counts and
+            /*
+             * Each field is present only when it was asked for, and a spread of `{}` is how a key is *absent*
+             * rather than `null` — the same distinction this whole plan is about. A caller that asked for
+             * `?fields=server` and received `db: null` would have to know that null means "not requested" and
+             * not "no accounts", which is precisely the ambiguity `removals` is omitted to avoid.
+             */
+            ...(fields.has('inProcess') ? { inProcess } : {}),
+            ...(fields.has('db') && accountMetrics && onboardingMetrics
+              ? {
+                  db: {
+                    ...accountMetrics,
+                    onboardingCompleted: onboardingMetrics.onboardingCompleted,
+                    onboardingSkipped: onboardingMetrics.onboardingSkipped,
+                    activationRate7d,
+                  },
+                }
+              : {}),
+            // plans/implemented/52-audit-trust §"Add trust runtime gates and redacted metrics" — counts and
             // states only. See `getRemovalRequestMetrics` for what is deliberately absent and why.
             ...(removals ? { removals } : {}),
-            // plans/phase-1/44-calendar-scheduling-interview-intelligence §"Add redacted metrics and
+            // plans/implemented/44-calendar-scheduling-interview-intelligence §"Add redacted metrics and
             // operator dashboards". Counters and flags only: every value here is a number or a boolean,
             // which is what makes it safe to render on a page that must never approach a candidate's name.
-            interviews: {
-              capabilities: interviewCapabilities,
-              ...(anyInterviewCapability ? { counters: interviewOperatorCounters(inProcess) } : {}),
-            },
-            discovery: discovery && {
-              cursor: discovery.cursor,
-              lastCellKey: discovery.lastCellKey,
-              lastRunAt: discovery.lastRunAt,
-              stats: discovery.stats,
-            },
-            server: {
-              nodeVersion: process.version,
-              platform: process.platform,
-              pid: process.pid,
-              memoryUsage: process.memoryUsage(),
-            },
+            ...(fields.has('interviews')
+              ? {
+                  interviews: {
+                    capabilities: interviewCapabilities,
+                    ...(anyInterviewCapability && inProcess
+                      ? { counters: interviewOperatorCounters(inProcess) }
+                      : {}),
+                  },
+                }
+              : {}),
+            ...(fields.has('discovery')
+              ? {
+                  discovery: discovery && {
+                    cursor: discovery.cursor,
+                    lastCellKey: discovery.lastCellKey,
+                    lastRunAt: discovery.lastRunAt,
+                    stats: discovery.stats,
+                  },
+                }
+              : {}),
+            ...(fields.has('server')
+              ? {
+                  server: {
+                    nodeVersion: process.version,
+                    platform: process.platform,
+                    pid: process.pid,
+                    memoryUsage: process.memoryUsage(),
+                  },
+                }
+              : {}),
           })
         } catch (err) {
           const response = platformAdminErrorResponse(err)

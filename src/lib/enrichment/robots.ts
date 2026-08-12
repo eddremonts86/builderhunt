@@ -1,6 +1,6 @@
 /**
  * Public Profile Enrichment — robots.txt cache + evaluation.
- * Spec reference: plans/phase-1/42-stealth-scraping/spec.md §8, §14. Only
+ * Spec reference: plans/implemented/42-stealth-scraping/spec.md §8, §14. Only
  * `authorized_crawl` connectors are required to honor this (spec §4); a
  * fetch or parse failure fails closed (denies) for that mode.
  */

@@ -82,6 +82,9 @@ export async function loadAccountExportSource(userId: string) {
       createdAt: authAccounts.createdAt,
     }).from(authAccounts).where(eq(authAccounts.userId, userId)).limit(1),
     listAccountConsents(userId),
+    // unbounded-read-ok: a subject access request must be complete, and read-bounds.ts forbids a
+    // ceiling here by name — "a ceiling on a deletion, an export or a sweep is silent data loss".
+    // Scoped to one email address, so the set is one person's own claim attempts.
     accountDb.select({
       id: builderClaimRequests.id,
       builderId: builderClaimRequests.builderId,
@@ -104,6 +107,9 @@ export async function loadAccountExportSource(userId: string) {
      * For `builder_profile_views` it is a prerequisite: that table had no RLS at all until
      * `0154_builder_profile_views_rls.sql`, and once it has some, this read needs an identity.
      */
+    // unbounded-read-ok: the export must disclose every claim, which is the defect described
+    // directly above — a refused claim omitted from the export is the failure mode, and a ceiling
+    // reintroduces it silently.
     withAccountSubjectContext(userId, (transaction) => transaction.select({
       id: builderClaims.id,
       builderIdentityId: builderClaims.builderIdentityId,
@@ -114,6 +120,9 @@ export async function loadAccountExportSource(userId: string) {
       revokedAt: builderClaims.revokedAt,
       createdAt: builderClaims.createdAt,
     }).from(builderClaims).where(eq(builderClaims.subjectUserId, userId))),
+    // unbounded-read-ok: every view this person performed is data held about them, so the export
+    // owes them all of it. De-duplicated one viewer per day by the table itself, so the row count is
+    // days of activity rather than page loads.
     withAccountSubjectContext(userId, (transaction) => transaction.select({
       builderId: builderProfileViews.builderId,
       viewedAt: builderProfileViews.viewedAt,
@@ -132,6 +141,9 @@ export async function loadAccountExportSource(userId: string) {
     // read this specific "which orgs am I in" query through authDb instead
     // of accountDb rather than trying to invent a per-org tenant context for
     // a query whose whole purpose is discovering those org ids.
+    // unbounded-read-ok: this drives the per-organization loop below as well as the export, so a
+    // ceiling would drop whole organizations out of the subject's tracked-builder disclosure rather
+    // than merely truncating a list. Bounded in practice by the organizations one person joined.
     authDb.select({
       organizationId: organizations.id,
       name: organizations.name,
@@ -157,6 +169,7 @@ export async function loadAccountExportSource(userId: string) {
           role: membership.role as OrganizationRole,
           requestId: crypto.randomUUID(),
         },
+        // unbounded-read-ok: same export-completeness rule, once per membership.
         (tx) => tx.select({
           id: builders.id,
           source: builders.source,
@@ -242,6 +255,11 @@ export async function listOwnedOrganizationsWithOtherMembers(userId: string) {
   // read through authDb, which has unrestricted access via the auth-broker
   // policy, not accountDb (which would silently return zero rows and let
   // the ownership guard wrongly conclude the user owns nothing).
+  // unbounded-read-ok: this is the guard that *blocks* account deletion, so a truncated result does
+  // not shorten a list — it drops a blocking organization and lets the deletion proceed. The failure
+  // is in the permissive direction, which is the one that cannot be allowed to happen quietly. The
+  // comment above already records the RLS variant of exactly this mistake: read through the wrong
+  // connection and the guard "wrongly conclude[s] the user owns nothing".
   return authDb
     .selectDistinct({
       organizationId: organizationMembers.organizationId,

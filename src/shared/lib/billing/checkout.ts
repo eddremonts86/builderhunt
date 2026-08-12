@@ -1,5 +1,5 @@
 /**
- * Idempotent subscription Checkout Session creation (plans/phase-1/30-stripe-billing-platform/tasks.md §5
+ * Idempotent subscription Checkout Session creation (plans/implemented/30-stripe-billing-platform/tasks.md §5
  * "Build subscription Checkout endpoint"; spec.md §Subscription state machine, step 1-3). The
  * caller (route handler) is responsible for owner-only permission enforcement — this module never
  * checks `principal.role` itself, matching every other billing service file's separation of
@@ -187,7 +187,7 @@ export async function createSubscriptionCheckout(
  * organization state.
  *
  * `'succeeded'` requires an actual active subscription row — the only authoritative signal, written
- * by the webhook handler (plans/phase-1/30-stripe-billing-platform/tasks.md §6, not yet built) once Stripe
+ * by the webhook handler (plans/implemented/30-stripe-billing-platform/tasks.md §6, not yet built) once Stripe
  * confirms payment. Until that handler exists, a real Checkout completed via the fake provider stays
  * `'pending'` forever, which is the correct, safe default: this function never promotes anything to
  * `'succeeded'` on its own say-so. `'failed'` is not yet reachable from here for the same reason —
