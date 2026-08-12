@@ -187,6 +187,48 @@ async function waitForSkeletonsToClear(page) {
     .catch(() => {})
 }
 
+/**
+ * Runs every finite animation to its end state before anything is measured.
+ *
+ * `FREEZE_ANIMATIONS_CSS` above sets `animation-duration: 0s` and `transition-duration: 0s`, and
+ * those two declarations govern CSS animations and CSS transitions — nothing else. The dashboard's
+ * widget entrance is a Framer Motion stagger driven through the Web Animations API, which they do not
+ * reach, so it was still mid-flight when axe sampled the page.
+ *
+ * What that produced, on 2026-08-12: four `serious` colour-contrast violations on `/dashboard` at all
+ * three viewports, reporting foregrounds of `#404044` and `#797980`. Neither is a token in this
+ * codebase. `#404044` is `--color-bh-text-dim` (`#a4a4ab`, which clears 7.2:1) composited at roughly
+ * a third of full opacity over the card; `#797980` is `--color-bh-text-muted` at about
+ * three-quarters. The gate was measuring a fade, and reporting the fade as a design defect — with a
+ * ratio of 1.86:1, which no reviewer would read as anything but a real and severe fault.
+ *
+ * Finishing rather than waiting, because waiting is what the skeleton pulse makes impossible: an
+ * infinite animation never completes, and `finish()` throws on one, which is exactly the signal
+ * needed to leave it alone. The resting state is also the honest thing to audit — it is the state a
+ * reader spends their time in.
+ */
+async function settleAnimations(page) {
+  const deadline = Date.now() + 5_000
+  for (;;) {
+    const pending = await page
+      .evaluate(() => {
+        const isFinite_ = (animation) => {
+          const timing = animation.effect?.getComputedTiming?.()
+          return timing ? timing.iterations !== Infinity : true
+        }
+        for (const animation of document.getAnimations()) {
+          if (isFinite_(animation)) animation.finish()
+        }
+        // Re-read: finishing one can mount markup that starts another (a widget whose section data
+        // arrived while the first pass was running).
+        return document.getAnimations().filter((a) => isFinite_(a) && a.playState === 'running').length
+      })
+      .catch(() => 0)
+    if (pending === 0 || Date.now() >= deadline) return
+    await page.waitForTimeout(100)
+  }
+}
+
 async function dismissOverlays(page) {
   const status = await page
     .evaluate(async () => {
@@ -224,6 +266,9 @@ async function auditRoute(page, route, viewportName) {
   await waitForHydration(page)
   await dismissOverlays(page)
   await waitForSkeletonsToClear(page)
+  // After the skeletons, not before: a widget whose section data arrives late mounts late, and its
+  // entrance starts then.
+  await settleAnimations(page)
 
   // `target-size` (WCAG 2.2 SC 2.5.8, pointer target minimums) isn't in
   // axe-core's default rule set (confirmed by enumerating every rule id the
