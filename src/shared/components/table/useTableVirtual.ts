@@ -37,6 +37,10 @@ export type TableDensity = 'sm' | 'md' | 'lg'
  * record back onto the container as an inline `--tbl-row-height`, so the pixels CSS paints and the
  * pixels the virtualizer offsets by cannot drift apart. A mismatch there does not look broken — it
  * looks like rows slowly sliding out from under their own hover state as you scroll.
+ *
+ * Unwindowed, this is the row's *floor*: a cell whose actions or identity need a few more pixels
+ * grows the row rather than being clipped. Windowed, `[data-virtualized]` pins it exactly, because
+ * there a taller row overlaps the one below it. See the `.tbl-row` rules in `globals.css`.
  */
 export const ROW_HEIGHT: Record<TableDensity, number> = {
   sm: 44,

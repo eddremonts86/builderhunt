@@ -321,6 +321,7 @@ for (const surface of SURFACES) {
             headerPadding: getComputedStyle(header).paddingLeft,
             columnGap: getComputedStyle(header).columnGap,
             rowHeight: Math.round(row.getBoundingClientRect().height),
+            virtualized: document.querySelector('[data-virtualized="true"]') !== null,
           }
         })
 
@@ -330,10 +331,17 @@ for (const surface of SURFACES) {
         expect(anatomy.headerPosition).toBe('sticky')
         expect(anatomy.headerPadding).toBe('16px')
         expect(anatomy.columnGap).toBe('20px')
-        // The density the container declares and the height a row actually paints have to agree —
-        // the virtualizer offsets by the first and the user sees the second.
         expect(['sm', 'md', 'lg']).toContain(anatomy.density)
-        expect(anatomy.rowHeightVar).toBe(`${anatomy.rowHeight}px`)
+        /**
+         * The declared density is the row's floor, and its exact height once the table is windowed.
+         *
+         * Unvirtualized, a row whose actions or identity need a few more pixels grows rather than
+         * clipping them — the densities are a rhythm, not a guillotine. Windowed, the virtualizer
+         * positions every row at `index * --tbl-row-height` and measures nothing, so a row painting
+         * taller than it is offset by *overlaps the one below it*. That one has to be exact.
+         */
+        expect(anatomy.rowHeight).toBeGreaterThanOrEqual(parseInt(anatomy.rowHeightVar, 10))
+        if (anatomy.virtualized) expect(anatomy.rowHeightVar).toBe(`${anatomy.rowHeight}px`)
       } finally {
         await context.close()
       }

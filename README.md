@@ -272,6 +272,18 @@ Two files, and no pagination code.
    keyboard model and the ARIA indices; it never sorts or filters the rows it was handed, because the
    server already did.
 
+Give every column a `kind` — one of `primary`, `status`, `category`, `date`, `number`, `ratio`,
+`identity`, `empty`, `actions` — and render it with the matching cell from
+`~/shared/components/table`. The kind decides the column's width and whether it may truncate, so a
+date is one date format across every table in the app and a number is right-aligned without anyone
+having to remember to align it. Pick the container's `density` while you are there: `lg` for rows
+carrying an avatar, `sm` for a long list, `md` otherwise. The full contract is in
+[`docs/visual-system.md`](docs/visual-system.md#tables--the---tbl--visual-contract-plan-phase-314).
+
+A table nobody operates — a comparison, a summary, four rows of prose — is a `<SemanticTable>`
+instead. Same tokens, real `table`/`thead`/`tbody`, and `scope="row"` on the row's identity so a
+screen reader can say which row a number came from.
+
 Then add `// table-surface: yourCapability` to the surface — `pnpm check:table-surfaces` fails without
 it — and let `pnpm check:unbounded` tell you if the read behind it forgot its bound. Copy any existing
 capability plus its surface; between them they show every shape.

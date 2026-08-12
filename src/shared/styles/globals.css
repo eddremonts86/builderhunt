@@ -1256,9 +1256,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-sort-button:hover { color: var(--tbl-header-active); }
 
 /* ── Rows ──────────────────────────────────────────────────────────────────
-   Height comes from the container's density and nothing else. A cell that
-   chose its own would break the virtualizer's offset arithmetic, which
-   measures every row at exactly --tbl-row-height. */
+   Height comes from the container's density. `min-height` rather than
+   `height`, so a cell whose content genuinely needs more room grows the row
+   instead of being silently clipped — a clipped action is worse than a tall
+   row, and the reference's densities are a rhythm rather than a guillotine.
+
+   Except when the table is windowed. There the virtualizer positions every row
+   at `index * --tbl-row-height` and measures nothing, so a row that paints
+   taller than it is offset by overlaps the one below it — a visibly broken
+   table rather than an untidy one. Clipping is the lesser failure, and a
+   surface whose row genuinely is a card has the documented escape hatch:
+   declare `rowHeight` (search does, at SEARCH_CARD_ROW_HEIGHT). */
 .tbl-row {
   min-height: var(--tbl-row-height);
   padding-inline: var(--tbl-padding-inline);
@@ -1269,6 +1277,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   transition: background-color var(--tbl-transition);
 }
 .tbl-row:last-child { border-bottom: 0; }
+[data-virtualized='true'] .tbl-row {
+  height: var(--tbl-row-height);
+  overflow: hidden;
+}
 .tbl-row:hover { background: var(--tbl-row-hover); }
 .tbl-row[data-state='selected'] { background: var(--tbl-row-selected); }
 .tbl-row[data-tone='danger'] { background: var(--tbl-row-danger); }
