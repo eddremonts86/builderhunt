@@ -5,7 +5,25 @@ ENV PATH="$PNPM_HOME:$PATH"
 # CI=true so pnpm's deps-status check can purge node_modules non-interactively
 # (avoids ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY).
 ENV CI=true
-RUN corepack enable
+# pnpm 10, pinned — the same major every workflow pins with `pnpm/action-setup`.
+#
+# `corepack enable` on its own takes corepack's default, which on this image is pnpm 11.21.0
+# (measured). pnpm 11 enforces a `minimumReleaseAge` supply-chain policy that pnpm 10 does not, and a
+# Dependabot lockfile legitimately contains packages published hours ago — so the build died on
+#
+#   [ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION] 17 lockfile entries failed verification
+#   ERROR: process "/bin/sh -c pnpm install --frozen-lockfile" did not complete successfully
+#
+# **Four consecutive production deploys failed this way** on 2026-08-12 — 4c3cb91fa, ffab53b96,
+# 498191764 and cffb11710 — while Quality was green on every one of them, because CI pins pnpm 10 and
+# this image did not. Every gate passed and nothing shipped, which is the worst shape a pipeline can
+# take: `/api/health` kept answering because the *previous* build kept serving.
+#
+# Pinned here rather than by adding `packageManager` to `package.json`: that is the better
+# single-source fix, but `pnpm/action-setup` documents `version` as optional *when* `packageManager`
+# exists and does not say what it does when both are set, and nine workflow inputs would be riding on
+# the answer. Fixing a dead deploy pipeline is not the moment to find out.
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 
 WORKDIR /app
 
