@@ -172,6 +172,22 @@ test.describe('the dashboard shell', () => {
       // Every tile has a value; none is left claiming to load.
       await expect(tab.locator('[data-metric-state="loading"]')).toHaveCount(0)
       await expect(tab.locator('[data-metric-state="ready"]').first()).toBeVisible()
+
+      /**
+       * All three headline tiles exist and each shows a digit — asserted on this platform, whichever it is.
+       *
+       * The tiles carry no `isVisible` and no `isEmpty`, so the registry cannot hide them: three is the count on any
+       * settled dashboard, and a number is what each must contain. That is worth pinning explicitly because the
+       * Linux CI render and the macOS render of this page disagree, and reading downscaled screenshots could not
+       * tell me whether the tiles were absent there or merely dark-on-dark. This answers it in the DOM, on the
+       * platform CI runs, which is also the platform production runs.
+       */
+      const tiles = tab.locator('[data-metric-state]')
+      await expect(tiles).toHaveCount(3)
+      for (let index = 0; index < 3; index += 1) {
+        await expect(tiles.nth(index)).toHaveAttribute('data-metric-state', 'ready')
+        await expect(tiles.nth(index)).toContainText(/[0-9]/)
+      }
     } finally {
       await context.close()
     }
