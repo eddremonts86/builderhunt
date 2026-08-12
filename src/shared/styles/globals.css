@@ -865,6 +865,656 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 }
 
 /* =============================================================================
+   Table visual system — the `--tbl-*` contract
+   -----------------------------------------------------------------------------
+   Provenance: the product reference was supplied on 2026-08-11 as two equivalent
+   artifacts — `Design.pdf` (visual authority for composition and hierarchy) and
+   `Sistema de tablas.html` (authority for literal values). The reference ships a
+   SCSS token block; BuilderHunt mirrors it as CSS custom properties rather than
+   adding Sass to the toolchain for one file. That is the only *intentional*
+   adaptation of the source's shape.
+
+   The three intentional adaptations of its *values*, all in the same direction —
+   the reference's own stone ramp, one step darker — are recorded at their tokens
+   below. Each exists because the spec that supplied these literals also requires
+   WCAG AA for text, and three of them do not clear it on the surface they sit on.
+
+   Every table in the app — the interactive `DataTable` grid and the native
+   `SemanticTable` — reads these and nothing else. A surface that reaches for a
+   literal colour, height or width is what `pnpm check:table-surfaces` rejects.
+   ============================================================================= */
+:root {
+  /* ── Surfaces and borders ───────────────────────────────────────────────── */
+  --tbl-surface: #ffffff;
+  --tbl-surface-subtle: #fafaf9;
+  --tbl-border-outer: #e2dfda;
+  --tbl-border-header: #edeae6;
+  --tbl-border-row: #f5f3f1;
+
+  /* ── Text roles ─────────────────────────────────────────────────────────── */
+  --tbl-text-primary: #1b1917;
+  --tbl-text-secondary: #44403c;
+  /* Adaptation 1 of 4. The reference's muted ink is #a8a29e, which measures
+     2.52:1 on its own #ffffff surface — far below the 4.5:1 the same spec
+     demands for text, and this role carries the empty-cell em dash and every
+     cell's secondary metadata. The next step down the reference's ramp
+     (#78716c) clears AA on white at 4.80:1 but only 4.48:1 on the selected-row
+     tint, which is a surface this ink genuinely lands on, so the role takes one
+     more step (#57534e, 7.11:1 there). #a8a29e survives verbatim as
+     --tbl-text-faint below, for the things it *can* carry. */
+  --tbl-text-muted: #57534e;
+  /* The reference literal, kept for non-text decoration only: the ratio bar's
+     unfilled track and hairline rules. Never put words in this colour. */
+  --tbl-text-faint: #a8a29e;
+
+  /* ── Header ink ─────────────────────────────────────────────────────────── */
+  /* Adaptation 2 of 4. The reference pairs an idle header of #a8a29e with an
+     active-sort header of #78716c. At 11px/700 that idle value is 2.52:1 —
+     11px bold is not "large text" under WCAG (that starts at 18.66px bold), so
+     it is held to 4.5:1 like any other. Both roles move one step down the same
+     ramp, which preserves the thing the reference is actually specifying: the
+     active column reads stronger than the idle ones. */
+  --tbl-header-idle: #78716c;
+  --tbl-header-active: #44403c;
+
+  /* ── Accent and row states ──────────────────────────────────────────────── */
+  /* Decorative fills only — today, the ratio bar. It measures 2.79:1 against
+     its own track, which is under SC 1.4.11's 3:1 for a graphical object; that
+     is allowed here for the one reason the reference itself supplies, which is
+     that a ratio cell prints the number beside the bar. The bar is redundant
+     presentation of a value that is also text, never the only carrier of it. */
+  --tbl-accent: #e8703a;
+  /* Adaptation 3 of 4. The focus boundary is *not* decorative — SC 1.4.11 holds
+     it to 3:1 against everything it is drawn on. #e8703a manages 3.14:1 on
+     white but 2.93:1 on the selected-row tint, and a focus ring that
+     disappears exactly on the rows you are acting on is the worst place for it
+     to fail. This is BuilderHunt's existing --color-bh-accent-hover, three
+     units per channel from the reference's accent and already in the palette,
+     at 4.11:1 on white and 3.83:1 on a selected row. */
+  --tbl-focus-ring: #ca5d25;
+  --tbl-row-hover: #fafaf9;
+  --tbl-row-selected: #fdf6f1;
+  --tbl-row-danger: #fef9f8;
+  --tbl-row-muted-text: #78716c;
+
+  /* ── Status chips ───────────────────────────────────────────────────────── */
+  --tbl-chip-success-bg: #eaf7ee;
+  --tbl-chip-success-fg: #166534;
+  --tbl-chip-warning-bg: #fef3e7;
+  --tbl-chip-warning-fg: #9a5b0b;
+  --tbl-chip-danger-bg: #fdecea;
+  --tbl-chip-danger-fg: #9f2d20;
+  --tbl-chip-neutral-bg: #f5f4f2;
+  /* Adaptation 4 of 4, and the same value adaptation 1 landed on. The
+     reference's neutral chip is #78716c on #f5f4f2, which measures 4.36:1 —
+     0.14 short. One more step down the ramp reaches 6.94:1 and is visually
+     indistinguishable at 11px. */
+  --tbl-chip-neutral-fg: var(--tbl-text-muted);
+  --tbl-chip-accent-bg: #fdf0e9;
+  --tbl-chip-accent-fg: #9a4318;
+
+  /* ── Anatomy (px, from the reference's geometry table) ──────────────────── */
+  --tbl-radius: 14px;
+  --tbl-toolbar-height: 58px;
+  --tbl-header-height: 34px;
+  --tbl-footer-height: 44px;
+  --tbl-padding-inline: 16px;
+  --tbl-column-gap: 20px;
+
+  /* ── Density. One source of truth for row height lives in TypeScript
+     (`useTableVirtual.ts`'s ROW_HEIGHT) because the virtualizer does the offset
+     arithmetic; `DataTable` writes it back here as --tbl-row-height so CSS and
+     the virtualizer can never disagree. These are the fallbacks a table that
+     sets no density (SemanticTable) resolves against. ─────────────────────── */
+  --tbl-row-height-sm: 44px;
+  --tbl-row-height-md: 52px;
+  --tbl-row-height-lg: 64px;
+  --tbl-row-height: var(--tbl-row-height-md);
+  /* Search's row *is* a result card. It stays a specialized height rather than
+     a fourth density, but it is named here instead of being a literal in
+     SearchPage.tsx. */
+  --tbl-row-height-search-card: 176px;
+
+  /* ── Fixed column widths. Only the primary column is flexible. ──────────── */
+  --tbl-col-status: 116px;
+  --tbl-col-category: 132px;
+  --tbl-col-date: 168px;
+  --tbl-col-number: 88px;
+  --tbl-col-ratio: 120px;
+  --tbl-col-actions: 44px;
+  --tbl-col-empty: 88px;
+  /* The two flexible tracks are whole `minmax()` expressions rather than a
+     min and a multiplier, because `fr` is not a value `calc()` accepts — a
+     grid track cannot be assembled from parts at the call site. */
+  --tbl-col-primary: minmax(240px, 1.6fr);
+  --tbl-col-identity: minmax(180px, 1fr);
+  /* Control columns the shell adds either side of the data columns. */
+  --tbl-col-select: 36px;
+  --tbl-col-expand: 36px;
+
+  /* ── Typography ─────────────────────────────────────────────────────────── */
+  --tbl-font-header-size: 11px;
+  --tbl-font-header-weight: 700;
+  --tbl-font-header-tracking: 0.07em;
+  --tbl-font-primary-size: 13.5px;
+  --tbl-font-primary-weight: 600;
+  --tbl-font-cell-size: 13px;
+  --tbl-font-meta-size: 11px;
+
+  /* ── Chips, avatars, focus, motion, elevation ───────────────────────────── */
+  --tbl-chip-height: 22px;
+  --tbl-chip-radius: 6px;
+  --tbl-avatar-size: 26px;
+  --tbl-focus-ring-width: 2px;
+  --tbl-transition: 120ms ease;
+  --tbl-shadow: 0 1px 2px rgba(27, 25, 23, 0.04), 0 8px 24px -16px rgba(27, 25, 23, 0.18);
+}
+
+/* Dark mode is semantic, not a copy. The light literals above are a warm stone
+   ramp tuned for a white page; pasting them into `.dark` would put near-black
+   ink on a near-black surface. Each role maps to the BuilderHunt dark palette
+   that every other surface in the app already uses, and the chips become their
+   own opaque dark tints (translucent fills would composite differently on a
+   selected row and quietly lose contrast). */
+.dark {
+  --tbl-surface: var(--color-bh-surface);
+  --tbl-surface-subtle: var(--color-bh-surface-2);
+  --tbl-border-outer: var(--color-bh-border-strong);
+  --tbl-border-header: var(--color-bh-border-strong);
+  --tbl-border-row: var(--color-bh-border);
+
+  --tbl-text-primary: var(--color-bh-text);
+  --tbl-text-secondary: var(--color-bh-text-muted);
+  --tbl-text-muted: var(--color-bh-text-dim);
+  --tbl-text-faint: #6b6b73;
+
+  --tbl-header-idle: var(--color-bh-text-dim);
+  --tbl-header-active: var(--color-bh-text);
+
+  --tbl-accent: var(--color-bh-accent);
+  /* The light-mode ring darkens to clear 3:1 on a near-white row; on a
+     near-black one the base accent already measures 5.4-5.7:1 everywhere, and
+     darkening it further would make it *less* visible. */
+  --tbl-focus-ring: var(--color-bh-accent);
+  --tbl-row-hover: var(--color-bh-surface-2);
+  --tbl-row-selected: #241a15;
+  --tbl-row-danger: #241416;
+  --tbl-row-muted-text: var(--color-bh-text-dim);
+
+  --tbl-chip-success-bg: #152a1e;
+  --tbl-chip-success-fg: #4ade80;
+  --tbl-chip-warning-bg: #2a1e0c;
+  --tbl-chip-warning-fg: #fbbf24;
+  --tbl-chip-danger-bg: #2c1616;
+  --tbl-chip-danger-fg: #f26464;
+  --tbl-chip-neutral-bg: #232329;
+  --tbl-chip-neutral-fg: #a4a4ab;
+  --tbl-chip-accent-bg: #2e1c11;
+  --tbl-chip-accent-fg: #f5a878;
+
+  --tbl-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Container ─────────────────────────────────────────────────────────────
+   Deliberately not `.card`: a card is 24px-radius with 1.5rem of padding, and
+   the reference's table is a 14px-radius clipped surface whose first child is
+   flush against its own edge. Sharing `.card` is how the toolbar ended up
+   inset from the header rule below it. */
+.tbl-container {
+  background: var(--tbl-surface);
+  border: 1px solid var(--tbl-border-outer);
+  border-radius: var(--tbl-radius);
+  box-shadow: var(--tbl-shadow);
+  /* `clip`, not `hidden`. Both round off the corners, but `hidden` creates a
+     scroll container, and a scroll container is what a `position: sticky`
+     descendant resolves against — the floating selection dock inside would
+     stop tracking the viewport and settle at the bottom of the table instead.
+     `overflow: clip` clips without creating one. */
+  overflow: clip;
+}
+[data-density='sm'] { --tbl-row-height: var(--tbl-row-height-sm); }
+[data-density='md'] { --tbl-row-height: var(--tbl-row-height-md); }
+[data-density='lg'] { --tbl-row-height: var(--tbl-row-height-lg); }
+
+/* ── Toolbar ───────────────────────────────────────────────────────────────
+   `min-height` rather than `height`: the reference's 58px assumes one line of
+   chips, and a table with eight facet values wraps to two on a laptop. Pinning
+   the height there would clip them. */
+.tbl-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--tbl-toolbar-height);
+  padding-inline: var(--tbl-padding-inline);
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--tbl-border-header);
+  background: var(--tbl-surface);
+}
+
+.tbl-toolbar-search-icon {
+  pointer-events: none;
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  transform: translateY(-50%);
+  color: var(--tbl-text-muted);
+}
+.tbl-toolbar-group-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--tbl-font-meta-size);
+  color: var(--tbl-text-muted);
+}
+.tbl-toolbar-select {
+  height: 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--tbl-border-outer);
+  background: var(--tbl-surface);
+  padding-inline: 0.5rem;
+  font-size: var(--tbl-font-meta-size);
+  color: var(--tbl-text-primary);
+}
+.tbl-toolbar-select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--tbl-focus-ring-width) var(--tbl-focus-ring);
+}
+
+/* Facet chips. Counted, and the count comes from the server's facets over the
+   whole filtered set — a chip that said how many of the *loaded* rows it would
+   add would be wrong the moment there is a second page, which is always. */
+.tbl-facet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding-inline: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--tbl-border-outer);
+  background: var(--tbl-surface);
+  color: var(--tbl-text-muted);
+  font-size: var(--tbl-font-meta-size);
+  transition: color var(--tbl-transition), background-color var(--tbl-transition), border-color var(--tbl-transition);
+}
+.tbl-facet-chip:hover { color: var(--tbl-text-primary); }
+.tbl-facet-chip[data-active='true'] {
+  border-color: var(--tbl-focus-ring);
+  background: var(--tbl-chip-accent-bg);
+  color: var(--tbl-chip-accent-fg);
+}
+.tbl-facet-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--tbl-focus-ring-width) var(--tbl-focus-ring);
+}
+.tbl-facet-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
+
+.tbl-column-menu {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  margin-top: 0.25rem;
+  width: 13rem;
+  border-radius: 10px;
+  border: 1px solid var(--tbl-border-outer);
+  background: var(--tbl-surface);
+  padding: 0.5rem;
+  box-shadow: var(--tbl-shadow);
+}
+.tbl-column-menu-item {
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  padding: 0.375rem 0.5rem;
+  font-size: var(--tbl-font-cell-size);
+  color: var(--tbl-text-primary);
+}
+.tbl-column-menu-item:hover { background: var(--tbl-surface-subtle); }
+
+/* ── Group headers ─────────────────────────────────────────────────────────
+   Sticky beneath the column header, so the group you are reading stays named
+   while its rows scroll past. */
+.tbl-group-row {
+  position: sticky;
+  top: var(--tbl-header-height);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  min-height: var(--tbl-row-height-sm);
+  padding-inline: var(--tbl-padding-inline);
+  background: var(--tbl-surface-subtle);
+  border-block: 1px solid var(--tbl-border-header);
+}
+.tbl-group-label {
+  font-size: var(--tbl-font-primary-size);
+  font-weight: var(--tbl-font-primary-weight);
+  color: var(--tbl-text-primary);
+}
+.tbl-group-count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--tbl-font-meta-size);
+  color: var(--tbl-text-muted);
+}
+
+/* Skeleton blocks sit in the real grid, so nothing moves when rows arrive. */
+.tbl-skeleton { border-radius: 4px; background: var(--tbl-border-row); }
+.dark .tbl-skeleton { background: var(--color-bh-surface-2); }
+
+/* ── The scrolling viewport ────────────────────────────────────────────────
+   Fixed column widths mean a wide table is wider than a phone. That overflow
+   belongs *here*, never to the document: `tests/e2e/responsive-device-matrix`
+   asserts the page never exceeds the viewport at 375px, and this is the box
+   that keeps that true. */
+.tbl-scroll {
+  overflow-x: auto;
+  background: var(--tbl-surface);
+}
+
+/* ── Header row ────────────────────────────────────────────────────────────
+   34px and sticky: it survives the vertical scroll of a virtualized list. */
+.tbl-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-height: var(--tbl-header-height);
+  padding-inline: var(--tbl-padding-inline);
+  background: var(--tbl-surface-subtle);
+  border-bottom: 1px solid var(--tbl-border-header);
+  font-size: var(--tbl-font-header-size);
+  font-weight: var(--tbl-font-header-weight);
+  letter-spacing: var(--tbl-font-header-tracking);
+  text-transform: uppercase;
+  color: var(--tbl-header-idle);
+}
+.tbl-header-cell { display: flex; align-items: center; min-width: 0; }
+.tbl-header-cell[aria-sort='ascending'],
+.tbl-header-cell[aria-sort='descending'] { color: var(--tbl-header-active); }
+.tbl-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 4px;
+  color: inherit;
+  transition: color var(--tbl-transition);
+}
+.tbl-sort-button:hover { color: var(--tbl-header-active); }
+
+/* ── Rows ──────────────────────────────────────────────────────────────────
+   Height comes from the container's density and nothing else. A cell that
+   chose its own would break the virtualizer's offset arithmetic, which
+   measures every row at exactly --tbl-row-height. */
+.tbl-row {
+  min-height: var(--tbl-row-height);
+  padding-inline: var(--tbl-padding-inline);
+  border-bottom: 1px solid var(--tbl-border-row);
+  color: var(--tbl-text-primary);
+  font-size: var(--tbl-font-cell-size);
+  background: var(--tbl-surface);
+  transition: background-color var(--tbl-transition);
+}
+.tbl-row:last-child { border-bottom: 0; }
+.tbl-row:hover { background: var(--tbl-row-hover); }
+.tbl-row[data-state='selected'] { background: var(--tbl-row-selected); }
+.tbl-row[data-tone='danger'] { background: var(--tbl-row-danger); }
+.tbl-row[data-tone='muted'] { color: var(--tbl-row-muted-text); }
+.tbl-row[data-tone='muted'] .tbl-cell-primary { font-weight: 500; }
+
+.tbl-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.5rem;
+}
+.tbl-cell:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 var(--tbl-focus-ring-width) var(--tbl-focus-ring);
+  border-radius: 4px;
+}
+
+.tbl-expansion-row {
+  border-bottom: 1px solid var(--tbl-border-row);
+  background: var(--tbl-surface-subtle);
+  padding: 0.75rem var(--tbl-padding-inline);
+}
+.tbl-expand-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 0.25rem;
+  color: var(--tbl-text-muted);
+  transition: color var(--tbl-transition), background-color var(--tbl-transition);
+}
+.tbl-expand-button:hover { color: var(--tbl-text-primary); background: var(--tbl-surface-subtle); }
+.tbl-expand-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--tbl-focus-ring-width) var(--tbl-focus-ring);
+}
+
+/* ── Actions: one sticky trailing column ───────────────────────────────────
+   Sticky to the right edge so the row's actions stay reachable while the
+   fixed-width middle columns scroll horizontally underneath. */
+.tbl-actions-cell {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  justify-content: flex-end;
+  background: inherit;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────
+   Count on the left, cursor actions on the right. Never page numbers: phase 3
+   replaced offsets with keyset cursors precisely because an offset repeats and
+   drops rows when the set changes between two requests. */
+.tbl-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: var(--tbl-footer-height);
+  padding-inline: var(--tbl-padding-inline);
+  border-top: 1px solid var(--tbl-border-header);
+  background: var(--tbl-surface-subtle);
+  font-size: var(--tbl-font-meta-size);
+  color: var(--tbl-text-muted);
+}
+
+/* ── Floating selection bar ────────────────────────────────────────────────
+   A strip between the toolbar and the header pushed every row down by 40px the
+   moment a checkbox was ticked — the list moved under the cursor selecting it.
+   The dock is a zero-height sticky line at the table's bottom edge, so the bar
+   floats over the last rows and costs no layout at all. */
+.tbl-selection-dock {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 30;
+  height: 0;
+  display: flex;
+  justify-content: center;
+  /* The dock spans the table's full width but must not eat clicks on the rows
+     underneath it; only the bar itself is interactive. */
+  pointer-events: none;
+}
+.tbl-selection-bar {
+  pointer-events: auto;
+  transform: translateY(-100%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100% - 2 * var(--tbl-padding-inline));
+  padding: 0.375rem 0.5rem 0.375rem 0.75rem;
+  border: 1px solid var(--tbl-border-outer);
+  border-radius: 10px;
+  background: var(--tbl-surface);
+  box-shadow: var(--tbl-shadow);
+}
+.tbl-selection-count {
+  font-size: var(--tbl-font-cell-size);
+  font-weight: 600;
+  color: var(--tbl-text-primary);
+  white-space: nowrap;
+}
+
+/* ── Stacked and board layouts ─────────────────────────────────────────────
+   Different arrangements of the same row: they take `.tbl-row`'s colours,
+   states and separators and only change how the cells are placed. The
+   accessibility tree does not change shape with the viewport, and neither does
+   the palette. */
+.tbl-stacked-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding-block: 0.625rem;
+  /* A card row is as tall as its content, so the container's fixed density is
+     a floor here rather than the height. Stacked surfaces never virtualize —
+     `OperationsPage` renders it below `md` where the list is short. */
+  height: auto;
+}
+.tbl-stacked-value {
+  font-size: var(--tbl-font-meta-size);
+  color: var(--tbl-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-board {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.75rem var(--tbl-padding-inline);
+  background: var(--tbl-surface);
+}
+.tbl-board-card {
+  min-height: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--tbl-border-outer);
+  border-radius: 10px;
+}
+.tbl-board-card[data-state='selected'] { border-color: var(--tbl-focus-ring); }
+
+/* ── Status chips ──────────────────────────────────────────────────────────
+   Semantic tone, never decoration. `category` is plain text on purpose: a grey
+   chip around every category is the thing the reference explicitly rejects. */
+.tbl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: var(--tbl-chip-height);
+  padding-inline: 0.5rem;
+  border-radius: var(--tbl-chip-radius);
+  font-size: var(--tbl-font-meta-size);
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--tbl-chip-neutral-bg);
+  color: var(--tbl-chip-neutral-fg);
+}
+.tbl-chip[data-tone='success'] { background: var(--tbl-chip-success-bg); color: var(--tbl-chip-success-fg); }
+.tbl-chip[data-tone='warning'] { background: var(--tbl-chip-warning-bg); color: var(--tbl-chip-warning-fg); }
+.tbl-chip[data-tone='danger'] { background: var(--tbl-chip-danger-bg); color: var(--tbl-chip-danger-fg); }
+.tbl-chip[data-tone='accent'] { background: var(--tbl-chip-accent-bg); color: var(--tbl-chip-accent-fg); }
+
+/* ── Cell presentations ────────────────────────────────────────────────────
+   The nine kinds. Only free text may ellipsize; a date, a number or a status
+   that truncates is a cell that lies, so those get their width from the fixed
+   column tracks and never a `text-overflow`. */
+.tbl-cell-primary {
+  font-size: var(--tbl-font-primary-size);
+  font-weight: var(--tbl-font-primary-weight);
+  color: var(--tbl-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-cell-meta {
+  font-size: var(--tbl-font-meta-size);
+  color: var(--tbl-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-cell-date-relative { font-size: var(--tbl-font-cell-size); color: var(--tbl-text-secondary); }
+.tbl-cell-date-absolute { font-size: var(--tbl-font-meta-size); color: var(--tbl-text-muted); }
+.tbl-cell-number {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--tbl-font-cell-size);
+  color: var(--tbl-text-primary);
+}
+.tbl-cell-empty { color: var(--tbl-text-muted); }
+.tbl-avatar {
+  width: var(--tbl-avatar-size);
+  height: var(--tbl-avatar-size);
+  border-radius: 9999px;
+  object-fit: cover;
+  flex: none;
+  background: var(--tbl-surface-subtle);
+}
+.tbl-ratio-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--tbl-border-row);
+  overflow: hidden;
+}
+.dark .tbl-ratio-track { background: var(--color-bh-surface-2); }
+.tbl-ratio-fill { height: 100%; border-radius: 9999px; background: var(--tbl-accent); }
+
+/* ── The native semantic table ─────────────────────────────────────────────
+   Same tokens, real `<table>` markup. For bounded prose comparisons and
+   summaries — pricing, cookies, conversion, hygiene — where the ARIA grid's
+   virtualization and keyboard model would be machinery over four rows. */
+.tbl-semantic { width: 100%; border-collapse: collapse; font-size: var(--tbl-font-cell-size); }
+.tbl-semantic caption {
+  padding: 0.5rem var(--tbl-padding-inline);
+  text-align: left;
+  font-size: var(--tbl-font-meta-size);
+  color: var(--tbl-text-muted);
+}
+.tbl-semantic th {
+  height: var(--tbl-header-height);
+  padding-inline: var(--tbl-padding-inline);
+  text-align: left;
+  vertical-align: middle;
+  background: var(--tbl-surface-subtle);
+  border-bottom: 1px solid var(--tbl-border-header);
+  font-size: var(--tbl-font-header-size);
+  font-weight: var(--tbl-font-header-weight);
+  letter-spacing: var(--tbl-font-header-tracking);
+  text-transform: uppercase;
+  color: var(--tbl-header-idle);
+  white-space: nowrap;
+}
+.tbl-semantic td {
+  height: var(--tbl-row-height);
+  padding-block: 0.5rem;
+  padding-inline: var(--tbl-padding-inline);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--tbl-border-row);
+  color: var(--tbl-text-primary);
+}
+.tbl-semantic tbody tr:last-child td { border-bottom: 0; }
+.tbl-semantic tbody tr:hover td { background: var(--tbl-row-hover); }
+.tbl-semantic th[data-align='end'],
+.tbl-semantic td[data-align='end'] { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl-semantic td[data-align='end'] { color: var(--tbl-text-primary); }
+/* A row header (`scope="row"`) is the row's identity, not a column label — it
+   reads as body text, at the primary cell's weight. */
+.tbl-semantic tbody th[scope='row'] {
+  height: var(--tbl-row-height);
+  background: transparent;
+  border-bottom: 1px solid var(--tbl-border-row);
+  font-size: var(--tbl-font-primary-size);
+  font-weight: var(--tbl-font-primary-weight);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--tbl-text-primary);
+}
+.tbl-semantic tbody tr:last-child th[scope='row'] { border-bottom: 0; }
+
+/* =============================================================================
    Table horizontal-scroll hint — for genuinely wide data tables (admin
    billing queues, etc.), not primary navigation. Classic CSS-only "scroll
    shadow" technique: two solid cover gradients (`background-attachment:

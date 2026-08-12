@@ -9,7 +9,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import * as React from 'react'
 
 import { Checkbox } from '~/components/ui/checkbox'
-import type { ColumnDef } from '~/shared/lib/table/columns'
+import { isSortable, type ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
 import { cn } from '~/shared/lib/utils'
 
@@ -17,11 +17,13 @@ import { GridRow } from './GridRow'
 import { buildTableEntries } from './entries'
 import { SelectionBar } from './SelectionBar'
 import { TableCommandSheet } from './TableCommandSheet'
+import { TableFooter } from './TableFooter'
 import { TableToolbar } from './TableToolbar'
 import {
   ariaColIndex,
   ariaRowCount,
   cellAlignmentClass,
+  gridMinWidth,
   gridTemplateColumns,
   HEADER_ROW_INDEX,
 } from './grid-roles'
@@ -90,6 +92,20 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
   selectAllMatching?: SelectAllMatching
   bulkActions?: React.ReactNode
 
+  /**
+   * The row's visual state, beyond selected.
+   *
+   * The reference's five row variants are resting, hover, selected/active, danger/degraded and
+   * muted/paused. The first three the shell already knows about — the last two are facts only the
+   * surface has: a failed job, a revoked session, a paused radar. Returning a tone paints the whole
+   * row rather than leaving each surface to tint one cell red, which is what produced a red *status
+   * chip* in a row that otherwise looked healthy.
+   *
+   * It is presentation only. A muted row is still selectable, still keyboard-reachable and still
+   * announced normally; dimming a row is not a way to disable it.
+   */
+  rowTone?: (row: Row) => 'danger' | 'muted' | undefined
+
   /** Per-table extra row content — an inline edit form, for instance. The shell knows nothing about it. */
   expansion?: (row: Row) => React.ReactNode
   /**
@@ -129,7 +145,14 @@ export interface DataTableProps<Row extends Record<string, unknown>> {
   filterLabels?: Record<string, string>
   className?: string
 
-  /** Row height. The table's own concept, not the dashboard's bento/sections preference. */
+  /**
+   * Row height, inherited by every cell in the table.
+   *
+   * `sm` (44px) for large lists, `md` (52px) as the default, `lg` (64px) where the row carries an
+   * avatar. It is the *container's* choice, never a cell's: the virtualizer computes every offset
+   * as `index * rowHeight`, so one cell deciding to be taller puts every row below it at the wrong
+   * position — a failure that looks like the list sliding out from under its own hover state.
+   */
   density?: TableDensity
   /**
    * Row height in pixels, overriding `density`.
@@ -238,6 +261,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     onSelectionChange,
     selectAllMatching,
     bulkActions,
+    rowTone,
     expansion,
     expandedRowId,
     onExpandedChange,
@@ -246,7 +270,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     emptyState,
     filterLabels,
     className,
-    density = 'comfortable',
+    density = 'md',
     rowHeight = ROW_HEIGHT[density],
     virtualize,
     maxHeight,
@@ -370,6 +394,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
     selection,
     keyboard,
     onPrimaryAction,
+    rowTone,
     expansion,
     expandedRowId,
     onExpandedChange,
@@ -400,9 +425,21 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
   const showFilteredEmpty = !isLoading && rows.length === 0 && hasFilters
   // A board arranges its own cards; the shared grid template would fight it.
   const usesGridTemplate = renderer === 'table' || renderer === 'grouped'
+  const gridOptions = { selectable, expandable: Boolean(expansion) }
+  // Fixed column widths can want more room than the container has. That overflow is the table
+  // scroller's, never the document's — every row carries the same floor so they stay in column.
+  const minWidth = usesGridTemplate ? gridMinWidth(visibleColumns, gridOptions) : 0
 
   return (
-    <div className={cn('card overflow-hidden p-0', className)}>
+    <div
+      className={cn('tbl-container', className)}
+      data-density={density}
+      data-testid="table-container"
+      // The one place row height crosses from TypeScript into CSS. `ROW_HEIGHT` is the source of
+      // truth because the virtualizer offsets by it; writing it back here is what stops the painted
+      // height and the computed height from drifting apart.
+      style={{ '--tbl-row-height': `${rowHeight}px`, '--tbl-grid-min-width': minWidth > 0 ? `${minWidth}px` : undefined } as React.CSSProperties}
+    >
       {chrome === 'full' && <TableToolbar
         columns={columns}
         query={query}
@@ -417,8 +454,6 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         valueLabel={valueLabel}
       />}
 
-      {selectable && <SelectionBar selection={selection} total={page.total} actions={bulkActions} />}
-
       <div
         role="grid"
         aria-label={label}
@@ -431,7 +466,7 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
         onKeyDown={keyboard.onKeyDown}
         ref={scrollRef}
         onScroll={virtualized ? handleScroll : undefined}
-        className="table-scroll"
+        className="tbl-scroll"
         // Virtualization needs a bounded viewport to window against; an unbounded container is
         // always "fully visible" and every row stays mounted.
         style={virtualized ? { maxHeight: maxHeight ?? '70vh', overflowY: 'auto' } : undefined}
@@ -442,13 +477,17 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
           role="row"
           aria-rowindex={HEADER_ROW_INDEX}
           className={cn(
-            'sticky top-0 z-20 border-b border-bh-border bg-bh-surface px-4 py-2.5',
-            usesGridTemplate ? 'grid items-center gap-3' : 'flex items-center gap-3',
+            'tbl-header-row',
+            usesGridTemplate ? 'grid items-center' : 'flex items-center gap-3',
             // Hidden from sight, not from a screen reader: `aria-rowcount` counts this row.
             chrome === 'minimal' && 'sr-only',
           )}
           style={usesGridTemplate
-            ? { gridTemplateColumns: gridTemplateColumns(visibleColumns, { selectable, expandable: Boolean(expansion) }) }
+            ? {
+                gridTemplateColumns: gridTemplateColumns(visibleColumns, gridOptions),
+                columnGap: 'var(--tbl-column-gap)',
+                minWidth: minWidth > 0 ? minWidth : undefined,
+              }
             : undefined}
         >
           {selectable && (
@@ -466,27 +505,31 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
           {visibleColumns.map((column, columnIndex) => {
             const term = query.sort.find((entry) => entry.id === column.id)
             const SortIcon = term === undefined ? ChevronsUpDown : term.dir === 'asc' ? ArrowUp : ArrowDown
+            // `isSortable`, not `column.sortable`: status and actions never carry a sort
+            // affordance whatever the column author wrote, because ordering by an enum's spelling
+            // is an order nobody means. See `shared/lib/table/columns.ts`.
+            const sortable = isSortable(column)
             return (
               <div
                 key={column.id}
                 role="columnheader"
                 aria-colindex={ariaColIndex(columnIndex + (selectable ? 1 : 0))}
-                aria-sort={column.sortable ? (term ? (term.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
-                className={cn('flex min-w-0 items-center text-xs font-semibold uppercase tracking-wide text-bh-text-muted', cellAlignmentClass(column))}
+                aria-sort={sortable ? (term ? (term.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                className={cn('tbl-header-cell', cellAlignmentClass(column), column.kind === 'actions' && 'tbl-actions-cell')}
               >
-                {column.sortable
+                {sortable
                   ? (
                     <button
                       type="button"
                       onClick={() => toggleSort(column)}
                       data-testid={`table-sort-${column.id}`}
-                      className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+                      className="tbl-sort-button"
                     >
                       <span className="truncate">{column.header}</span>
                       <SortIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
                     </button>
                     )
-                  : <span className="truncate px-1">{column.header}</span>}
+                  : <span className="truncate">{column.header}</span>}
               </div>
             )
           })}
@@ -510,6 +553,19 @@ export function DataTable<Row extends Record<string, unknown>>(props: DataTableP
           <GridStateRow><ErrorRow message={error.message} onRetry={error.onRetry} /></GridStateRow>
         )}
       </div>
+
+      {chrome === 'full' && (
+        <TableFooter
+          loaded={rows.length}
+          total={page.total}
+          hasMore={page.nextCursor !== null}
+          onLoadMore={onLoadMore}
+          loading={isLoading && rows.length > 0}
+        />
+      )}
+
+      {/* Last child, so its zero-height sticky dock resolves against the bottom of the table. */}
+      {selectable && <SelectionBar selection={selection} total={page.total} actions={bulkActions} />}
 
       <TableCommandSheet
         open={commandOpen}

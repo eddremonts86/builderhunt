@@ -2,11 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "//": "vite invoked directly rather than through `pnpm exec`. Going through pnpm makes starting the dev server depend on which pnpm happens to be on PATH: this project's node_modules is installed by pnpm 10 (the major every workflow pins with `pnpm/action-setup`), and a global pnpm 11 refuses to run any script until it has purged and reinstalled that directory — `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`, because the purge wants a TTY to confirm. The two fixes pnpm suggests, `CI=true` and `confirmModulesPurge=false`, both *authorise* the purge, which would delete node_modules underneath whatever else is using it. The dev server needs none of that: the binary is already on disk.",
       "name": "builderhunt-dev",
-      "runtimeExecutable": "pnpm",
+      "runtimeExecutable": "./node_modules/.bin/vite",
       "runtimeArgs": [
-        "exec",
-        "vite",
         "dev"
       ],
       "port": 3010,

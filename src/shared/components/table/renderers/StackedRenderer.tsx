@@ -1,7 +1,7 @@
 import { Checkbox } from '~/components/ui/checkbox'
 import { cn } from '~/shared/lib/utils'
 
-import { ariaColIndex, ariaRowIndex, columnsForPriority } from '../grid-roles'
+import { ariaColIndex, ariaRowIndex, columnsForPriority, isEndAligned } from '../grid-roles'
 import type { RendererContext } from './types'
 
 /**
@@ -16,7 +16,7 @@ import type { RendererContext } from './types'
  * accessibility tree should not change shape with the viewport.
  */
 export function StackedRenderer<Row>({ context }: { context: RendererContext<Row> }) {
-  const { rows, columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction } = context
+  const { rows, columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction, rowTone } = context
 
   const primary = columnsForPriority(columns, ['primary'])
   const secondary = columnsForPriority(columns, ['secondary'])
@@ -37,10 +37,12 @@ export function StackedRenderer<Row>({ context }: { context: RendererContext<Row
             aria-rowindex={ariaRowIndex(index, rowOffset)}
             aria-selected={selectable ? selected : undefined}
             data-testid={rowTestId(row)}
-            className={cn(
-              'flex gap-3 border-b border-bh-border px-4 py-3 last:border-b-0',
-              selected && 'bg-bh-accent-soft',
-            )}
+            data-state={selected ? 'selected' : undefined}
+            data-tone={rowTone?.(row)}
+            // The same row tokens as the grid renderer, laid out as a card. The reference's point
+            // about density and colour is that they do not change with the viewport — only the
+            // arrangement does.
+            className="tbl-row tbl-stacked-row"
             onDoubleClick={onPrimaryAction ? () => onPrimaryAction(row) : undefined}
           >
             {selectable && (
@@ -62,7 +64,7 @@ export function StackedRenderer<Row>({ context }: { context: RendererContext<Row
                   tabIndex={keyboard.isFocused(index, columnIndex) ? 0 : -1}
                   ref={(element) => keyboard.registerCell(index, columnIndex, element)}
                   onFocus={() => keyboard.setPosition({ row: index, column: columnIndex })}
-                  className="truncate text-sm font-medium text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+                  className="tbl-cell tbl-cell-primary"
                 >
                   {column.cell(row)}
                 </div>
@@ -70,11 +72,11 @@ export function StackedRenderer<Row>({ context }: { context: RendererContext<Row
               <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                 {rest.map((column, columnIndex) => (
                   <div key={column.id} className="flex min-w-0 items-baseline gap-1.5">
-                    <dt className="text-xs text-bh-text-muted">{column.header}</dt>
+                    <dt className="tbl-cell-meta">{column.header}</dt>
                     <dd
                       role="gridcell"
                       aria-colindex={ariaColIndex(identity.length + columnIndex + (selectable ? 1 : 0))}
-                      className={cn('truncate text-xs text-bh-text', column.align === 'end' && 'tabular-nums')}
+                      className={cn('tbl-stacked-value', isEndAligned(column) && 'tabular-nums')}
                     >
                       {column.cell(row)}
                     </dd>

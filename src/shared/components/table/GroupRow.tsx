@@ -31,17 +31,17 @@ export function GroupRow({ value, label, total, loaded, columnCount }: GroupRowP
   return (
     <div
       role="row"
-      className="sticky top-[var(--table-header-height,2.75rem)] z-10 border-y border-bh-border bg-bh-surface-2 px-4 py-2"
+      className="tbl-group-row"
       data-testid={`table-group-${value}`}
     >
       <div role="gridcell" aria-colindex={1} className="flex items-baseline gap-2" style={{ gridColumn: `span ${columnCount}` }}>
-        <span className="text-sm font-semibold text-bh-text">{label ?? value}</span>
+        <span className="tbl-group-label">{label ?? value}</span>
         {total !== null && (
-          <span className="tabular-nums text-xs text-bh-text-muted" data-testid={`table-group-${value}-total`}>
+          <span className="tbl-group-count" data-testid={`table-group-${value}-total`}>
             {total.toLocaleString()} total
           </span>
         )}
-        <span className="tabular-nums text-xs text-bh-text-muted" data-testid={`table-group-${value}-loaded`}>
+        <span className="tbl-group-count" data-testid={`table-group-${value}-loaded`}>
           {loaded.toLocaleString()} loaded
         </span>
       </div>

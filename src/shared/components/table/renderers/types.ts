@@ -29,6 +29,8 @@ export interface RendererContext<Row> {
   selection: TableSelectionResult
   keyboard: TableKeyboardResult
   onPrimaryAction?: (row: Row) => void
+  /** The reference's danger/degraded and muted/paused row variants. Presentation only. */
+  rowTone?: (row: Row) => 'danger' | 'muted' | undefined
   expansion?: (row: Row) => React.ReactNode
   /** Set together with `onExpandedChange` to let the surface own which row is open. */
   expandedRowId?: string | null
