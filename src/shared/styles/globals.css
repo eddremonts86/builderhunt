@@ -1071,6 +1071,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
      stop tracking the viewport and settle at the bottom of the table instead.
      `overflow: clip` clips without creating one. */
   overflow: clip;
+  /* Load-bearing, and not for the reason it usually is. Neither `overflow: clip`
+     nor `overflow: auto` clips an absolutely-positioned descendant whose
+     containing block sits *outside* the clipping box — and `.sr-only` is
+     `position: absolute`. Without a positioned ancestor here, the accessible
+     text inside an EmptyCell in a horizontally-scrolled table resolved against
+     the page and pushed `documentElement.scrollWidth` 226px past the viewport:
+     an invisible 1px span, scrolling the whole document sideways. */
+  position: relative;
 }
 [data-density='sm'] { --tbl-row-height: var(--tbl-row-height-sm); }
 [data-density='md'] { --tbl-row-height: var(--tbl-row-height-md); }
@@ -1212,6 +1220,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-scroll {
   overflow-x: auto;
   background: var(--tbl-surface);
+  /* Same reason as `.tbl-container`: this is the box that actually scrolls, so
+     it has to be the containing block for the `.sr-only` spans inside its
+     cells, or they escape it. */
+  position: relative;
 }
 
 /* ── Header row ────────────────────────────────────────────────────────────
