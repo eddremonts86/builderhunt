@@ -221,6 +221,28 @@ async function settle(turns = 6) {
   }
 }
 
+/**
+ * Waits until the trace records `label`, rather than waiting a duration and hoping.
+ *
+ * The two poll-driven tests below used `setTimeout(resolve, 80)` against a `pollIntervalMs={50}`, which left
+ * 30ms for the timer to fire, its `await`ed heartbeat to resolve, and the teardown chain to run. That held on
+ * an idle machine and lost on a loaded CI runner: `Unit (shard 1/2)` failed with
+ * `expected -1 to be greater than or equal to 0` — the `-1` being `trace.indexOf('closeSocket')` on a poll
+ * that had not fired yet, reported as though the teardown order were wrong.
+ *
+ * Waiting for the condition is both faster on an idle machine and correct on a busy one. The failure message
+ * carries the trace, because "expected -1" says nothing about which step never happened.
+ */
+async function traceReaches(label: string, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs
+  while (trace.indexOf(label) < 0) {
+    if (Date.now() >= deadline) {
+      throw new Error(`"${label}" never reached the trace within ${timeoutMs}ms — trace was [${trace.join(', ')}]`)
+    }
+    await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 10) }) })
+  }
+}
+
 /** Ticks the verbal-reminder box and presses start, which is the only way capture begins. */
 async function startCapture() {
   const box = container?.querySelector('input[type="checkbox"]') as HTMLInputElement
@@ -337,7 +359,7 @@ describe('the withdrawal path', () => {
     await startCapture()
     trace = []
 
-    await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 80) }) })
+    await traceReaches('closeSocket')
     await settle()
 
     // The socket first, then the microphone. Reversing it delivers frames to a closed socket.
@@ -357,7 +379,7 @@ describe('the withdrawal path', () => {
     })
     await mount(api)
     await startCapture()
-    await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 80) }) })
+    await traceReaches('closeSocket')
     await settle(2)
 
     expect(buttonNamed(/Pause/)).toBeUndefined()
