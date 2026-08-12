@@ -309,20 +309,41 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
       unique per run — rather than by an ignore file that would have weakened the detector for every future file.
       That change had a trap: the pooled leg authenticates the five roles through `PGPASSWORD=postgres psql`, which
       the new password would have broken on the next run. Four places agree now.
-    - **Still open: the preview server refuses to boot.** `❌ the preview server never answered /api/health`, and
-      the cause is in the log beneath it: `ZodError: DATABASE_URL — "Production DATABASE_URL must use the non-owner
-      application role"`. The workflow hands it `postgres`, the owner. A production build refuses that by design,
-      and this repository has the scar the rule exists for — a superuser connection ignores GRANTs and RLS, which
-      is what hid three defects.
-  - **What the fix needs, so the next attempt does not start from the symptom.** The smoke creates and migrates its
-    own disposable `builderhunt_load_test_smoke`, so the preview server's URL has to name *that* database *and*
-    `builderhunt_app`. The app-role password is minted by the "Give the five roles passwords" step, which currently
-    runs *after* the direct leg — so the ordering has to change too, and `DATABASE_URL` has to be exported through
-    `$GITHUB_ENV` rather than set as static job-level env, because the password does not exist until that step runs.
-    `DATABASE_MIGRATION_URL` stays the owner, which is correct and is what the app's own contract expects.
-  - **Deliberately not attempted during the phase-3 release.** It is a non-required check on a workflow that has
-    never worked, and the rest of this plan is blocked on provisioning an isolated host anyway. Half-fixing the
-    ordering while a merge was in flight is how a release picks up an unrelated failure.
+    - **Third defect, fixed 2026-08-12: the preview server refused to boot.** `❌ the preview server never
+      answered /api/health`, with the cause in the log beneath it: `ZodError: DATABASE_URL — "Production
+      DATABASE_URL must use the non-owner application role"`. The workflow handed it `postgres`, the owner, and a
+      production build refuses that by design — a superuser connection ignores GRANTs and RLS, which is what hid
+      three defects in this repository. `env.ts` was right; the workflow was wrong.
+  - **What the fix had to solve that the symptom did not show: the roles did not exist yet.** Giving a role a
+    password requires the role to exist, and the five `builderhunt_*` roles are created by `drizzle/0002` and
+    `drizzle/0012` — which the smoke runs *inside* the run that needs the password already set. So the job now
+    creates `builderhunt_load_test_smoke` and migrates it once up front, purely so the roles exist; they are
+    cluster-global and outlive the database the smoke then drops and recreates. Deliberately not hand-rolled
+    `CREATE ROLE` statements: role creation, the GRANTs and the RLS policies live in migrations and only there, so
+    a workflow inventing its own roles would be testing a cluster this application never runs on. The cost is one
+    extra `drizzle-kit migrate`, and it buys the real path.
+    - `DATABASE_URL` is now **absent** from the job `env` and exported from `$GITHUB_ENV` by the password step,
+      which moved above the direct leg. Absent rather than left as the owner so that a future edit dropping that
+      step fails with `DATABASE_URL is not set` — the true statement — instead of falling back to a superuser and
+      failing somewhere unrelated. `DATABASE_MIGRATION_URL` stays the owner, which is what migrations are for.
+    - All five role URLs are exported, not just the app role. `smoke.ts` defaults the other four to whatever
+      `DATABASE_URL` holds, which would have run the auth and worker paths as `builderhunt_app` — the roles that
+      exist precisely because they carry different privileges. The pooled leg already named each one; the direct
+      leg does now too.
+    - A guard follows the migration: the step queries `pg_roles` for all five names and fails naming whichever is
+      missing, because every step below it authenticates as those roles and "role does not exist" three steps later
+      is a worse way to learn it.
+  - **Verified by reproducing the failure and then removing it, locally, with `NODE_ENV=production` — which is the
+    condition the rule is gated on and the reason this never reproduced during ordinary local runs.**
+    With the owner URL: exit 1, `Production DATABASE_URL must use the non-owner application role`, `never answered
+    /api/health` — the CI failure, reproduced. With the app role: exit 0, preflight passed on all five routes, 198
+    requests, verdict pass, and no superuser warning. Same 15-user / 30-second profile the workflow uses.
+    The password step was dry-run with `psql` and `openssl` stubbed, confirming eleven `$GITHUB_ENV` exports with
+    the right role in each URL and five `ALTER ROLE` calls; the role-presence query was checked both ways against a
+    real cluster — empty when all five exist, naming the absent one when they do not.
+  - **What the pooled leg is for changed with this fix.** It used to be described as "the more faithful of the two"
+    because the direct leg ran as a superuser with RLS out of the path. Both legs authenticate as `builderhunt_app`
+    now, so the only difference left is the pooler — which is the one thing that leg exists to exercise.
 - [~] **Document the Coolify pooler rollout and rollback**
   - Files: `docs/operations/deploy-runbook.md`, `docs/operations/database-roles.md`,
     `docs/operations/load-testing.md`, `.env.production.example`
