@@ -1,7 +1,7 @@
 # Specification — adopt the canonical table visual system
 
-> **Status**: `pending`
-> **Depends on**: [`13-pagination-ci-gates`](../../implemented/phase-3/13-pagination-ci-gates/spec.md)
+> **Status**: `implemented`
+> **Depends on**: [`13-pagination-ci-gates`](../../../implemented/phase-3/13-pagination-ci-gates/spec.md)
 > **Blocks**: nothing
 > **Reality check**: `src/shared/components/table/DataTable.tsx` already centralizes the interactive grid used by 20 JSX call sites, while `scripts/check-table-surfaces.mjs` classifies 23 table-bearing source files. The shell already owns sorting, keyboard navigation, selection, virtualization and four renderers; this plan changes its visual contract and closes the remaining raw-table styling gap instead of rebuilding table behavior.
 
