@@ -261,7 +261,7 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - Operator: starting the 1,000-user calibration on the isolated host requires the same explicit
     confirmation as the baseline.
 
-- [~] **Add a dedicated CI load smoke**
+- [x] **Add a dedicated CI load smoke**
   - Files: `.github/workflows/load-smoke.yml`, `package.json`, `scripts/load/smoke.ts`
   - Do: Provision PostgreSQL 18, Redis, PgBouncer, a production app build, disposable fixtures, and
     25 users for 30 seconds. Run on workflow dispatch and on pull requests that change DB/pool/load
@@ -323,6 +323,10 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - **Deliberately not attempted during the phase-3 release.** It is a non-required check on a workflow that has
     never worked, and the rest of this plan is blocked on provisioning an isolated host anyway. Half-fixing the
     ordering while a merge was in flight is how a release picks up an unrelated failure.
+  - **Closed 2026-08-12 by the green run its Verify line asked for**: `workflow_dispatch` 31582506100 on
+    `fix/load-smoke-app-role`, conclusion success — both legs, direct and pooled. Four defects deep, each hidden
+    behind the one before it, and the reason all four survived is that the original "Done" recorded the *file*
+    rather than a run. A CI job that has never executed is not a gate, whatever its YAML says.
 - [~] **Document the Coolify pooler rollout and rollback**
   - Files: `docs/operations/deploy-runbook.md`, `docs/operations/database-roles.md`,
     `docs/operations/load-testing.md`, `.env.production.example`

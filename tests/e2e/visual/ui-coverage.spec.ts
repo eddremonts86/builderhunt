@@ -41,7 +41,7 @@ import {
   registerPlatformAdminEnv,
   reservePlatformAdminSeed,
 } from '../harness/fixtures/platform-admin'
-import { dismissOverlays, gotoHydrated } from '../harness/browser'
+import { dismissOverlays, gotoHydrated, waitForFontsSettled } from '../harness/browser'
 
 interface Harness {
   workerIndex: number
@@ -138,7 +138,7 @@ async function prepare(page: import('playwright/test').Page, path: string): Prom
   // Left up, every baseline would be a screenshot of the cookie banner and none of them a screenshot of
   // the surface.
   await dismissOverlays(page)
-  await page.evaluate(() => document.fonts.ready)
+  await waitForFontsSettled(page)
 }
 
 const OWNER_SURFACES = [

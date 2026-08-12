@@ -39,7 +39,7 @@ import { startWorkerServer, stopWorkerServer } from '../harness/server'
 import { e2eEnv } from '../harness/env'
 import { ensureFixedTimeEnv, fixedClockFromEnv, installFixedBrowserClock } from '../harness/clock'
 import { createOwnerPrincipal, disposePrincipal, type FixtureContext, type Principal } from '../harness/fixtures/principals'
-import { dismissOverlays, gotoHydrated, waitForTilesSettled } from '../harness/browser'
+import { dismissOverlays, gotoHydrated, waitForFontsSettled, waitForTilesSettled } from '../harness/browser'
 
 interface Harness {
   workerIndex: number
@@ -193,7 +193,7 @@ async function prepare(page: import('playwright/test').Page, path: string): Prom
     await waitForTilesSettled(page)
   }
 
-  await page.evaluate(() => document.fonts.ready)
+  await waitForFontsSettled(page)
 }
 
 /**

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Sql } from 'postgres'
 import { parseDockerBytes, startMonitor } from '../../../../scripts/load/monitor'
 import { readPgBouncerPools, readPgBouncerStats, readPostgresActivity } from '../../../../scripts/load/sql'
@@ -210,5 +210,52 @@ describe('startMonitor', () => {
     await new Promise((done) => setTimeout(done, 60))
     // A timer left running outsurvives the run and keeps writing into the array the report was built from.
     expect(monitor.samples.length).toBe(after)
+  })
+
+  /**
+   * `fetch_types: false` on the pooler client, asserted on the options rather than on behaviour.
+   *
+   * It is one word, and without it the entire pooled leg dies four seconds in: `fetch_types` defaults to
+   * true, so postgres.js asks the server for array type OIDs on connect — with the extended query protocol,
+   * which PgBouncer's admin console does not implement. It answers
+   * `extended query protocol not supported by admin console`.
+   *
+   * Asserted here because nothing else can. The failure arrives as an **uncaught** rejection out of the
+   * socket's read handler, for a query this module never issued, so it slips past every `try`/`catch` and
+   * `.catch(() => null)` around the pooler reads — including the one wrapping `readPgBouncerConfig`. And it
+   * cannot be caught by a stubbed `Sql`: the fault is in how the client is *constructed*, before any query.
+   * Reproduced against a real PgBouncer 1.25.2 on 2026-08-12, both ways.
+   *
+   * `prepare: false` is not what arranges the simple protocol — that turns off statement caching, while
+   * `sql.unsafe(text)` with no bind parameters already picks simple per query. The comment in `monitor.ts`
+   * used to claim otherwise, which is why the option was missing.
+   */
+  it('builds the pooler admin client with type fetching off', async () => {
+    const options: Array<Record<string, unknown>> = []
+    vi.doMock('postgres', () => ({
+      default: (_url: string, opts: Record<string, unknown>) => {
+        options.push(opts)
+        return fakeSql(() => [])
+      },
+    }))
+    vi.resetModules()
+    const { startMonitor: freshStartMonitor } = await import('../../../../scripts/load/monitor')
+    try {
+      const monitor = await freshStartMonitor({
+        databaseUrl: 'postgresql://nobody:nothing@127.0.0.1:1/builderhunt_load_test_absent',
+        poolerAdminUrl: 'postgresql://pgbouncer:nothing@127.0.0.1:6432/pgbouncer',
+        intervalMs: 10_000,
+      })
+      await monitor.stop()
+    } finally {
+      vi.doUnmock('postgres')
+      vi.resetModules()
+    }
+
+    // Two clients: the database under test, then the admin console.
+    expect(options).toHaveLength(2)
+    expect(options[1]).toMatchObject({ fetch_types: false, prepare: false })
+    // And not on the direct client, which needs the type table to decode arrays from real tables.
+    expect(options[0].fetch_types).toBeUndefined()
   })
 })

@@ -22,7 +22,7 @@ import {
   registerPlatformAdminEnv,
   reservePlatformAdminSeed,
 } from './harness/fixtures/platform-admin'
-import { dismissOverlays, gotoHydrated } from './harness/browser'
+import { dismissOverlays, gotoHydrated, waitForFontsSettled } from './harness/browser'
 
 /**
  * The walkthrough: every screen plans 58 and 59 ask a human to look at, captured.
@@ -129,7 +129,7 @@ async function open(page: Page, path: string): Promise<void> {
   await installFixedBrowserClock(page)
   await gotoHydrated(page, `${harness.baseURL}${path}`)
   await dismissOverlays(page)
-  await page.evaluate(() => document.fonts.ready)
+  await waitForFontsSettled(page)
 }
 
 test.describe('plan 59 — the sender', () => {
