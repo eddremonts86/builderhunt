@@ -97,6 +97,7 @@
     "test:security": "vitest run tests/unit/security",
     "test:status-trust": "node tests/regression/test-status-and-trust.mjs",
     "test:unit": "vitest run tests/unit",
+    "visual:inspect": "node scripts/visual/inspect-baseline.mjs",
     "test:visual": "playwright test --project=visual-desktop --project=visual-mobile",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit"
