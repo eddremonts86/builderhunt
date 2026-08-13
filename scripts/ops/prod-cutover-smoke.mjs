@@ -20,7 +20,12 @@
  * Env: SMOKE_BASE_URL, SMOKE_EMAIL, SMOKE_PASSWORD
  */
 
-const BASE = process.env.SMOKE_BASE_URL || 'https://builderhunt.eduardoinerarte.dk'
+// The default has to be the host the app is actually served on. It was
+// `builderhunt.eduardoinerarte.dk` until 2026-08-13, four days after that hostname was dropped
+// from the application's domains — every path on it answers `503 no available server` from the
+// proxy, so an unattended run reported the whole route matrix as failing and the failure said
+// nothing about the roles this script exists to exercise.
+const BASE = process.env.SMOKE_BASE_URL || 'https://builderhunt.dev'
 const EMAIL = process.env.SMOKE_EMAIL || 'edd_admin@local.com'
 const PASSWORD = process.env.SMOKE_PASSWORD || 'Passw0rd!234'
 const ONCE = process.argv.includes('--once')
