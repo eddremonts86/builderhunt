@@ -12,7 +12,7 @@
 // table-surface-bounded: the library is the filesystem — one row per post file, read whole. A capability would exist only to satisfy this gate.
 import * as React from 'react'
 import { Calendar, Clock, ExternalLink, FileText, Rss, Search, Tag as TagIcon } from 'lucide-react'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, EmptyCell, NumberCell, PrimaryCell } from '~/shared/components/table'
 import { emptyTableSearch } from '~/shared/lib/table/query-url'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
@@ -83,63 +83,56 @@ export function BlogLibrary({ posts }: { posts: BlogPostRow[] }) {
     {
       id: 'title',
       header: 'Post',
+      kind: 'primary',
       sortable: true,
       priority: 'primary',
       value: (post) => post.title,
-      cell: (post) => (
-        <span className="min-w-0">
-          <span className="block truncate font-medium">{post.title}</span>
-          <span className="block truncate text-xs text-bh-text-muted">{post.description}</span>
-        </span>
-      ),
+      cell: (post) => <PrimaryCell title={post.title} meta={post.description} />,
     },
     {
       id: 'date',
       header: 'Published',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       value: (post) => post.date,
-      cell: (post) => (
-        <span className="inline-flex items-center gap-1">
-          <Calendar className="h-3 w-3" aria-hidden="true" />
-          {post.date}
-        </span>
-      ),
+      // The calendar icon went with the raw date string. A `date` column is the only thing in the
+      // table shaped like a date, so an icon saying so is decoration in a 168px track that now has
+      // two lines of real content to fit.
+      cell: (post) => <DateCell value={post.date} />,
     },
     {
       id: 'readingTime',
       header: 'Reading',
+      kind: 'number',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (post) => post.readingTime,
-      cell: (post) => (
-        <span className="inline-flex items-center gap-1 tabular-nums">
-          <Clock className="h-3 w-3" aria-hidden="true" />
-          {post.readingTime} min
-        </span>
-      ),
+      cell: (post) => <NumberCell value={post.readingTime} unit=" min" />,
     },
     {
       id: 'file',
       header: 'File',
+      kind: 'category',
       priority: 'detail',
       value: (post) => post.file,
       // A path is a literal filesystem key, which is one of the two things DESIGN.md:221 keeps a
       // monospace face for.
-      cell: (post) => <code className="truncate text-xs text-bh-text-dim">content/posts/{post.file}</code>,
+      cell: (post) => <code className="truncate text-xs" title={`content/posts/${post.file}`}>content/posts/{post.file}</code>,
     },
     {
       id: 'tags',
       header: 'Tags',
+      kind: 'category',
       priority: 'detail',
       value: (post) => post.tags.join(', '),
-      cell: (post) => post.tags.length > 0 ? post.tags.join(', ') : '—',
+      cell: (post) => post.tags.length > 0
+        ? <span className="truncate" title={post.tags.join(', ')}>{post.tags.join(', ')}</span>
+        : <EmptyCell label="No tags" />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       cell: (post) => (
         <a
           href={`/blog/${post.slug}`}

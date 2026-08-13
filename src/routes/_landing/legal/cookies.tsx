@@ -1,7 +1,10 @@
-// table-surface-ok: the cookie disclosure table is legal prose, written in the component.
+// table-surface-semantic: the cookie disclosure is four rows of legal prose — bounded, read
+// rather than operated, and the one thing native <th scope> gives it (row/column context for a
+// screen reader) is what a role="grid" would have to reconstruct by hand.
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Cookie } from 'lucide-react'
+import { SemanticTable, StatusCell, type SemanticColumn, type StatusTone } from '~/shared/components/table'
 import { pageMeta } from '~/shared/lib/page-meta'
 
 export const Route = createFileRoute('/_landing/legal/cookies')({
@@ -30,11 +33,28 @@ const COOKIES: CookieRow[] = [
   { name: 'bh_claim_token', purpose: 'One-time claim token for builder profile claims', type: 'functional', lifespan: '24 hours' },
 ]
 
-const TYPE_COLORS: Record<CookieRow['type'], string> = {
-  essential: 'bg-bh-success/10 text-bh-success border-bh-success/30',
-  functional: 'bg-bh-accent-soft text-bh-accent border-bh-accent/30',
-  analytics: 'bg-bh-warning/10 text-bh-warning border-bh-warning/30',
+/**
+ * Which of the shared status tones each cookie class reads as.
+ *
+ * The tones are the table system's, not this page's: `essential` is the resting, unremarkable
+ * state; `functional` is the one a reader may want to act on; `analytics` is the one this policy
+ * exists to say we do not set. Local colour classes here were how a "chip" on the cookie page came
+ * to be a different size and radius from every chip in the admin queues.
+ */
+const TYPE_TONES: Record<CookieRow['type'], StatusTone> = {
+  essential: 'neutral',
+  functional: 'accent',
+  analytics: 'warning',
 }
+
+const COOKIE_COLUMNS: SemanticColumn<CookieRow>[] = [
+  // The cookie's literal name, which is a key a reader may go looking for in their browser's
+  // storage inspector — one of the two things DESIGN.md:221 keeps the monospace face for.
+  { id: 'name', header: 'Name', rowHeader: true, cell: (row) => <span className="font-mono text-xs">{row.name}</span> },
+  { id: 'purpose', header: 'Purpose', cell: (row) => row.purpose },
+  { id: 'type', header: 'Type', cell: (row) => <StatusCell label={row.type} tone={TYPE_TONES[row.type]} /> },
+  { id: 'lifespan', header: 'Lifespan', cell: (row) => row.lifespan },
+]
 
 function CookiesPage() {
   return (
@@ -52,32 +72,14 @@ function CookiesPage() {
         </p>
 
         <h2 className="text-lg font-semibold text-bh-text mb-3">Cookies in use</h2>
-        <div className="card table-scroll mb-8 p-0" tabIndex={0} role="region" aria-label="Cookies table, scrollable">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-bh-border text-left text-xs uppercase tracking-wider text-bh-text-dim">
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Purpose</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Lifespan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {COOKIES.map((c) => (
-                <tr key={c.name} className="border-b border-bh-border/40" data-testid={`cookie-row-${c.name}`}>
-                  <td className="px-3 py-2 font-mono text-xs">{c.name}</td>
-                  <td className="px-3 py-2 text-bh-text-muted">{c.purpose}</td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${TYPE_COLORS[c.type]}`}>
-                      {c.type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-bh-text-dim">{c.lifespan}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SemanticTable
+          caption="Cookies BuilderHunt sets, their purpose, class and lifespan"
+          columns={COOKIE_COLUMNS}
+          rows={COOKIES}
+          rowKey={(row) => row.name}
+          rowTestId={(row) => `cookie-row-${row.name}`}
+          className="mb-8"
+        />
 
         <h2 className="text-lg font-semibold text-bh-text mb-3">How to opt out</h2>
         <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed space-y-4">

@@ -4,9 +4,9 @@
 // is a property of the codebase. See `registry-page.ts` for why sorting it in the browser is correct
 // here and wrong on every surface backed by a growing table.
 import * as React from 'react'
-import { AlertTriangle, BookOpen, CheckCircle2, Clock, Pause, Play, RefreshCw, XCircle } from 'lucide-react'
+import { BookOpen, Pause, Play, RefreshCw } from 'lucide-react'
 import { Button } from '~/components/ui'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, EmptyCell, PrimaryCell, RatioCell, StatusCell } from '~/shared/components/table'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import { registryPage, type RegistryTableSpec } from '~/shared/lib/table/registry-page'
 import type { TableQuery } from '~/shared/lib/table/types'
@@ -86,47 +86,28 @@ function formatDuration(ms: number | null): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-function formatWhen(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString()
-}
-
+/**
+ * One chip for the job's state, in the shared tones.
+ *
+ * Five hand-rolled pills with five different tints and five different icons became one
+ * `StatusCell`. The per-row `data-testid` survives verbatim: `admin-operations.spec.ts` and the
+ * status regression suite drive these by it.
+ *
+ * Note the order — paused first, then overdue/stale, then failed. A paused job that is also
+ * overdue is *paused*: it is not running because somebody stopped it, and reporting "Overdue"
+ * there sends an operator looking for a fault that does not exist.
+ */
 function StatusPill({ job }: { job: JobRow }) {
-  if (!job.enabled) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-surface text-bh-text-muted" data-testid={`job-status-${job.jobKey}`}>
-        Paused
-      </span>
-    )
-  }
-  if (job.overdue || job.stale) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-warning/15 text-bh-warning" data-testid={`job-status-${job.jobKey}`}>
-        <AlertTriangle className="size-3" aria-hidden />
-        {job.overdue ? 'Overdue' : 'Stale'}
-      </span>
-    )
-  }
-  if (job.lastRun?.state === 'failed') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-danger/15 text-bh-danger" data-testid={`job-status-${job.jobKey}`}>
-        <XCircle className="size-3" aria-hidden />
-        Failed
-      </span>
-    )
-  }
-  if (job.lastRun?.state === 'running') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-accent/15 text-bh-accent" data-testid={`job-status-${job.jobKey}`}>
-        <Clock className="size-3" aria-hidden />
-        Running
-      </span>
-    )
-  }
+  const state = !job.enabled ? { label: 'Paused', tone: 'neutral' as const }
+    : job.overdue ? { label: 'Overdue', tone: 'warning' as const }
+      : job.stale ? { label: 'Stale', tone: 'warning' as const }
+        : job.lastRun?.state === 'failed' ? { label: 'Failed', tone: 'danger' as const }
+          : job.lastRun?.state === 'running' ? { label: 'Running', tone: 'accent' as const }
+            : { label: 'Healthy', tone: 'success' as const }
+
   return (
-    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-success/15 text-bh-success" data-testid={`job-status-${job.jobKey}`}>
-      <CheckCircle2 className="size-3" aria-hidden />
-      Healthy
+    <span data-testid={`job-status-${job.jobKey}`}>
+      <StatusCell label={state.label} tone={state.tone} />
     </span>
   )
 }
@@ -293,59 +274,79 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
     {
       id: 'label',
       header: 'Job',
+      kind: 'primary',
       sortable: true,
-      weight: 2,
       value: (job) => job.label,
-      cell: (job) => (
-        <div>
-          <div className="font-medium text-bh-text">{job.label}</div>
-          <div className="text-xs text-bh-text-dim font-mono">{job.cronExpression} · {job.timezone}</div>
-        </div>
-      ),
+      // The cron expression is a literal schedule string an operator copies — one of the two
+      // things DESIGN.md:221 keeps the monospace face for.
+      cell: (job) => <PrimaryCell title={job.label} meta={`${job.cronExpression} · ${job.timezone}`} monoMeta />,
     },
-    { id: 'status', header: 'Status', sortable: true, value: (job) => jobStatus(job), cell: (job) => <StatusPill job={job} /> },
-    { id: 'scope', header: 'Scope', sortable: true, value: (job) => job.scope, cell: (job) => <span className="capitalize text-bh-text-muted">{job.scope}</span> },
+    { id: 'status', header: 'Status', kind: 'status', sortable: true, value: (job) => jobStatus(job), cell: (job) => <StatusPill job={job} /> },
+    { id: 'scope', header: 'Scope', kind: 'category', sortable: true, value: (job) => job.scope, cell: (job) => <span className="capitalize">{job.scope}</span> },
     {
       id: 'nextRunAt',
       header: 'Next run',
+      kind: 'date',
       sortable: true,
       value: (job) => (job.enabled ? job.nextRunAt : null),
-      cell: (job) => <span className="text-bh-text-muted">{job.enabled ? formatWhen(job.nextRunAt) : '—'}</span>,
+      // A paused job has no next run, and the empty cell says so — "—" beside a date column used
+      // to read as "we do not know when", which is a different and more alarming fact.
+      cell: (job) => job.enabled
+        ? <DateCell value={job.nextRunAt} withTime />
+        : <EmptyCell label="Paused, no next run" />,
     },
     {
       id: 'lastRunAt',
       header: 'Last run',
+      kind: 'date',
       sortable: true,
       value: (job) => job.lastRun?.scheduledFor ?? null,
-      cell: (job) => <span className="text-bh-text-muted">{formatWhen(job.lastRun?.scheduledFor ?? null)}</span>,
+      cell: (job) => <DateCell value={job.lastRun?.scheduledFor ?? null} withTime />,
     },
     {
       id: 'durationMs',
       header: 'Duration',
+      kind: 'number',
       sortable: true,
       value: (job) => job.lastRun?.durationMs ?? null,
-      cell: (job) => <span className="text-bh-text-muted">{formatDuration(job.lastRun?.durationMs ?? null)}</span>,
+      // `formatDuration` picks its own unit (ms, s, m), so the unit travels with the figure
+      // rather than living only in a header that scrolls out of view.
+      cell: (job) => job.lastRun?.durationMs === undefined || job.lastRun?.durationMs === null
+        ? <EmptyCell label="Never run" />
+        : <span className="tbl-cell-number">{formatDuration(job.lastRun.durationMs)}</span>,
     },
     {
       id: 'counters',
       header: 'Counters',
+      kind: 'ratio',
       value: (job) => (job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : null),
-      cell: (job) => (
-        <span className="text-bh-text-muted">
-          {job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : '—'}
-        </span>
-      ),
+      // A bar rather than "412 ok / 3 failed" as prose: what an operator scans this column for is
+      // "did anything fail", and the number beside it is what makes the bar legible and legal.
+      cell: (job) => {
+        const run = job.lastRun
+        if (!run) return <EmptyCell label="Never run" />
+        const total = run.processedCount + run.failedCount
+        return (
+          <RatioCell
+            value={total === 0 ? 1 : run.processedCount / total}
+            label={`${run.processedCount} ok / ${run.failedCount} failed`}
+          />
+        )
+      },
     },
     {
       id: 'error',
       header: 'Error',
+      kind: 'category',
       value: (job) => job.lastRun?.errorCode ?? null,
-      cell: (job) => <span className="text-bh-text-dim font-mono text-xs">{job.lastRun?.errorCode ?? '—'}</span>,
+      cell: (job) => job.lastRun?.errorCode
+        ? <span className="font-mono text-xs truncate" title={job.lastRun.errorCode}>{job.lastRun.errorCode}</span>
+        : <EmptyCell label="No error" />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       // No `value`: there is nothing to sort or group a button by, and giving it one would put a
       // sort control on a column whose order means nothing.
       cell: (job) => (
@@ -431,7 +432,7 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
               aria-pressed={selected}
               data-testid={`operations-filter-${scope}`}
               className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${
-                selected ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
+                selected ? 'bg-bh-accent text-bh-accent-contrast' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
               }`}
             >
               {scope}

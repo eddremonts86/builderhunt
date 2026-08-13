@@ -28,15 +28,13 @@ export function FilteredEmptyState({ query, onClear, labels = {}, valueLabel }: 
   }
 
   return (
-    <div className="px-4 py-12 text-center" data-testid="table-filtered-empty">
-      <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-bh-border bg-bh-surface-2">
-        <FilterX className="h-6 w-6 text-bh-text-muted" aria-hidden="true" />
+    <div className="tbl-state" data-testid="table-filtered-empty">
+      <div className="tbl-state-icon">
+        <FilterX className="h-6 w-6" aria-hidden="true" />
       </div>
-      <p className="mb-1 font-semibold text-bh-text">No rows match these filters</p>
+      <p className="tbl-state-title">No rows match these filters</p>
       {active.length > 0 && (
-        <p className="mx-auto mb-4 max-w-md text-sm text-bh-text-muted">
-          Active: {active.join(' · ')}
-        </p>
+        <p className="tbl-state-description">Active: {active.join(' · ')}</p>
       )}
       <Button variant="secondary" size="sm" onClick={onClear} data-testid="table-clear-filters">
         Clear filters

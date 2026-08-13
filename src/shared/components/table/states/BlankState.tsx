@@ -17,12 +17,12 @@ interface BlankStateProps {
  */
 export function BlankState({ title = 'Nothing here yet', description, action }: BlankStateProps) {
   return (
-    <div className="px-4 py-12 text-center" data-testid="table-blank">
-      <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-bh-border bg-bh-surface-2">
-        <Inbox className="h-6 w-6 text-bh-text-muted" aria-hidden="true" />
+    <div className="tbl-state" data-testid="table-blank">
+      <div className="tbl-state-icon">
+        <Inbox className="h-6 w-6" aria-hidden="true" />
       </div>
-      <p className="mb-1 font-semibold text-bh-text">{title}</p>
-      {description && <div className="mx-auto mb-4 max-w-md text-sm text-bh-text-muted">{description}</div>}
+      <p className="tbl-state-title">{title}</p>
+      {description && <div className="tbl-state-description">{description}</div>}
       {action}
     </div>
   )

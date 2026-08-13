@@ -1,7 +1,7 @@
 # Plan — adopt the canonical table visual system
 
-> **Status**: `pending`
-> **Depends on**: [`13-pagination-ci-gates`](../../implemented/phase-3/13-pagination-ci-gates/spec.md)
+> **Status**: `implemented`
+> **Depends on**: [`13-pagination-ci-gates`](../../../implemented/phase-3/13-pagination-ci-gates/spec.md)
 > **Blocks**: nothing
 > **Reality check**: the behavioral shell, surface registry, accessibility tests and screenshot harness already exist. The implementation should concentrate change in `src/shared/components/table/` and `src/shared/styles/globals.css`, then migrate the five visible raw tables.
 

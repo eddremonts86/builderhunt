@@ -2,7 +2,7 @@
 import * as React from 'react'
 import { Input, Label } from '~/components/ui'
 import { ErrorState } from '~/shared/components/ErrorState'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, EmptyCell, PrimaryCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import { tableSearchToParams } from '~/shared/lib/table/query-url'
 import type { PageResult, TableQuery, TableSearch } from '~/shared/lib/table/types'
@@ -33,10 +33,14 @@ function formatUsd(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
 
-function outcomeBadgeClass(outcome: string): string {
-  if (outcome === 'won') return 'text-bh-success'
-  if (outcome === 'lost') return 'text-bh-danger'
-  return 'text-bh-warning'
+/**
+ * This view is read-only — Stripe owns the outcome — so the tone is the whole affordance: it is
+ * how an operator finds the lost ones without reading every row.
+ */
+const DISPUTE_OUTCOME_TONES: Record<string, StatusTone> = {
+  won: 'success',
+  lost: 'danger',
+  warning_closed: 'neutral',
 }
 
 export interface DisputeQueueProps {
@@ -121,45 +125,54 @@ export function DisputeQueue({ search, onSearchChange }: DisputeQueueProps) {
     {
       id: 'reason',
       header: 'Reason',
+      kind: 'primary',
       priority: 'primary',
       value: (dispute) => dispute.reason,
-      cell: (dispute) => dispute.reason ?? '—',
+      cell: (dispute) => dispute.reason
+        ? <PrimaryCell title={dispute.reason} />
+        : <EmptyCell label="No reason given" />,
     },
     {
       id: 'amountCents',
       header: 'Amount',
-      align: 'end',
+      kind: 'number',
       value: (dispute) => dispute.amountCents,
-      cell: (dispute) => formatUsd(dispute.amountCents),
+      cell: (dispute) => <span className="tbl-cell-number">{formatUsd(dispute.amountCents)}</span>,
     },
     {
       id: 'stripeStatus',
       header: 'Stripe status',
+      // Stripe's own vocabulary, not ours: a classification we pass through rather than a state we
+      // control, so plain text at a fixed width instead of a chip claiming a meaning we assigned.
+      kind: 'category',
       value: (dispute) => dispute.stripeStatus,
       cell: (dispute) => dispute.stripeStatus,
     },
     {
       id: 'outcome',
       header: 'Outcome',
+      kind: 'status',
       value: (dispute) => dispute.outcome,
-      cell: (dispute) => <span className={`font-medium ${outcomeBadgeClass(dispute.outcome)}`}>{dispute.outcome}</span>,
+      cell: (dispute) => <StatusCell label={dispute.outcome} tone={DISPUTE_OUTCOME_TONES[dispute.outcome] ?? 'warning'} />,
     },
     {
       id: 'evidenceDueBy',
       header: 'Evidence due',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       value: (dispute) => dispute.evidenceDueBy,
-      cell: (dispute) => dispute.evidenceDueBy ? new Date(dispute.evidenceDueBy).toLocaleString() : '—',
+      // With the time: a chargeback evidence window closes at an hour, and a date alone has cost
+      // people the deadline.
+      cell: (dispute) => <DateCell value={dispute.evidenceDueBy} withTime />,
     },
     {
       id: 'createdAt',
       header: 'Opened',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (dispute) => dispute.createdAt,
-      cell: (dispute) => new Date(dispute.createdAt).toLocaleString(),
+      cell: (dispute) => <DateCell value={dispute.createdAt} withTime />,
     },
   ], [])
 

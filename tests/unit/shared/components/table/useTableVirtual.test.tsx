@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildTableEntries } from '~/shared/components/table/entries'
-import { pinFocusedIndex, ROW_HEIGHT, type VirtualWindowItem } from '~/shared/components/table/useTableVirtual'
+import { pinFocusedIndex, ROW_HEIGHT, SEARCH_CARD_ROW_HEIGHT, type VirtualWindowItem } from '~/shared/components/table/useTableVirtual'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { TableQuery } from '~/shared/lib/table/types'
 
@@ -65,8 +65,28 @@ describe('row height', () => {
    * shift as rows resolve to their real height.
    */
   it('is exact rather than estimated', () => {
-    expect(ROW_HEIGHT.comfortable).toBe(40)
-    expect(ROW_HEIGHT.compact).toBe(34)
+    expect(ROW_HEIGHT.sm).toBe(44)
+    expect(ROW_HEIGHT.md).toBe(52)
+    expect(ROW_HEIGHT.lg).toBe(64)
+  })
+
+  /**
+   * The reference's three densities, and the only three. A fourth would need a matching
+   * `--tbl-row-height-*` fallback in globals.css and a matching `[data-density]` rule; this is the
+   * assertion that makes adding one deliberate rather than accidental.
+   */
+  it('offers exactly the three container densities', () => {
+    expect(Object.keys(ROW_HEIGHT).sort()).toEqual(['lg', 'md', 'sm'])
+  })
+
+  /**
+   * Search's result-card row is a named token rather than a literal in `SearchPage.tsx`, but it is
+   * deliberately *not* a fourth density — a card row is a specialized renderer's height, and adding
+   * it to `ROW_HEIGHT` would offer it to every table in the app.
+   */
+  it('keeps the search result-card height out of the density scale', () => {
+    expect(SEARCH_CARD_ROW_HEIGHT).toBe(176)
+    expect(Object.values(ROW_HEIGHT)).not.toContain(SEARCH_CARD_ROW_HEIGHT)
   })
 })
 

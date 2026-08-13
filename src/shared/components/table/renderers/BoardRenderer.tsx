@@ -1,7 +1,7 @@
 import { Checkbox } from '~/components/ui/checkbox'
 import { cn } from '~/shared/lib/utils'
 
-import { ariaColIndex, ariaRowIndex, columnsForPriority } from '../grid-roles'
+import { ariaColIndex, ariaRowIndex, columnsForPriority, isEndAligned } from '../grid-roles'
 import type { RendererContext } from './types'
 
 /**
@@ -16,7 +16,7 @@ import type { RendererContext } from './types'
  * inventing a grouping the server did not order by.
  */
 export function BoardRenderer<Row>({ context }: { context: RendererContext<Row> }) {
-  const { rows, columns, query, page, rowId, rowTestId, rowOffset, selectable, selection, onPrimaryAction } = context
+  const { rows, columns, query, page, rowId, rowTestId, rowOffset, selectable, selection, onPrimaryAction, rowTone } = context
   const groupColumn = columns.find((column) => column.id === query.groupBy)
 
   const read = (row: Row): string => {
@@ -43,15 +43,15 @@ export function BoardRenderer<Row>({ context }: { context: RendererContext<Row> 
   const cardSummary = identity.length > 0 ? summary : columns.slice(1, 4)
 
   return (
-    <div className="flex gap-4 overflow-x-auto px-4 py-3" data-testid="table-board">
+    <div className="tbl-board" data-testid="table-board">
       {[...lanes.entries()].map(([value, lane]) => (
         <section key={value} className="w-64 shrink-0" aria-label={value}>
           <header className="mb-2 flex items-baseline gap-2">
-            <h3 className="text-sm font-semibold text-bh-text">{value}</h3>
+            <h3 className="tbl-group-label">{value}</h3>
             {serverTotals.has(value) && (
-              <span className="tabular-nums text-xs text-bh-text-muted">{serverTotals.get(value)?.toLocaleString()} total</span>
+              <span className="tbl-group-count">{serverTotals.get(value)?.toLocaleString()} total</span>
             )}
-            <span className="tabular-nums text-xs text-bh-text-muted">{lane.length.toLocaleString()} loaded</span>
+            <span className="tbl-group-count">{lane.length.toLocaleString()} loaded</span>
           </header>
           <div className="flex flex-col gap-2">
             {lane.map(({ row, index }) => {
@@ -65,10 +65,9 @@ export function BoardRenderer<Row>({ context }: { context: RendererContext<Row> 
                   aria-selected={selectable ? selected : undefined}
                   data-testid={rowTestId(row)}
                   onDoubleClick={onPrimaryAction ? () => onPrimaryAction(row) : undefined}
-                  className={cn(
-                    'rounded-xl border border-bh-border bg-bh-surface p-3',
-                    selected && 'border-bh-accent bg-bh-accent-soft',
-                  )}
+                  data-state={selected ? 'selected' : undefined}
+                  data-tone={rowTone?.(row)}
+                  className="tbl-row tbl-board-card"
                 >
                   <div className="flex items-start gap-2">
                     {selectable && (
@@ -87,7 +86,7 @@ export function BoardRenderer<Row>({ context }: { context: RendererContext<Row> 
                           key={column.id}
                           role="gridcell"
                           aria-colindex={ariaColIndex(columnIndex + (selectable ? 1 : 0))}
-                          className="truncate text-sm font-medium text-bh-text"
+                          className="tbl-cell-primary"
                         >
                           {column.cell(row)}
                         </div>
@@ -97,7 +96,7 @@ export function BoardRenderer<Row>({ context }: { context: RendererContext<Row> 
                           key={column.id}
                           role="gridcell"
                           aria-colindex={ariaColIndex(cardIdentity.length + columnIndex + (selectable ? 1 : 0))}
-                          className={cn('truncate text-xs text-bh-text-muted', column.align === 'end' && 'tabular-nums')}
+                          className={cn('tbl-cell-meta', isEndAligned(column) && 'tabular-nums')}
                         >
                           {column.cell(row)}
                         </div>

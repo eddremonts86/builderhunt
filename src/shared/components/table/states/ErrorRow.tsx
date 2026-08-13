@@ -21,10 +21,10 @@ export function ErrorRow({ message, onRetry }: ErrorRowProps) {
     <div
       role="alert"
       data-testid="table-error"
-      className="flex items-center gap-3 border-t border-bh-border bg-bh-surface-2 px-4 py-3"
+      className="tbl-error-row"
     >
-      <AlertTriangle className="h-4 w-4 shrink-0 text-bh-text-muted" aria-hidden="true" />
-      <p className="min-w-0 flex-1 truncate text-sm text-bh-text">{message}</p>
+      <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <p className="min-w-0 flex-1 truncate">{message}</p>
       {onRetry && (
         <Button variant="secondary" size="sm" onClick={onRetry} data-testid="table-error-retry">
           Retry

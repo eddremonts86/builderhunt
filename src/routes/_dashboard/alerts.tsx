@@ -28,7 +28,7 @@ import { formatDistanceToNow } from '~/shared/lib/format'
 // and which crashes this page at runtime.
 import { readAlertMatchPayload, type AlertMatchPayload } from '~/shared/lib/alerts-shared'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell } from '~/shared/components/table'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import {
   pickTableSearchParams,
@@ -410,10 +410,11 @@ function AlertsInboxPage() {
     {
       id: 'match',
       header: 'Match',
+      // The row *is* this column, so it is the table's one flexible track. At an equal share of
+      // the width beside the two thin ones, the person card collapsed to an avatar and a
+      // truncated username.
+      kind: 'primary',
       priority: 'primary',
-      // The row *is* this column. At an equal share of the width beside the two thin ones, the
-      // person card collapsed to an avatar and a truncated username.
-      weight: 6,
       value: (trigger) => trigger.id,
       cell: (trigger) => (
         <MatchRow
@@ -427,26 +428,29 @@ function AlertsInboxPage() {
     {
       id: 'alertId',
       header: 'Radar',
+      // Which radar found this — a classification, so plain text at a fixed width. Never a
+      // decorative chip: every row has one, so a chip around all of them signals nothing.
+      kind: 'category',
       groupable: true,
       priority: 'secondary',
       // The grouped value must be what the server counted — the id — or `GroupRow` has no honest
       // total. `groupLabel` turns it into the name for display.
       value: (trigger) => trigger.alertId,
       cell: (trigger) => (
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-bh-text-dim">
-          <Radar className="w-3 h-3 shrink-0 text-bh-accent" aria-hidden="true" />
-          <span className="truncate">{radarLabel(trigger.alertId)}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Radar className="w-3 h-3 shrink-0" aria-hidden="true" />
+          <span className="truncate" title={radarLabel(trigger.alertId)}>{radarLabel(trigger.alertId)}</span>
         </span>
       ),
     },
     {
       id: 'matchedAt',
       header: 'Matched',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (trigger) => trigger.matchedAt,
-      cell: (trigger) => formatDistanceToNow(new Date(trigger.matchedAt)),
+      cell: (trigger) => <DateCell value={trigger.matchedAt} />,
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [radarLabel, trackedRowIds, onMatchTracked])
@@ -814,6 +818,10 @@ function AlertsInboxPage() {
                 replace: true,
               })}
               renderer="grouped"
+              // A match row carries an avatar and two lines, which is the reference's identity
+              // density. At `md` the card overflows the height the virtualizer offsets by, and
+              // this list accumulates past the virtualization threshold on a busy radar.
+              density="lg"
               // The stored values are alert ids, because that is what the server counted its facet
               // over and because two radars may share a name. This is where they become readable —
               // in the group header, the chips, the command sheet and the filtered-empty copy alike.

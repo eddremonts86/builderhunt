@@ -95,6 +95,27 @@ const AUTH_ROUTES = [
   '/admin/metrics?section=operations&range=24h&variant=integrations&compare=false',
   '/admin/metrics?section=trust&range=30d&variant=abuse&compare=false',
   '/admin/metrics?section=runtime&range=24h&variant=freshness&compare=false',
+  /**
+   * The interactive tables, added 2026-08-12 (plan phase-3/14, "adopt the canonical table visual
+   * system").
+   *
+   * The matrix already covered seven surfaces that happen to hold a table, and none of the admin
+   * queues — which is where the density is: statuses, dates, numbers, sticky action columns and a
+   * horizontal scroller, all of it rewritten by that plan. `role="grid"` is a construct axe has a
+   * lot to say about (`aria-required-children`, `aria-required-parent`, valid indices), and the
+   * three surfaces below are the ones that exercise every cell kind at once.
+   *
+   * `/admin/content` is listed three times for the same reason the metrics page is listed five: the
+   * tabs are three different tables — a filesystem-backed library, a sortable roadmap with move
+   * controls in a cell, and a changelog — not three states of one.
+   */
+  '/admin/operations',
+  '/admin/integrations',
+  '/admin/users',
+  '/admin/incidents',
+  '/admin/content?tab=blog',
+  '/admin/content?tab=roadmap',
+  '/admin/content?tab=changelog',
 ]
 
 // Every entry needs a reason and a date — this is a debt ledger, not a

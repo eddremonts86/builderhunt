@@ -2,7 +2,7 @@
 import * as React from 'react'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui'
 import { ErrorState } from '~/shared/components/ErrorState'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, PrimaryCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import { REFUND_POLICY_DECISIONS, type RefundPolicyDecision } from '~/shared/lib/billing-shared'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import { tableSearchToParams } from '~/shared/lib/table/query-url'
@@ -57,6 +57,18 @@ export interface RefundQueueProps {
   /** The route's URL, parsed. This component holds no query state of its own. */
   search: TableSearch
   onSearchChange: (next: TableSearch) => void
+}
+
+/**
+ * A pending refund is the only state an operator can act on, so it is the only one that carries a
+ * colour asking to be acted on. Everything after it belongs to the billing worker.
+ */
+const REFUND_STATE_TONES: Record<string, StatusTone> = {
+  pending: 'warning',
+  approved: 'accent',
+  completed: 'success',
+  denied: 'neutral',
+  failed: 'danger',
 }
 
 export function RefundQueue({ search, onSearchChange }: RefundQueueProps) {
@@ -227,37 +239,41 @@ export function RefundQueue({ search, onSearchChange }: RefundQueueProps) {
     {
       id: 'policyDecision',
       header: 'Policy',
+      kind: 'primary',
       priority: 'primary',
       value: (refund) => refund.policyDecision,
-      cell: (refund) => POLICY_LABELS[refund.policyDecision as RefundPolicyDecision] ?? refund.policyDecision,
+      cell: (refund) => <PrimaryCell title={POLICY_LABELS[refund.policyDecision as RefundPolicyDecision] ?? refund.policyDecision} />,
     },
     {
       id: 'amountCents',
       header: 'Amount',
+      kind: 'number',
       sortable: true,
-      align: 'end',
       value: (refund) => refund.amountCents,
-      cell: (refund) => formatUsd(refund.amountCents),
+      // Formatted currency rather than `NumberCell`: the figure carries a symbol and a fixed two
+      // decimals that a generic number cell would have to be told about twice.
+      cell: (refund) => <span className="tbl-cell-number">{formatUsd(refund.amountCents)}</span>,
     },
     {
       id: 'state',
       header: 'State',
+      kind: 'status',
       value: (refund) => refund.state,
-      cell: (refund) => refund.state,
+      cell: (refund) => <StatusCell label={refund.state} tone={REFUND_STATE_TONES[refund.state] ?? 'neutral'} />,
     },
     {
       id: 'createdAt',
       header: 'Requested',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (refund) => refund.createdAt,
-      cell: (refund) => new Date(refund.createdAt).toLocaleString(),
+      cell: (refund) => <DateCell value={refund.createdAt} withTime />,
     },
     {
       id: 'decide',
       header: 'Decision',
-      align: 'end',
+      kind: 'actions',
       // Only a pending refund can be decided; the worker owns every state after that.
       value: () => null,
       cell: (refund) => refund.state === 'pending'

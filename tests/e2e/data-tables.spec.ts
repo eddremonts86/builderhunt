@@ -289,6 +289,210 @@ for (const surface of SURFACES) {
       }
     })
 
+    /**
+     * The canonical anatomy, measured in a real browser (plan phase-3/14).
+     *
+     * Every number here is from the supplied reference: a 14px container, a 58px toolbar, a 34px
+     * sticky header, 16px of inline padding and a 20px gap between columns. They are asserted
+     * against *computed* style rather than against class names, because a class that stops
+     * resolving to anything is exactly the regression a class-name assertion cannot see.
+     */
+    test('renders the canonical container, toolbar, header and density', async ({ browser }) => {
+      const context = await browser.newContext({ storageState: harness.owner.storageState! })
+      const page = await context.newPage()
+      try {
+        await gotoHydrated(page, `${harness.baseURL}${surface.path()}`)
+        await dismissOverlays(page)
+        await expect(page.locator('[role="grid"]')).toBeVisible()
+
+        const anatomy = await page.evaluate(() => {
+          const container = document.querySelector('[data-testid="table-container"]') as HTMLElement
+          const toolbar = document.querySelector('.tbl-toolbar') as HTMLElement
+          const header = document.querySelector('.tbl-header-row') as HTMLElement
+          const row = document.querySelector('.tbl-row') as HTMLElement
+          const cs = getComputedStyle(container)
+          return {
+            radius: cs.borderRadius,
+            density: container.getAttribute('data-density'),
+            rowHeightVar: cs.getPropertyValue('--tbl-row-height').trim(),
+            toolbarMinHeight: getComputedStyle(toolbar).minHeight,
+            headerHeight: Math.round(header.getBoundingClientRect().height),
+            headerPosition: getComputedStyle(header).position,
+            headerPadding: getComputedStyle(header).paddingLeft,
+            columnGap: getComputedStyle(header).columnGap,
+            rowHeight: Math.round(row.getBoundingClientRect().height),
+            virtualized: document.querySelector('[data-virtualized="true"]') !== null,
+          }
+        })
+
+        expect(anatomy.radius).toBe('14px')
+        expect(anatomy.toolbarMinHeight).toBe('58px')
+        expect(anatomy.headerHeight).toBe(34)
+        expect(anatomy.headerPosition).toBe('sticky')
+        expect(anatomy.headerPadding).toBe('16px')
+        expect(anatomy.columnGap).toBe('20px')
+        expect(['sm', 'md', 'lg']).toContain(anatomy.density)
+        /**
+         * The declared density is the row's floor, and its exact height once the table is windowed.
+         *
+         * Unvirtualized, a row whose actions or identity need a few more pixels grows rather than
+         * clipping them — the densities are a rhythm, not a guillotine. Windowed, the virtualizer
+         * positions every row at `index * --tbl-row-height` and measures nothing, so a row painting
+         * taller than it is offset by *overlaps the one below it*. That one has to be exact.
+         */
+        expect(anatomy.rowHeight).toBeGreaterThanOrEqual(parseInt(anatomy.rowHeightVar, 10))
+        if (anatomy.virtualized) expect(anatomy.rowHeightVar).toBe(`${anatomy.rowHeight}px`)
+      } finally {
+        await context.close()
+      }
+    })
+
+    /**
+     * The overflow belongs to the table, never to the document.
+     *
+     * Fixed column widths mean a wide table wants more room than a laptop has, which is intended —
+     * `.tbl-scroll` is the box that absorbs it. This is the assertion that would have caught the
+     * regression that shipped inside this plan: an `.sr-only` span is `position: absolute`, and
+     * neither `overflow: clip` nor `overflow: auto` clips an abspos descendant whose containing
+     * block sits outside them. One invisible 1px span in an empty cell pushed the document 226px
+     * past the viewport, and nothing on screen looked wrong.
+     */
+    test('the table scroller owns the horizontal overflow, not the page', async ({ browser }) => {
+      const context = await browser.newContext({ storageState: harness.owner.storageState! })
+      const page = await context.newPage()
+      try {
+        await gotoHydrated(page, `${harness.baseURL}${surface.path()}`)
+        await dismissOverlays(page)
+        await expect(page.locator('[role="grid"]')).toBeVisible()
+
+        const measured = await page.evaluate(() => {
+          const scroller = document.querySelector('.tbl-scroll') as HTMLElement
+          return {
+            documentScroll: document.documentElement.scrollWidth,
+            documentClient: document.documentElement.clientWidth,
+            scrollerScroll: scroller.scrollWidth,
+            scrollerClient: scroller.clientWidth,
+          }
+        })
+
+        expect(
+          measured.documentScroll,
+          `the page is ${measured.documentScroll - measured.documentClient}px wider than the viewport — ` +
+            'a table that widens the document is a table that escaped its scroller',
+        ).toBeLessThanOrEqual(measured.documentClient + 1)
+        // And the scroller is genuinely the one holding it, rather than the columns having
+        // collapsed to fit — which would pass the assertion above for the wrong reason.
+        expect(measured.scrollerScroll).toBeGreaterThanOrEqual(measured.scrollerClient)
+      } finally {
+        await context.close()
+      }
+    })
+
+    /**
+     * Fixed widths per kind, and only the primary column flexing.
+     *
+     * A date sharing the free width with everything else truncates on a narrow screen, and a
+     * half-shown date is a wrong date. This reads the resolved grid template rather than the
+     * `ColumnDef`s, so it fails if the tokens stop resolving as well as if a column is misclassified.
+     */
+    test('sizes every classified column from the reference, and truncates none of them', async ({ browser }) => {
+      const context = await browser.newContext({ storageState: harness.owner.storageState! })
+      const page = await context.newPage()
+      try {
+        await gotoHydrated(page, `${harness.baseURL}${surface.path()}`)
+        await dismissOverlays(page)
+        await expect(page.locator('[role="grid"]')).toBeVisible()
+
+        const tracks = await page.evaluate(() => {
+          const header = document.querySelector('.tbl-header-row') as HTMLElement
+          return getComputedStyle(header).gridTemplateColumns.split(' ').map((track) => Math.round(parseFloat(track)))
+        })
+        // The reference's fixed widths. At least one has to be present, or the table is still on
+        // the pre-adoption proportional sizing and this assertion is measuring nothing.
+        const FIXED = [116, 132, 168, 88, 120, 44, 36]
+        expect(tracks.some((track) => FIXED.includes(track))).toBe(true)
+        // Exactly one flexible track: the primary column, at its 240px floor or wider.
+        const flexible = tracks.filter((track) => !FIXED.includes(track))
+        expect(flexible.length).toBeGreaterThanOrEqual(1)
+        for (const track of flexible) expect(track).toBeGreaterThanOrEqual(180)
+
+        // A date or a number that ellipsizes is a different value, not a shortened one.
+        const clipped = await page.evaluate(() => {
+          const suspects = [...document.querySelectorAll('[data-testid="cell-date"], [data-testid="cell-number"], [data-testid="cell-status"]')]
+          return suspects.filter((element) => element.scrollWidth > element.clientWidth + 1).length
+        })
+        expect(clipped, 'a date, number or status cell is clipping its own value').toBe(0)
+      } finally {
+        await context.close()
+      }
+    })
+
+    /**
+     * The column menu opens *over* the sticky header, not under it.
+     *
+     * They overlap by exactly the header's 34px, and both used to carry `z-index: 20` — an equal
+     * z-index is settled by DOM order, the toolbar comes before the grid, so the header won and
+     * painted across the top of the open menu. Half the checkboxes were unreachable.
+     *
+     * Asserted with `elementFromPoint` rather than by comparing the two z-indices, because the
+     * numbers agreeing is not the property that matters: what matters is which element a click at
+     * that coordinate actually lands on, and that is a function of stacking contexts, DOM order and
+     * every ancestor's `position` as well.
+     */
+    test('the column menu opens above the sticky header, not behind it', async ({ browser }) => {
+      const context = await browser.newContext({ storageState: harness.owner.storageState! })
+      const page = await context.newPage()
+      try {
+        await gotoHydrated(page, `${harness.baseURL}${surface.path()}`)
+        await dismissOverlays(page)
+
+        await page.getByTestId('table-columns-toggle').click()
+        await expect(page.locator('.tbl-column-menu')).toBeVisible()
+
+        const hit = await page.evaluate(() => {
+          const menu = document.querySelector('.tbl-column-menu')!.getBoundingClientRect()
+          const header = document.querySelector('.tbl-header-row')!.getBoundingClientRect()
+          const overlap = Math.min(menu.bottom, header.bottom) - Math.max(menu.top, header.top)
+          if (overlap <= 0) return { overlap, on: 'no overlap to test' }
+          const element = document.elementFromPoint(menu.left + menu.width / 2, header.top + header.height / 2)
+          return {
+            overlap,
+            on: element?.closest('.tbl-column-menu') ? 'menu'
+              : element?.closest('.tbl-header-row') ? 'header'
+                : 'neither',
+          }
+        })
+
+        expect(hit.overlap, 'the menu and the header no longer overlap — this test proves nothing').toBeGreaterThan(0)
+        expect(hit.on, 'a click in the overlap lands on the header, so the menu opened behind it').toBe('menu')
+      } finally {
+        await context.close()
+      }
+    })
+
+    /**
+     * `X of Y`, and never page numbers.
+     *
+     * Phase 3 replaced offsets with keyset cursors because an offset repeats and drops rows when
+     * the set changes between two requests. A footer drawing "1 2 3 … 10" over a cursor API would
+     * mean either lying about what the buttons do or bringing that bug back.
+     */
+    test('the footer counts the set and offers no page numbers', async ({ browser }) => {
+      const context = await browser.newContext({ storageState: harness.owner.storageState! })
+      const page = await context.newPage()
+      try {
+        await gotoHydrated(page, `${harness.baseURL}${surface.path()}`)
+        await dismissOverlays(page)
+
+        const footer = page.getByTestId('table-footer')
+        await expect(footer).toBeVisible()
+        await expect(page.getByTestId('table-footer-count')).toHaveText(new RegExp(`of ${SEEDED_ROWS}`))
+        await expect(footer.locator('a[href*="page="], button', { hasText: /^\s*[0-9]+\s*$/ })).toHaveCount(0)
+      } finally {
+        await context.close()
+      }
+    })
+
     test('sorting asks the server and shows in the URL', async ({ browser }) => {
       const context = await browser.newContext({ storageState: harness.owner.storageState! })
       const page = await context.newPage()

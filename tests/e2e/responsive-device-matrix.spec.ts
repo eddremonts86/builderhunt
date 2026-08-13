@@ -213,6 +213,28 @@ async function expectReallyOnPage(page: import('playwright/test').Page, path: st
   expect(height, `${path} rendered a body only ${height}px tall — that is not a page`).toBeGreaterThan(200)
 }
 
+/**
+ * Every table on the page keeps its own overflow.
+ *
+ * `expectNoHorizontalOverflow` below is the outcome; this is the mechanism, and the two fail
+ * differently. A table whose columns silently collapsed to fit satisfies the page-level assertion
+ * for the wrong reason — nothing overflows because nothing is the right width any more. This says
+ * the scroller is genuinely the box holding the extra width, which is what the fixed column tracks
+ * (`--tbl-col-*`) are supposed to produce.
+ */
+async function expectTablesOwnTheirOverflow(
+  page: import('playwright/test').Page,
+  where: string,
+): Promise<void> {
+  const escaped = await page.evaluate(() => {
+    const clipping = ['auto', 'scroll', 'hidden', 'clip']
+    return [...document.querySelectorAll('.tbl-scroll')]
+      .filter((scroller) => !clipping.includes(getComputedStyle(scroller).overflowX))
+      .length
+  })
+  expect(escaped, `${where}: a .tbl-scroll stopped clipping its own horizontal overflow`).toBe(0)
+}
+
 /** The checklist's pass criterion, with the observed numbers in the failure message. */
 async function expectNoHorizontalOverflow(
   page: import('playwright/test').Page,
@@ -240,6 +262,9 @@ for (const viewport of VIEWPORTS) {
         await dismissOverlays(page)
         await expectReallyOnPage(page, path)
         await expectNoHorizontalOverflow(page, `${path} at ${viewport.width}px`)
+        // `/pricing` and `/legal/cookies` are two of the five semantic tables, and a five-column
+        // comparison does not fit a phone by any arrangement — the scroller is how it survives.
+        await expectTablesOwnTheirOverflow(page, `${path} at ${viewport.width}px`)
       }
 
       /**
@@ -269,6 +294,7 @@ for (const viewport of VIEWPORTS) {
         await dismissOverlays(page)
         await expectReallyOnPage(page, path)
         await expectNoHorizontalOverflow(page, `${path} at ${viewport.width}px`)
+        await expectTablesOwnTheirOverflow(page, `${path} at ${viewport.width}px`)
       }
     } finally {
       await context.close()

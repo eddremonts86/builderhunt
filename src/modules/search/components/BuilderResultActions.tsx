@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowUpRight, Bookmark, ExternalLink } from 'lucide-react'
 import { Button } from '~/components/ui'
+import { ActionsCell } from '~/shared/components/table'
 import { getSourcePresentation } from '~/shared/lib/source-presentation'
 
 /**
@@ -51,6 +52,13 @@ export interface BuilderResultActionsProps {
   from?: string
   /** Called once tracking succeeds, so the caller's own list can flip `tracked`/`trackedRowId` without a full reload. */
   onTracked?: (organizationBuilderId: string) => void
+  /**
+   * `inline` — two labelled buttons, for a card that has room for them.
+   * `compact` — one icon action plus an overflow menu, for a 44px table actions column.
+   *
+   * Defaults to `inline`, so every existing card call site is unchanged.
+   */
+  layout?: 'inline' | 'compact'
   className?: string
 }
 
@@ -59,7 +67,7 @@ interface TrackErrorState {
   upgradeUrl?: string
 }
 
-export function BuilderResultActions({ builder, from, onTracked, className }: BuilderResultActionsProps) {
+export function BuilderResultActions({ builder, from, onTracked, layout = 'inline', className }: BuilderResultActionsProps) {
   const navigate = useNavigate()
   const [tracking, setTracking] = React.useState(false)
   const [error, setError] = React.useState<TrackErrorState | null>(null)
@@ -127,6 +135,68 @@ export function BuilderResultActions({ builder, from, onTracked, className }: Bu
     } finally {
       setTracking(false)
     }
+  }
+
+  /**
+   * A table row gets one visible action and a menu; a card gets both buttons.
+   *
+   * The reference's constraint is about the *column*, not the buttons: two labelled controls across
+   * fifty rows is a hundred tab stops between the top of a table and the bottom, and a 44px actions
+   * track cannot hold them anyway — before this, "Track & open" and "Open source profile" wrapped to
+   * three lines each and spilled over the column beside them.
+   *
+   * A card has room and no repetition, so `PersonResultCard` and the alerts inbox keep both.
+   */
+  if (layout === 'compact') {
+    return (
+      <div data-testid={`builder-result-actions-${builder.id}`}>
+        <ActionsCell
+          label={`Actions for ${builder.displayName ?? builder.username}`}
+          primary={builder.tracked && builder.trackedRowId
+            ? (
+              <button
+                type="button"
+                className="tbl-actions-trigger"
+                onClick={() => openWorkspace(builder.trackedRowId!)}
+                aria-label={`Open ${builder.username} in the workspace`}
+                title="Open workspace"
+                data-testid={`open-workspace-${builder.id}`}
+              >
+                <ArrowUpRight className="w-4 h-4" aria-hidden="true" />
+              </button>
+              )
+            : (
+              <button
+                type="button"
+                className="tbl-actions-trigger"
+                onClick={() => { void trackAndOpen() }}
+                disabled={!isTrackable || tracking}
+                aria-label={`Track ${builder.username} and open the workspace`}
+                title={isTrackable ? 'Track & open' : (dormantReason ?? undefined)}
+                data-testid={`track-and-open-${builder.id}`}
+              >
+                <Bookmark className="w-4 h-4" aria-hidden="true" />
+              </button>
+              )}
+          overflow={externalUrl
+            ? (
+              <a
+                href={externalUrl}
+                role="menuitem"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid={`open-source-profile-${builder.id}`}
+              >
+                Open source profile <ExternalLink className="w-3 h-3" aria-hidden="true" />
+              </a>
+              )
+            : undefined}
+        />
+        {error && (
+          <p className="sr-only" role="alert" data-testid={`track-error-${builder.id}`}>{error.message}</p>
+        )}
+      </div>
+    )
   }
 
   return (

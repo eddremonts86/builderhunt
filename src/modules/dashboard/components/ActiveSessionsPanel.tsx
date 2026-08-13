@@ -1,9 +1,9 @@
 // table-surface-bounded: this person's live sessions, read whole — one row per device they signed in from.
 import * as React from 'react'
-import { Laptop, LogOut, ShieldAlert, Sparkles } from 'lucide-react'
+import { Laptop, LogOut } from 'lucide-react'
 import { authClient } from '~/shared/lib/auth/client'
 import { Button } from '~/components/ui'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, PrimaryCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import { emptyTableSearch } from '~/shared/lib/table/query-url'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult } from '~/shared/lib/table/types'
@@ -29,20 +29,24 @@ const UA_FAMILY_LABELS: Record<string, string> = {
   unknown: 'Unknown device',
 }
 
+/**
+ * The one thing this session is, out of three that used to be drawn at once.
+ *
+ * The device name carried up to three separate 10px uppercase badges — "This device", "New" and
+ * "Flagged" — each in its own colour. They are mutually exclusive in every case that matters and
+ * they answer one question, so they collapse to one chip in the shared tones. Order is by urgency:
+ * a flagged session is the reason somebody opened this page.
+ */
+function sessionState(entry: ActiveSessionEntry): { label: string; tone: StatusTone } {
+  if (entry.trustState === 'flagged') return { label: 'Flagged', tone: 'danger' }
+  if (entry.isCurrent) return { label: 'This device', tone: 'success' }
+  if (entry.isNewDevice) return { label: 'New', tone: 'accent' }
+  return { label: 'Active', tone: 'neutral' }
+}
+
 function deviceLabel(entry: ActiveSessionEntry): string {
   if (!entry.uaFamily) return 'Unknown device'
   return UA_FAMILY_LABELS[entry.uaFamily] ?? entry.uaFamily
-}
-
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const minutes = Math.round(diffMs / 60_000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  return `${days}d ago`
 }
 
 /**
@@ -122,43 +126,36 @@ export function ActiveSessionsPanel() {
     {
       id: 'device',
       header: 'Device',
+      kind: 'primary',
       priority: 'primary',
       value: (entry) => deviceLabel(entry),
-      cell: (entry) => (
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-medium">{deviceLabel(entry)}</span>
-          {entry.isCurrent && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-bh-success" data-testid="current-session-badge">
-              This device
-            </span>
-          )}
-          {entry.isNewDevice && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-bh-accent" data-testid="new-device-badge">
-              <Sparkles className="h-3 w-3" aria-hidden="true" />
-              New
-            </span>
-          )}
-          {entry.trustState === 'flagged' && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-bh-danger" data-testid="flagged-device-badge">
-              <ShieldAlert className="h-3 w-3" aria-hidden="true" />
-              Flagged
-            </span>
-          )}
-        </span>
-      ),
+      cell: (entry) => <PrimaryCell title={deviceLabel(entry)} />,
+    },
+    {
+      id: 'trust',
+      header: 'State',
+      // The three badges used to ride inside the device name, each with its own colour, weight and
+      // 10px uppercase treatment. They are one fact — what this session is — so they are one chip,
+      // in the shared tones, in a column of its own that can be scanned down.
+      kind: 'status',
+      value: (entry) => sessionState(entry).label,
+      cell: (entry) => {
+        const state = sessionState(entry)
+        return <StatusCell label={state.label} tone={state.tone} />
+      },
     },
     {
       id: 'lastActive',
       header: 'Last active',
-      align: 'end',
+      kind: 'date',
       priority: 'secondary',
       value: (entry) => entry.lastActiveAt,
-      cell: (entry) => relativeTime(entry.lastActiveAt),
+      cell: (entry) => <DateCell value={entry.lastActiveAt} withTime />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       priority: 'secondary',
       // Per-row, and it stays per-row: revoking a session is not a bulk operation, and a
       // multi-select over "which of my devices to sign out" is a worse affordance than a button.

@@ -3,7 +3,7 @@ import * as React from 'react'
 import { Checkbox } from '~/components/ui/checkbox'
 import { cn } from '~/shared/lib/utils'
 
-import { ariaColIndex, ariaRowIndex, cellAlignmentClass, gridTemplateColumns } from './grid-roles'
+import { ariaColIndex, ariaRowIndex, cellAlignmentClass, gridMinWidth, gridTemplateColumns } from './grid-roles'
 import type { RendererContext } from './renderers/types'
 
 interface GridRowProps<Row> {
@@ -21,7 +21,7 @@ interface GridRowProps<Row> {
  * `aria-rowcount`, and that drift is invisible to everyone who is not using a screen reader.
  */
 export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
-  const { columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction, expansion, expandedRowId, onExpandedChange } = context
+  const { columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction, rowTone, expansion, expandedRowId, onExpandedChange } = context
   const id = rowId(row)
   const selected = selection.isSelected(id)
 
@@ -45,6 +45,13 @@ export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
   // one. Computing it here rather than in each renderer is what keeps the two in step.
   const columnOffset = selectable ? 1 : 0
 
+  const gridOptions = { selectable, expandable: Boolean(expansion) }
+  const minWidth = gridMinWidth(columns, gridOptions)
+  // Presentation only. A `danger` or `muted` row is still selectable, still keyboard-reachable and
+  // still announced normally — dimming a row is not a way to disable it, and `aria-disabled` here
+  // would be a lie the visual state cannot back up.
+  const tone = rowTone?.(row)
+
   return (
     <>
       <div
@@ -53,12 +60,13 @@ export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
         aria-selected={selectable ? selected : undefined}
         data-testid={rowTestId(row)}
         data-state={selected ? 'selected' : undefined}
-        className={cn(
-          'grid items-center gap-3 border-b border-bh-border px-4 py-2.5 last:border-b-0',
-          'hover:bg-bh-surface-2',
-          selected && 'bg-bh-accent-soft',
-        )}
-        style={{ gridTemplateColumns: gridTemplateColumns(columns, { selectable, expandable: Boolean(expansion) }) }}
+        data-tone={tone}
+        className="tbl-row grid items-center"
+        style={{
+          gridTemplateColumns: gridTemplateColumns(columns, gridOptions),
+          columnGap: 'var(--tbl-column-gap)',
+          minWidth: minWidth > 0 ? minWidth : undefined,
+        }}
         onDoubleClick={onPrimaryAction ? () => onPrimaryAction(row) : undefined}
       >
         {selectable && (
@@ -95,9 +103,11 @@ export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
               ref={(element) => keyboard.registerCell(index, columnIndex, element)}
               onFocus={() => keyboard.setPosition({ row: index, column: columnIndex })}
               className={cn(
-                'flex min-w-0 items-center truncate text-sm text-bh-text',
+                'tbl-cell',
                 cellAlignmentClass(column),
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-bh-accent',
+                // The one sticky column: actions stay reachable while the fixed-width middle
+                // columns scroll horizontally underneath them.
+                column.kind === 'actions' && 'tbl-actions-cell',
               )}
             >
               {column.cell(row)}
@@ -113,7 +123,7 @@ export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
               aria-expanded={expanded}
               aria-label={expanded ? 'Collapse row' : 'Expand row'}
               data-testid={`${rowTestId(row)}-expand`}
-              className="rounded-md p-1 text-bh-text-muted hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+              className="tbl-expand-button"
             >
               <span aria-hidden="true">{expanded ? '−' : '+'}</span>
             </button>
@@ -124,7 +134,7 @@ export function GridRow<Row>({ context, row, index }: GridRowProps<Row>) {
       {expansion && expanded && (
         // The expansion is a row of the grid too — omitting the role would make a screen reader
         // announce a row count that does not match what it can navigate.
-        <div role="row" className="border-b border-bh-border bg-bh-surface-2 px-4 py-3">
+        <div role="row" className="tbl-expansion-row">
           <div role="gridcell" aria-colindex={1}>{expansion(row)}</div>
         </div>
       )}

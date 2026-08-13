@@ -122,9 +122,10 @@ The code wins where this section and `DataTable.tsx` disagree; this describes wh
 
 | Decision | Value | Where |
 | --- | --- | --- |
-| Row height, comfortable | 40px | `useTableVirtual.ts` `ROW_HEIGHT` |
-| Row height, compact | 34px | same |
-| Row height, card surfaces | declared per surface (`rowHeight`) | `DataTable.tsx`; search uses 176px |
+| Row height, `sm` | 44px | `useTableVirtual.ts` `ROW_HEIGHT` |
+| Row height, `md` (default) | 52px | same |
+| Row height, `lg` (identity rows) | 64px | same |
+| Row height, card surfaces | declared per surface (`rowHeight`) | `DataTable.tsx`; search uses `SEARCH_CARD_ROW_HEIGHT` (176px) |
 | Windowing threshold | above 100 loaded rows | `VIRTUALIZATION_THRESHOLD` |
 | Scroll viewport when windowed | `maxHeight` or 70vh | `DataTable.tsx` |
 | Numeric alignment | `tabular-nums` on `align: 'end'` | `grid-roles.ts` `cellAlignmentClass` |
@@ -137,3 +138,102 @@ The code wins where this section and `DataTable.tsx` disagree; this describes wh
 `chrome="minimal"` hides the toolbar and visually hides the header row — for a grid whose row *is* a
 card, where a column-visibility menu over one column reads as a mistake. The header row stays in the
 accessibility tree, because `aria-rowcount` counts it.
+
+
+## Tables — the `--tbl-*` visual contract (plan phase-3/14)
+
+Phase 3 gave the app one table *shell*. This is the one table *look*: every table in the product —
+the interactive `DataTable` grid and the native `SemanticTable` — draws from the `--tbl-*` block in
+`globals.css` and from nothing else.
+
+### Provenance
+
+The reference was supplied on 2026-08-11 as two equivalent artifacts: `Design.pdf` (the visual
+authority for composition and hierarchy) and `Sistema de tablas.html` (the authority for literal
+values). The reference ships a SCSS token block; BuilderHunt mirrors it as CSS custom properties
+rather than adding Sass to the toolchain for one file. Neither artifact is in the repository — the
+extracted contract lives in
+[`plans/implemented/phase-3/14-unified-table-visual-style/spec.md`](../plans/implemented/phase-3/14-unified-table-visual-style/spec.md),
+and the token block itself is the executable copy.
+
+### The four deliberate deviations from the supplied literals
+
+The same specification that supplied these colours also requires WCAG AA. Four of its roles do not
+clear it on the surface they sit on, and each moves one step down the reference's own stone ramp.
+`tests/unit/shared/lib/accessibility.test.ts` pins all four in both themes, so a future edit putting
+the original values back because they "look closer to the design" fails the suite.
+
+| Role | Reference | Shipped | Why |
+| --- | --- | --- | --- |
+| Muted text | `#A8A29E` | `#57534E` | 2.52:1 on white; the next step (`#78716C`) still only reaches 4.48:1 on the selected-row tint |
+| Idle header | `#A8A29E` | `#78716C` | 11px/700 is not "large text" (that starts at 18.66px bold), so it is held to 4.5:1 |
+| Active header | `#78716C` | `#44403C` | moves with the idle one, preserving the relationship the reference is actually specifying |
+| Focus ring | `#E8703A` | `#CA5D25` | 3.14:1 on white but 2.93:1 on a selected row — the row a keyboard user is most likely to be acting on |
+
+`#A8A29E` survives verbatim as `--tbl-text-faint`, for the things it can carry: the ratio bar's
+unfilled track and hairline rules. Never words.
+
+Dark mode is a semantic remapping onto the existing BuilderHunt palette, not the same literals on a
+different background — pasting a warm stone ramp tuned for a white page into `.dark` puts near-black
+ink on a near-black surface. The chips become their own opaque dark tints, because a translucent
+fill composites differently on a selected row and quietly loses contrast.
+
+### Anatomy
+
+| Element | Contract | Token |
+| --- | --- | --- |
+| Container | 14px radius, 1px border, subtle shadow, clipped | `--tbl-radius`, `.tbl-container` |
+| Toolbar | 58px minimum (`min-height`, so eight facet chips may wrap rather than clip) | `--tbl-toolbar-height` |
+| Header | 34px, sticky, 11px/700 uppercase at `.07em` | `--tbl-header-height`, `--tbl-font-header-*` |
+| Rows | 44 / 52 / 64px by container `data-density` | `--tbl-row-height-{sm,md,lg}` |
+| Footer | 44px, `X of Y` left, cursor actions right, never page numbers | `--tbl-footer-height`, `TableFooter.tsx` |
+| Horizontal rhythm | 16px inline padding, 20px inter-column gap | `--tbl-padding-inline`, `--tbl-column-gap` |
+| Fixed columns | status 116, category 132, date 168, number 88, ratio 120, actions 44 | `--tbl-col-*` |
+| Flexible column | only `primary`, at `minmax(240px, 1.6fr)` | `--tbl-col-primary` |
+
+Row height has **one** source of truth: `ROW_HEIGHT` in `useTableVirtual.ts`, because the virtualizer
+computes every offset as `index * rowHeight`. `DataTable` writes it back onto the container as an
+inline `--tbl-row-height`, so the painted height and the computed height cannot drift. The values in
+`globals.css` are the fallback a table that sets no density (`SemanticTable`) resolves against.
+
+### Two primitives, one contract
+
+- **`DataTable`** — interactive, paged and virtualized collections. A `role="grid"` over a div tree,
+  because virtualized rows inside a `<tbody>` need spacer rows and `translateY`, which fight sticky
+  group headers and column alignment (plans 05–06).
+- **`SemanticTable`** — bounded prose, comparisons and summaries. Real `table`/`thead`/`tbody`, with
+  `scope="col"` on every header and `scope="row"` on the row's identity. That is what makes a screen
+  reader announce "Pro Max, Monthly credits, 700" instead of a bare number, and it is the thing the
+  ARIA grid would have to rebuild by hand.
+
+A visible `<table>` element may only be written inside `SemanticTable.tsx`. `pnpm check:table-surfaces`
+fails on any other, with two declared exceptions: a `.sr-only` chart equivalent (`BarSeries`) and
+`lib/email.ts`, whose clients strip stylesheets and support none of this.
+
+### The nine cell kinds
+
+`primary`, `status`, `category`, `date`, `number`, `ratio`, `identity`, `empty`, `actions`. Eight have
+a component in `src/shared/components/table/cells/`; `category` deliberately does not, because its
+rule is "plain text, never a decorative grey chip" and a component whose whole body is `{value}` is
+one somebody gives a background.
+
+**Only free text may ellipsize**, and it hands over the complete string through `title`. A date, a
+number or a status that truncates is a different value, not a shortened one — which is why those
+kinds take fixed tracks instead of a share of the free width.
+
+### Overflow belongs to the table
+
+Fixed column widths mean a wide table wants more room than a laptop has. `.tbl-scroll` absorbs it;
+the document never widens. Two assertions hold that: `tests/e2e/responsive-device-matrix.spec.ts`
+checks the page against the viewport at five widths, and `tests/e2e/data-tables.spec.ts` checks that
+the scroller is genuinely the box holding the extra width rather than the columns having collapsed.
+
+Both `.tbl-container` and `.tbl-scroll` are `position: relative`, and that is load-bearing for a
+non-obvious reason: `.sr-only` is `position: absolute`, and **neither `overflow: clip` nor
+`overflow: auto` clips an absolutely-positioned descendant whose containing block sits outside them**.
+Without a positioned ancestor, one invisible 1px span inside an empty cell in a horizontally-scrolled
+table pushed the document 226px past the viewport, with nothing visibly wrong.
+
+`.tbl-container` uses `overflow: clip` rather than `hidden` for a second non-obvious reason: `hidden`
+creates a scroll container, and a scroll container is what a `position: sticky` descendant resolves
+against — the floating selection dock inside would stop tracking the viewport.

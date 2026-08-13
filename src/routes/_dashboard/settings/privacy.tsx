@@ -4,7 +4,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Download, Trash2, Shield, AlertTriangle, FileJson, CheckCircle2, Clock, X, Users } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button } from '~/components/ui/button'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import { emptyTableSearch } from '~/shared/lib/table/query-url'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult } from '~/shared/lib/table/types'
@@ -38,6 +38,17 @@ export const Route = createFileRoute('/_dashboard/settings/privacy')({
   },
   component: PrivacySettingsPage,
 })
+
+/**
+ * An expired export is not a failure — the file is simply gone, which is the privacy behaviour
+ * working. It reads neutral so that the one tone on this page a person has to act on is `failed`.
+ */
+const EXPORT_STATUS_TONES: Record<string, StatusTone> = {
+  ready: 'success',
+  expired: 'neutral',
+  failed: 'danger',
+  pending: 'warning',
+}
 
 function PrivacySettingsPage() {
   const navigate = useNavigate()
@@ -193,30 +204,27 @@ function PrivacySettingsPage() {
 
   const exportColumns = React.useMemo<ColumnDef<ExportRecord>[]>(() => [
     {
-      id: 'status',
-      header: 'Status',
-      priority: 'primary',
-      value: (record) => record.status,
-      cell: (record) => (
-        <span className={`text-[10px] font-bold uppercase tracking-wider ${
-          record.status === 'ready' ? 'text-bh-success'
-            : record.status === 'expired' ? 'text-bh-text-dim'
-              : record.status === 'failed' ? 'text-bh-danger' : 'text-bh-warning'
-        }`}>
-          {record.status}
-        </span>
-      ),
-    },
-    {
       id: 'createdAt',
       header: 'Requested',
+      // The primary column, because a data export *is* the request that produced it: three rows
+      // reading "ready", "ready", "expired" identify nothing, and the date is the only thing that
+      // tells one from another.
+      kind: 'primary',
+      priority: 'primary',
       value: (record) => record.createdAt,
-      cell: (record) => new Date(record.createdAt).toLocaleString(),
+      cell: (record) => <DateCell value={record.createdAt} withTime />,
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      kind: 'status',
+      value: (record) => record.status,
+      cell: (record) => <StatusCell label={record.status} tone={EXPORT_STATUS_TONES[record.status] ?? 'warning'} />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       cell: (record) => record.status !== 'ready' ? null : (
         <Button
           type="button"

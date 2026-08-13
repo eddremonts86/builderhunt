@@ -1,3 +1,6 @@
+// table-surface-email: HTML email output, deliberately outside the app's visual system. Email
+// clients strip stylesheets and support none of the --tbl-* contract, so this markup carries inline
+// compatibility styles on purpose — it is the one place a table is allowed to name its own colours.
 import {
   INVITATION_INTENT_EMAIL_LEAD,
   normalizeInvitationIntent,
