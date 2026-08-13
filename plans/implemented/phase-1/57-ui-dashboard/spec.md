@@ -4,6 +4,8 @@
 > **Audience**: recruiters, team members, organization owners/admins, and verified profile owners
 > **Depends on**: selected deliverables from [`plans/UI`](../56-UI/spec.md), [`saved-search-health`](../../../phase-4/saved-search-health/spec.md), and [`hiring-pipeline-kanban`](../../../phase-4/hiring-pipeline-kanban/spec.md)
 > **Canonical surface**: `/dashboard`
+> **Blocks**: nothing. The dashboard consumes existing surfaces; no schema, API or migration in
+> this plan gates another one.
 > **Reality check**: the current dashboard already has banners, four metric tiles, activity, sprints, recommendations, alerts, saved searches, recent builders, plan usage, and source mix. The problem is not an empty dashboard; it is weak prioritization, ambiguous data semantics, disconnected workflows, and incomplete failure/accessibility states.
 > **Status reconciliation 2026-08-12.** `pending` → `implemented`. Every task is checked with no `- [ ]` and no
 > `- [~]`, and the four rulings recorded in `tasks.md` closed the last of them on their evidence rather than by

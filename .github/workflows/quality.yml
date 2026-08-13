@@ -302,6 +302,13 @@ jobs:
       - run: pnpm plans:check-links
       - run: pnpm plans:check-order
       - run: pnpm plans:check-implemented
+      # `plans:check-readiness` existed in `package.json` and was called from nowhere — the same shape
+      # as the three above before 2026-08-11. It guards the trio-and-header contract for phase 2 and
+      # phase 3 and chains `plans:check-tasks`. Its first real run found phase-2 plan 08 shipping with
+      # three headers missing from `plan.md` and `tasks.md`, and a bug in the checker that resolved
+      # only `plans/<phase>/` for every phase but the first, so phase 3 reported a position failure
+      # computed from a corpus missing its thirteen archived plans.
+      - run: pnpm plans:check-readiness
       - run: pnpm check:unbounded
       # Plan 57: no billing sweep on the metrics refresh path, no uncapped payload collection, no lost
       # request-abort or visibility guard. Static, so it fails on the pull request rather than on the deploy.
