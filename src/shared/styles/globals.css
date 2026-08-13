@@ -1001,6 +1001,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   --tbl-font-cell-size: 13px;
   --tbl-font-meta-size: 11px;
 
+  /* ── Layering ───────────────────────────────────────────────────────────
+     Three tiers, and the order between them is the whole point:
+
+       sticky chrome  — stays put while its own axis scrolls (actions column,
+                        group header, column header). Lowest, because it is
+                        part of the table rather than on top of it.
+       floating chrome — the selection dock, which hovers over the rows.
+       popovers        — the column menu and a row's overflow menu. Highest,
+                        because a menu that opens *under* the thing it was
+                        opened from is a menu nobody can use.
+
+     The column menu and the column header used to share one value. They
+     overlap by exactly the header's 34px, and an equal z-index is settled by
+     DOM order — the toolbar comes first, so the header won and painted over
+     the top of the open menu. */
+  --tbl-z-actions-column: 1;
+  --tbl-z-group-header: 10;
+  --tbl-z-column-header: 20;
+  --tbl-z-selection-dock: 30;
+  --tbl-z-popover: 40;
+
   /* ── Chips, avatars, focus, motion, elevation ───────────────────────────── */
   --tbl-chip-height: 22px;
   --tbl-chip-radius: 6px;
@@ -1162,7 +1183,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-column-menu {
   position: absolute;
   right: 0;
-  z-index: 20;
+  z-index: var(--tbl-z-popover);
   margin-top: 0.25rem;
   width: 13rem;
   border-radius: 10px;
@@ -1189,7 +1210,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-group-row {
   position: sticky;
   top: var(--tbl-header-height);
-  z-index: 10;
+  z-index: var(--tbl-z-group-header);
   display: flex;
   align-items: center;
   min-height: var(--tbl-row-height-sm);
@@ -1231,7 +1252,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-header-row {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--tbl-z-column-header);
   min-height: var(--tbl-header-height);
   padding-inline: var(--tbl-padding-inline);
   background: var(--tbl-surface-subtle);
@@ -1330,7 +1351,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-actions-cell {
   position: sticky;
   right: 0;
-  z-index: 1;
+  z-index: var(--tbl-z-actions-column);
   justify-content: flex-end;
   background: inherit;
 }
@@ -1360,7 +1381,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .tbl-selection-dock {
   position: sticky;
   bottom: 0.75rem;
-  z-index: 30;
+  z-index: var(--tbl-z-selection-dock);
   height: 0;
   display: flex;
   justify-content: center;
@@ -1583,7 +1604,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   position: absolute;
   right: 0;
   top: calc(100% + 0.25rem);
-  z-index: 40;
+  z-index: var(--tbl-z-popover);
   min-width: 11rem;
   padding: 0.25rem;
   border: 1px solid var(--tbl-border-outer);

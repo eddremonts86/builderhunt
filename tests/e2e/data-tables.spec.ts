@@ -428,6 +428,49 @@ for (const surface of SURFACES) {
     })
 
     /**
+     * The column menu opens *over* the sticky header, not under it.
+     *
+     * They overlap by exactly the header's 34px, and both used to carry `z-index: 20` — an equal
+     * z-index is settled by DOM order, the toolbar comes before the grid, so the header won and
+     * painted across the top of the open menu. Half the checkboxes were unreachable.
+     *
+     * Asserted with `elementFromPoint` rather than by comparing the two z-indices, because the
+     * numbers agreeing is not the property that matters: what matters is which element a click at
+     * that coordinate actually lands on, and that is a function of stacking contexts, DOM order and
+     * every ancestor's `position` as well.
+     */
+    test('the column menu opens above the sticky header, not behind it', async ({ browser }) => {
+      const context = await browser.newContext({ storageState: harness.owner.storageState! })
+      const page = await context.newPage()
+      try {
+        await gotoHydrated(page, `${harness.baseURL}${surface.path()}`)
+        await dismissOverlays(page)
+
+        await page.getByTestId('table-columns-toggle').click()
+        await expect(page.locator('.tbl-column-menu')).toBeVisible()
+
+        const hit = await page.evaluate(() => {
+          const menu = document.querySelector('.tbl-column-menu')!.getBoundingClientRect()
+          const header = document.querySelector('.tbl-header-row')!.getBoundingClientRect()
+          const overlap = Math.min(menu.bottom, header.bottom) - Math.max(menu.top, header.top)
+          if (overlap <= 0) return { overlap, on: 'no overlap to test' }
+          const element = document.elementFromPoint(menu.left + menu.width / 2, header.top + header.height / 2)
+          return {
+            overlap,
+            on: element?.closest('.tbl-column-menu') ? 'menu'
+              : element?.closest('.tbl-header-row') ? 'header'
+                : 'neither',
+          }
+        })
+
+        expect(hit.overlap, 'the menu and the header no longer overlap — this test proves nothing').toBeGreaterThan(0)
+        expect(hit.on, 'a click in the overlap lands on the header, so the menu opened behind it').toBe('menu')
+      } finally {
+        await context.close()
+      }
+    })
+
+    /**
      * `X of Y`, and never page numbers.
      *
      * Phase 3 replaced offsets with keyset cursors because an offset repeats and drops rows when
