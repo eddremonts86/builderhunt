@@ -33,7 +33,7 @@
 | **Stripe** | billing, live mode, Denmark/individual KYC, DK tax registration | per-transaction fees | `stripe-launch-register.md` |
 | **Ollama embeddings** | `nomic-embed-text` 768-dim, own Coolify resource | €0 (self-hosted) | `AI_EMBEDDING_URL` |
 | **Redis** | cache + rate limiting, optional with in-memory fallback | €0 (self-hosted) | `src/shared/lib/redis.ts` |
-| **builderhunt.eduardoinerarte.dk** | interim production hostname | on an owned domain | `.env.production.example` |
+| ~~**builderhunt.eduardoinerarte.dk**~~ | ~~interim production hostname~~ | — | **retired 2026-08-09** — dropped from the app's Coolify domains; every path now answers `503 no available server` from the proxy. See §1 "Cutover — what actually happened". |
 
 ### To contract now
 
@@ -139,14 +139,23 @@ was no hydration mismatch.
 The seven `@builderhunt.dev` mailbox addresses are deliberately *not* env-derived — they are
 identity, not routing, and they are what makes step 2 below necessary.
 
-### Also missing: the `/crawler` page
+### ~~Also missing: the `/crawler` page~~ — shipped 2026-07-26
 
-`ENRICHMENT_USER_AGENT` promises `https://builderhunt.dev/crawler` to every site we crawl, and
-**no such route exists**. Not urgent (`ENRICHMENT_ENABLED=false`), but it must ship before
-enrichment is ever enabled — that URL is the only way a webmaster can identify the bot, and
+`ENRICHMENT_USER_AGENT` promises `https://builderhunt.dev/crawler` to every site we crawl, and for
+a while no such route existed. `src/routes/_landing/crawler.tsx` now serves it (verified `200` in
+production 2026-08-13) — that URL is the only way a webmaster can identify the bot, and
 `public-enrichment-source-register.md` leans on it.
 
-### What to do
+One copy of that promise stayed broken until 2026-08-13: `src/lib/devpost/worker.ts` announced
+`+https://builderhunt.eduardoinerarte.dk/about` — the retired host *and* a path that has never
+existed on any host. Three call sites name this page (`env.ENRICHMENT_USER_AGENT`,
+`ENRICHMENT_DEFAULT_USER_AGENT`, the Devpost worker) and nothing checks that they agree, which is
+why only two of them were updated.
+
+### What to do — ✅ all executed, steps 1–5 on 2026-07-26, step 6 only on 2026-08-13
+
+Kept as the record of the decision, not as an open list. Step 6 is the one that was left hanging
+for four days; "Cutover — what actually happened" below is where that is written up.
 
 1. Register `builderhunt.dev` at any registrar with free WHOIS privacy. Porkbun, Cloudflare
    Registrar (at-cost, no markup) and Namecheap are all fine; `.dev` is ~$12–15/yr everywhere
@@ -172,40 +181,61 @@ enrichment is ever enabled — that URL is the only way a webmaster can identify
   icon — all four contact roles publish `Whois Privacy / Private by Design, LLC`. The owner's home
   address, phone and personal email are not exposed.
 - **DNS host**: Porkbun (`{curitiba,fortaleza,maceio,salvador}.ns.porkbun.com`), Cloudflare-backed
-- **Current records**: Porkbun URL forwarding — `A @ → 207.207.210.50/.36` (their forwarding
-  front-end; replaced the original parking IPs). 7 records total: forwarding A records, the two MX,
-  the SPF TXT.
-- **Interim redirect**: `builderhunt.dev` → `https://builderhunt.eduardoinerarte.dk`,
-  **temporary 302**, wildcard on, include-path off (so any deep link lands on the homepage — fine,
-  nothing links to `.dev` yet). 302 and not 301 **on purpose**: browsers cache 301s hard, and at
-  cutover the redirect has to run the other way (`.dk` → `.dev`). A cached permanent redirect
-  pointing backwards would fight the cutover in every browser that ever visited.
-- **HTTPS on the redirect**: ✅ working. Let's Encrypt issued `CN=builderhunt.dev` (issuer `YR2`),
-  valid 2026-07-26 → 2026-10-24, **~28 minutes after the forward was configured** — worth knowing,
-  because `.dev` is HSTS-preloaded and until the cert existed the domain failed the TLS handshake
-  with no HTTP fallback. Verified end-to-end: `https://builderhunt.dev` and
-  `https://www.builderhunt.dev` both `302` and resolve to the live site with `200`. Porkbun renews
-  this cert; nothing to diarize.
-- **Cutover to `APP_URL`**: _(pending — deliberately deferred)_ see below
+- **Current records** _(re-verified 2026-08-13)_: `A @ → 178.105.106.79` and
+  `A www → 178.105.106.79` — the VPS. The Porkbun URL-forwarding A records
+  (`207.207.210.50/.36`) are gone, replaced at cutover. Mail did **not** move: the two Porkbun
+  forwarding MX (`fwd1`/`fwd2.porkbun.com`) and the SPF TXT (`v=spf1 include:_spf.porkbun.com ~all`)
+  are untouched, so §2's mailboxes are unaffected by anything in this section.
+- ~~**Interim redirect**~~: was `builderhunt.dev` → `https://builderhunt.eduardoinerarte.dk`,
+  **temporary 302**, wildcard on, include-path off. Retired at cutover along with the forwarding
+  records. It was a 302 and not a 301 **on purpose**, and the reasoning paid off: browsers cache
+  301s hard, and at cutover the redirect had to run the other way (`.dk` → `.dev`). A cached
+  permanent redirect pointing backwards would have fought the cutover in every browser that ever
+  visited.
+- **HTTPS**: ✅ Coolify issued a fresh `CN=builderhunt.dev` (Let's Encrypt, issuer `YR2`) valid
+  **2026-08-09 15:39 UTC → 2026-11-07**, which is the hard timestamp for when the cutover
+  happened. This replaced Porkbun's redirect-era cert; Coolify renews it now, not Porkbun.
+  `.dev` is HSTS-preloaded, so there is no http:// fallback if a renewal ever fails — that is the
+  one thing here worth an alert.
+- **Cutover to `APP_URL`**: ✅ **done 2026-08-09** — see "Cutover — what actually happened" below.
 - **2FA on the registrar account**: _(pending — owner's action)_ ⚠️ this account now holds the
   product's domain, its legal mailboxes, and the support contact Stripe has on file
 
-### Cutover checklist (when launching)
+### Cutover — what actually happened (2026-08-09)
 
-1. Remove the URL forwarding (that is what owns the apex `A` records now), then add
-   `A @ → 178.105.106.79` (+ `A www`). Do it in one change — leaving both would round-robin between
-   Porkbun's forwarding front-end and the VPS, which presents as intermittent, hard-to-diagnose
-   failures rather than a clean break.
-2. Add the domain in Coolify, let it issue the Let's Encrypt cert. `.dev` is HSTS-preloaded, so
-   there is no http:// fallback to fall back to — the cert must be live before the switch.
-3. Change `APP_URL`, `VITE_APP_URL` and `BETTER_AUTH_URL` **together**, one redeploy.
-   `isTrustedMutationOrigin` hard-403s any unsafe-method request whose `Origin` ≠ `APP_URL`, so a
-   half-switch breaks every form. Verify a form submit immediately after.
-4. Update the Stripe webhook endpoint URL and the crontab URLs in `runbook.md`.
-5. 301 the old `.dk` hostname to the new one.
+The canonical URL is now `https://builderhunt.dev`. Steps 1–3 of the checklist below ran on
+2026-08-09 and worked. **Steps 4 and 5 did not run**, and nothing noticed for four days.
 
-Until then the canonical URL is whatever `APP_URL` holds (`builderhunt.eduardoinerarte.dk`), which
-is indexable and self-consistent — the point of the refactor above.
+| # | Step | Outcome |
+| --- | --- | --- |
+| 1 | Replace Porkbun's forwarding `A` records with `A @`/`A www → 178.105.106.79`, in one change | ✅ done |
+| 2 | Add the domain in Coolify, let it issue the Let's Encrypt cert before the switch | ✅ done — cert issued 15:39 UTC |
+| 3 | Change `APP_URL` + `VITE_APP_URL` + `BETTER_AUTH_URL` **together**, one redeploy | ✅ done — `isTrustedMutationOrigin` hard-403s any unsafe request whose `Origin` ≠ `APP_URL`, so a half-switch breaks every form |
+| 4 | Update the Stripe webhook endpoint URL and the crontab URLs | ❌ **missed** — see below |
+| 5 | 301 the old `.dk` hostname to the new one | ❌ **missed** — the retired host was dropped from the app's domains instead, so it answers `503 no available server`, not a redirect |
+
+**What step 4 cost.** The old hostname stopped being served, but Stripe was still delivering to
+`https://builderhunt.eduardoinerarte.dk/api/webhooks/stripe`. From 2026-08-10 08:27:13 UTC to
+2026-08-13 it accumulated **7,870 failed deliveries — 6,950 of them HTTP 503** — and Stripe's
+warning mail said it would disable the endpoint on 2026-08-19. Fixed 2026-08-13 by **editing the
+existing endpoint in place** (`we_1Twgh6FbQx9fJlcGFSyEvX3l`) rather than creating a replacement:
+editing preserves the endpoint's signing secret, so `STRIPE_WEBHOOK_SECRET` in Coolify needed no
+change. Creating a new endpoint mints a fresh `whsec_` and turns a one-field edit into a redeploy.
+
+Two things kept the blast radius small, and neither was a control we designed: the endpoint was
+**test mode**, so no customer and no real money was involved; and the 503 is the proxy's, which
+means the requests never reached the app and no partial state was written.
+
+**Why no gate caught it.** `deploy.yml`'s verification step probes `builderhunt.dev` — correctly,
+that is the host that must work. Nothing in this repo asserts anything about a *retired* host,
+and nothing can see where a third party has aimed its webhooks. An integration pointed at a
+hostname we stopped serving is invisible to every check we own; the only signal was Stripe's own
+warning mail, four days in.
+
+**Still unverified** (the Coolify API token returns 401, so the live values could not be read):
+whether the Coolify scheduled tasks call `builderhunt.dev`. The crontab lines *documented* in
+[`deploy-runbook.md`](./deploy-runbook.md) do, but the documented value and the configured value
+are exactly what diverged above. Check them the next time the token works.
 
 ---
 
