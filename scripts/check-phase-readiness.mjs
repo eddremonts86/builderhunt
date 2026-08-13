@@ -37,20 +37,29 @@ function localLinks(file, text) {
 }
 
 /**
- * Phase 1's plans live in two directories, and its build order spans both.
+ * A phase's plans live in up to three directories, and its build order spans all of them.
  *
- * `plans/implemented/` holds the finished ones and `plans/phase-1/` the rest, split by *state* rather
- * than by order — a plan's two-digit prefix never changes when it moves. So the position-contiguity
- * check has to see the union, exactly as `check-plan-order.mjs` does. Scanning one directory alone
- * produced 57 failures of the form "is position 44, expected 38": every number was correct and the
- * expectation was computed from a partial corpus.
+ * `plans/<phase>/` holds live work, `plans/implemented/<phase>/` what is finished, and
+ * `plans/rejected/<phase>/` what was never built — split by *state*, not by order, and a plan's
+ * two-digit prefix never changes when it moves. So the position-contiguity check has to see the union,
+ * exactly as `check-plan-order.mjs` does.
  *
- * Any other phase is a single directory and resolves to itself.
+ * This used to special-case phase 1 and treat every other phase as a single directory, which was the
+ * same partial-corpus mistake one level up. Phase 3 has 01-13 under `plans/implemented/phase-3/` and
+ * `14-unified-table-visual-style` still live, so scanning only `plans/phase-3/` saw one directory and
+ * reported `is position 14, expected 1` — a correct number measured against a corpus missing thirteen
+ * entries. Renumbering the plan to satisfy it would have been the wrong repair: the prefix is the
+ * plan's position in the phase order, not its address, and moving a plan must never change it.
+ *
+ * The old phase-1 branch also pointed at `plans/implemented` rather than `plans/implemented/phase-1`,
+ * so it enumerated `phase-1/` and `phase-3/` as if they were plan directories. Harmless only because
+ * phase 1 is not in the default list.
  */
-const ROOTS_FOR = (phase) =>
-  phase === 'phase-1' || phase === 'implemented'
-    ? [join(ROOT, 'plans', 'phase-1'), join(ROOT, 'plans', 'implemented')]
-    : [join(ROOT, 'plans', phase)]
+const ROOTS_FOR = (phase) => [
+  join(ROOT, 'plans', phase),
+  join(ROOT, 'plans', 'implemented', phase),
+  join(ROOT, 'plans', 'rejected', phase),
+]
 
 for (const phase of phases) {
   const roots = ROOTS_FOR(phase).filter((root) => existsSync(root))

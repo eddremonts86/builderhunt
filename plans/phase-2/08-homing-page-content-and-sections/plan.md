@@ -1,6 +1,15 @@
 # Homing-page content and sections — Delivery Plan
 
 > **Status**: `pending`
+> **Depends on**: nothing in the same phase. Reads [`app-reality`](../../_meta/app-reality.md)
+> for the ground truth on what is shipped today and what the home page is allowed to claim. Reads
+> every plan under `plans/` to know what is coming so the home page can advertise it honestly.
+> **Blocks**: nothing. Pure landing-page rewrite — no schema, no API, no migration.
+> **Reality check**: the current landing (`src/modules/landing/components/HomePage.tsx`) is a single
+> 600+ line file grown across three redesign passes, advertising only the discovery loop and a
+> 4-persona grid. It does not mention teams, sprints, alerts as a first-class surface, notes,
+> exports, RSS, claimable profiles, outreach, enrichment, AI helpers, the credit ledger, semantic
+> search, or the phase-4 queue — see [`spec.md`](./spec.md) for the full list.
 
 ## Delivery principles
 
