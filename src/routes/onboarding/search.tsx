@@ -2,7 +2,8 @@ import * as React from 'react'
 import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router'
 import { Search, X, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
-import { STARTER_QUERIES } from '~/shared/lib/onboarding-shared'
+import { searchStepCopyFor, starterQueriesFor } from '~/shared/lib/onboarding-shared'
+import type { SegmentPreset } from '~/shared/lib/user-segments'
 import { Button, Input, LinkButton } from '~/components/ui'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
@@ -80,23 +81,53 @@ function SearchStep() {
     navigate({ to: '/onboarding/save', search: { q: q.trim() } })
   }
 
+  /**
+   * The route the person is on, read from the server rather than inferred.
+   *
+   * `/api/onboarding/v2` already resolves the segment from `user_preferences` and answers the
+   * preset, so there is one place that decision is made. Anything that goes wrong — the
+   * segmentation feature being off, a failed request, an account with no segment — lands on
+   * `general`, which is the flow v1 already had. A step that could fail to render because a
+   * preference did not load would be a worse product than one that shows the general copy.
+   */
+  const [preset, setPreset] = React.useState<SegmentPreset>('general')
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await fetch('/api/onboarding/v2', { credentials: 'include' })
+        if (!response.ok || cancelled) return
+        const body = (await response.json()) as { preset?: SegmentPreset }
+        if (!cancelled && body.preset) setPreset(body.preset)
+      } catch {
+        // Deliberately silent: `general` is already the right answer.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const copy = searchStepCopyFor(preset)
+  const starterQueries = starterQueriesFor(preset)
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6">
       <div className="max-w-2xl w-full">
         <div className="text-center mb-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim mb-2">Step 2 of 3</p>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
-            What are you looking for?
+            {copy.heading}
           </h1>
           <p className="text-bh-text-muted">
-            Pick a starter query or type your own. We'll search {SEARCH_SOURCE_COUNT} sources.
+            {copy.body} We'll search {SEARCH_SOURCE_COUNT} sources.
           </p>
         </div>
 
         <div className="mb-6">
           <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-2">Try one of these:</p>
           <div className="flex flex-wrap gap-2">
-            {STARTER_QUERIES.map((q) => (
+            {starterQueries.map((q) => (
               <button
                 key={q}
                 type="button"

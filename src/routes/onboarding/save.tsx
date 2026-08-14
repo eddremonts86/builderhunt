@@ -138,6 +138,25 @@ function SaveStep() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed: true }),
     })
+
+    /**
+     * Ask the server whether this amounts to activation (plan phase-2/03).
+     *
+     * A request, not an assertion: `activationType` here says which kind is being *claimed*, and the
+     * server re-counts the evidence before recording anything. A client that could assert "I saved
+     * three builders" could assert it having saved none, and the activation rate — the number the
+     * whole plan exists to make trustworthy — would be the first casualty.
+     *
+     * `.catch` and no branch on the result: v2 is additive, and a person who has finished the flow
+     * must reach the success step whether or not the bookkeeping behind it succeeded.
+     */
+    await fetch('/api/onboarding/v2', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'activate', activationType: 'tracked_builders' }),
+    }).catch(() => {})
+
     navigate({ to: '/onboarding/success' })
   }
 

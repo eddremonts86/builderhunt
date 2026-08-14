@@ -85,10 +85,29 @@
     como una sola clave, devolviendo "sin hint" en silencio. Y un path relativo es justo lo que
     entrega un loader de ruta, así que el caso roto era el común.
 
-- [ ] **Implementar rama hiring**
+- [x] **Implementar rama hiring**
   - Files: `src/routes/onboarding/search.tsx`, `src/routes/onboarding/save.tsx`
   - Do: parametrizar copy, starter queries y activación por builders guardados.
   - Verify: e2e hasta activación y dashboard.
+  - Result: `onboarding-shared.ts` parametriza copy y starter queries **por preset** (10 tests);
+    `search.tsx` lee el suyo de `/api/onboarding/v2`, con `general` como respuesta a cualquier fallo
+    — un paso que no renderizara porque una preferencia no cargó sería peor producto que uno que
+    muestra el copy general. `save.tsx` pide activación al terminar.
+  - Las rutas difieren en **qué sugieren buscar**, no en tono: quien contrata quiere gente disponible,
+    quien invierte quiere qué se está construyendo, y un builder quiere encontrarse a sí mismo.
+    Reescribir las mismas cinco queries en cuatro voces habría sido personalización que cambia
+    títulos, que es el modo de fallo que el README de la fase nombra explícitamente. Un test lo pina.
+  - `other` comparte ruta con `general` a propósito, y el test lo afirma: `other` *es* la experiencia
+    general, no una quinta variante.
+  - **La activación se pide, no se afirma.** `save.tsx` envía `activationType`, y el servidor recuenta
+    la evidencia antes de escribir nada. Dos e2e cubren las dos mitades: sin evidencia no activa, y
+    con tres builders reales en `onboarding_selected_builders` sí — sin la segunda, un endpoint que no
+    activara nunca satisfaría a la primera. Un tercero prueba que no re-activa: el primer acto real es
+    el que cuenta, y una segunda activación movería `activated_at` y corrompería cualquier medida de
+    tiempo hasta activación.
+  - **No cubierto**: el recorrido completo por navegador hasta el dashboard. El e2e que existe llega a
+    la activación por la API con evidencia real en la base; el paso por la UI de búsqueda depende de
+    resultados de proveedores externos y sería una prueba que falla por motivos ajenos al plan.
 
 - [ ] **Implementar rama investing**
   - Files: `src/routes/onboarding/investing.tsx`, `src/shared/lib/onboarding-shared.ts`

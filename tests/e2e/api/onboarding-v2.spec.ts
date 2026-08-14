@@ -149,6 +149,55 @@ test('an activation request does not activate on its own say-so', async () => {
   expect((await response.json()).activationType).toBeNull()
 })
 
+/**
+ * The other half of the same rule: with real evidence in the database, the server *does* record the
+ * activation — and records which kind. Without this, the test above would be satisfied by an
+ * endpoint that never activates anybody.
+ */
+test('activates once the evidence is actually there, and names the kind', async () => {
+  await setSegment('hiring')
+
+  // The row the activation counter reads. Written directly rather than through the flow, because
+  // what is under test is the server's counting, not the search UI that produces the rows.
+  await harness.sql`
+    insert into onboarding_progress (user_id, organization_id, step)
+    values (${harness.owner.userId}, ${harness.organization.organizationId}, 2)
+  `
+  for (const n of [1, 2, 3]) {
+    await harness.sql`
+      insert into onboarding_selected_builders (id, organization_id, user_id, builder_ref)
+      values (${`sb-${harness.owner.userId}-${n}`}, ${harness.organization.organizationId},
+              ${harness.owner.userId}, ${`gh-${n}`})
+    `
+  }
+
+  const response = await harness.owner.api!.post('/api/onboarding/v2', {
+    data: { action: 'activate', activationType: 'tracked_builders', refId: 'run-1' },
+  })
+
+  expect(response.status()).toBe(200)
+  const body = await response.json()
+  expect(body.activationType).toBe('tracked_builders')
+  expect(body.activatedAt).not.toBeNull()
+})
+
+/**
+ * The first real act is the one that counts. A later activation of a different kind would move
+ * `activated_at` and quietly corrupt every time-to-activation figure computed from it.
+ */
+test('never re-activates once it has', async () => {
+  const before = await (await harness.owner.api!.get('/api/onboarding/v2')).json()
+  expect(before.activationType).toBe('tracked_builders')
+
+  await harness.owner.api!.post('/api/onboarding/v2', {
+    data: { action: 'activate', activationType: 'sourcing_sprint' },
+  })
+
+  const after = await (await harness.owner.api!.get('/api/onboarding/v2')).json()
+  expect(after.activationType).toBe('tracked_builders')
+  expect(after.activatedAt).toBe(before.activatedAt)
+})
+
 test('every other method is refused with an Allow header', async () => {
   const response = await harness.owner.api!.delete('/api/onboarding/v2')
   expect(response.status()).toBe(405)
