@@ -99,3 +99,12 @@
     cliente que pueda desincronizarse.
   - Verify cumplido: con el flag apagado la suite completa pasa y `/me` sigue entera — la sección
     simplemente no existe.
+  - **No demostrado de extremo a extremo, y por qué**: `startWorkerServer` cachea un servidor por
+    worker de Playwright, y los `flags` solo lo alcanzan escribiéndose en `process.env` *antes* de
+    que ese servidor arranque. Un segundo harness en el mismo worker reutiliza el primero, así que un
+    test que afirme `USER_SEGMENTATION_ENABLED=false` en la misma corrida habla con un proceso que ya
+    arrancó con el flag encendido — el primer intento recibió `200` donde esperaba `404`. Queda
+    cubierto donde sí se puede: el test del componente prueba que la superficie desaparece ante el
+    404, y el guard se lee antes de resolver la sesión, por encima de todo lo demás del handler. Lo
+    que sigue sin probarse en e2e es la API devolviendo 404 en un servidor arrancado con el flag
+    apagado, y eso necesita una corrida cuyo worker entero lo tenga apagado.
