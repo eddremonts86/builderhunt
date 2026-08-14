@@ -20,9 +20,18 @@ Protect PostgreSQL with three independent controls:
    pooling;
 3. PgBouncer 1.25.2 in transaction mode, with a hard database-wide backend cap.
 
-Capacity is certified by a 1,000-session, two-hour soak on an isolated production-sized host.
-The 10-minute run is a calibration gate, not evidence for the two-hour claim. Rate limiting is
-not part of the capacity fix: legitimate traffic must pass without being converted to `429`.
+Capacity is certified by a 1,000-session, two-hour soak **against production**, during beta, with
+an approved window. The 10-minute run is a calibration gate, not evidence for the two-hour claim.
+Rate limiting is not part of the capacity fix: legitimate traffic must pass without being converted
+to `429`.
+
+> **Changed 2026-08-14.** This spec said "on an isolated production-sized host" until then, and
+> [`docs/operations/load-testing.md`](../../../docs/operations/load-testing.md) had said the
+> opposite since 2026-08-11: certify against production, because the real Coolify private network,
+> the real pooler and the real host only exist there, and a 4-vCPU box somewhere else measures a
+> different system. During beta there are no real users and the database is expendable, which is
+> what makes it defensible. The doc's decision is the newer and the reasoned one; the spec was
+> stale, and every task below now names production.
 
 ## Problem
 
@@ -65,8 +74,9 @@ database-wide connection failure.
 
 1. **Baseline** — 10 minutes, direct app-to-PostgreSQL, same build, data, host, and workload.
 2. **Calibration** — 10 minutes through PgBouncer. Tune only within the connection budget below.
-3. **Soak** — two hours through PgBouncer on an isolated 4-vCPU/8-GB ARM64 host, matching the
-   production CAX21 class documented in `docs/operations/host-maintenance.md`.
+3. **Soak** — two hours through PgBouncer against production: the CAX21 host documented in
+   `docs/operations/host-maintenance.md`, its own Coolify private network, and the pooler that
+   will actually serve traffic. Approved window, named owner, fresh backup first.
 4. **Smoke** — 25 users for 30 seconds in a dedicated CI workflow. This detects broken wiring;
    it does not certify 1,000 users.
 

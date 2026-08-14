@@ -227,8 +227,26 @@ LOAD_DATABASE_URL=… LOAD_RUN_ID=load-<stamp>-<suffix> pnpm load:cleanup
 `/sign-in/email` allows 20 per minute per IP. A thousand virtual users signing in from one machine therefore
 needs about 53 minutes of paced startup, or the limit raised for the window. Raising it on a public site
 removes a real brute-force guard, so the paced option is the one that costs nothing but time — and a
-two-hour soak can afford an hour of ramp-in. Either way it is an operator decision with a window, not
-something the runner should choose.
+two-hour soak can afford an hour of ramp-in.
+
+> ⛔ **Neither lever exists yet, as of 2026-08-14.** This section used to end "either way it is an operator
+> decision with a window", which assumed two knobs and there are none.
+>
+> - **Pacing is not implemented.** Sign-in is a *separate phase before* the ramp, so
+>   `stages.rampSeconds` does not govern it — that only staggers when already-authenticated sessions
+>   begin issuing requests. `signInAll` takes `baseUrl`, `users`, `concurrency`, `timeoutMs` and
+>   `onProgress`; `concurrency` bounds parallelism, not rate. `runner.ts` calls it with a hardcoded
+>   `SIGN_IN_CONCURRENCY = 8` and no delay, so eight workers exhaust 20/minute in seconds and
+>   `signInAll` aborts at the first `429` — deliberately, because continuing would produce a run with
+>   an arbitrary subset of users.
+> - **Raising the cap is not configuration.** `'/sign-in/email': { window: 60, max: 20 }` is a literal
+>   in `better-auth.ts`, not read from the environment, so that route needs a code change and a
+>   redeploy of the app whose capacity is being measured.
+>
+> So a 1,000-user run cannot start today, against any target. The first open task in Phase 1 of
+> [`plans/phase-1/55-load-1000-concurrent-users/tasks.md`](../../plans/phase-1/55-load-1000-concurrent-users/tasks.md)
+> adds pacing to the harness, which is the option that touches nothing a user relies on. Until it
+> lands, the runbook below stops at its first command.
 
 ### Production load runs still require explicit approval
 
@@ -236,6 +254,61 @@ A load run against production is a deliberate, approved act with a named owner a
 troubleshooting step. `safety.ts` refuses a production marker in a URL, and that refusal is not to be
 worked around — the fixtures write a thousand users and the cleanup deletes rows. See
 [`deploy-runbook.md`](./deploy-runbook.md) for how release-time decisions are recorded.
+
+### The certification window, step by step
+
+Written 2026-08-14 for the operator running
+[`plans/phase-1/55-load-1000-concurrent-users`](../../plans/phase-1/55-load-1000-concurrent-users/tasks.md)
+to completion. **It does not run today** — the two harness tasks at the top of that plan's Phase 1
+have to land first. Everything below is the order once they have.
+
+Budget about four hours: ~53 minutes of paced sign-in before each of the three runs, ten minutes
+each for baseline and calibration, two hours of soak.
+
+**Before the window**
+
+1. Fresh database backup, verified restorable — not just taken. `host-maintenance.md` has the
+   restore drill.
+2. Agree the window and name its owner. This is the approval `safety.ts` refuses without.
+3. Mint the fixture password. Never reuse one, never use the repository default:
+   ```bash
+   export LOAD_TARGET_PRODUCTION=i-am-seeding-and-deleting-rows-in-production
+   export LOAD_FIXTURE_PASSWORD="$(openssl rand -hex 24)"
+   export LOAD_BASE_URL=https://builderhunt.dev
+   ```
+4. Seed, and **write the run id down before anything else happens**. It is the only handle cleanup
+   has on a thousand live logins:
+   ```bash
+   LOAD_DATABASE_URL=… pnpm load:seed          # prints the runId and the manifest path
+   ```
+
+**The three runs**
+
+| # | Stage | Command | Reads |
+|---|---|---|---|
+| 1 | Baseline | `LOAD_MANIFEST=… pnpm load:test:baseline` | `pool_mode=direct`, 10 min |
+| 2 | Deploy the pooler, then calibrate | rollout steps 1–2 above, then `pnpm load:pooler:preflight`, then the runner with `--pooled` | `pool_mode=transaction`, 10 min |
+| 3 | Soak | the runner with `--pooled` and the two-hour duration | 120 complete steady minutes |
+
+Between 1 and 2, follow *The order, and the one URL that must not move* above. `DATABASE_MIGRATION_URL`
+stays direct on 5432 through all of it.
+
+**Watch these, and stop if any trips**
+
+The table under *Metrics to watch, and stop conditions* is the live list. The two that end a run
+immediately rather than being noted: any `prepared statement … does not exist` in the app logs
+(`prepare: false` has regressed), and any SQLSTATE 53300.
+
+**Rollback**, at any point: point the five runtime URLs back at 5432 and redeploy. Nothing else.
+The pooler holds no state the app needs and no schema changed.
+
+**After the window, in this order**
+
+1. `LOAD_DATABASE_URL=… LOAD_RUN_ID=<the id> pnpm load:cleanup` — and then *confirm zero remain*.
+   A thousand accounts with a shared password on a public site is an access problem, not a data
+   problem; an aborted run that skipped cleanup leaves them live.
+2. Write the report to `docs/operations/load-certification-<date>.md` with the raw artifact id.
+   A missed threshold leaves the plan task open. Do not close the plan from the calibration.
 
 ## What this harness does not cover
 

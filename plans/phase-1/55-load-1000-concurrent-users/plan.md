@@ -124,9 +124,17 @@ Document the exact Coolify service, private-network host names, role-secret inje
 and rollback. Repoint only the five runtime role URLs; keep the migration URL direct. Run deploy
 preflight, auth smoke, RLS/API-isolation checks, and a low-rate route smoke before any load.
 
-The two-hour load runs against an isolated 4-vCPU/8-GB ARM64 environment, not the customer-facing
-production app. Provisioning that environment and starting the load are outward/cost-bearing
-operator actions and require confirmation.
+**Changed 2026-08-14.** This paragraph read "the two-hour load runs against an isolated
+4-vCPU/8-GB ARM64 environment, not the customer-facing production app". The load now runs
+**against production**, for the reason
+[`docs/operations/load-testing.md`](../../../docs/operations/load-testing.md) gives: the real
+Coolify private network, the real pooler and the real host only exist there, and a box somewhere
+else measures a different system. What makes it defensible is beta — no real users, and a database
+that is expendable — so this justification expires the day it stops being true. Re-read it before
+any run once the product has users; at that point the isolated host comes back.
+
+Starting sustained 1,000-user traffic against a public site is an outward-facing operator action
+and requires confirmation immediately before the run, plus a verified-restorable backup.
 
 Only after certification passes, roll out PgBouncer as a dark healthy Coolify service, lower the
 production resource to `max_connections=120` during an approved restart window, repoint the five
