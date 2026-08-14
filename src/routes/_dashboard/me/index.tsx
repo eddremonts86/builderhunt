@@ -9,6 +9,7 @@ import { PortfolioSettings } from '~/modules/builder-profile/components/Portfoli
 import { EvidenceProvenancePanel } from '~/modules/builder-profile/components/EvidenceProvenancePanel'
 import { ProfileViewAnalytics } from '~/modules/builder-profile/components/ProfileViewAnalytics'
 import { AccountSummaryCard } from '~/modules/dashboard/components/AccountSummaryCard'
+import { UserSegmentSettings } from '~/modules/dashboard/components/UserSegmentSettings'
 
 interface ClaimedBuilder {
   id: string
@@ -152,6 +153,10 @@ function MePage() {
           bare skeleton and then a single "No claimed profiles yet" card, so an account with real
           identity, plan and usage behind it looked empty. None of that depends on the claim fetch. */}
       <AccountSummaryCard identity={user} />
+
+      {/* Renders nothing until `USER_SEGMENTATION_ENABLED=true` — the component hides itself on the
+          404 the API returns while the flag is off, so the flag has exactly one home. */}
+      <UserSegmentSettings />
 
       {loading ? (
         <div className="animate-pulse space-y-4" data-testid="me-claims-loading">

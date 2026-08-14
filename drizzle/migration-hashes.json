@@ -684,6 +684,10 @@
     "0170_platform_admin_preferences": {
       "sql": "7d23933a5f8fbc1b0a5e128c15eb1d645673c428c9039eb2a3b96f774f7a7b4a",
       "snapshot": "4220c498ccd04dda96bc315915154a306029dae05d7070e8a5b302316421b429"
+    },
+    "0171_user_preferences": {
+      "sql": "f57c98b6e5d095e1fddcfffc4a8491f47ec2e6b1644255a943b7fce691437c5d",
+      "snapshot": "9a95efaae8b9e85c2b20e29c7dbd4607482149b2ee696c8cf0c059f71cdf8630"
     }
   }
 }

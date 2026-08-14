@@ -6,8 +6,9 @@
  * see the spec's "Non-goals" and "Event contract" sections.
  */
 import { z } from 'zod'
+import { userSegmentSchema } from './user-segments'
 
-export const CONVERSION_SURFACES = ['hero', 'final_cta', 'explore', 'signup'] as const
+export const CONVERSION_SURFACES = ['hero', 'final_cta', 'explore', 'signup', 'onboarding', 'settings'] as const
 export type ConversionSurface = (typeof CONVERSION_SURFACES)[number]
 
 export const CONVERSION_EVENT_NAMES = [
@@ -18,6 +19,14 @@ export const CONVERSION_EVENT_NAMES = [
   'explore_signup_click',
   'signup_submit',
   'signup_complete',
+  // Segmentation (plan: phase-2/02-segmentacion-usuarios). Same stream and the same rules: no
+  // identity, no free text, nothing about a candidate. What a segment event adds is *which* choice
+  // was made, and that is an enum either way.
+  'segment_prompt_viewed',
+  'segment_selected',
+  'segment_changed',
+  'segment_skipped',
+  'activation_reached',
 ] as const
 export type ConversionEventName = (typeof CONVERSION_EVENT_NAMES)[number]
 
@@ -37,7 +46,42 @@ const ALLOWED_SURFACES_BY_NAME: Record<ConversionEventName, readonly ConversionS
   explore_signup_click: ['explore'],
   signup_submit: ['signup'],
   signup_complete: ['signup'],
+  segment_prompt_viewed: ['onboarding', 'settings'],
+  segment_selected: ['onboarding', 'settings'],
+  segment_changed: ['onboarding', 'settings'],
+  segment_skipped: ['onboarding'],
+  // Activation is reported from wherever the person reached it, so it is the one segment-adjacent
+  // event with a wide surface list rather than a narrow one.
+  activation_reached: ['onboarding', 'settings', 'explore'],
 }
+
+/** The four that describe a choice, and therefore the four that must carry one. */
+export const SEGMENT_CHOICE_EVENTS = [
+  'segment_prompt_viewed',
+  'segment_selected',
+  'segment_changed',
+  'segment_skipped',
+] as const
+
+/**
+ * What a segment event may say, and nothing more.
+ *
+ * Two enums and a source. There is deliberately no field that could hold a name, an email, a query
+ * or anything about a candidate — the spec lists those as forbidden, and the reliable way to honour
+ * that is to give them nowhere to go rather than to strip them later.
+ *
+ * `previous` is nullable because a first choice has no predecessor, and `next` is nullable because
+ * clearing a segment is a real event.
+ */
+const segmentContextShape = z.object({
+  previous: userSegmentSchema.nullable(),
+  next: userSegmentSchema.nullable(),
+  source: z.enum(['onboarding', 'settings', 'landing']),
+}).strict()
+
+/** Coarse, and an enum — "what kind of first value did they reach", never which search or builder. */
+export const ACTIVATION_TYPES = ['first_search', 'first_saved_builder', 'first_alert', 'profile_published'] as const
+export type ActivationType = (typeof ACTIVATION_TYPES)[number]
 
 const conversionEventShape = z.object({
   name: z.enum(CONVERSION_EVENT_NAMES),
@@ -47,6 +91,10 @@ const conversionEventShape = z.object({
   sessionId: z.string().uuid(),
   variant: z.enum(CONVERSION_VARIANTS),
   occurredAt: z.string().datetime({ offset: true }),
+  /** Present on exactly the four segment-choice events; rejected on any other. */
+  segment: segmentContextShape.optional(),
+  /** Present on exactly `activation_reached`; rejected on any other. */
+  activationType: z.enum(ACTIVATION_TYPES).optional(),
 }).strict()
 
 export type ConversionEvent = z.infer<typeof conversionEventShape>
@@ -72,6 +120,31 @@ export function parseConversionEvent(raw: unknown): ParseConversionEventResult {
   if (!allowed.includes(parsed.data.surface)) {
     return { ok: false, event: null, error: `Event "${parsed.data.name}" cannot occur on surface "${parsed.data.surface}"` }
   }
+
+  /**
+   * The optional fields are optional to the *schema* and mandatory to the *contract*. Enforced here
+   * because zod cannot express "required for these five names and forbidden for the rest" without
+   * a discriminated union that would rewrite the whole shape.
+   *
+   * Both directions matter. A missing context makes a segment event uncountable; a context on a
+   * landing event means a surface is sending data it has no business knowing.
+   */
+  const needsSegment = (SEGMENT_CHOICE_EVENTS as readonly string[]).includes(parsed.data.name)
+  if (needsSegment && !parsed.data.segment) {
+    return { ok: false, event: null, error: `Event "${parsed.data.name}" requires segment context` }
+  }
+  if (!needsSegment && parsed.data.segment) {
+    return { ok: false, event: null, error: `Event "${parsed.data.name}" must not carry segment context` }
+  }
+
+  const needsActivation = parsed.data.name === 'activation_reached'
+  if (needsActivation && !parsed.data.activationType) {
+    return { ok: false, event: null, error: 'Event "activation_reached" requires activationType' }
+  }
+  if (!needsActivation && parsed.data.activationType) {
+    return { ok: false, event: null, error: `Event "${parsed.data.name}" must not carry activationType` }
+  }
+
   return { ok: true, event: parsed.data, error: null }
 }
 

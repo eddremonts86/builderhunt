@@ -6,6 +6,8 @@ import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '~/sha
 import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
 import { env } from '~/shared/lib/env'
 import { getRemovalRequestMetrics } from '~/shared/lib/repositories/profile-removal'
+import { countUsersBySegment } from '~/shared/lib/repositories/user-preferences'
+import { publicDb } from '~/shared/lib/db/client'
 
 /**
  * The bounded legacy compatibility response for `/admin/metrics` (plan 57, Admin track — "Split the
@@ -158,6 +160,22 @@ export const Route = createFileRoute('/api/admin/metrics/')({
             : null
 
           /**
+           * How many accounts sit in each segment (plan: phase-2/02-segmentacion-usuarios).
+           *
+           * Absent while `USER_SEGMENTATION_ENABLED` is `false`, for the reason `removals` is: nobody
+           * can have chosen a segment yet, and a block of zeros would read as "everyone declined"
+           * rather than "the question has not been asked".
+           *
+           * Counts only, and `unknown` is a bucket rather than a filter — a distribution that
+           * silently fails to add up to the number of accounts is worse than one that admits it does
+           * not recognise a stored value. Nothing here identifies anybody: the spec permits internal
+           * staff to see aggregates and forbids using somebody's segment as support data.
+           */
+          const segments = fields.has('db') && env.USER_SEGMENTATION_ENABLED === 'true'
+            ? await countUsersBySegment(publicDb).catch(() => null)
+            : null
+
+          /**
            * The interview counters, with the capability flags that decide whether they mean anything.
            *
            * Same reasoning as `removals` above, one step further. `metrics.get()` already carried all
@@ -214,6 +232,7 @@ export const Route = createFileRoute('/api/admin/metrics/')({
             // plans/implemented/52-audit-trust §"Add trust runtime gates and redacted metrics" — counts and
             // states only. See `getRemovalRequestMetrics` for what is deliberately absent and why.
             ...(removals ? { removals } : {}),
+            ...(segments ? { segments } : {}),
             // plans/implemented/44-calendar-scheduling-interview-intelligence §"Add redacted metrics and
             // operator dashboards". Counters and flags only: every value here is a number or a boolean,
             // which is what makes it safe to render on a page that must never approach a candidate's name.

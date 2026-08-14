@@ -1,7 +1,7 @@
 # Tareas — dashboard personalizado por segmento
 
 > **Status**: `partially-implemented`
-> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md)
 > **Blocks**: nothing
 > **Reality check**: The registry, compositor primitives, customization UI and persistence are
 > already implemented in `src/modules/dashboard/lib/widget-registry.ts`, `DashboardPage.tsx`,

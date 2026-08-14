@@ -250,6 +250,7 @@ import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
+import { Route as ApiMePreferencesIndexRouteImport } from './routes/api/me/preferences/index'
 import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
 import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
 import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/api/organizations/deletion/immediate'
@@ -1583,6 +1584,11 @@ const ApiMeDeleteAccountIndexRoute = ApiMeDeleteAccountIndexRouteImport.update({
   path: '/api/me/delete-account/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMePreferencesIndexRoute = ApiMePreferencesIndexRouteImport.update({
+  id: '/api/me/preferences/',
+  path: '/api/me/preferences/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
   id: '/api/me/sessions/',
   path: '/api/me/sessions/',
@@ -2165,6 +2171,7 @@ export interface FileRoutesByFullPath {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences/': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
@@ -2459,6 +2466,7 @@ export interface FileRoutesByTo {
   '/api/me/builders': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
@@ -2758,6 +2766,7 @@ export interface FileRoutesById {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences/': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
@@ -3056,6 +3065,7 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/preferences/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
@@ -3350,6 +3360,7 @@ export interface FileRouteTypes {
     | '/api/me/builders'
     | '/api/me/data-export'
     | '/api/me/delete-account'
+    | '/api/me/preferences'
     | '/api/me/sessions'
     | '/api/me/stepup'
     | '/api/organizations/invitations'
@@ -3648,6 +3659,7 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/preferences/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
@@ -3863,6 +3875,7 @@ export interface RootRouteChildren {
   ApiMeBuildersIndexRoute: typeof ApiMeBuildersIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
+  ApiMePreferencesIndexRoute: typeof ApiMePreferencesIndexRoute
   ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
@@ -5577,6 +5590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeDeleteAccountIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/me/preferences/': {
+      id: '/api/me/preferences/'
+      path: '/api/me/preferences'
+      fullPath: '/api/me/preferences/'
+      preLoaderRoute: typeof ApiMePreferencesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/sessions/': {
       id: '/api/me/sessions/'
       path: '/api/me/sessions'
@@ -6619,6 +6639,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeBuildersIndexRoute: ApiMeBuildersIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
+  ApiMePreferencesIndexRoute: ApiMePreferencesIndexRoute,
   ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
   ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,

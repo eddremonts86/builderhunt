@@ -127,6 +127,15 @@ const zodEnv = z.object({
   CLAIMABLE_PROFILES_ENABLED: z.enum(['true', 'false']).default('true'),
   // Kill switch for the verified-owner portfolio feature (public /portfolio/$claimId pages).
   PORTFOLIOS_ENABLED: z.enum(['true', 'false']).default('true'),
+  // Plan: phase-2/02-segmentacion-usuarios — the user's primary goal (`hiring | investing |
+  // building | other`). Off by default because the phase README requires this to roll out behind a
+  // flag: the taxonomy is an explicit hypothesis awaiting the phase-5 research, and shipping it
+  // dark lets the contract, the table and the API land without changing what anybody sees.
+  //
+  // Off means *absent*, not hidden: the settings section does not render and
+  // `/api/me/preferences` answers 404. Rows already written survive a flip back to `false` — the
+  // flag governs the interface, never the data.
+  USER_SEGMENTATION_ENABLED: z.enum(['true', 'false']).default('false'),
   // Plan: audit-trust — profile-removal/global-suppression subsystem. Off by default: a new
   // security-critical flow that hashes requester email/challenge with a dedicated key distinct
   // from BETTER_AUTH_SECRET (spec.md: "must not reuse BETTER_AUTH_SECRET").
