@@ -94,6 +94,15 @@ export interface LoadFixtureUser {
   email: string
   organizationId: string
   sprintId: string
+  /**
+   * Carried since 2026-08-14 for `mintSessions`, which needs `auth_sessions.user_id`.
+   *
+   * The email happens to be `${userId}@load.local`, so this is derivable today — and that is exactly
+   * why it is written down instead. A consumer that parsed the id back out of the address would keep
+   * working until somebody changed the fixture's email format for an unrelated reason, and then fail
+   * as a wrong `user_id` rather than as a missing one.
+   */
+  userId: string
 }
 
 export interface LoadFixtureManifest {
@@ -248,7 +257,7 @@ export async function seedLoadFixtures(options: SeedOptions): Promise<LoadFixtur
       const userId = userIds[index]
       const ordinal = String(index).padStart(4, '0')
       const sprintId = fixtureId(runId, 'sp', ordinal)
-      manifestUsers.push({ email: `${userId}@load.local`, organizationId, sprintId })
+      manifestUsers.push({ userId, email: `${userId}@load.local`, organizationId, sprintId })
 
       for (let n = 0; n < counts.builderRowsPerOrganization; n += 1) {
         builderRows.push({
