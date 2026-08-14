@@ -364,6 +364,17 @@ test('full onboarding journey: welcome → starter query → three saves → suc
       (r) => r.url().includes('/api/onboarding/complete') && r.ok(),
     )
     await page.getByTestId('onboarding-start').click()
+
+    /**
+     * v2 inserts the goal step between welcome and search (plan phase-2/03). This journey is about
+     * the v1 flow, so it answers the question and moves on rather than asserting on it —
+     * `goal.spec` owns the goal step's own behaviour. "I would rather not say" is used because it
+     * is the path that must work with the segmentation feature in either position: it writes
+     * nothing, so it cannot depend on the flag.
+     */
+    await page.waitForURL(/\/onboarding\/goal/)
+    await page.getByRole('button', { name: /rather not say/i }).click()
+
     await page.waitForURL(/\/onboarding\/search/)
     await step2Done
     await expect(page.getByRole('heading', { name: 'What are you looking for?' })).toBeVisible()

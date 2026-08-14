@@ -335,6 +335,13 @@ const classifications: Classification[] = [
   account('account_risk', 'user_id', ['abuse-and-usage-integrity']),
   operational('session_signals', 'session_id_hash (salted, no raw session token)', ['abuse-and-usage-integrity']),
   account('user_devices', 'user_id', ['abuse-and-usage-integrity']),
+
+  // The person's own preferences (plan phase-2/02-segmentacion-usuarios). `account-subject` and not
+  // `tenant-private` on purpose: a segment describes what somebody is here to do, which does not
+  // change when they switch workspace, so the table has no `organization_id` for a tenant filter to
+  // key on. Its RLS is enabled and forced, keyed on `app.user_id`, the same shape as `user_devices`
+  // above rather than `dashboard_preferences`.
+  account('user_preferences', 'user_id', ['phase-2/02-segmentacion-usuarios']),
   tenant('seat_usage_daily', 'organization_id + user_id + day', ['abuse-and-usage-integrity'], { organizationColumn: true }),
 
   // Onboarding (plan 8). `onboarding_selected_builders` is keyed by organization AND user, with a

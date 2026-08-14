@@ -967,6 +967,24 @@ export const onboardingProgress = pgTable(
     firstQueryId: text('first_query_id'),
     firstBuilderIds: jsonb('first_builder_ids').$type<string[]>().default([]).notNull(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    /**
+     * Onboarding v2 (Plan: phase-2/03-onboarding-segmentado). All nullable, and the v1 columns
+     * above are kept rather than replaced.
+     *
+     * A row written by v1 has `flow_version` null and `step` 0..3; a row written by v2 has
+     * `flow_version` 2 and a `current_step_key`. Both are readable, which is what lets the new flow
+     * roll out by cohort instead of by migration — and what lets a rollback leave people where they
+     * were rather than dropping them back to the start.
+     *
+     * `activation_type` and `activation_ref_id` record *what* somebody did, not that they finished:
+     * v1 counted a completed flow as an activated user, so its activation rate described the flow
+     * rather than the product.
+     */
+    flowVersion: integer('flow_version'),
+    currentStepKey: text('current_step_key'),
+    activationType: text('activation_type'),
+    activationRefId: text('activation_ref_id'),
+    activatedAt: timestamp('activated_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
