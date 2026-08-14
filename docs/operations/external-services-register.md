@@ -232,10 +232,25 @@ and nothing can see where a third party has aimed its webhooks. An integration p
 hostname we stopped serving is invisible to every check we own; the only signal was Stripe's own
 warning mail, four days in.
 
-**Still unverified** (the Coolify API token returns 401, so the live values could not be read):
-whether the Coolify scheduled tasks call `builderhunt.dev`. The crontab lines *documented* in
-[`deploy-runbook.md`](./deploy-runbook.md) do, but the documented value and the configured value
-are exactly what diverged above. Check them the next time the token works.
+**Verified 2026-08-14, once a working Coolify token was available.** The production environment is
+consistent with the cutover: `APP_URL` and `VITE_APP_URL` both read `https://builderhunt.dev` in
+both rows, and `STRIPE_WEBHOOK_SECRET` is the secret belonging to the endpoint repointed above —
+independent confirmation of the delivery test.
+
+Two things that check turned up, neither of them about a hostname:
+
+- **The scheduled tasks do not exist.** `GET /applications/{uuid}/scheduled-tasks` returns `[]`, and
+  `/api/status` reports `uptime30d: null`, which `src/routes/api/status/index.ts` documents as the
+  "no history" case — no `status_checks` row has been written in 30 days. So the every-5-minute
+  snapshot and the hourly Devpost worker in [`deploy-runbook.md`](./deploy-runbook.md) are
+  documented, not configured. `CRON_SECRET` *is* set and `DEVPOST_ENABLED=true`, so nothing is
+  missing except a scheduler. The public `/status` page therefore advertises an uptime figure that
+  has never been measured. Same class of defect as the Stripe endpoint above — documented as
+  configured, never configured — and again invisible to every gate.
+- **`BETTER_AUTH_URL` is not set in Coolify, and does not need to be.** `better-auth.ts` passes
+  `baseURL: env.APP_URL`, and `env.ts` does not declare `BETTER_AUTH_URL` at all, so nothing reads
+  it. The cutover checklist's "change all three together" is really "change the two that exist".
+  `.env.production.example` still lists it; harmless, but it is not load-bearing.
 
 ---
 
