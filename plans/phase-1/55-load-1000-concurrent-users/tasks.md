@@ -88,27 +88,39 @@
 
 ## Phase 1 — Direct baseline
 
-- [ ] **Pace the fixture sign-in so 1,000 users can authenticate at all**
-  - Files: `scripts/load/auth.ts`, `scripts/load/runner.ts`, `scripts/load/config.ts`,
+- [ ] **Mint fixture sessions in the database instead of signing 1,000 users in**
+  - Files: `scripts/load/auth.ts`, `scripts/load/seed.ts`, `scripts/load/runner.ts`,
     `tests/unit/scripts/load/auth.test.ts`, `docs/operations/load-testing.md`
-  - Do: Give `signInAll` a minimum interval between sign-in attempts, configurable and defaulting
-    to a rate strictly under the limiter's, and have the runner log the projected sign-in duration
-    before it starts so an operator is not watching a silent hour. Every run below depends on this:
-    `better-auth.ts` caps `/sign-in/email` at 20 per minute per IP, every virtual user comes from
-    one host, and `signInAll` aborts at the first `429` by design — so a 1,000-user run currently
-    cannot start, at any target. 1,000 users at 19/min is ~53 minutes, which a two-hour soak can
-    absorb; the ten-minute baseline and calibration pay the same startup for a shorter measurement.
-  - Verify: a unit test drives `signInAll` with 1,000 fake users against a stub that returns `429`
-    the moment it sees more than 20 attempts inside any 60-second window, and asserts the run
-    completes with 1,000 sessions and no `LoadAuthRateLimitedError`. `pnpm ci:local` green.
-  - Do **not** solve this by raising the app's limit. `'/sign-in/email': { window: 60, max: 20 }` is
-    a literal in `better-auth.ts`, so raising it means a code change and a redeploy, and it removes
-    a real brute-force guard from a public site for the length of the window. Pacing costs only
-    time and touches nothing a user relies on.
-  - Why this task exists: `load-testing.md` said the operator picks "paced startup, or the limit
-    raised for the window", and on 2026-08-14 neither lever turned out to exist. `signInAll` takes
-    `baseUrl`, `users`, `concurrency`, `timeoutMs` and `onProgress` — `concurrency` bounds
-    parallelism, not rate — and the app-side cap is not configurable. Documented, never implemented.
+  - Do: Add `mintSessions()` beside `signInAll`. For each fixture user: a token from
+    `generateRandomString`, one `auth_sessions` row (`id`, `user_id`, `token`, `expires_at`,
+    `active_organization_id`) written through the existing `insertBatched`, and the cookie value
+    `${token}.${signature}` where the signature comes from `makeSignature` — both helpers exported
+    by `better-auth/crypto`, which `seed.ts` already imports for `hashPassword`. Using the
+    library's own primitives is the point: the signature cannot drift from what better-auth
+    verifies. Have the runner call this instead of `signInAll` for the 1,000-user profile.
+  - **Learn the cookie name, do not hardcode it.** No `cookiePrefix`/`useSecureCookies` is
+    configured, so the name is better-auth's default and an upgrade could move it. Do **one** real
+    sign-in first — one request is far under 20/min — read the name off its `set-cookie`, and
+    assert the minted signature for that same session matches the real one byte for byte. That
+    turns "I reproduced the format correctly" into something each run re-proves, and it is where a
+    silent break would otherwise surface as every route 401-ing.
+  - Verify: a unit test mints 1,000 sessions against a disposable database and asserts 1,000
+    `auth_sessions` rows and 1,000 distinct cookies; an e2e test replays one minted cookie against
+    an authenticated route and asserts 200 plus the right `active_organization_id`. `pnpm ci:local`
+    green.
+  - Needs `BETTER_AUTH_SECRET` (already optional in `env.ts`) and the load database URL, both of
+    which the harness has. Refuse with a clear message rather than minting unsigned cookies if the
+    secret is absent.
+  - **Records a real trade-off**: the run no longer exercises `/sign-in/email`. That is acceptable
+    and deliberate — `spec.md` says "Rate limiting is not part of the capacity fix", and sign-in is
+    startup, not the workload being measured. It is a decision, not a detail, and it belongs in the
+    certification report.
+  - Why this task exists: `better-auth.ts` caps `/sign-in/email` at 20/min/IP, every virtual user
+    comes from one host, and `signInAll` aborts at the first `429` by design — so a 1,000-user run
+    could not start, at any target. `load-testing.md` said the operator picks "paced startup, or the
+    limit raised for the window"; on 2026-08-14 neither lever existed (`signInAll` has no rate
+    parameter, and the cap is a literal, not configuration). Pacing would have worked and cost ~53
+    minutes of every run. Minting is less code, costs seconds, and touches no protection at all.
 
 - [ ] **Let the soak set its duration without silently dropping its own thresholds**
   - Files: `scripts/load/runner.ts`, `scripts/load/config.ts`,
@@ -133,19 +145,20 @@
 
 - [ ] **Run and record the direct 10-minute baseline**
   - Files: `docs/operations/load-baseline-<date>.md`
-  - Do: Run the production image and disposable fixture directly against PostgreSQL **on
-    production** with 1,000 users for 10 minutes, inside the approved window (see the spec's
-    2026-08-14 note). Preserve raw JSON as an artifact even if the app/database fails; record
-    commit, image, hardware, offered/achieved RPS, latency, status codes, connections, resource
-    use, and failure time.
+  - Do: Run the production image directly against PostgreSQL **on the production instance**, with
+    the fixture in a disposable `builderhunt_load_test_*` database, 1,000 users for 10 minutes,
+    inside the approved window (see the spec's 2026-08-14 note). Preserve raw JSON as an artifact
+    even if the app/database fails; record commit, image, hardware, offered/achieved RPS, latency,
+    status codes, connections, resource use, and failure time.
   - Verify: the Markdown report links an immutable raw-artifact id, contains every success metric,
     identifies `pool_mode=direct`, and passes `pnpm exec prettier --check
 docs/operations/load-baseline-<date>.md`.
-  - Operator: this now runs against production. Fresh backup, named owner, agreed window, and
-    explicit confirmation first — `safety.ts` refuses without `LOAD_TARGET_PRODUCTION` and
-    `LOAD_FIXTURE_PASSWORD`, and that refusal is not to be worked around. Record the `LOAD_RUN_ID`
-    before starting: `pnpm load:cleanup` is scoped to it and is the only thing that removes the
-    thousand fixture accounts from a public site.
+  - Operator: this runs on the production host with the app repointed at a disposable
+    `builderhunt_load_test_*` database for the window. Fresh backup, named owner, agreed window and
+    explicit confirmation first. `LOAD_DISPOSABLE_DATABASE=true` is what allows a non-loopback host;
+    the name prefix and production-marker refusals in `safety.ts` still apply on top and are not to
+    be worked around. Repointing the app is five runtime URLs and a redeploy, and the same five back
+    afterwards — `DATABASE_MIGRATION_URL` never moves.
 
 ## Phase 2 — Bounded application pools
 
@@ -308,8 +321,9 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     never exceed 80 pooled backends or 120 PostgreSQL connections.
   - Verify: the report links an immutable raw artifact, identifies `pool_mode=transaction`, includes
     every threshold and direct-baseline delta, and records pass/fail without hiding failed routes.
-  - Operator: starting the 1,000-user calibration against production requires the same explicit
-    confirmation, sentinels and run-id bookkeeping as the baseline.
+  - Operator: starting the 1,000-user calibration requires the same explicit confirmation and the
+    same disposable-database discipline as the baseline. Reuse the same load database rather than
+    reseeding, so the calibration and the baseline compare the same rows.
 
 - [x] **Add a dedicated CI load smoke**
   - Files: `.github/workflows/load-smoke.yml`, `package.json`, `scripts/load/smoke.ts`
@@ -404,15 +418,17 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
 
 - [ ] **Run the two-hour certification against production**
   - Files: `docs/operations/load-certification-<date>.md`
-  - Do: In the approved window, run the paced sign-in, then two-minute ramp plus two hours at 1,000
-    authenticated users through PgBouncer against production. Preserve raw artifacts, note any
-    aborted interval, and evaluate every success criterion exactly as defined in `spec.md`.
+  - Do: In the approved window, mint the 1,000 sessions, then two-minute ramp plus two hours
+    through PgBouncer on the production host against the disposable load database. Preserve raw
+    artifacts, note any aborted interval, and evaluate every success criterion exactly as defined
+    in `spec.md`.
   - Verify: the report links immutable raw artifacts, records 120 complete steady-state minutes,
     includes every threshold and host/pool/database peak, and marks the overall result `pass`. Any
     missed threshold leaves this task open.
   - Operator: sustained 1,000-user traffic against a public site is an outward-facing action;
     obtain explicit confirmation immediately before the run, and take a fresh backup first.
-    Depends on the paced sign-in task above — without it the run aborts in the first minute.
+    Depends on the session-minting task above — without it the run aborts in its first minute on
+    the sign-in limiter.
 
 - [ ] **Roll out PgBouncer to production after certification**
   - Files: `docs/operations/load-certification-<date>.md`,
@@ -442,8 +458,9 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     smoke, and the certification is one of the four runs excluded from this branch by agreement (the
     10-minute direct baseline, the pooled calibration, the two-hour soak, and the production rollout).
   - **Amended 2026-08-14.** This note used to end "what remains is an isolated host, a window and an
-    approval, not code". Two thirds of that is now wrong. The host is no longer needed — the target is
-    production — and it is *not* true that no code remains: nothing in the harness can pace the
-    fixture sign-in under the 20-per-minute limiter, so a 1,000-user run aborts in its first minute
-    at any target. That is the first open task in Phase 1 above. What remains is one small harness
-    change, a window and an approval.
+    approval, not code". Two thirds of that is now wrong. The host is no longer needed — the target
+    is the production instance with the fixture in a disposable database — and it is *not* true that
+    no code remains. Two harness gaps, both found before any run was attempted and both now the first
+    two open tasks in Phase 1 above: nothing can obtain 1,000 sessions under the sign-in limiter, and
+    `--seconds` silently drops the offered-rate threshold it is supposed to certify. What remains is
+    those two changes, a window and an approval.
