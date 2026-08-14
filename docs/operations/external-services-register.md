@@ -239,7 +239,8 @@ independent confirmation of the delivery test.
 
 Two things that check turned up, neither of them about a hostname:
 
-- **The scheduled tasks do not exist.** `GET /applications/{uuid}/scheduled-tasks` returns `[]`, and
+- **The scheduled tasks did not exist, and creating them was not enough.** `GET
+  /applications/{uuid}/scheduled-tasks` returned `[]`, and
   `/api/status` reports `uptime30d: null`, which `src/routes/api/status/index.ts` documents as the
   "no history" case — no `status_checks` row has been written in 30 days. So the every-5-minute
   snapshot and the hourly Devpost worker in [`deploy-runbook.md`](./deploy-runbook.md) are
@@ -247,6 +248,20 @@ Two things that check turned up, neither of them about a hostname:
   missing except a scheduler. The public `/status` page therefore advertises an uptime figure that
   has never been measured. Same class of defect as the Stripe endpoint above — documented as
   configured, never configured — and again invisible to every gate.
+
+  Two tasks were created on 2026-08-14 (`status-snapshot`, `*/5 * * * *`; `devpost-worker`,
+  `0 * * * *`), both against the main container rather than a named one, both invoking `node -e` with
+  `fetch` because `node:22-bookworm-slim` does not guarantee `curl`, both reading `CRON_SECRET` from
+  the environment rather than carrying it in the command text, and both targeting `127.0.0.1:3000` —
+  `isTrustedMutationOrigin` returns true when there is no cookie, so a cron is not refused for
+  lacking an `Origin`.
+
+  **They still do not run.** Forty minutes and eight five-minute windows later, `/api/status` still
+  reports `uptime30d: null`. The routes are not the problem — both answer `401` to an unauthenticated
+  POST, so they exist and their auth works. Whether Coolify never fires them or fires them into a
+  failing command is undiagnosed, and needs the scheduled task's execution log in the Coolify UI or
+  shell access to the host. Do not mark this fixed on the strength of the tasks existing: their
+  existence is what was already assumed and was already false.
 - **`BETTER_AUTH_URL` is not set in Coolify, and does not need to be.** `better-auth.ts` passes
   `baseURL: env.APP_URL`, and `env.ts` does not declare `BETTER_AUTH_URL` at all, so nothing reads
   it. The cutover checklist's "change all three together" is really "change the two that exist".

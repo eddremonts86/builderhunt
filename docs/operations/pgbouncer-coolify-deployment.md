@@ -57,7 +57,25 @@ difference:
 SHOW max_connections;   -- must print 120
 ```
 
-## Step 1 — create the pooler service
+## Step 1 — create the pooler service — ✅ done 2026-08-14
+
+The resource exists: **`builderhunt-pgbouncer`**, uuid `p7lvq0qmuic48d1ojmgb6bsu`, in project
+`builderhunt` / environment `production`, on the `coolify` network. It reports `running:healthy`,
+which means the image's healthcheck (`pg_isready -h 127.0.0.1 -p 6432`) succeeded — PgBouncer
+started and is listening.
+
+The six secrets are set. They were copied from the application's production `DATABASE_*_URL` rows
+through the Coolify API, never rendered anywhere, and verified by comparing SHA-256 prefixes of what
+was written against what reads back. `PGBOUNCER_ADMIN_PASSWORD` was generated fresh.
+
+**What `running:healthy` does not prove**: that the five application roles can authenticate through
+it. `pg_isready` speaks to PgBouncer's own admin database, not to PostgreSQL as `builderhunt_app`.
+That is exactly what Step 2's preflight is for, and it has not run — 6432 is private to the Coolify
+network, so it must be run from inside it.
+
+The rest of this section is kept as the record of how it was created.
+
+### The original instructions
 
 A **separate Docker Compose resource on the `coolify` network**, not a container beside the app.
 Nothing about it is published; the app reaches it by service name.
