@@ -5,7 +5,9 @@
 > [`03-postgres-18-upgrade`](../../implemented/phase-1/03-postgres-18-upgrade/spec.md)
 > **Blocks**: nothing
 > **Reality check**: existing rate limiting is not work for this plan. The executable path is load
-> evidence, one pool per role, role-level timeouts, PgBouncer, and a two-hour isolated soak.
+> evidence, one pool per role, role-level timeouts, PgBouncer, and a two-hour soak against
+> production. (The soak was specified against an isolated host until 2026-08-14; see the spec's
+> note for why the decision moved.)
 
 ## Phase 0 — Reproducible workload
 
@@ -86,17 +88,77 @@
 
 ## Phase 1 — Direct baseline
 
+- [ ] **Mint fixture sessions in the database instead of signing 1,000 users in**
+  - Files: `scripts/load/auth.ts`, `scripts/load/seed.ts`, `scripts/load/runner.ts`,
+    `tests/unit/scripts/load/auth.test.ts`, `docs/operations/load-testing.md`
+  - Do: Add `mintSessions()` beside `signInAll`. For each fixture user: a token from
+    `generateRandomString`, one `auth_sessions` row (`id`, `user_id`, `token`, `expires_at`,
+    `active_organization_id`) written through the existing `insertBatched`, and the cookie value
+    `${token}.${signature}` where the signature comes from `makeSignature` — both helpers exported
+    by `better-auth/crypto`, which `seed.ts` already imports for `hashPassword`. Using the
+    library's own primitives is the point: the signature cannot drift from what better-auth
+    verifies. Have the runner call this instead of `signInAll` for the 1,000-user profile.
+  - **Learn the cookie name, do not hardcode it.** No `cookiePrefix`/`useSecureCookies` is
+    configured, so the name is better-auth's default and an upgrade could move it. Do **one** real
+    sign-in first — one request is far under 20/min — read the name off its `set-cookie`, and
+    assert the minted signature for that same session matches the real one byte for byte. That
+    turns "I reproduced the format correctly" into something each run re-proves, and it is where a
+    silent break would otherwise surface as every route 401-ing.
+  - Verify: a unit test mints 1,000 sessions against a disposable database and asserts 1,000
+    `auth_sessions` rows and 1,000 distinct cookies; an e2e test replays one minted cookie against
+    an authenticated route and asserts 200 plus the right `active_organization_id`. `pnpm ci:local`
+    green.
+  - Needs `BETTER_AUTH_SECRET` (already optional in `env.ts`) and the load database URL, both of
+    which the harness has. Refuse with a clear message rather than minting unsigned cookies if the
+    secret is absent.
+  - **Records a real trade-off**: the run no longer exercises `/sign-in/email`. That is acceptable
+    and deliberate — `spec.md` says "Rate limiting is not part of the capacity fix", and sign-in is
+    startup, not the workload being measured. It is a decision, not a detail, and it belongs in the
+    certification report.
+  - Why this task exists: `better-auth.ts` caps `/sign-in/email` at 20/min/IP, every virtual user
+    comes from one host, and `signInAll` aborts at the first `429` by design — so a 1,000-user run
+    could not start, at any target. `load-testing.md` said the operator picks "paced startup, or the
+    limit raised for the window"; on 2026-08-14 neither lever existed (`signInAll` has no rate
+    parameter, and the cap is a literal, not configuration). Pacing would have worked and cost ~53
+    minutes of every run. Minting is less code, costs seconds, and touches no protection at all.
+
+- [ ] **Let the soak set its duration without silently dropping its own thresholds**
+  - Files: `scripts/load/runner.ts`, `scripts/load/config.ts`,
+    `tests/unit/scripts/load/runner-config.test.ts`
+  - Do: Separate duration from profile. `--seconds` is the only way to ask for anything other than
+    600 steady seconds, and it currently also collapses `rampSeconds` to `min(ramp, 2)` and widens
+    `offeredRatePerSecond` to `{0, ∞}`. Run the two-hour soak with `--seconds=7200` today and it
+    reports a two-second ramp and **no offered-rate check at all** — the spec lists 400–500 req/s as
+    a success criterion, so the report would read `pass` without having evaluated one of them.
+  - The widening is right for `--users` and wrong for `--seconds`: the offered rate is derived as
+    `users / (thinkTime + averageJitter)`, so changing the user count does invalidate the window,
+    while changing the duration does not. 1,000 users offer the same rate for two hours as for ten
+    minutes. Keep the widening keyed on `--users` alone, and keep the configured ramp unless a flag
+    explicitly asks otherwise.
+  - Verify: unit tests assert that `--seconds=7200` alone yields `rampSeconds: 120` and the
+    unmodified `offeredRatePerSecond` window, that `--users=25` still widens it, and that
+    `--smoke` is unchanged. `pnpm ci:local` green.
+  - Why this task exists: `config.ts` states the contract as "the two-hour soak overrides
+    `steadySeconds`; nothing else about the contract changes between stages". The only mechanism
+    that overrides it changes two other things. Found 2026-08-14 while writing the certification
+    runbook, before any run had been attempted.
+
 - [ ] **Run and record the direct 10-minute baseline**
   - Files: `docs/operations/load-baseline-<date>.md`
-  - Do: Run the production image and disposable fixture directly against PostgreSQL on the
-    production-sized isolated host with 1,000 users for 10 minutes. Preserve raw JSON as an
-    artifact even if the app/database fails; record commit, image, hardware, offered/achieved RPS,
-    latency, status codes, connections, resource use, and failure time.
+  - Do: Run the production image directly against PostgreSQL **on the production instance**, with
+    the fixture in a disposable `builderhunt_load_test_*` database, 1,000 users for 10 minutes,
+    inside the approved window (see the spec's 2026-08-14 note). Preserve raw JSON as an artifact
+    even if the app/database fails; record commit, image, hardware, offered/achieved RPS, latency,
+    status codes, connections, resource use, and failure time.
   - Verify: the Markdown report links an immutable raw-artifact id, contains every success metric,
     identifies `pool_mode=direct`, and passes `pnpm exec prettier --check
 docs/operations/load-baseline-<date>.md`.
-  - Operator: provisioning or using the isolated 4-vCPU/8-GB ARM64 host and starting 1,000-user
-    traffic are cost-bearing actions; obtain explicit confirmation first.
+  - Operator: this runs on the production host with the app repointed at a disposable
+    `builderhunt_load_test_*` database for the window. Fresh backup, named owner, agreed window and
+    explicit confirmation first. `LOAD_DISPOSABLE_DATABASE=true` is what allows a non-loopback host;
+    the name prefix and production-marker refusals in `safety.ts` still apply on top and are not to
+    be worked around. Repointing the app is five runtime URLs and a redeploy, and the same five back
+    afterwards — `DATABASE_MIGRATION_URL` never moves.
 
 ## Phase 2 — Bounded application pools
 
@@ -252,14 +314,16 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
 
 - [ ] **Run the pooled 10-minute calibration**
   - Files: `docs/operations/load-calibration-<date>.md`
-  - Do: Repeat the baseline workload and host with only the runtime URLs changed to PgBouncer.
+  - Do: Repeat the baseline workload on the same host (production) with only the runtime URLs
+    changed to PgBouncer.
     Compare offered/achieved RPS, latency, status codes, PgBouncer waits, PostgreSQL backends, and
     host saturation. Update the spec budget if calibration lowers or otherwise changes a default;
     never exceed 80 pooled backends or 120 PostgreSQL connections.
   - Verify: the report links an immutable raw artifact, identifies `pool_mode=transaction`, includes
     every threshold and direct-baseline delta, and records pass/fail without hiding failed routes.
-  - Operator: starting the 1,000-user calibration on the isolated host requires the same explicit
-    confirmation as the baseline.
+  - Operator: starting the 1,000-user calibration requires the same explicit confirmation and the
+    same disposable-database discipline as the baseline. Reuse the same load database rather than
+    reseeding, so the calibration and the baseline compare the same rows.
 
 - [x] **Add a dedicated CI load smoke**
   - Files: `.github/workflows/load-smoke.yml`, `package.json`, `scripts/load/smoke.ts`
@@ -334,8 +398,9 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     migration URL, healthcheck, preflight, low-rate smoke, metrics, stop conditions, and direct-URL
     rollback. State that generated auth files live only in tmpfs and that production load requires
     explicit approval.
-  - Verify: a redacted dry run of the documented preflight passes on the isolated environment;
-    `pnpm deploy:preflight`, `pnpm type-check`, and `pnpm ci:local` are green.
+  - Verify: a redacted dry run of the documented preflight passes against the pooler deployed on
+    production's Coolify private network; `pnpm deploy:preflight`, `pnpm type-check`, and
+    `pnpm ci:local` are green.
   - Written: `docs/operations/load-testing.md` (new — the harness, how to read a report without being
     misled, the three safety refusals, the sign-in ceiling, the connection budget, the local pooled
     topology, the Coolify rollout order, metrics with stop conditions, rollback, and what the harness
@@ -343,22 +408,27 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     operator is already looking; two sections in `database-roles.md` — role settings are not inherited
     through membership, and the transaction-local GUC the tenant boundary rests on under a pooler; and
     the six pooler secrets plus five pool caps in `.env.production.example`.
-  - **Not done: the redacted dry run on the isolated environment.** There is no isolated environment
-    provisioned — standing it up is one of the cost-bearing steps excluded from this branch by
-    agreement. The documented preflight *was* run for real against the local pooled topology (13/13),
-    which is the same script and the same assertions against a different host.
+  - **Not done: the redacted dry run against the real pooler.** Originally this waited on an
+    isolated environment nobody had provisioned. Since 2026-08-14 the target is production's own
+    Coolify private network, so the blocker is no longer procurement — it is that the pooler service
+    has not been deployed there yet, which is step 1 of the rollout task below. The documented
+    preflight *was* run for real against the local pooled topology (13/13): the same script and the
+    same assertions against a different host.
   - Result: `pnpm deploy:preflight` passed, `git diff --check` clean, `check-env-fidelity` 0 gaps.
 
-- [ ] **Run the isolated two-hour certification**
+- [ ] **Run the two-hour certification against production**
   - Files: `docs/operations/load-certification-<date>.md`
-  - Do: On the approved 4-vCPU/8-GB ARM64 environment, run two-minute ramp plus two hours at 1,000
-    authenticated users through PgBouncer. Preserve raw artifacts, note any aborted interval, and
-    evaluate every success criterion exactly as defined in `spec.md`.
+  - Do: In the approved window, mint the 1,000 sessions, then two-minute ramp plus two hours
+    through PgBouncer on the production host against the disposable load database. Preserve raw
+    artifacts, note any aborted interval, and evaluate every success criterion exactly as defined
+    in `spec.md`.
   - Verify: the report links immutable raw artifacts, records 120 complete steady-state minutes,
     includes every threshold and host/pool/database peak, and marks the overall result `pass`. Any
     missed threshold leaves this task open.
-  - Operator: provisioning the host and starting sustained traffic are cost-bearing/outward actions;
-    obtain explicit confirmation immediately before the run.
+  - Operator: sustained 1,000-user traffic against a public site is an outward-facing action;
+    obtain explicit confirmation immediately before the run, and take a fresh backup first.
+    Depends on the session-minting task above — without it the run aborts in its first minute on
+    the sign-in limiter.
 
 - [ ] **Roll out PgBouncer to production after certification**
   - Files: `docs/operations/load-certification-<date>.md`,
@@ -385,7 +455,12 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
   - Verify: `pnpm plans:check-order`, `pnpm plans:check-tasks`, `pnpm ci:local`, and
     `git diff --check` pass; no unchecked task remains and the certification report says `pass`.
   - **Deliberately still open.** This task's own Do line forbids closing from the calibration or the CI
-    smoke, and the certification is one of the four cost-bearing runs excluded from this branch by
-    agreement (the 10-minute direct baseline, the pooled calibration, the two-hour soak, and the
-    production rollout). Everything the certification needs is built and exercised at smoke scale; what
-    remains is an isolated host, a window and an approval, not code.
+    smoke, and the certification is one of the four runs excluded from this branch by agreement (the
+    10-minute direct baseline, the pooled calibration, the two-hour soak, and the production rollout).
+  - **Amended 2026-08-14.** This note used to end "what remains is an isolated host, a window and an
+    approval, not code". Two thirds of that is now wrong. The host is no longer needed — the target
+    is the production instance with the fixture in a disposable database — and it is *not* true that
+    no code remains. Two harness gaps, both found before any run was attempted and both now the first
+    two open tasks in Phase 1 above: nothing can obtain 1,000 sessions under the sign-in limiter, and
+    `--seconds` silently drops the offered-rate threshold it is supposed to certify. What remains is
+    those two changes, a window and an approval.

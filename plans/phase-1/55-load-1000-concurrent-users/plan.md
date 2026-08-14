@@ -124,9 +124,29 @@ Document the exact Coolify service, private-network host names, role-secret inje
 and rollback. Repoint only the five runtime role URLs; keep the migration URL direct. Run deploy
 preflight, auth smoke, RLS/API-isolation checks, and a low-rate route smoke before any load.
 
-The two-hour load runs against an isolated 4-vCPU/8-GB ARM64 environment, not the customer-facing
-production app. Provisioning that environment and starting the load are outward/cost-bearing
-operator actions and require confirmation.
+**Changed 2026-08-14.** This paragraph read "the two-hour load runs against an isolated
+4-vCPU/8-GB ARM64 environment, not the customer-facing production app". Both halves moved.
+
+The load now runs on the **production host, pooler and PostgreSQL instance**, for the reason
+[`docs/operations/load-testing.md`](../../../docs/operations/load-testing.md) gives: the real
+Coolify private network, the real pooler and the real host only exist there, and a box somewhere
+else measures a different system.
+
+The fixture, however, goes in a **disposable `builderhunt_load_test_*` database on that instance**,
+and the app is repointed at it for the window. Nothing being certified changes — same CPU, disk,
+pooler and instance-wide `max_connections` — but the fixture never enters `builderhunt`, and
+cleanup is a `DROP DATABASE` rather than deleting a thousand rows from the live one. The hazard
+this plan worried about, an aborted run leaving a thousand accounts that share one password on a
+public site, stops being a step somebody has to remember and becomes impossible by construction.
+
+What still rests on beta is the *window itself*: for a few hours the live site serves the load
+fixture and answers under saturation. That is defensible with no real users and expires the day
+there are some. Re-read this before any run once the product has users.
+
+Starting sustained 1,000-user traffic against a public site is an outward-facing operator action
+and requires confirmation immediately before the run, plus a verified-restorable backup of
+`builderhunt` — the load never writes to it, but the app is redeployed twice and PostgreSQL is
+restarted for `max_connections`.
 
 Only after certification passes, roll out PgBouncer as a dark healthy Coolify service, lower the
 production resource to `max_connections=120` during an approved restart window, repoint the five

@@ -198,6 +198,17 @@ Coolify private network, the real pooler and the real host only exist there, and
 measures a different system. During beta there are no real users and the database is expendable, which is
 what makes it defensible.
 
+> **Refined 2026-08-14 — the certification does not use the sentinel below.** "Against production" turned
+> out to mean the *host, pooler and PostgreSQL instance*, not the `builderhunt` database. The fixture goes
+> in a disposable `builderhunt_load_test_*` database on that same instance, with the app repointed at it
+> for the window, so the certification never targets the production database and
+> `LOAD_TARGET_PRODUCTION` is never set. It needs `LOAD_DISPOSABLE_DATABASE=true` alone — the name-prefix
+> and production-marker refusals still stand on top of it. See *The certification window, step by step*.
+>
+> The rest of this section still applies to the case it was written for: deliberately pointing the fixture
+> at the production database itself. Nothing in the plan now does that, and the paragraph below on a
+> thousand live logins is the reason the arrangement changed.
+
 It is still not something a script should be able to do by accident, so the guard takes **two** deliberate
 variables and refuses without either:
 
@@ -227,8 +238,40 @@ LOAD_DATABASE_URL=… LOAD_RUN_ID=load-<stamp>-<suffix> pnpm load:cleanup
 `/sign-in/email` allows 20 per minute per IP. A thousand virtual users signing in from one machine therefore
 needs about 53 minutes of paced startup, or the limit raised for the window. Raising it on a public site
 removes a real brute-force guard, so the paced option is the one that costs nothing but time — and a
-two-hour soak can afford an hour of ramp-in. Either way it is an operator decision with a window, not
-something the runner should choose.
+two-hour soak can afford an hour of ramp-in.
+
+> ⛔ **Neither lever exists, as of 2026-08-14 — and the fix is to stop needing them.** This section used
+> to end "either way it is an operator decision with a window", which assumed two knobs and there are
+> none.
+>
+> - **Pacing is not implemented.** Sign-in is a *separate phase before* the ramp, so
+>   `stages.rampSeconds` does not govern it — that only staggers when already-authenticated sessions
+>   begin issuing requests. `signInAll` takes `baseUrl`, `users`, `concurrency`, `timeoutMs` and
+>   `onProgress`; `concurrency` bounds parallelism, not rate. `runner.ts` calls it with a hardcoded
+>   `SIGN_IN_CONCURRENCY = 8` and no delay, so eight workers exhaust 20/minute in seconds and
+>   `signInAll` aborts at the first `429` — deliberately, because continuing would produce a run with
+>   an arbitrary subset of users.
+> - **Raising the cap is not configuration.** `'/sign-in/email': { window: 60, max: 20 }` is a literal
+>   in `better-auth.ts`, not read from the environment, so that route needs a code change and a
+>   redeploy of the app whose capacity is being measured.
+>
+> So a 1,000-user run cannot start today, against any target.
+>
+> **The chosen fix is neither lever: mint the sessions instead of earning them.** `auth_sessions` is
+> a flat table (`id`, `user_id`, `token`, `expires_at`, `active_organization_id`), the cookie is
+> `${token}.${signature}` — `tests/e2e/auth-and-sessions.spec.ts` documents that format while
+> expiring a session by its token — and `better-auth/crypto` exports both `generateRandomString` and
+> `makeSignature`, so the harness can build a valid cookie with the library's own primitives rather
+> than a reimplementation that could drift. Sign-in stops being a rate-limited phase at all: 53
+> minutes per run becomes seconds, and no protection is touched.
+>
+> The cost is that a run no longer exercises `/sign-in/email`, which is acceptable because this spec
+> already says rate limiting is not part of the capacity fix and sign-in is startup, not the measured
+> workload. It is a decision, and it belongs in the certification report.
+>
+> The first open task in Phase 1 of
+> [`plans/phase-1/55-load-1000-concurrent-users/tasks.md`](../../plans/phase-1/55-load-1000-concurrent-users/tasks.md)
+> implements it. Until it lands, the runbook below stops at its first command.
 
 ### Production load runs still require explicit approval
 
@@ -236,6 +279,82 @@ A load run against production is a deliberate, approved act with a named owner a
 troubleshooting step. `safety.ts` refuses a production marker in a URL, and that refusal is not to be
 worked around — the fixtures write a thousand users and the cleanup deletes rows. See
 [`deploy-runbook.md`](./deploy-runbook.md) for how release-time decisions are recorded.
+
+### The certification window, step by step
+
+Written 2026-08-14 for the operator running
+[`plans/phase-1/55-load-1000-concurrent-users`](../../plans/phase-1/55-load-1000-concurrent-users/tasks.md)
+to completion. **It does not run today** — the two harness tasks at the top of that plan's Phase 1
+have to land first. Everything below is the order once they have.
+
+Budget about three hours: sessions are minted rather than signed in, so startup is seconds, not the
+53 minutes an earlier draft of this section budgeted. Ten minutes each for baseline and calibration,
+two hours of soak, and the repointing either side.
+
+**The fixture never touches `builderhunt`.** It lives in a throwaway database on the same PostgreSQL
+instance, and the app is repointed at it for the window. Everything being certified is unchanged —
+same host, same CPU and disk, same pooler, same instance-wide `max_connections`, and the
+`* = host=…` wildcard in `pgbouncer.ini` already forwards whatever database a client asks for. What
+changes is that cleanup is a `DROP DATABASE`, so an aborted run cannot leave a thousand accounts
+sharing one password on the live site.
+
+**Before the window**
+
+1. Fresh database backup of `builderhunt`, verified restorable — not just taken.
+   `host-maintenance.md` has the restore drill. The load never writes to it, but the app is being
+   redeployed twice and PostgreSQL is being restarted for `max_connections`.
+2. Agree the window and name its owner. This is the approval `safety.ts` refuses without.
+3. Create the load database on the production instance and migrate it to head. The name **must**
+   start with `builderhunt_load_test` — that prefix is one of the three refusals, not a convention.
+4. Environment. `LOAD_DISPOSABLE_DATABASE=true` is what permits a non-loopback host; the name-prefix
+   and production-marker refusals still apply on top of it.
+   ```bash
+   export LOAD_DISPOSABLE_DATABASE=true
+   export LOAD_FIXTURE_PASSWORD="$(openssl rand -hex 24)"   # never reuse, never the repo default
+   export LOAD_BASE_URL=https://builderhunt.dev
+   ```
+5. Seed, and keep the run id and manifest path:
+   ```bash
+   LOAD_DATABASE_URL=postgresql://…/builderhunt_load_test_1 pnpm load:seed
+   ```
+6. Repoint the app's five runtime role URLs at the load database and redeploy.
+   `DATABASE_MIGRATION_URL` stays on `builderhunt`, direct on 5432.
+
+**The three runs**
+
+| # | Stage | Command | Reads |
+|---|---|---|---|
+| 1 | Baseline | `LOAD_MANIFEST=… pnpm load:test:baseline` | `pool_mode=direct`, 10 min |
+| 2 | Deploy the pooler, then calibrate | rollout steps 1–2 above, then `pnpm load:pooler:preflight`, then the runner with `--pooled` | `pool_mode=transaction`, 10 min |
+| 3 | Soak | the runner with `--pooled` and the two-hour duration | 120 complete steady minutes |
+
+Between 1 and 2, follow *The order, and the one URL that must not move* above. `DATABASE_MIGRATION_URL`
+stays direct on 5432 through all of it.
+
+**Watch these, and stop if any trips**
+
+The table under *Metrics to watch, and stop conditions* is the live list. The two that end a run
+immediately rather than being noted: any `prepared statement … does not exist` in the app logs
+(`prepare: false` has regressed), and any SQLSTATE 53300.
+
+**Rollback**, at any point: point the five runtime URLs back at `builderhunt` on 5432 and redeploy.
+That single step both leaves the pooler and abandons the load database, so it is also the abort
+procedure — there is no ordering to get wrong under pressure. The pooler holds no state the app
+needs and no schema changed.
+
+**After the window, in this order**
+
+1. **Repoint the app back at `builderhunt` and redeploy first**, before anything else. Until that
+   lands, the live site is serving the load fixture.
+2. Drop the load database. That is the cleanup — `pnpm load:cleanup` exists for the case where the
+   fixture shares a database with other rows, which is exactly the case this arrangement removes.
+   Then confirm no `builderhunt_load_test%` database remains: a thousand accounts sharing one
+   password is an access problem, and one left behind on the production instance is still reachable
+   by anything that can reach that instance.
+3. Write the report to `docs/operations/load-certification-<date>.md` with the raw artifact id, and
+   state in it that sessions were minted rather than signed in, so `/sign-in/email` was not part of
+   the measured workload. A missed threshold leaves the plan task open. Do not close the plan from
+   the calibration.
 
 ## What this harness does not cover
 
