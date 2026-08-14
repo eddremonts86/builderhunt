@@ -84,9 +84,21 @@ from one host. A 1,000-user startup therefore hits that wall by design, and the 
 `aborted` report quoting the limit rather than a `fail` — `aborted` says the run proved nothing, while
 `fail` would say the product cannot do this, which is untrue.
 
-A run at that size needs the limit raised **on the disposable load host, by whoever owns it**. That is
-an operator decision about a throwaway environment. Do not raise it to make a test pass: the CI smoke
-runs 15 users for exactly this reason.
+**A run at that size does not sign in** (since 2026-08-14). Set `LOAD_SESSION_DATABASE_URL` — or just
+`LOAD_DATABASE_URL`, which the runner falls back to — and it mints the sessions instead: one batched
+insert into `auth_sessions`, cookies signed with better-auth's own `makeSignature`, and exactly one
+real `/sign-in/email` call to learn the cookie's name and prove the signing. Startup goes from ~53
+minutes of paced traffic to seconds, and the limiter is never approached.
+
+Everything above still describes what happens **without** that variable, which is the smoke's path and
+the honest one: 15 users, signed in for real, well inside the limit. Do not raise the app's cap to make
+a test pass — it is a literal in `better-auth.ts`, so raising it is a code change and a redeploy, and
+on a public site it removes a real brute-force guard for the length of the window.
+
+What minting costs: the run no longer exercises `/sign-in/email`, so the report's header says so and
+`sessionOrigin` records it in the JSON. `spec.md` already excludes rate limiting from the capacity fix
+and sign-in is startup rather than the measured workload — but a reader comparing two runs has to be
+able to see that one of them skipped a code path the other exercised.
 
 ### 4. The connection budget
 
@@ -269,9 +281,12 @@ two-hour soak can afford an hour of ramp-in.
 > already says rate limiting is not part of the capacity fix and sign-in is startup, not the measured
 > workload. It is a decision, and it belongs in the certification report.
 >
-> The first open task in Phase 1 of
-> [`plans/phase-1/55-load-1000-concurrent-users/tasks.md`](../../plans/phase-1/55-load-1000-concurrent-users/tasks.md)
-> implements it. Until it lands, the runbook below stops at its first command.
+> **Implemented 2026-08-14.** `mintSessions` is in `auth.ts`; the runner mints whenever
+> `LOAD_SESSION_DATABASE_URL` (or `LOAD_DATABASE_URL`) is set and signs in otherwise, so the smoke's
+> honest sign-in path is unchanged. Two details worth knowing before reading the code: the signature is
+> **standard** base64, so the cookie is percent-encoded; and every run re-proves its own signing by
+> signing in once for real and comparing, because a silent format drift would otherwise present as every
+> route answering 401 two hours into a certification.
 
 ### Production load runs still require explicit approval
 
@@ -284,8 +299,8 @@ worked around — the fixtures write a thousand users and the cleanup deletes ro
 
 Written 2026-08-14 for the operator running
 [`plans/phase-1/55-load-1000-concurrent-users`](../../plans/phase-1/55-load-1000-concurrent-users/tasks.md)
-to completion. **It does not run today** — the two harness tasks at the top of that plan's Phase 1
-have to land first. Everything below is the order once they have.
+to completion. The two harness changes it depended on landed the same day, so this is runnable — what
+it still needs is a window, an approval and a named owner.
 
 Budget about three hours: sessions are minted rather than signed in, so startup is seconds, not the
 53 minutes an earlier draft of this section budgeted. Ten minutes each for baseline and calibration,
@@ -326,7 +341,11 @@ sharing one password on the live site.
 |---|---|---|---|
 | 1 | Baseline | `LOAD_MANIFEST=… pnpm load:test:baseline` | `pool_mode=direct`, 10 min |
 | 2 | Deploy the pooler, then calibrate | rollout steps 1–2 above, then `pnpm load:pooler:preflight`, then the runner with `--pooled` | `pool_mode=transaction`, 10 min |
-| 3 | Soak | the runner with `--pooled` and the two-hour duration | 120 complete steady minutes |
+| 3 | Soak | the runner with `--pooled --seconds=7200` | 120 complete steady minutes |
+
+`--seconds` sets the duration and nothing else. It used to also collapse the ramp and drop the
+offered-rate threshold, which would have made the soak's own report skip one of the criteria it exists
+to certify; `--ramp` is now the separate, deliberate way to shorten a ramp.
 
 Between 1 and 2, follow *The order, and the one URL that must not move* above. `DATABASE_MIGRATION_URL`
 stays direct on 5432 through all of it.

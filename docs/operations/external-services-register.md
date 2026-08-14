@@ -239,7 +239,8 @@ independent confirmation of the delivery test.
 
 Two things that check turned up, neither of them about a hostname:
 
-- **The scheduled tasks do not exist.** `GET /applications/{uuid}/scheduled-tasks` returns `[]`, and
+- **The scheduled tasks did not exist, and creating them was not enough.** `GET
+  /applications/{uuid}/scheduled-tasks` returned `[]`, and
   `/api/status` reports `uptime30d: null`, which `src/routes/api/status/index.ts` documents as the
   "no history" case — no `status_checks` row has been written in 30 days. So the every-5-minute
   snapshot and the hourly Devpost worker in [`deploy-runbook.md`](./deploy-runbook.md) are
@@ -247,6 +248,34 @@ Two things that check turned up, neither of them about a hostname:
   missing except a scheduler. The public `/status` page therefore advertises an uptime figure that
   has never been measured. Same class of defect as the Stripe endpoint above — documented as
   configured, never configured — and again invisible to every gate.
+
+  Two tasks were created on 2026-08-14 (`status-snapshot`, `*/5 * * * *`; `devpost-worker`,
+  `0 * * * *`), both against the main container rather than a named one, both invoking `node -e` with
+  `fetch` because `node:22-bookworm-slim` does not guarantee `curl`, both reading `CRON_SECRET` from
+  the environment rather than carrying it in the command text, and both targeting `127.0.0.1:3000` —
+  `isTrustedMutationOrigin` returns true when there is no cookie, so a cron is not refused for
+  lacking an `Origin`.
+
+  **Whether they fire is unverified, and `uptime30d: null` does not answer it.** An earlier version of
+  this paragraph claimed they "still do not run", on the strength of `/api/status` reporting
+  `uptime30d: null` forty minutes later. That reasoning was wrong.
+  `computeUptimeFromAggregate` returns `null` while the oldest sample is under 24 hours old — on
+  purpose, because "a percentage drawn from a handful of samples is misleading". The signal could not
+  have changed inside that window no matter how well the cron worked, and two rounds of diagnosis
+  (including setting `container` on both tasks) were spent on a measurement incapable of showing
+  otherwise.
+
+  What is established: the endpoint works. Called directly with `CRON_SECRET` it answered
+  `{"ok":true,"inserted":true,"pruned":0}` and wrote a row. Both routes also answer `401` to an
+  unauthenticated POST, so they exist and their auth is intact.
+
+  What is not: whether Coolify's scheduler invokes them. That is not observable from outside — the one
+  public signal is suppressed for 24 hours by design, and counting `status_checks` rows needs the
+  database, which is private. Two things settle it: the scheduled task's execution log in the Coolify
+  UI, which answers it in one click; or waiting, since `uptime30d` turns into a number 24 hours after
+  the first row if and only if samples have been accumulating. Until one of those, this is *unknown*,
+  not *broken* — and `uptime30d: null` on a system that just started measuring is the correct
+  behaviour, not a fault.
 - **`BETTER_AUTH_URL` is not set in Coolify, and does not need to be.** `better-auth.ts` passes
   `baseURL: env.APP_URL`, and `env.ts` does not declare `BETTER_AUTH_URL` at all, so nothing reads
   it. The cutover checklist's "change all three together" is really "change the two that exist".

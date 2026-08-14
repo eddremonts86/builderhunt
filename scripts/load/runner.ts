@@ -37,7 +37,7 @@ import {
   type LoadRoute,
 } from './config'
 import { LatencyHistogram } from './histogram'
-import { LoadAuthRateLimitedError, signInAll, type LoadSession } from './auth'
+import { LoadAuthRateLimitedError, mintSessions, probeSessionCookie, signInAll, type LoadSession } from './auth'
 import { startMonitor } from './monitor'
 import { buildLoadReport, renderLoadReportMarkdown, type ObservabilitySample, type RouteOutcome } from './report'
 import type { LoadFixtureManifest } from './seed'
@@ -124,6 +124,15 @@ export interface RunnerOptions {
   poolerAdminUrl?: string
   outputDirectory?: string
   log?: (message: string) => void
+  /**
+   * The load database, which turns startup from ~53 minutes of paced sign-ins into one batched insert.
+   *
+   * Supplied → sessions are minted (see `mintSessions`). Absent → every user signs in for real, which
+   * only fits a profile smaller than the 20-per-minute limiter, i.e. the smoke.
+   */
+  sessionDatabaseUrl?: string
+  /** `BETTER_AUTH_SECRET` of the app under test. Required alongside `sessionDatabaseUrl`. */
+  authSecret?: string
 }
 
 export interface RunnerResult {
@@ -164,17 +173,42 @@ export async function runLoadTest(options: RunnerOptions): Promise<RunnerResult>
   }
 
   let sessions: LoadSession[] = []
+  let sessionOrigin: 'signed-in' | 'minted' = 'signed-in'
   try {
-    log(`signing in ${wanted.length} users, ${SIGN_IN_CONCURRENCY} at a time`)
-    sessions = await signInAll({
-      baseUrl: options.baseUrl,
-      users: wanted,
-      concurrency: SIGN_IN_CONCURRENCY,
-      timeoutMs: config.requestTimeoutMs,
-      onProgress: (signedIn, total) => {
-        if (signedIn % 100 === 0 || signedIn === total) log(`  ${signedIn}/${total}`)
-      },
-    })
+    if (options.sessionDatabaseUrl) {
+      sessionOrigin = 'minted'
+      // One real sign-in, which is three things at once: it learns the cookie's name instead of
+      // hardcoding better-auth's default, it proves this harness signs the way the server does, and it
+      // is the only `/sign-in/email` request the run makes — comfortably inside the limiter.
+      log('probing the session cookie with one real sign-in')
+      const shape = await probeSessionCookie({
+        baseUrl: options.baseUrl,
+        email: wanted[0]!.email,
+        timeoutMs: config.requestTimeoutMs,
+      })
+      log(`minting ${wanted.length} sessions (cookie ${shape.name})`)
+      sessions = await mintSessions({
+        databaseUrl: options.sessionDatabaseUrl,
+        users: wanted,
+        secret: options.authSecret ?? '',
+        cookie: shape,
+        runId: manifest.runId,
+        onProgress: (minted, total) => {
+          if (minted % 500 === 0 || minted === total) log(`  ${minted}/${total}`)
+        },
+      })
+    } else {
+      log(`signing in ${wanted.length} users, ${SIGN_IN_CONCURRENCY} at a time`)
+      sessions = await signInAll({
+        baseUrl: options.baseUrl,
+        users: wanted,
+        concurrency: SIGN_IN_CONCURRENCY,
+        timeoutMs: config.requestTimeoutMs,
+        onProgress: (signedIn, total) => {
+          if (signedIn % 100 === 0 || signedIn === total) log(`  ${signedIn}/${total}`)
+        },
+      })
+    }
   } catch (error) {
     if (error instanceof LoadAuthRateLimitedError) abortedReason = error.message
     else throw error
@@ -339,6 +373,7 @@ export async function runLoadTest(options: RunnerOptions): Promise<RunnerResult>
     routes,
     samples,
     abortedReason,
+    sessionOrigin,
   })
 
   await mkdir(outputDirectory, { recursive: true })
@@ -371,23 +406,45 @@ function flag(argv: readonly string[], name: string): string | undefined {
   return argv.find((entry) => entry.startsWith(prefix))?.slice(prefix.length)
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  const argv = process.argv.slice(2)
-  const base = configFromArgv(argv)
+/**
+ * Applies `--users`, `--seconds` and `--ramp` to a base profile.
+ *
+ * Exported for the tests, because the interaction here is exactly the kind that passes review and then
+ * silently invalidates a two-hour run.
+ *
+ * **`--seconds` no longer touches anything but the duration** (fixed 2026-08-14). It used to collapse
+ * `rampSeconds` to `min(ramp, 2)` and widen `offeredRatePerSecond` to `{0, ∞}` alongside `--users`, so
+ * the certification's own `--seconds=7200` would have reported a two-second ramp and skipped the
+ * 400–500 req/s criterion the spec lists — while still printing `pass`. `config.ts` meanwhile stated
+ * the contract as "the two-hour soak overrides `steadySeconds`; nothing else about the contract changes
+ * between stages", which was true of the intent and false of the code.
+ *
+ * The widening is still right for `--users`: the offered rate is derived as
+ * `users / (thinkTime + averageJitter)`, so a different user count genuinely invalidates the declared
+ * window. A different *duration* does not — 1,000 users offer the same rate for two hours as for ten
+ * minutes. `--ramp` exists so a short manual run can still skip the two-minute ramp on purpose, which is
+ * the one legitimate need the old coupling was serving.
+ */
+export function configFromFlags(base: LoadConfig, argv: readonly string[]): LoadConfig {
   const users = flag(argv, 'users')
   const seconds = flag(argv, 'seconds')
-  const config: LoadConfig = {
+  const ramp = flag(argv, 'ramp')
+  return {
     ...base,
     users: users ? Number(users) : base.users,
-    stages: seconds
-      ? { rampSeconds: Math.min(base.stages.rampSeconds, 2), steadySeconds: Number(seconds) }
-      : base.stages,
-    // An explicit `--users`/`--seconds` makes the offered-rate window meaningless: it is derived from the
-    // thousand-user profile. Widened rather than dropped, so the check still appears and still reports.
-    thresholds: users || seconds
+    stages: {
+      rampSeconds: ramp ? Number(ramp) : base.stages.rampSeconds,
+      steadySeconds: seconds ? Number(seconds) : base.stages.steadySeconds,
+    },
+    thresholds: users
       ? { ...base.thresholds, offeredRatePerSecond: { min: 0, max: Number.POSITIVE_INFINITY } }
       : base.thresholds,
   }
+}
+
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  const argv = process.argv.slice(2)
+  const config = configFromFlags(configFromArgv(argv), argv)
 
   const manifestFile = flag(argv, 'manifest') ?? process.env.LOAD_MANIFEST
   if (!manifestFile) {
@@ -402,6 +459,11 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
     poolMode: argv.includes('--pooled') ? 'transaction' : 'direct',
     monitorDatabaseUrl: process.env.LOAD_MONITOR_DATABASE_URL,
     poolerAdminUrl: process.env.LOAD_PGBOUNCER_ADMIN_URL,
+    // Opt-in, and opt-in *by supplying the database* rather than by a boolean: minting needs a
+    // connection to the load fixture's own database, so there is no way to ask for it without having
+    // said which database, and no way to point it at the application's by accident.
+    sessionDatabaseUrl: process.env.LOAD_SESSION_DATABASE_URL ?? process.env.LOAD_DATABASE_URL,
+    authSecret: process.env.BETTER_AUTH_SECRET,
   })
     .then((result) => process.exit(result.exitCode))
     .catch((error: unknown) => {
