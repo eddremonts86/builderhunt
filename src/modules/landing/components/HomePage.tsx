@@ -7,6 +7,7 @@ import {
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
+import { SegmentSelector } from '~/modules/landing/components/SegmentSelector'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
 export interface HomePageProps {
@@ -145,6 +146,23 @@ export function HomePage({ isAuthed }: HomePageProps) {
             </div>
           </div>
         </section>
+
+        {/*
+          The three segment routes, in their own band (plan: phase-2/06-landing-segmentada).
+
+          Below the hero rather than inside it: the hero documents a cap of four text elements plus
+          one primary and one secondary CTA (§4.7), and three more links would break it. Its own band
+          also means nothing above moves, so every visual baseline of the hero is unchanged.
+
+          Offered, never required. The main message answers on its own and somebody who does not want
+          to classify themselves never has to — a landing that made people choose before showing them
+          anything would turn an optional question into a toll.
+        */}
+        <section className="container py-8" aria-labelledby="segment-routes">
+          <h2 id="segment-routes" className="sr-only">Start with what brings you here</h2>
+          <SegmentSelector heading="Or start with what brings you here" />
+        </section>
+
 
         {/* ───────────────────── SOCIAL PROOF ───────────────────── */}
         <section className="border-y border-bh-border bg-bh-bg-alt/30 py-8 overflow-hidden">
