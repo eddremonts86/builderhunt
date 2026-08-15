@@ -9,9 +9,9 @@
  * The segment comes from `user_preferences`, never from the request. That is what makes the route
  * a property of the person rather than of whatever the client last claimed.
  */
-import { and, eq } from 'drizzle-orm'
+import { and, count, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import type { TenantTransaction } from './db/client'
-import { onboardingProgress } from './db/schema'
+import { alerts, builderClaims, feedCapabilities, onboardingProgress, savedQueries } from './db/schema'
 import { getUserPreferences } from './repositories/user-preferences'
 import { resolveSegmentPreset, type SegmentPreset } from './user-segments'
 import {
@@ -95,6 +95,77 @@ export async function getOnboardingV2State(
     skipped: row.skipped,
     skippedCount: row.skippedCount,
     completed: row.completed,
+  }
+}
+
+/**
+ * Counts what the person has actually done (plan: phase-2/03-onboarding-segmentado).
+ *
+ * Every number here is a row, read on the server. The route used to derive
+ * `savedSearchesWithAlert` from "does a saved query exist" — which was the same fact as
+ * `trackedBuilders` wearing a different name, and would have recorded an investing activation for
+ * somebody whose search nobody was watching.
+ *
+ * ## Armed means armed
+ *
+ * A saved search counts once something delivers it. That is an `alerts` row on the paid path and a
+ * minted feed capability on the free one, because a brand-new organization is on `free` and
+ * `/api/alerts` answers 402 there — counting only alerts would have made this route's activation
+ * rate a measure of conversion to Pro rather than of the route.
+ *
+ * ## Why attribution is per user
+ *
+ * A saved search belongs to the organization, but an activation belongs to a person. Both counts are
+ * narrowed to rows this user created, so a teammate arming a search does not mark somebody else as
+ * activated. `feed_capabilities` has no author column, so the attribution comes from the saved query
+ * it points at.
+ *
+ * `trackedBuilders` is passed in rather than re-counted: v1 already reads
+ * `onboarding_selected_builders` for its own status, and a second count here could disagree with it.
+ */
+export async function countActivationEvidence(
+  transaction: TenantTransaction,
+  organizationId: string,
+  userId: string,
+  trackedBuilders: number,
+): Promise<ActivationEvidence> {
+  const [[alertRow], [feedRow], [claimRow]] = await Promise.all([
+    transaction
+      .select({ value: count() })
+      .from(alerts)
+      .where(and(
+        eq(alerts.organizationId, organizationId),
+        eq(alerts.userId, userId),
+        isNotNull(alerts.queryId),
+        eq(alerts.enabled, true),
+      )),
+    transaction
+      .select({ value: count() })
+      .from(feedCapabilities)
+      .innerJoin(savedQueries, eq(feedCapabilities.queryId, savedQueries.id))
+      .where(and(
+        eq(feedCapabilities.organizationId, organizationId),
+        eq(savedQueries.userId, userId),
+        isNull(feedCapabilities.revokedAt),
+      )),
+    transaction
+      .select({ value: count() })
+      .from(builderClaims)
+      .where(and(
+        eq(builderClaims.subjectUserId, userId),
+        // Pending counts. The spec asks for "claim verified, or — if verification is asynchronous —
+        // claim started with a clear next step", and this product's verification is asynchronous.
+        inArray(builderClaims.status, ['pending', 'verified']),
+      )),
+  ])
+
+  return {
+    trackedBuilders,
+    // No sourcing sprint is created anywhere in onboarding, so reporting one would be inventing
+    // evidence. `hiring` activates on tracked builders instead; this stays 0 until a step creates one.
+    sourcingSprints: 0,
+    savedSearchesWithAlert: (alertRow?.value ?? 0) + (feedRow?.value ?? 0),
+    builderClaims: claimRow?.value ?? 0,
   }
 }
 
@@ -182,10 +253,33 @@ export async function recordActivation(
   const reached = activationReached(state.preset, evidence)
   if (!reached) return null
 
+  /**
+   * An upsert, not an update.
+   *
+   * A route can activate somebody who has no `onboarding_progress` row at all: the investing branch
+   * arms a saved search straight from the goal step, and nothing before it has written a step. An
+   * `UPDATE` there matched zero rows and reported success — the activation simply vanished, which
+   * an e2e caught on its first run.
+   *
+   * The `if (state.activationType)` guard above still makes this write-once, so the conflict branch
+   * can only be reached by a row that has never been activated.
+   */
   await transaction
-    .update(onboardingProgress)
-    .set({ activationType: reached, activationRefId: refId, activatedAt: now, updatedAt: now })
-    .where(and(eq(onboardingProgress.userId, userId), eq(onboardingProgress.organizationId, organizationId)))
+    .insert(onboardingProgress)
+    .values({
+      userId,
+      organizationId,
+      step: 0,
+      activationType: reached,
+      activationRefId: refId,
+      activatedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [onboardingProgress.userId],
+      set: { activationType: reached, activationRefId: refId, activatedAt: now, updatedAt: now },
+    })
 
   return reached
 }

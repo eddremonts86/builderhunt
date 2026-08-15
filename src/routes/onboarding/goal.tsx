@@ -5,10 +5,12 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button } from '~/components/ui'
 import { parseSegmentHint } from '~/shared/lib/landing-segment-hint'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
+import { entryRouteFor } from '~/shared/lib/onboarding-shared'
 import {
   SEGMENT_SCOPE_NOTICE,
   USER_SEGMENT_COPY,
   USER_SEGMENTS,
+  resolveSegmentPreset,
   type UserSegment,
 } from '~/shared/lib/user-segments'
 
@@ -85,7 +87,9 @@ function GoalStep() {
             segment: { previous: null, next: null, source: 'onboarding' },
           })
         }
-        await navigate({ to: '/onboarding/search' })
+        // The route follows the answer. Declining, or a segment whose branch does not exist yet,
+        // lands on the general search flow — the one v1 already had, which never blocks anybody.
+        await navigate({ to: entryRouteFor(resolveSegmentPreset(segment)) })
       } catch {
         setError('We could not save that. You can continue and set it later in your account.')
         setSaving(false)

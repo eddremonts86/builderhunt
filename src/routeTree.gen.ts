@@ -32,6 +32,7 @@ import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
 import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
 import { Route as OnboardingGoalRouteImport } from './routes/onboarding/goal'
+import { Route as OnboardingInvestingRouteImport } from './routes/onboarding/investing'
 import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
 import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
@@ -420,6 +421,11 @@ const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
 const OnboardingGoalRoute = OnboardingGoalRouteImport.update({
   id: '/goal',
   path: '/goal',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingInvestingRoute = OnboardingInvestingRouteImport.update({
+  id: '/investing',
+  path: '/investing',
   getParentRoute: () => OnboardingRouteRoute,
 } as any)
 const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
@@ -1951,6 +1957,7 @@ export interface FileRoutesByFullPath {
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2249,6 +2256,7 @@ export interface FileRoutesByTo {
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2549,6 +2557,7 @@ export interface FileRoutesById {
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2851,6 +2860,7 @@ export interface FileRouteTypes {
     | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3149,6 +3159,7 @@ export interface FileRouteTypes {
     | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3448,6 +3459,7 @@ export interface FileRouteTypes {
     | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -4087,6 +4099,13 @@ declare module '@tanstack/react-router' {
       path: '/goal'
       fullPath: '/onboarding/goal'
       preLoaderRoute: typeof OnboardingGoalRouteImport
+      parentRoute: typeof OnboardingRouteRoute
+    }
+    '/onboarding/investing': {
+      id: '/onboarding/investing'
+      path: '/investing'
+      fullPath: '/onboarding/investing'
+      preLoaderRoute: typeof OnboardingInvestingRouteImport
       parentRoute: typeof OnboardingRouteRoute
     }
     '/onboarding/save': {
@@ -6203,6 +6222,7 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 
 interface OnboardingRouteRouteChildren {
   OnboardingGoalRoute: typeof OnboardingGoalRoute
+  OnboardingInvestingRoute: typeof OnboardingInvestingRoute
   OnboardingSaveRoute: typeof OnboardingSaveRoute
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
@@ -6211,6 +6231,7 @@ interface OnboardingRouteRouteChildren {
 
 const OnboardingRouteRouteChildren: OnboardingRouteRouteChildren = {
   OnboardingGoalRoute: OnboardingGoalRoute,
+  OnboardingInvestingRoute: OnboardingInvestingRoute,
   OnboardingSaveRoute: OnboardingSaveRoute,
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,

@@ -108,3 +108,91 @@ export function starterQueriesFor(preset: SegmentPreset): readonly string[] {
 export function searchStepCopyFor(preset: SegmentPreset): OnboardingStepCopy {
   return SEARCH_STEP_COPY[preset] ?? SEARCH_STEP_COPY.general
 }
+
+/**
+ * The light thesis an investing route starts from (plan: phase-2/03-onboarding-segmentado).
+ *
+ * Themes, not a questionnaire. The spec asks for "technologies, industry or type of builder", and
+ * the honest way to collect that in one step is a handful of chips that expand into search keywords
+ * the product already understands — every keyword here is the kind of term the connectors index.
+ *
+ * Deliberately no sector taxonomy, no cheque size and no stage. The product models people and what
+ * they ship; asking for a fund's parameters would imply it does something with them.
+ */
+export interface ThesisTheme {
+  id: string
+  label: string
+  keywords: readonly string[]
+}
+
+export const INVESTING_THESIS_THEMES: readonly ThesisTheme[] = [
+  { id: 'ai-infrastructure', label: 'AI infrastructure', keywords: ['ai agents', 'llm infrastructure'] },
+  { id: 'developer-tools', label: 'Developer tools', keywords: ['developer tools', 'sdk'] },
+  { id: 'open-source', label: 'Open source', keywords: ['open source maintainer'] },
+  { id: 'climate', label: 'Climate tech', keywords: ['climate tech', 'energy'] },
+  { id: 'fintech', label: 'Fintech', keywords: ['fintech', 'payments'] },
+  { id: 'security', label: 'Security', keywords: ['security', 'cryptography'] },
+  { id: 'robotics', label: 'Robotics and hardware', keywords: ['robotics', 'embedded'] },
+  { id: 'health', label: 'Health tech', keywords: ['health tech', 'bioinformatics'] },
+] as const
+
+/**
+ * The longest thesis that may travel in a URL.
+ *
+ * `onboarding/search` caps its own prefill at 300 characters, and composing past that here would
+ * produce a query that silently arrives truncated — a saved search whose name does not match what
+ * the person selected. Capped at the source instead, on a keyword boundary.
+ */
+const MAX_THESIS_LENGTH = 300
+
+/**
+ * Turns the selected themes and any free text into one search string.
+ *
+ * Free text goes first: somebody who typed something specific meant it more than the chip they also
+ * tapped. Duplicates are dropped case-insensitively so picking two overlapping themes does not
+ * produce a query that searches the same term twice, and the result is capped on a keyword boundary
+ * rather than mid-word.
+ */
+export function composeThesisQuery(themeIds: readonly string[], freeText = ''): string {
+  const parts: string[] = []
+  const seen = new Set<string>()
+  const push = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    parts.push(trimmed)
+  }
+
+  push(freeText)
+  for (const id of themeIds) {
+    const theme = INVESTING_THESIS_THEMES.find((candidate) => candidate.id === id)
+    if (!theme) continue
+    for (const keyword of theme.keywords) push(keyword)
+  }
+
+  const kept: string[] = []
+  for (const part of parts) {
+    const candidate = kept.length === 0 ? part : `${kept.join(', ')}, ${part}`
+    if (candidate.length > MAX_THESIS_LENGTH) break
+    kept.push(part)
+  }
+  return kept.join(', ')
+}
+
+/** The keywords a saved search is created with — the same list, unjoined. */
+export function thesisKeywords(themeIds: readonly string[], freeText = ''): string[] {
+  const composed = composeThesisQuery(themeIds, freeText)
+  return composed ? composed.split(', ') : []
+}
+
+/**
+ * Where the goal step sends somebody once they have answered.
+ *
+ * `building` is not here yet — its route lands with the next task, and pointing at it before it
+ * exists would send anybody who picks it to a 404 rather than to the general flow that works.
+ */
+export function entryRouteFor(preset: SegmentPreset): '/onboarding/investing' | '/onboarding/search' {
+  return preset === 'investing' ? '/onboarding/investing' : '/onboarding/search'
+}

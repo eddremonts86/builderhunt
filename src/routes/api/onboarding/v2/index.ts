@@ -5,6 +5,7 @@ import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getOnboardingStatus } from '~/shared/lib/onboarding'
 import {
   advanceOnboarding,
+  countActivationEvidence,
   getOnboardingV2State,
   recordActivation,
   toStatusV2,
@@ -84,16 +85,17 @@ export const Route = createFileRoute('/api/onboarding/v2/')({
                * trustworthy — would be the first casualty.
                */
               const v1 = await getOnboardingStatus(tx, principal.organizationId, principal.userId)
+              const evidence = await countActivationEvidence(
+                tx,
+                principal.organizationId,
+                principal.userId,
+                v1.firstBuilderIds.length,
+              )
               await recordActivation(
                 tx,
                 principal.organizationId,
                 principal.userId,
-                {
-                  trackedBuilders: v1.firstBuilderIds.length,
-                  sourcingSprints: 0,
-                  savedSearchesWithAlert: v1.firstQueryId ? 1 : 0,
-                  builderClaims: 0,
-                },
+                evidence,
                 action.refId ?? null,
               )
               const state = await getOnboardingV2State(tx, principal.organizationId, principal.userId)

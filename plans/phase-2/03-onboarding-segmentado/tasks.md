@@ -109,10 +109,33 @@
     la activación por la API con evidencia real en la base; el paso por la UI de búsqueda depende de
     resultados de proveedores externos y sería una prueba que falla por motivos ajenos al plan.
 
-- [ ] **Implementar rama investing**
+- [x] **Implementar rama investing**
   - Files: `src/routes/onboarding/investing.tsx`, `src/shared/lib/onboarding-shared.ts`
   - Do: configurar tema y crear saved query/alert usando APIs existentes.
   - Verify: e2e confirma recurso tenant-scoped y no promete deal-flow inexistente.
+  - Result: `src/routes/onboarding/investing.tsx`, `src/shared/lib/onboarding-investing.ts` (16 tests),
+    la composición de tesis en `onboarding-shared.ts` y `tests/e2e/onboarding-investing.spec.ts`
+    (8 specs). `goal.tsx` ya enruta por `entryRouteFor`, así que elegir `investing` lleva a su rama y
+    todo lo demás sigue en el flujo general.
+  - **Armar no es guardar.** La activación del spec es "primera búsqueda guardada con alerta/radar",
+    y las alertas son de pago: `/api/alerts` responde 402 sin `paidActionsAllowed` y una organización
+    recién creada está en `free`. Dejarlo ahí habría hecho que esta rama solo pudiera activar a quien
+    ya había pagado, y su tasa de activación mediría la conversión a Pro y no la ruta. Así que armar
+    tiene dos formas reales — alerta en el camino de pago, capacidad de feed (RSS privado, sin gate)
+    en el gratuito — y la pantalla dice cuál de las dos ocurrió. `none` también es un resultado: una
+    búsqueda que nadie va a entregar no se anuncia como si sí.
+  - **La evidencia se cuenta, ya no se infiere.** `countActivationEvidence` lee filas:
+    alertas con `query_id` y habilitadas, capacidades de feed no revocadas, y claims en `pending` o
+    `verified`. La ruta derivaba `savedSearchesWithAlert` de "existe una saved query", que era el
+    mismo hecho que `trackedBuilders` con otro nombre y habría activado a alguien cuya búsqueda no
+    miraba nadie. La atribución es por persona aunque el recurso sea de la organización: sin eso, un
+    compañero armando una búsqueda marcaría como activado a todo el equipo.
+  - Encontrado por su propio e2e: `recordActivation` era un `UPDATE`, y esta rama activa a alguien
+    que todavía no tiene fila en `onboarding_progress` — arma la búsqueda directamente desde el paso
+    de objetivo. El UPDATE afectaba a cero filas y reportaba éxito; la activación desaparecía. Ahora
+    es un upsert, y el guardia de "no sobreescribir" sigue haciéndolo de una sola vez.
+  - **No cubierto**: el paso v2 (`current_step_key`) no lo escribe todavía ninguna pantalla, así que
+    el funnel por step key aún no tiene datos. Es trabajo de la tarea de instrumentación, no de esta.
 
 - [ ] **Implementar rama building**
   - Files: `src/routes/onboarding/building.tsx`, `src/routes/onboarding/success.tsx`
