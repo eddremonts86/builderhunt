@@ -54,6 +54,28 @@ export const SHIPPED_DASHBOARD_CAPABILITIES: readonly DashboardCapability[] = [
   'source-coverage',
 ]
 
+/**
+ * Which route to compose for, given the stored segment and whether presets are on.
+ *
+ * A function rather than an inline ternary because the flag cannot be tested in both positions end
+ * to end: `env` is frozen at module load and the e2e harness caches one server per worker, so a
+ * spec cannot flip it between tests. Here both positions are two lines of a unit test, and the e2e
+ * proves the wiring with it on.
+ *
+ * Off means `general` for everybody, whatever they chose. The segment itself still travels — it is
+ * their own answer and already readable from their settings, and blanking it would make the flag
+ * look like data loss.
+ */
+export function resolveDashboardPresetId(
+  segment: string | null | undefined,
+  presetsEnabled: boolean,
+): (typeof SEGMENT_PRESETS)[number] {
+  if (!presetsEnabled || !segment) return 'general'
+  return (SEGMENT_PRESETS as readonly string[]).includes(segment)
+    ? (segment as (typeof SEGMENT_PRESETS)[number])
+    : 'general'
+}
+
 export const dashboardContextSchema = z.object({
   /** What the person chose. `null` is the common case and is not a failure. */
   segment: userSegmentSchema.nullable(),

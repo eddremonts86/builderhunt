@@ -24,7 +24,7 @@ test.beforeAll(async () => {
   test.setTimeout(300_000)
   harness = await startInterviewHarness({
     scope: 'dashpre',
-    flags: { USER_SEGMENTATION_ENABLED: 'true' },
+    flags: { USER_SEGMENTATION_ENABLED: 'true', DASHBOARD_PRESETS_ENABLED: 'true' },
   })
   await harness.sql`
     insert into user_consents (id, user_id, document, version)
@@ -222,4 +222,32 @@ test('the empty state fits a phone @mobile-only', async ({ page }) => {
   const viewportWidth = page.viewportSize()?.width ?? 0
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth)
   expect(scrollWidth).toBeLessThanOrEqual(viewportWidth + 1)
+})
+
+/**
+ * One widget failing must not take the dashboard with it (plan spec: "un widget fallido no tumba el
+ * dashboard"). Intercepting `/api/queries` is safe here because the saved-searches list is a plain
+ * `fetch` in the page rather than a TanStack Query endpoint — interception on one of those hangs
+ * rather than failing, which cost an hour and a revert once already.
+ */
+test('a failing widget does not take the page down', async ({ page }) => {
+  await setSegment('investing')
+  await page.route('**/api/queries', (route) => route.fulfill({
+    status: 500,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: 'boom' }),
+  }))
+
+  try {
+    await openDashboard(page)
+
+    // The page still settles, and the rest of the widgets are still there.
+    const order = await widgetOrder(page)
+    expect(order.length).toBeGreaterThan(3)
+    expect(order).toContain('activity')
+    // And the route's own empty state is unaffected — it reads a different source entirely.
+    await expect(page.getByTestId('dashboard-empty-cta')).toHaveAttribute('data-preset', 'investing')
+  } finally {
+    await page.unroute('**/api/queries')
+  }
 })

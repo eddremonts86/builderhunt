@@ -4,9 +4,10 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getUserPreferences } from '~/shared/lib/repositories/user-preferences'
 import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
-import { resolveSegmentPreset } from '~/shared/lib/user-segments'
+import { env } from '~/shared/lib/env'
 import {
   SHIPPED_DASHBOARD_CAPABILITIES,
+  resolveDashboardPresetId,
   type DashboardContext,
 } from '~/shared/lib/dashboard-api'
 
@@ -47,9 +48,21 @@ export const Route = createFileRoute('/api/dashboard/context')({
               getOrganizationEntitlement(transaction, principal.organizationId),
             ])
 
+            /*
+             * The kill switch, enforced here and nowhere else.
+             *
+             * Off answers `general` whatever the stored segment says, so turning the feature off is
+             * one environment variable and a restart rather than a deploy — and the client has no
+             * branch of its own that could disagree with it.
+             *
+             * `segment` still travels: it is the person's own answer, it is already readable from
+             * their settings, and blanking it here would make the flag look like data loss.
+             */
+            const presetsEnabled = env.DASHBOARD_PRESETS_ENABLED === 'true'
+
             const context: DashboardContext = {
               segment: preferences.primarySegment,
-              presetId: resolveSegmentPreset(preferences.primarySegment),
+              presetId: resolveDashboardPresetId(preferences.primarySegment, presetsEnabled),
               role: principal.role,
               capabilities: [...SHIPPED_DASHBOARD_CAPABILITIES],
               entitlement: {

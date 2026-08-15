@@ -118,7 +118,29 @@
   - Cubierto por tres specs: cambiar de segmento conserva el layout guardado, vaciarlo restaura la
     ruta, y un widget que la ruta esconde sigue siendo restaurable.
 
-- [ ] **Medir rendimiento y rollout**
+- [~] **Medir rendimiento y rollout**
   - Files: `scripts/check-performance-budgets.mjs`, `.env.example`, `docs/operations/personalized-dashboard-rollout.md`
   - Do: eventos por widget y flag para preset general/segmentado.
   - Verify: Lighthouse budgets, E2E settle signal y smoke con widget fallido.
+  - Hecho: `DASHBOARD_PRESETS_ENABLED` (off por defecto),
+    [`docs/operations/personalized-dashboard-rollout.md`](../../../docs/operations/personalized-dashboard-rollout.md),
+    el settle signal ampliado, el smoke con un widget caído, y los budgets de Lighthouse verdes
+    dentro de `ci:local`.
+  - **El flag se aplica en `/api/dashboard/context` y en ningún otro sitio**, así que apagarlo es una
+    variable y un reinicio, y el navegador no tiene una rama propia que pueda desincronizarse. Es un
+    booleano y no un porcentaje: en un dashboard nadie está a mitad de un flujo.
+  - La decisión se extrajo a `resolveDashboardPresetId`, una función pura, porque el flag **no se
+    puede probar en las dos posiciones por e2e**: `env` se congela al cargar el módulo y el harness
+    cachea un servidor por worker. Las dos posiciones son ahora dos líneas de un unitario.
+  - `scripts/check-performance-budgets.mjs` no se tocó: mide tamaños de imagen, y un preset no añade
+    ninguna petición — dieciséis de veintiún widgets leen secciones de un único `overview`, y los
+    cinco que piden por su cuenta lo hacen al montar, ocupen la posición que ocupen.
+  - **No hecho: los eventos por widget.** Impresión e interacción por widget son una superficie de
+    instrumentación de veintiún componentes, y lo que hay hoy es la telemetría propia de la cola de
+    acciones más el funnel de onboarding. Está escrito en el runbook con todas las letras: *no se
+    debe subir la rampa con la promesa de medirla*, porque decidir si una ruta es mejor que `general`
+    necesita los eventos primero. Es trabajo de su propio plan, no un remate de este.
+  - **Conocido**: la página pinta en orden general y reordena al llegar el contexto. Para una cuenta
+    en `general` — todas, hasta que esto se encienda — no hay reordenación ninguna; para una
+    segmentada hay una, y la alternativa era retrasar el primer pintado de todo el mundo detrás de
+    una lectura de preferencias.

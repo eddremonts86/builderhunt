@@ -26,7 +26,7 @@ test.beforeAll(async () => {
   harness = await startInterviewHarness({
     scope: 'dashctx',
     tier: 'free',
-    flags: { USER_SEGMENTATION_ENABLED: 'true' },
+    flags: { USER_SEGMENTATION_ENABLED: 'true', DASHBOARD_PRESETS_ENABLED: 'true' },
   })
   member = await createMemberPrincipal(harness.ctx, harness.organization.organizationId, 'member')
   harness.extraPrincipals.push(member)
