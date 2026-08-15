@@ -114,3 +114,15 @@ export function getClaimSourceAdapter(source: string): ClaimSourceAdapter | null
 export function isClaimSourceSupported(source: string): boolean {
   return source in CLAIM_SOURCE_ADAPTERS
 }
+
+/**
+ * The sources a claim can actually be proven on.
+ *
+ * Read by the onboarding lookup so it never offers an identity from a source where the claim would
+ * be refused as `unsupported` — an offer the product cannot honour is worse than no result. Derived
+ * from the registry rather than written down twice, so adding an adapter widens the lookup in the
+ * same commit.
+ */
+export function claimSupportedSources(): string[] {
+  return Object.keys(CLAIM_SOURCE_ADAPTERS)
+}

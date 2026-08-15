@@ -66,9 +66,14 @@ describe('composing a thesis', () => {
 })
 
 describe('where the goal step sends people', () => {
-  it('sends investing to its own route and everybody else to the general search', () => {
+  it('sends each branch to its own route and the rest to the general search', () => {
     expect(entryRouteFor('investing')).toBe('/onboarding/investing')
-    for (const preset of ONBOARDING_PRESETS.filter((candidate) => candidate !== 'investing')) {
+    expect(entryRouteFor('building')).toBe('/onboarding/building')
+    // `general`, `other` and `hiring` all start at the search step — hiring differs in what it
+    // suggests looking for, not in where it begins.
+    for (const preset of ONBOARDING_PRESETS.filter(
+      (candidate) => candidate !== 'investing' && candidate !== 'building',
+    )) {
       expect(entryRouteFor(preset)).toBe('/onboarding/search')
     }
   })

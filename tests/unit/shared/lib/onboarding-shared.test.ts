@@ -5,6 +5,7 @@ import {
   STARTER_QUERIES_BY_PRESET,
   searchStepCopyFor,
   starterQueriesFor,
+  successStepCopyFor,
 } from '~/shared/lib/onboarding-shared'
 import { ONBOARDING_PRESETS } from '~/shared/lib/onboarding-v2'
 
@@ -59,6 +60,44 @@ describe('the routes actually differ', () => {
   /** The v1 list is still what the general route uses; nobody's experience changed by default. */
   it('leaves the general route on the original queries', () => {
     expect(starterQueriesFor('general')).toEqual(STARTER_QUERIES)
+  })
+})
+
+/**
+ * The last screen (plan: phase-2/03-onboarding-segmentado).
+ *
+ * It used to tell everybody their radar was live, including somebody who had just claimed a profile
+ * and never saved a search. What is pinned here is that each route ends somewhere it can honestly
+ * end, and that none of them promises an outcome the product does not produce.
+ */
+describe('the success step', () => {
+  it.each(ONBOARDING_PRESETS)('%s has a heading, a body and a concrete next action', (preset) => {
+    const copy = successStepCopyFor(preset)
+    expect(copy.heading.length).toBeGreaterThan(0)
+    expect(copy.body.length).toBeGreaterThan(20)
+    expect(copy.next.length).toBeGreaterThanOrEqual(2)
+    expect(copy.primary.to).not.toBe(copy.secondary.to)
+  })
+
+  it('sends each route somewhere that matches what they just did', () => {
+    expect(successStepCopyFor('building').primary.to).toBe('/me')
+    expect(successStepCopyFor('investing').primary.to).toBe('/alerts')
+    expect(successStepCopyFor('hiring').primary.to).toBe('/dashboard')
+    expect(successStepCopyFor('general')).toEqual(successStepCopyFor('other'))
+  })
+
+  /**
+   * The spec forbids fabricating visits or opportunities, and forbids "deal flow" until the product
+   * models investment. A promise is the easiest thing to add to a success screen and the hardest to
+   * notice afterwards, so it is asserted rather than reviewed.
+   */
+  it('promises no outcome the product does not produce', () => {
+    const forbidden = /deal ?flow|opportunit|recruiters will|profile views|get noticed|guarantee/i
+    for (const preset of ONBOARDING_PRESETS) {
+      const copy = successStepCopyFor(preset)
+      const prose = [copy.heading, copy.body, ...copy.next].join(' ')
+      expect(prose, preset).not.toMatch(forbidden)
+    }
   })
 })
 

@@ -187,12 +187,95 @@ export function thesisKeywords(themeIds: readonly string[], freeText = ''): stri
   return composed ? composed.split(', ') : []
 }
 
+/** Where the goal step sends somebody once they have answered. */
+export function entryRouteFor(
+  preset: SegmentPreset,
+): '/onboarding/investing' | '/onboarding/building' | '/onboarding/search' {
+  if (preset === 'investing') return '/onboarding/investing'
+  if (preset === 'building') return '/onboarding/building'
+  return '/onboarding/search'
+}
+
+/** The routes the last onboarding step is allowed to send somebody to. */
+export type SuccessDestination = '/dashboard' | '/search' | '/alerts' | '/me'
+
+export interface SuccessStepCopy {
+  heading: string
+  body: string
+  next: readonly string[]
+  primary: { to: SuccessDestination; label: string }
+  secondary: { to: SuccessDestination; label: string }
+}
+
 /**
- * Where the goal step sends somebody once they have answered.
+ * The last screen, per route (plan: phase-2/03-onboarding-segmentado).
  *
- * `building` is not here yet — its route lands with the next task, and pointing at it before it
- * exists would send anybody who picks it to a 404 rather than to the general flow that works.
+ * The spec asks for "success with one concrete next action", and the concrete action is different
+ * for each route: a recruiter goes back to searching, an investor to the searches now watching for
+ * them, a builder to the profile they just claimed.
+ *
+ * Nothing here claims an outcome. "Your radar is live" is a statement about the product running;
+ * there is no promise of visits, opportunities or deal flow, because the product does not produce
+ * any of those on its own and saying so would be the fabrication the spec forbids by name.
  */
-export function entryRouteFor(preset: SegmentPreset): '/onboarding/investing' | '/onboarding/search' {
-  return preset === 'investing' ? '/onboarding/investing' : '/onboarding/search'
+export const SUCCESS_STEP_COPY: Record<SegmentPreset, SuccessStepCopy> = {
+  general: {
+    heading: 'Your radar is live',
+    body: 'Fresh picks land in your dashboard, and your saved searches keep running.',
+    next: [
+      'Your "For you" section starts filling in today',
+      'Save a search from any result to add another radar',
+      'Search your own handle to find and claim your profile',
+    ],
+    primary: { to: '/dashboard', label: 'Go to dashboard' },
+    secondary: { to: '/search', label: 'Run another search' },
+  },
+  other: {
+    heading: 'Your radar is live',
+    body: 'Fresh picks land in your dashboard, and your saved searches keep running.',
+    next: [
+      'Your "For you" section starts filling in today',
+      'Save a search from any result to add another radar',
+      'Search your own handle to find and claim your profile',
+    ],
+    primary: { to: '/dashboard', label: 'Go to dashboard' },
+    secondary: { to: '/search', label: 'Run another search' },
+  },
+  hiring: {
+    heading: 'Your shortlist has started',
+    body: 'The builders you saved are tracked, and the search that found them keeps running.',
+    next: [
+      'Your saved builders are on the dashboard, with what they ship',
+      'Save a search from any result to widen the shortlist',
+      'Turn a search into an alert to hear about new matches',
+    ],
+    primary: { to: '/dashboard', label: 'Go to dashboard' },
+    secondary: { to: '/search', label: 'Search for more people' },
+  },
+  investing: {
+    heading: 'Your thesis is running',
+    body: 'The search you saved keeps watching, and what it finds comes to you.',
+    next: [
+      'Your saved searches are on the dashboard with their latest results',
+      'Add another theme as a second search whenever you like',
+      'Track individual builders to follow what they ship',
+    ],
+    primary: { to: '/alerts', label: 'See what is watching' },
+    secondary: { to: '/dashboard', label: 'Go to dashboard' },
+  },
+  building: {
+    heading: 'The profile is yours',
+    body: 'It is linked to your account. What you add to it is what people see.',
+    next: [
+      'Add your topics and what you are open to, on your profile',
+      'Publish a portfolio page from the same place',
+      'Anything you do not fill in simply is not shown',
+    ],
+    primary: { to: '/me', label: 'Go to my profile' },
+    secondary: { to: '/dashboard', label: 'Go to dashboard' },
+  },
+}
+
+export function successStepCopyFor(preset: SegmentPreset): SuccessStepCopy {
+  return SUCCESS_STEP_COPY[preset] ?? SUCCESS_STEP_COPY.general
 }

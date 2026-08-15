@@ -137,10 +137,36 @@
   - **No cubierto**: el paso v2 (`current_step_key`) no lo escribe todavía ninguna pantalla, así que
     el funnel por step key aún no tiene datos. Es trabajo de la tarea de instrumentación, no de esta.
 
-- [ ] **Implementar rama building**
+- [x] **Implementar rama building**
   - Files: `src/routes/onboarding/building.tsx`, `src/routes/onboarding/success.tsx`
   - Do: localizar perfil y enlazar claim; soportar estado pendiente.
   - Verify: e2e claim found/not-found/pending y salida skippable.
+  - Result: `src/routes/onboarding/building.tsx`, `src/routes/api/builders/claim/candidates.ts`,
+    `findClaimCandidatesByHandle` y `tests/e2e/onboarding-building.spec.ts` (7 specs). Los tres
+    estados que el spec pide están cubiertos, y el skip está en la primera pantalla, antes de pedir
+    nada.
+  - **Pendiente es una pantalla, no un spinner.** La verificación es asíncrona por diseño: el
+    reclamante publica un challenge en la cuenta que reclama y el producto lo comprueba después. Así
+    que el estado pendiente enseña el challenge, dónde ponerlo y un botón para volver a comprobar —
+    "claim iniciado con siguiente paso claro", literalmente lo que pide el spec.
+  - **La activación se registra al abrir el claim, no al verificarlo.** Esperar a la verificación
+    haría que la tasa de activación de esta rama midiera con qué rapidez la gente se acuerda de
+    editar un perfil en otro sitio. `countActivationEvidence` ya cuenta `pending` y `verified`.
+  - **La búsqueda es por handle exacto.** Un prefijo sobre `builder_identities` sería un enumerador
+    de handles para cualquier cuenta autenticada: escribe una letra y te devuelve a todo el índice.
+    Quien busca su propia cuenta sabe cómo se escribe, así que la exactitud no le cuesta nada. Se
+    filtra además por `kind = 'person'`, por fuentes con adaptador de prueba, y por supresión — una
+    retirada de perfil que siguiera contestando "sí, esa persona está indexada" sería una retirada
+    solo de nombre.
+  - **"No encontrado" es una respuesta**, y no ofrece crear nada: el índice se construye de actividad
+    pública, y una fila inventada por este flujo sería un perfil que nadie puede probar.
+  - `success.tsx` dejó de contar una sola historia. Le decía a todo el mundo que su radar estaba
+    activo, incluido quien acababa de reclamar su perfil sin guardar ninguna búsqueda — una frase
+    simplemente falsa para esa persona. Ahora hay copy por ruta, con su acción concreta, y un test
+    unitario que rechaza promesas que el producto no cumple (`deal flow`, visitas, oportunidades).
+  - **No cubierto**: la llamada HTTP real a GitHub/GitLab/Codeberg/DEV. La bloquea el guardia de
+    egress bajo `E2E_MODE` y el challenge se acuña por claim, así que ningún perfil real puede
+    contenerlo — el seam de `claim-sources` la sustituye, igual que en `claimable-profiles.spec.ts`.
 
 - [ ] **Instrumentar y desplegar gradualmente**
   - Files: `src/shared/lib/conversion-events.ts`, `src/shared/lib/conversion-client.ts`, `src/routes/api/admin/metrics/conversion.ts`, `.env.example`, `docs/operations/segmented-onboarding-rollout.md`

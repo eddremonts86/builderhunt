@@ -108,9 +108,31 @@ test('changing the answer before confirming stores the second one', async ({ pag
   // does.
   await page.getByText('Building', { exact: true }).click()
   await page.getByRole('button', { name: /^continue/i }).click()
-  await page.waitForURL(/\/onboarding\/search/)
+  // The answer decides the route, so changing it changes where Continue leads.
+  await page.waitForURL(/\/onboarding\/building/)
 
   expect(await storedSegment()).toBe('building')
+})
+
+/**
+ * The step is only worth answering if the answer changes something. Each branch has its own entry
+ * route, and a segment whose branch is the general flow says so by landing on the search step.
+ */
+test('each answer leads to its own branch', async ({ page }) => {
+  for (const [label, path] of [
+    ['Investing or scouting', '/onboarding/investing'],
+    ['Building', '/onboarding/building'],
+    ['Hiring builders', '/onboarding/search'],
+    ['Something else', '/onboarding/search'],
+  ] as const) {
+    await harness.sql`delete from user_preferences where user_id = ${harness.owner.userId}`
+    await page.context().addCookies(harness.owner.storageState!.cookies)
+    await page.goto(`${harness.baseURL}/onboarding/goal`)
+
+    await page.getByText(label, { exact: true }).click()
+    await page.getByRole('button', { name: /^continue/i }).click()
+    await page.waitForURL(new RegExp(path.replace('/', '\\/')))
+  }
 })
 
 /** Declining is an answer the product accepts, and it must never block the flow. */

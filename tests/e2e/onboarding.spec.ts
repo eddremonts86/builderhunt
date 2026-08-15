@@ -410,7 +410,11 @@ test('full onboarding journey: welcome → starter query → three saves → suc
     await finish.click()
     await page.waitForURL(/\/onboarding\/success/)
     await expect(page.getByTestId('onboarding-success')).toBeVisible()
-    await expect(page.getByText('Your radar is live!')).toBeVisible()
+    // The general route's heading. The step is per-route since phase-2/03, so this asserts the
+    // preset it resolved to as well as the words — a segmented account reaching the general copy
+    // would be the failure worth catching here.
+    await expect(page.getByTestId('onboarding-success')).toHaveAttribute('data-preset', 'general')
+    await expect(page.getByTestId('onboarding-success-heading')).toHaveText('Your radar is live')
 
     // Server-side truth: completed + ineligible, the search was saved, and
     // exactly the three builders were tracked in the personal workspace.
