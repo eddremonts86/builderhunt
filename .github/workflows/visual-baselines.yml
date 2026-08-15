@@ -92,6 +92,13 @@ jobs:
       CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'true'
       ACCESS_ALLOWLIST_ENABLED: 'true'
       DEVPOST_ENABLED: 'true'
+      # The three /for/* segment pages and the home selector (plan: phase-2/06-landing-segmentada).
+      #
+      # On here rather than left to `playwright.config.ts`'s webServer pin, so a reader of this job
+      # can see which public surfaces the suite exercises. `segmented-landing.spec.ts` asserts on
+      # pages that do not exist with it off, and the *off* state has its own per-worker server —
+      # `segmented-landing-flag.spec.ts` sets it to 'false' through the harness.
+      SEGMENTED_LANDING_ENABLED: 'true'
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       STRIPE_BILLING_ENABLED: 'true'

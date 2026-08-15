@@ -1219,6 +1219,13 @@
       "when": 1786780677383,
       "tag": "0173_conversion_onboarding_funnel",
       "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1786795382089,
+      "tag": "0174_segmented_landing_funnel",
+      "breakpoints": true
     }
   ]
 }

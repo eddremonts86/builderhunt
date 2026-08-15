@@ -173,7 +173,30 @@
     así que "qué porcentaje de quien leyó `/for/investors` acabó activando" no tiene respuesta en
     estos datos. Se leen los dos tramos por separado, no el arco entero.
 
-- [ ] **Ejecutar QA de lanzamiento**
+- [~] **Ejecutar QA de lanzamiento**
   - Files: `docs/design/responsive-qa-checklist.md`, `docs/accessibility-verification.md`
   - Do: revisar navegadores, breakpoints, teclado, lectores, performance, copy legal y claims.
   - Verify: `pnpm build`, tests, Playwright, performance budget y smoke runtime.
+  - Hecho: `pnpm ci:local` completo, 39/39 pasos. Estructura, teclado y responsive registrados en
+    [`accessibility-verification.md`](../../../docs/accessibility-verification.md) y
+    [`responsive-qa-checklist.md`](../../../docs/design/responsive-qa-checklist.md), ambos con fecha y
+    con lo que **no** se comprobó escrito al lado.
+  - **El embudo no grababa nada, y el 200 lo tapaba.** El CHECK de `conversion_events` rechazaba los
+    tres eventos nuevos y la superficie `segment_page` con `23514`, y la ruta de ingesta loguea y
+    responde `{ok:true}`. Es exactamente el fallo de la fase 02 repitiéndose, y por eso el smoke fue
+    contra la tabla y no contra el código de estado. `drizzle/0174_segmented_landing_funnel.sql` lo
+    arregla; probado con inserciones directas antes (`23514` en `conversion_events_name_check`) y
+    después (las cuatro combinaciones aceptadas).
+  - Smoke de runtime real: con `CONVERSION_EVENTS_ENABLED=true` en local, leer `/for/hiring-teams`,
+    pulsar "I'm investing" y luego el CTA deja **tres filas** en `conversion_events` —
+    `segment_page_viewed` (hiring), `segment_selector_click` (`prev=hiring next=investing`,
+    `src=landing`) y `segment_page_viewed` (investing). La segunda vista confirma que el efecto va
+    keyed por segmento: sin eso, moverse entre las tres páginas contaría como una sola visita.
+  - **El gate encontró una divergencia real**: `SEGMENTED_LANDING_ENABLED` estaba en `.env` y ausente
+    del job de calidad, así que "local está verde" no habría significado que CI lo estuviera. Añadido
+    a los tres bloques `env` de `quality.yml` y a `advisory.yml` y `visual-baselines.yml`, que
+    `check-step-parity` exige idénticos.
+  - **Pendiente**: pase real con lector de pantalla sobre las tres páginas. Lo automático comprueba
+    estructura, nombre accesible y orden de foco; no puede decir si "I'm investing" seguido de un
+    cambio de encabezado se anuncia como una navegación que funcionó. Es la razón de que esta tarea
+    quede en `- [~]` y no en `- [x]`.
