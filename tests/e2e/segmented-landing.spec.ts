@@ -132,6 +132,93 @@ test.describe('the hint into sign-up', () => {
   }
 })
 
+/**
+ * Discovery: what a crawler and a link preview receive.
+ *
+ * All of it read out of the served HTML, because that is the only version any of them sees. The
+ * structured data claims two things — that this page exists, and where it sits in the site — and the
+ * canonical has to survive a shared link carrying `?goal=`, which is the URL people will actually
+ * paste.
+ */
+test.describe('what a crawler receives', () => {
+  function jsonLdBlocks(html: string): unknown[] {
+    const blocks: unknown[] = []
+    const pattern = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g
+    for (const match of html.matchAll(pattern)) {
+      const parsed: unknown = JSON.parse(match[1]!)
+      blocks.push(...(Array.isArray(parsed) ? parsed : [parsed]))
+    }
+    return blocks
+  }
+
+  for (const page of PAGES) {
+    test(`/for/${page.slug} describes itself as a page of this site`, async ({ request, baseURL }) => {
+      const html = await (await request.get(`${baseURL}/for/${page.slug}`)).text()
+      const blocks = jsonLdBlocks(html) as Array<Record<string, unknown>>
+
+      const webPage = blocks.find((block) => block['@type'] === 'WebPage')
+      expect(webPage, 'a WebPage node').toBeTruthy()
+      expect(String(webPage!.url)).toContain(page.path)
+      expect(webPage!.name).toBe(page.title)
+      // Joined to the site the root route already published, rather than declaring a second one.
+      expect(webPage!.isPartOf).toMatchObject({ '@id': expect.stringContaining('#website') })
+
+      const crumbs = blocks.find((block) => block['@type'] === 'BreadcrumbList')
+      expect(crumbs, 'a BreadcrumbList node').toBeTruthy()
+      expect((crumbs!.itemListElement as unknown[]).length).toBe(2)
+
+      // The root's own graph survives — a leaf that replaced it would take the site and the
+      // publisher down with it.
+      expect(blocks.some((block) => block['@type'] === 'WebSite')).toBe(true)
+
+      /**
+       * The objection is not marked up as a FAQ, although each page renders exactly one question
+       * and answer.
+       *
+       * `FAQPage` says the page *is* a list of questions, and these are not — the objection is one
+       * block among five. Describing the page as something it is not in order to qualify for a rich
+       * result is the markup equivalent of a claim with no evidence behind it.
+       *
+       * Asserted on the question text rather than on the absence of the type: the root route
+       * publishes a site-wide `FAQPage` of its own, which is about the product and not about this
+       * page.
+       */
+      expect(JSON.stringify(blocks)).not.toContain(page.objection.question)
+    })
+
+    test(`/for/${page.slug} previews correctly wherever it is pasted`, async ({ request, baseURL }) => {
+      const html = await (await request.get(`${baseURL}/for/${page.slug}`)).text()
+      const meta = (key: string): string | null =>
+        new RegExp(`<meta[^>]*(?:property|name)="${key}"[^>]*content="([^"]*)"`).exec(html)?.[1] ?? null
+
+      // og and twitter both, and both this page's — the failure this guards is a page whose tab
+      // title is right and whose Slack preview is the homepage. Substring rather than equality,
+      // because the title carries the site name and the site name is not what is being tested.
+      for (const key of ['og:title', 'twitter:title']) {
+        expect(meta(key), key).toContain(page.title)
+      }
+      for (const key of ['og:description', 'twitter:description']) {
+        expect(meta(key), key).toBe(page.metaDescription)
+      }
+    })
+  }
+
+  /**
+   * One canonical, and it survives the hint.
+   *
+   * `?goal=` is a personalisation the crawler cannot see, so a page reached with one is the same
+   * page. Two canonical tags would be worse than none: search engines discard the pair rather than
+   * pick between them, which is what a route emitting its own on top of the root's produces.
+   */
+  test('a shared link carrying a hint still canonicalises to the bare path', async ({ request, baseURL }) => {
+    const html = await (await request.get(`${baseURL}/for/investors?goal=investing&utm_source=x`)).text()
+    const canonicals = [...html.matchAll(/<link[^>]*rel="canonical"[^>]*href="([^"]*)"/g)].map((m) => m[1]!)
+
+    expect(canonicals.length, 'exactly one canonical tag').toBe(1)
+    expect(canonicals[0]).toMatch(/\/for\/investors$/)
+  })
+})
+
 test('the sitemap lists every segment page exactly once', async ({ request, baseURL }) => {
   const xml = await (await request.get(`${baseURL}/sitemap.xml`)).text()
   for (const content of PAGES) {

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { SegmentLandingPage } from '~/modules/landing/components/SegmentLandingPage'
+import { segmentPageHead } from '~/modules/landing/content/segment-page-head'
 import { SEGMENT_PAGES } from '~/modules/landing/content/segment-pages'
 
 /**
@@ -16,13 +17,6 @@ import { SEGMENT_PAGES } from '~/modules/landing/content/segment-pages'
 export const Route = createFileRoute('/_landing/for/builders')({
   validateSearch: (search: Record<string, unknown>): { goal?: string } =>
     (typeof search.goal === 'string' ? { goal: search.goal } : {}),
-  head: () => ({
-    meta: [
-      { title: `${SEGMENT_PAGES.building.title} · BuilderHunt` },
-      { name: 'description', content: SEGMENT_PAGES.building.metaDescription },
-      { property: 'og:title', content: SEGMENT_PAGES.building.title },
-      { property: 'og:description', content: SEGMENT_PAGES.building.metaDescription },
-    ],
-  }),
+  head: () => segmentPageHead(SEGMENT_PAGES.building),
   component: () => <SegmentLandingPage page={SEGMENT_PAGES.building} />,
 })

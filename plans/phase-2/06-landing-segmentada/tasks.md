@@ -104,16 +104,37 @@
     forjado, un solo uso, y las dos reglas de precedencia. La cuenta nueva termina con `primary_segment`
     a `null`: sigue siendo solo una preselección.
 
-- [~] **Actualizar descubrimiento SEO**
+- [x] **Actualizar descubrimiento SEO**
   - Files: `src/routes/sitemap[.]xml.ts`, `src/routes/robots[.]txt.ts`, `src/routes/__root.tsx`
   - Do: sitemap, crawling y structured data coherente.
   - Verify: parsear sitemap, canonical único y OG preview.
-  - Hecho: las tres páginas en el sitemap, **generadas desde `SEGMENT_PAGES`** y no escritas a mano,
+  - Result: las tres páginas en el sitemap, **generadas desde `SEGMENT_PAGES`** y no escritas a mano,
     así que una página añadida o renombrada no puede dejar el sitemap describiendo una URL que da 404
     — ni omitiendo una que existe y es el único sitio donde vive la copy de un segmento entero. Un
     e2e parsea el XML y exige exactamente una entrada por página.
-  - **No hecho**: JSON-LD / structured data y la revisión de canonical. `robots.txt` no necesitaba
-    cambio (no excluye `/for/`), pero eso está comprobado por lectura y no por un test.
+  - `src/modules/landing/content/segment-page-head.ts`: un único constructor de `<head>` para las
+    tres rutas. **Módulo aparte de `segment-pages.ts` a propósito** — ese es contenido y nada más, que
+    es lo que permite a un spec de Playwright (un proceso Node sin `.env`) importarlo para comprobar
+    la copy contra la que asierta. Este alcanza `site-url.ts` y por tanto `env.ts`.
+  - Las tres rutas escribían `title` / `og:*` a mano y **se dejaban `twitter:*` fuera**, que es
+    exactamente la deriva que `pageMeta` existe para evitar: una página correcta en la pestaña del
+    navegador y en Google, y que en X previsualiza la home. Ahora sale todo del mismo sitio, lo que
+    además impide que el JSON-LD describa una página distinta de la que describen los meta.
+  - Structured data: `WebPage` + `BreadcrumbList`, enganchados por `@id` al `#website` y
+    `#organization` que ya publica la raíz — la página se une a ese grafo en vez de declarar un
+    segundo sitio y un segundo publisher propios.
+  - **Sin `FAQPage`**, aunque cada página renderiza exactamente una pregunta con su respuesta. Ese
+    tipo dice que la página *es* una lista de preguntas, y no lo es: la objeción es un bloque entre
+    cinco. Marcarlo igualmente sería describir la página como algo que no es para optar a un rich
+    result, que es el mismo movimiento que una promesa sin evidencia detrás. El e2e lo asierta sobre
+    el texto de la pregunta, no sobre la ausencia del tipo — la raíz publica un `FAQPage` propio, de
+    ámbito de producto.
+  - Canonical: **ninguna ruta emite el suyo.** La raíz lo deriva del pathname con `canonicalUrlFor`, y
+    una ruta que emitiera el propio produciría *dos*, que los buscadores descartan en vez de
+    reconciliar. `goal` no está en `CANONICAL_SEARCH_PARAMS`, así que un enlace compartido con hint
+    canonicaliza al path desnudo — verificado con `?goal=investing&utm_source=x`, que es la URL que
+    la gente pega de verdad.
+  - `robots.txt` no necesitaba cambio: no excluye `/for/`.
 
 - [ ] **Instrumentar funnel y feature flags**
   - Files: `src/shared/lib/conversion-events.ts`, `src/shared/lib/conversion-client.ts`, `src/routes/api/analytics/conversion.ts`, `.env.example`, `docs/operations/segmented-landing-rollout.md`

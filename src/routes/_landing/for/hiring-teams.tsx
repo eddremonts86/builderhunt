@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { SegmentLandingPage } from '~/modules/landing/components/SegmentLandingPage'
+import { segmentPageHead } from '~/modules/landing/content/segment-page-head'
 import { SEGMENT_PAGES } from '~/modules/landing/content/segment-pages'
 
 /**
@@ -16,13 +17,6 @@ import { SEGMENT_PAGES } from '~/modules/landing/content/segment-pages'
 export const Route = createFileRoute('/_landing/for/hiring-teams')({
   validateSearch: (search: Record<string, unknown>): { goal?: string } =>
     (typeof search.goal === 'string' ? { goal: search.goal } : {}),
-  head: () => ({
-    meta: [
-      { title: `${SEGMENT_PAGES.hiring.title} · BuilderHunt` },
-      { name: 'description', content: SEGMENT_PAGES.hiring.metaDescription },
-      { property: 'og:title', content: SEGMENT_PAGES.hiring.title },
-      { property: 'og:description', content: SEGMENT_PAGES.hiring.metaDescription },
-    ],
-  }),
+  head: () => segmentPageHead(SEGMENT_PAGES.hiring),
   component: () => <SegmentLandingPage page={SEGMENT_PAGES.hiring} />,
 })

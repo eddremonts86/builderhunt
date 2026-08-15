@@ -10,18 +10,6 @@
       ],
       "port": 3010,
       "autoPort": false
-    },
-    {
-      "//": "A second port so a parallel session can run its own dev server. Port 3010 belongs to whichever session started first; this one takes 3011 rather than failing, and vite is invoked directly for the same pnpm-major reason recorded on the entry above.",
-      "name": "builderhunt-dev-3011",
-      "runtimeExecutable": "./node_modules/.bin/vite",
-      "runtimeArgs": [
-        "dev",
-        "--port",
-        "3011"
-      ],
-      "port": 3011,
-      "autoPort": false
     }
   ]
 }
