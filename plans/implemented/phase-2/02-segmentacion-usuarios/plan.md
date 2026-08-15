@@ -2,7 +2,7 @@
 
 > **Status**: `implemented`
 > **Depends on**: nothing — the provisional taxonomy is fixed in the phase README.
-> **Blocks**: [`03-onboarding-segmentado`](../../../phase-2/03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../../../phase-2/04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../../../phase-2/06-landing-segmentada/spec.md)
+> **Blocks**: [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../../../phase-2/04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../../../phase-2/06-landing-segmentada/spec.md)
 > **Reality check**: La aplicación ya usa Zod, Drizzle, Better Auth y rutas TanStack Start. La nueva
 > preferencia debe integrarse sin modificar los roles organizacionales.
 

@@ -1,7 +1,7 @@
 # Especificación — dashboard personalizado por segmento
 
 > **Status**: `partially-implemented`
-> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../../implemented/phase-2/03-onboarding-segmentado/spec.md)
 > **Blocks**: nothing
 > **Reality check**: `/dashboard` already has a typed widget registry
 > (`src/modules/dashboard/lib/widget-registry.ts`), accessible customization controls, and

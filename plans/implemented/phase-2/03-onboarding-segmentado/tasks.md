@@ -1,8 +1,8 @@
 # Tareas — onboarding segmentado
 
 > **Status**: `implemented`
-> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md)
-> **Blocks**: [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md)
+> **Blocks**: [`04-dashboard-personalizado`](../../../phase-2/04-dashboard-personalizado/spec.md)
 > **Reality check**: `src/shared/lib/onboarding.ts` y sus rutas son la base obligatoria.
 
 - [x] **Definir state machine v2**
@@ -177,7 +177,7 @@
     `src/shared/lib/onboarding-rollout.ts` (14 tests), `src/shared/lib/useOnboardingStep.ts` en las
     siete pantallas, el bloque `onboarding` en `/api/admin/metrics/conversion`,
     `tests/e2e/onboarding-rollout.spec.ts` (6 specs) y
-    [`docs/operations/segmented-onboarding-rollout.md`](../../../docs/operations/segmented-onboarding-rollout.md).
+    [`docs/operations/segmented-onboarding-rollout.md`](../../../../docs/operations/segmented-onboarding-rollout.md).
   - **El funnel de la fase 02 no existía, y no por estar incompleto.** `conversion_events` tenía un
     CHECK con los siete eventos de landing y cuatro surfaces; `segment_selected` sobre `onboarding`
     lo violaba, y la ruta de ingesta captura el fallo, lo registra y responde `{ok: true}`. Además
