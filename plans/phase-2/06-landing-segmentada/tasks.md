@@ -136,10 +136,42 @@
     la gente pega de verdad.
   - `robots.txt` no necesitaba cambio: no excluye `/for/`.
 
-- [ ] **Instrumentar funnel y feature flags**
+- [x] **Instrumentar funnel y feature flags**
   - Files: `src/shared/lib/conversion-events.ts`, `src/shared/lib/conversion-client.ts`, `src/routes/api/analytics/conversion.ts`, `.env.example`, `docs/operations/segmented-landing-rollout.md`
   - Do: extender el funnel existente con view/select/CTA/signup/onboarding/activation sin PII.
   - Verify: evento sintético atraviesa funnel y flag off restaura home/rutas.
+  - Result: tres eventos nuevos — `segment_page_viewed`, `segment_selector_click`,
+    `segment_page_cta_click` — y una superficie nueva, `segment_page`. Tres y no uno porque la
+    pregunta del embudo es en cuál de los tres pasos se para la gente; un solo `landing_view` para
+    las tres páginas no responde ninguno.
+  - Llevan el mismo `segment` context que los eventos de elección y **significan otra cosa**: `next`
+    es de qué página iba esto, nunca una preferencia guardada. Lista aparte (`SEGMENT_LANDING_EVENTS`)
+    en vez de meterlos en `SEGMENT_CHOICE_EVENTS`, porque un análisis que contara una vista como una
+    elección reportaría un segmento para cada visitante que leyó y no eligió nada.
+  - **Atribución sin campo de atribución.** `sessionId` ya está en cada evento, y first-touch es el
+    `segment_page_viewed` más antiguo de esa sesión, last-touch el último antes de `signup_complete`.
+    Derivarlas en la consulta es lo que impide que se contradigan: un par de campos escritos por el
+    cliente serían dos afirmaciones sobre el pasado hechas por la única parte que no lo ve entero.
+  - `SEGMENTED_LANDING_ENABLED`, `false` por defecto. Apagado significa **ausente en las tres
+    superficies a la vez**: `/for/*` responde 404, el selector no se renderiza, y el sitemap no las
+    lista. No un 200 con el contenido escondido — una URL pública apagada que se indexa igual — ni un
+    redirect a `/`, que le dice a un crawler que la página se mudó a un sitio al que no se mudó.
+  - La bandera se resuelve en el servidor (`segmented-landing-flag.ts`, un `createServerFn`). `env.ts`
+    le da al navegador un stub, así que una ruta que la leyera directa **serviría la página en un
+    refresco y la 404-aría en un clic**, con la bandera encendida todo el rato. Es la misma trampa que
+    `getIsAppAdmin` documenta en `auth-session.ts`.
+  - Verificado apagado en `tests/e2e/segmented-landing-flag.spec.ts`, sobre un servidor por worker
+    cuyo entorno controla el harness: las tres 404, el selector ausente, y el sitemap sin las tres
+    entradas pero todavía siendo un sitemap. Tres superficies leyendo una bandera son tres
+    oportunidades de discrepar, y la discrepancia es invisible hasta que alguien sigue una entrada del
+    sitemap hasta un 404.
+  - `playwright.config.ts` fija `SEGMENTED_LANDING_ENABLED='true'` en el servidor compartido: con el
+    default, `segmented-landing.spec.ts` entero probaría una feature apagada. Es seguro fijarlo ahí
+    por lo mismo que explica la nota de `ACCESS_ALLOWLIST_ENABLED` en negativo — dotenvx solo pisa
+    claves que existen en `.env`, y esta vive solo como default en `env.ts`.
+  - **No cubierto, y escrito en el runbook**: nada une una `sessionId` anónima con la cuenta que crea,
+    así que "qué porcentaje de quien leyó `/for/investors` acabó activando" no tiene respuesta en
+    estos datos. Se leen los dos tramos por separado, no el arco entero.
 
 - [ ] **Ejecutar QA de lanzamiento**
   - Files: `docs/design/responsive-qa-checklist.md`, `docs/accessibility-verification.md`

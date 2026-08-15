@@ -137,6 +137,20 @@ const zodEnv = z.object({
   // flag governs the interface, never the data.
   USER_SEGMENTATION_ENABLED: z.enum(['true', 'false']).default('false'),
   /**
+   * The three public segment pages and the selector that points at them
+   * (plan: phase-2/06-landing-segmentada).
+   *
+   * Off means the pages **do not exist** — `/for/*` answers 404, the selector does not render, and
+   * the sitemap does not list them. Not hidden and not redirected: a public URL that is switched off
+   * but still answers 200 gets indexed, and a redirect to `/` tells a crawler the page moved
+   * permanently to somewhere it did not move to. 404 is the only answer that is true.
+   *
+   * Read on the server and passed down, never read in a component: the sitemap, the routes and the
+   * home page have to agree, and three surfaces each consulting the flag is three chances to
+   * disagree about whether a page exists.
+   */
+  SEGMENTED_LANDING_ENABLED: z.enum(['true', 'false']).default('false'),
+  /**
    * Percentage of accounts on onboarding v2 (plan: phase-2/03-onboarding-segmentado).
    *
    * A percentage rather than a boolean because the spec asks for a cohort ramp with a stop

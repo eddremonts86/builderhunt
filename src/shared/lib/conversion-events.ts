@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { SEGMENT_PRESETS, userSegmentSchema } from './user-segments'
 import { ONBOARDING_STEP_KEYS } from './onboarding-v2'
 
-export const CONVERSION_SURFACES = ['hero', 'final_cta', 'explore', 'signup', 'onboarding', 'settings'] as const
+export const CONVERSION_SURFACES = ['hero', 'final_cta', 'explore', 'signup', 'onboarding', 'settings', 'segment_page'] as const
 export type ConversionSurface = (typeof CONVERSION_SURFACES)[number]
 
 export const CONVERSION_EVENT_NAMES = [
@@ -34,6 +34,13 @@ export const CONVERSION_EVENT_NAMES = [
   'onboarding_step_viewed',
   'onboarding_step_completed',
   'onboarding_flow_exited',
+  // The segmented landing (plan: phase-2/06-landing-segmentada). Three events, because the funnel
+  // question is which of three steps a visitor stops at: reaching a segment page, choosing a
+  // different one from the selector, or pressing that page's CTA. One "landing_view" for all three
+  // pages could not answer any of them.
+  'segment_page_viewed',
+  'segment_selector_click',
+  'segment_page_cta_click',
 ] as const
 export type ConversionEventName = (typeof CONVERSION_EVENT_NAMES)[number]
 
@@ -63,7 +70,27 @@ const ALLOWED_SURFACES_BY_NAME: Record<ConversionEventName, readonly ConversionS
   onboarding_step_viewed: ['onboarding'],
   onboarding_step_completed: ['onboarding'],
   onboarding_flow_exited: ['onboarding'],
+  segment_page_viewed: ['segment_page'],
+  // The selector is on both the home page and every segment page, and which of the two a visitor
+  // used is the difference between "arrived undecided" and "landed on the wrong one".
+  segment_selector_click: ['hero', 'segment_page'],
+  segment_page_cta_click: ['segment_page'],
 }
+
+/**
+ * The three landing events, which describe a *page*, not a stored preference
+ * (plan: phase-2/06-landing-segmentada).
+ *
+ * They carry the same segment context as the choice events and mean something different: `next` is
+ * which page this was about, and `source` is always `landing`. Kept as a separate list rather than
+ * folded into `SEGMENT_CHOICE_EVENTS` because an analysis that counted a page view as a choice would
+ * report a segment for every visitor who read a page and picked nothing.
+ */
+export const SEGMENT_LANDING_EVENTS = [
+  'segment_page_viewed',
+  'segment_selector_click',
+  'segment_page_cta_click',
+] as const
 
 /** The three that describe a position in a flow, and therefore the three that must carry one. */
 export const ONBOARDING_FUNNEL_EVENTS = [
@@ -165,7 +192,9 @@ export function parseConversionEvent(raw: unknown): ParseConversionEventResult {
    * Both directions matter. A missing context makes a segment event uncountable; a context on a
    * landing event means a surface is sending data it has no business knowing.
    */
-  const needsSegment = (SEGMENT_CHOICE_EVENTS as readonly string[]).includes(parsed.data.name)
+  const needsSegment =
+    (SEGMENT_CHOICE_EVENTS as readonly string[]).includes(parsed.data.name) ||
+    (SEGMENT_LANDING_EVENTS as readonly string[]).includes(parsed.data.name)
   if (needsSegment && !parsed.data.segment) {
     return { ok: false, event: null, error: `Event "${parsed.data.name}" requires segment context` }
   }

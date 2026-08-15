@@ -1,7 +1,9 @@
+import * as React from 'react'
 import { ArrowRight, Check } from 'lucide-react'
 import { LinkButton } from '~/components/ui'
 import { SegmentSelector } from '~/modules/landing/components/SegmentSelector'
 import type { SegmentPageContent } from '~/modules/landing/content/segment-pages'
+import { trackConversionEvent } from '~/shared/lib/conversion-client'
 
 /**
  * One segment's public page (plan: phase-2/06-landing-segmentada).
@@ -22,6 +24,19 @@ import type { SegmentPageContent } from '~/modules/landing/content/segment-pages
  * routes once a visitor has "chosen" would be treating a guess about them as a decision they made.
  */
 export function SegmentLandingPage({ page }: { page: SegmentPageContent }) {
+  /**
+   * The top of this page's funnel.
+   *
+   * Keyed on the segment so a click through the selector — which stays on this component and only
+   * swaps the content — reports the page somebody actually read. Without the key, moving between the
+   * three pages would count as one view of whichever one they landed on first.
+   */
+  React.useEffect(() => {
+    trackConversionEvent('segment_page_viewed', 'segment_page', {
+      segment: { previous: null, next: page.segment, source: 'landing' },
+    })
+  }, [page.segment])
+
   return (
     <main className="container max-w-3xl py-16">
       <SegmentSelector current={page.segment} className="mb-10" />
@@ -32,7 +47,17 @@ export function SegmentLandingPage({ page }: { page: SegmentPageContent }) {
       <p className="text-lg text-bh-text-muted mb-8">{page.subheading}</p>
 
       <div className="flex flex-wrap items-center gap-3 mb-12">
-        <LinkButton to={page.cta.to} variant="primary" className="btn-lg" data-testid="segment-cta">
+        <LinkButton
+          to={page.cta.to}
+          variant="primary"
+          className="btn-lg"
+          data-testid="segment-cta"
+          onClick={() =>
+            trackConversionEvent('segment_page_cta_click', 'segment_page', {
+              segment: { previous: null, next: page.segment, source: 'landing' },
+            })
+          }
+        >
           {page.cta.label}
           <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
         </LinkButton>

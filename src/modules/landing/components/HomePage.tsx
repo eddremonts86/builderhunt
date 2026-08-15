@@ -17,9 +17,17 @@ export interface HomePageProps {
    * present on the client's first render — a hydration mismatch on every CTA below.
    */
   isAuthed: boolean
+  /**
+   * Whether the three segment pages exist (plan: phase-2/06-landing-segmentada).
+   *
+   * A prop for the same reason `isAuthed` is one: the flag lives in `env.ts`, which hands the
+   * browser a stub, so a component reading it directly would hide the band on every client render
+   * however the server is configured. Resolved once in `_landing/index.tsx`.
+   */
+  showSegmentSelector: boolean
 }
 
-export function HomePage({ isAuthed }: HomePageProps) {
+export function HomePage({ isAuthed, showSegmentSelector }: HomePageProps) {
   const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
 
   React.useEffect(() => {
@@ -158,10 +166,12 @@ export function HomePage({ isAuthed }: HomePageProps) {
           to classify themselves never has to — a landing that made people choose before showing them
           anything would turn an optional question into a toll.
         */}
-        <section className="container py-8" aria-labelledby="segment-routes">
-          <h2 id="segment-routes" className="sr-only">Start with what brings you here</h2>
-          <SegmentSelector heading="Or start with what brings you here" />
-        </section>
+        {showSegmentSelector && (
+          <section className="container py-8" aria-labelledby="segment-routes">
+            <h2 id="segment-routes" className="sr-only">Start with what brings you here</h2>
+            <SegmentSelector heading="Or start with what brings you here" />
+          </section>
+        )}
 
 
         {/* ───────────────────── SOCIAL PROOF ───────────────────── */}

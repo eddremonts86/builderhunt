@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { SEGMENT_PAGES, SEGMENT_PAGE_KEYS } from '~/modules/landing/content/segment-pages'
+import { trackConversionEvent } from '~/shared/lib/conversion-client'
 
 /**
  * "I am here to…" on the public pages (plan: phase-2/06-landing-segmentada).
@@ -52,6 +53,16 @@ export function SegmentSelector({ heading, current, className }: SegmentSelector
                 aria-current={isCurrent ? 'page' : undefined}
                 data-testid="segment-selector-option"
                 data-segment={key}
+                /*
+                 * `source: 'landing'` and nothing stored — the same rule the whole feature runs on.
+                 * The surface says which selector was used, which is the difference between somebody
+                 * who arrived undecided and somebody who landed on the wrong page.
+                 */
+                onClick={() =>
+                  trackConversionEvent('segment_selector_click', current ? 'segment_page' : 'hero', {
+                    segment: { previous: current ?? null, next: key, source: 'landing' },
+                  })
+                }
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 ${
                   isCurrent
                     ? 'bg-bh-accent-soft border-bh-accent text-bh-accent'

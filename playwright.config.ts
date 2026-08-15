@@ -202,6 +202,21 @@ export default defineConfig({
        * default in `env.ts`.
        */
       SIGNUP_DEVICE_DAILY_LIMIT: '500',
+      /**
+       * The segmented landing pages, on for the shared server (plan: phase-2/06-landing-segmentada).
+       *
+       * `segmented-landing.spec.ts` is about what a crawler and an anonymous visitor receive from
+       * those three URLs, and it uses this shared server rather than a per-worker one. With the flag
+       * at its default the routes 404 and the whole file tests a feature that is switched off.
+       *
+       * Safe to pin here for the reason the `ACCESS_ALLOWLIST_ENABLED` note above explains in the
+       * negative: dotenvx overrides only keys that are present in `.env`, and this one lives solely
+       * as a default in `env.ts`. Adding it to a personal `.env` would take that back.
+       *
+       * The *off* state is covered separately, on a per-worker server whose environment the harness
+       * controls — see `segmented-landing-flag.spec.ts`.
+       */
+      SEGMENTED_LANDING_ENABLED: 'true',
     },
   },
 })
