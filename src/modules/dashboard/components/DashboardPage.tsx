@@ -27,6 +27,12 @@ import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
 import { useDashboardPreferences } from '~/modules/dashboard/ui/bento/useBentoDensity'
 import { useViewerRole } from '~/modules/dashboard/lib/use-viewer-role'
 import { defineWidgetRegistry, moveWidgetInOrder, orderedWidgets } from '~/modules/dashboard/lib/widget-registry'
+import {
+  assertPresetsMatchRegistry,
+  dashboardPresetFor,
+  resolvePresetLayout,
+} from '~/modules/dashboard/lib/dashboard-presets'
+import { useDashboardContext } from '~/modules/dashboard/lib/use-dashboard-context'
 import type { WidgetDependency } from '~/modules/dashboard/lib/contracts'
 import { ActivityWidget } from '~/modules/dashboard/ui/home/ActivityWidget'
 import { MetricWidget, type MetricWidgetProps } from '~/modules/dashboard/ui/home/MetricWidget'
@@ -767,6 +773,20 @@ export const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
 ])
 
 /**
+ * The presets are checked here, where the registry is (plan: phase-2/04).
+ *
+ * Same reasoning as `defineWidgetRegistry`'s own throws: a preset naming a widget that no longer
+ * exists promotes nothing and says nothing, and one hiding the action queue would be a route doing
+ * what a user preference is already forbidden from doing. Both are silent at runtime, so they fail
+ * at import instead — a dashboard that renders with one route quietly wrong is worse than a
+ * dashboard that fails its own unit test.
+ */
+assertPresetsMatchRegistry(
+  new Set(HOME_WIDGETS.map((widget) => widget.id)),
+  new Set(HOME_WIDGETS.filter((widget) => widget.criticality === 'critical').map((widget) => widget.id)),
+)
+
+/**
  * Loads the organization-admin overview and renders the section, or nothing (plan 57, Admin track).
  *
  * ## Why the role is not checked here
@@ -810,6 +830,9 @@ export function DashboardPage() {
   const { preferences, setDensity, toggleHidden, togglePinned, setOrder, resetPreferences } = useDashboardPreferences()
   const density = preferences.density
   const viewerRole = useViewerRole()
+  // Which route this dashboard is composing for. Falls back to `general` on any failure — see the
+  // hook, and see `resolvePresetLayout` for what `general` contributes, which is nothing.
+  const { context: dashboardContext } = useDashboardContext()
   const [customizeOpen, setCustomizeOpen] = React.useState(false)
   /*
    * Radix restores focus to whatever held it when the dialog opened — but this dialog is opened by a
@@ -1018,15 +1041,37 @@ export function DashboardPage() {
    * the spec and do not exist yet, so any widget declaring them is omitted rather than rendered
    * empty — an empty "Pipeline snapshot" implies a pipeline with nothing in it.
    */
+  /**
+   * The segment preset, resolved *before* the layout and *after* eligibility (plan: phase-2/04).
+   *
+   * `resolvePresetLayout` decides what the route contributes and what the person's own arrangement
+   * contributes, one dimension at a time. On `general` — a null segment, a failed context request,
+   * or a segment value from a future build — it contributes nothing at all, so this call is the
+   * identity and the dashboard everybody has today is byte-for-byte the page it was.
+   *
+   * Eligibility still runs first inside `orderedWidgets`: a preset may promote a widget the role
+   * cannot see, and the answer is that the role wins. A preset is presentation and grants nothing.
+   */
+  const presetLayout = React.useMemo(
+    () => resolvePresetLayout(dashboardPresetFor(dashboardContext.presetId), {
+      hiddenWidgetIds: preferences.hiddenWidgetIds,
+      pinnedWidgetIds: preferences.pinnedWidgetIds,
+      orderedWidgetIds: preferences.orderedWidgetIds,
+    }),
+    [dashboardContext.presetId, preferences.hiddenWidgetIds, preferences.orderedWidgetIds, preferences.pinnedWidgetIds],
+  )
+
   const resolved = React.useMemo(
     () => orderedWidgets(HOME_WIDGETS, {
       role: viewerRole,
-      available: SHIPPED_CAPABILITIES,
-      hidden: new Set(preferences.hiddenWidgetIds),
-      order: preferences.orderedWidgetIds,
-      pinned: preferences.pinnedWidgetIds,
+      // Served rather than compiled in, so "has this shipped" is answered by the deployment handling
+      // the request instead of by whatever build the browser happens to be holding.
+      available: new Set(dashboardContext.capabilities),
+      hidden: presetLayout.hidden,
+      order: presetLayout.order,
+      pinned: presetLayout.pinned,
     }),
-    [viewerRole, preferences.hiddenWidgetIds, preferences.orderedWidgetIds, preferences.pinnedWidgetIds],
+    [viewerRole, dashboardContext.capabilities, presetLayout],
   )
   const visibleWidgets = resolved.visible
 
