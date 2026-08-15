@@ -6,7 +6,8 @@
  * see the spec's "Non-goals" and "Event contract" sections.
  */
 import { z } from 'zod'
-import { userSegmentSchema } from './user-segments'
+import { SEGMENT_PRESETS, userSegmentSchema } from './user-segments'
+import { ONBOARDING_STEP_KEYS } from './onboarding-v2'
 
 export const CONVERSION_SURFACES = ['hero', 'final_cta', 'explore', 'signup', 'onboarding', 'settings'] as const
 export type ConversionSurface = (typeof CONVERSION_SURFACES)[number]
@@ -27,6 +28,12 @@ export const CONVERSION_EVENT_NAMES = [
   'segment_changed',
   'segment_skipped',
   'activation_reached',
+  // The onboarding funnel itself (plan: phase-2/03-onboarding-segmentado). One step is one event,
+  // carrying which route and which flow version it belongs to — a funnel that only knew "onboarding"
+  // could not answer whether v2 was better than v1, which is the whole question a cohort rollout asks.
+  'onboarding_step_viewed',
+  'onboarding_step_completed',
+  'onboarding_flow_exited',
 ] as const
 export type ConversionEventName = (typeof CONVERSION_EVENT_NAMES)[number]
 
@@ -53,7 +60,17 @@ const ALLOWED_SURFACES_BY_NAME: Record<ConversionEventName, readonly ConversionS
   // Activation is reported from wherever the person reached it, so it is the one segment-adjacent
   // event with a wide surface list rather than a narrow one.
   activation_reached: ['onboarding', 'settings', 'explore'],
+  onboarding_step_viewed: ['onboarding'],
+  onboarding_step_completed: ['onboarding'],
+  onboarding_flow_exited: ['onboarding'],
 }
+
+/** The three that describe a position in a flow, and therefore the three that must carry one. */
+export const ONBOARDING_FUNNEL_EVENTS = [
+  'onboarding_step_viewed',
+  'onboarding_step_completed',
+  'onboarding_flow_exited',
+] as const
 
 /** The four that describe a choice, and therefore the four that must carry one. */
 export const SEGMENT_CHOICE_EVENTS = [
@@ -83,6 +100,23 @@ const segmentContextShape = z.object({
 export const ACTIVATION_TYPES = ['first_search', 'first_saved_builder', 'first_alert', 'profile_published'] as const
 export type ActivationType = (typeof ACTIVATION_TYPES)[number]
 
+/**
+ * Where in which flow (plan: phase-2/03-onboarding-segmentado).
+ *
+ * Three enums, no free text and nothing identifying — same rules as the segment context. The step is
+ * a **key**, never the v1 step number: `2` means a different screen on each route, so a funnel keyed
+ * on it would silently add four different steps together.
+ *
+ * `flowVersion` is what makes the rollout measurable. Comparing v2 against v1 needs both cohorts in
+ * one stream, distinguishable; without it, a drop in completion could not be told apart from a
+ * change in who was being onboarded that week.
+ */
+const onboardingContextShape = z.object({
+  flowVersion: z.union([z.literal(1), z.literal(2)]),
+  preset: z.enum(SEGMENT_PRESETS),
+  stepKey: z.enum(ONBOARDING_STEP_KEYS),
+}).strict()
+
 const conversionEventShape = z.object({
   name: z.enum(CONVERSION_EVENT_NAMES),
   surface: z.enum(CONVERSION_SURFACES),
@@ -95,6 +129,8 @@ const conversionEventShape = z.object({
   segment: segmentContextShape.optional(),
   /** Present on exactly `activation_reached`; rejected on any other. */
   activationType: z.enum(ACTIVATION_TYPES).optional(),
+  /** Present on exactly the three onboarding funnel events; rejected on any other. */
+  onboarding: onboardingContextShape.optional(),
 }).strict()
 
 export type ConversionEvent = z.infer<typeof conversionEventShape>
@@ -143,6 +179,14 @@ export function parseConversionEvent(raw: unknown): ParseConversionEventResult {
   }
   if (!needsActivation && parsed.data.activationType) {
     return { ok: false, event: null, error: `Event "${parsed.data.name}" must not carry activationType` }
+  }
+
+  const needsOnboarding = (ONBOARDING_FUNNEL_EVENTS as readonly string[]).includes(parsed.data.name)
+  if (needsOnboarding && !parsed.data.onboarding) {
+    return { ok: false, event: null, error: `Event "${parsed.data.name}" requires onboarding context` }
+  }
+  if (!needsOnboarding && parsed.data.onboarding) {
+    return { ok: false, event: null, error: `Event "${parsed.data.name}" must not carry onboarding context` }
   }
 
   return { ok: true, event: parsed.data, error: null }

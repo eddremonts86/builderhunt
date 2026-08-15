@@ -5,10 +5,13 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button } from '~/components/ui'
 import { parseSegmentHint } from '~/shared/lib/landing-segment-hint'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
+import { entryRouteFor } from '~/shared/lib/onboarding-shared'
+import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
 import {
   SEGMENT_SCOPE_NOTICE,
   USER_SEGMENT_COPY,
   USER_SEGMENTS,
+  resolveSegmentPreset,
   type UserSegment,
 } from '~/shared/lib/user-segments'
 
@@ -44,6 +47,7 @@ export const Route = createFileRoute('/onboarding/goal')({
 
 function GoalStep() {
   const navigate = useNavigate()
+  const step = useOnboardingStep('goal')
   const [selected, setSelected] = React.useState<UserSegment | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -85,13 +89,18 @@ function GoalStep() {
             segment: { previous: null, next: null, source: 'onboarding' },
           })
         }
-        await navigate({ to: '/onboarding/search' })
+        // Completed before the navigation, so the funnel records the step somebody actually
+        // finished rather than the one they landed on.
+        await step.complete()
+        // The route follows the answer. Declining lands on the general search flow — the one v1
+        // already had, which never blocks anybody.
+        await navigate({ to: entryRouteFor(resolveSegmentPreset(segment)) })
       } catch {
         setError('We could not save that. You can continue and set it later in your account.')
         setSaving(false)
       }
     },
-    [navigate],
+    [navigate, step],
   )
 
   return (

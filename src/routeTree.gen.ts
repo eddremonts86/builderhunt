@@ -31,7 +31,9 @@ import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
 import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
+import { Route as OnboardingBuildingRouteImport } from './routes/onboarding/building'
 import { Route as OnboardingGoalRouteImport } from './routes/onboarding/goal'
+import { Route as OnboardingInvestingRouteImport } from './routes/onboarding/investing'
 import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
 import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
@@ -233,6 +235,7 @@ import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/buil
 import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
 import { Route as ApiBuildersBuilderIdTimelineRouteImport } from './routes/api/builders/$builderId/timeline'
 import { Route as ApiBuildersBuilderIdViewsRouteImport } from './routes/api/builders/$builderId/views'
+import { Route as ApiBuildersClaimCandidatesRouteImport } from './routes/api/builders/claim/candidates'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
 import { Route as ApiCalendarAvailabilityIndexRouteImport } from './routes/api/calendar/availability/index'
@@ -417,9 +420,19 @@ const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
   path: '/builders/$builderId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingBuildingRoute = OnboardingBuildingRouteImport.update({
+  id: '/building',
+  path: '/building',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
 const OnboardingGoalRoute = OnboardingGoalRouteImport.update({
   id: '/goal',
   path: '/goal',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingInvestingRoute = OnboardingInvestingRouteImport.update({
+  id: '/investing',
+  path: '/investing',
   getParentRoute: () => OnboardingRouteRoute,
 } as any)
 const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
@@ -1492,6 +1505,12 @@ const ApiBuildersBuilderIdViewsRoute =
     path: '/views',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBuildersClaimCandidatesRoute =
+  ApiBuildersClaimCandidatesRouteImport.update({
+    id: '/api/builders/claim/candidates',
+    path: '/api/builders/claim/candidates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBuildersClaimVerifyRoute = ApiBuildersClaimVerifyRouteImport.update({
   id: '/api/builders/claim/verify',
   path: '/api/builders/claim/verify',
@@ -1950,7 +1969,9 @@ export interface FileRoutesByFullPath {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/building': typeof OnboardingBuildingRoute
   '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2135,6 +2156,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
+  '/api/builders/claim/candidates': typeof ApiBuildersClaimCandidatesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2248,7 +2270,9 @@ export interface FileRoutesByTo {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/building': typeof OnboardingBuildingRoute
   '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2432,6 +2456,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
+  '/api/builders/claim/candidates': typeof ApiBuildersClaimCandidatesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2548,7 +2573,9 @@ export interface FileRoutesById {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/building': typeof OnboardingBuildingRoute
   '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2734,6 +2761,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
+  '/api/builders/claim/candidates': typeof ApiBuildersClaimCandidatesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2850,7 +2878,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/building'
     | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3035,6 +3065,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/$builderId/views'
+    | '/api/builders/claim/candidates'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -3148,7 +3179,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/building'
     | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3332,6 +3365,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/$builderId/views'
+    | '/api/builders/claim/candidates'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -3447,7 +3481,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/building'
     | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3633,6 +3669,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/$builderId/views'
+    | '/api/builders/claim/candidates'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -3861,6 +3898,7 @@ export interface RootRouteChildren {
   ApiBillingSubscriptionCancelRoute: typeof ApiBillingSubscriptionCancelRoute
   ApiBillingSubscriptionChangeRoute: typeof ApiBillingSubscriptionChangeRoute
   ApiBillingSubscriptionPreviewRoute: typeof ApiBillingSubscriptionPreviewRoute
+  ApiBuildersClaimCandidatesRoute: typeof ApiBuildersClaimCandidatesRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiCalendarAvailabilityOverridesRoute: typeof ApiCalendarAvailabilityOverridesRoute
   ApiCalendarEventsEventIdRoute: typeof ApiCalendarEventsEventIdRoute
@@ -4082,11 +4120,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BuildersBuilderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/building': {
+      id: '/onboarding/building'
+      path: '/building'
+      fullPath: '/onboarding/building'
+      preLoaderRoute: typeof OnboardingBuildingRouteImport
+      parentRoute: typeof OnboardingRouteRoute
+    }
     '/onboarding/goal': {
       id: '/onboarding/goal'
       path: '/goal'
       fullPath: '/onboarding/goal'
       preLoaderRoute: typeof OnboardingGoalRouteImport
+      parentRoute: typeof OnboardingRouteRoute
+    }
+    '/onboarding/investing': {
+      id: '/onboarding/investing'
+      path: '/investing'
+      fullPath: '/onboarding/investing'
+      preLoaderRoute: typeof OnboardingInvestingRouteImport
       parentRoute: typeof OnboardingRouteRoute
     }
     '/onboarding/save': {
@@ -5496,6 +5548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdViewsRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/builders/claim/candidates': {
+      id: '/api/builders/claim/candidates'
+      path: '/api/builders/claim/candidates'
+      fullPath: '/api/builders/claim/candidates'
+      preLoaderRoute: typeof ApiBuildersClaimCandidatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/claim/verify': {
       id: '/api/builders/claim/verify'
       path: '/api/builders/claim/verify'
@@ -6202,7 +6261,9 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 )
 
 interface OnboardingRouteRouteChildren {
+  OnboardingBuildingRoute: typeof OnboardingBuildingRoute
   OnboardingGoalRoute: typeof OnboardingGoalRoute
+  OnboardingInvestingRoute: typeof OnboardingInvestingRoute
   OnboardingSaveRoute: typeof OnboardingSaveRoute
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
@@ -6210,7 +6271,9 @@ interface OnboardingRouteRouteChildren {
 }
 
 const OnboardingRouteRouteChildren: OnboardingRouteRouteChildren = {
+  OnboardingBuildingRoute: OnboardingBuildingRoute,
   OnboardingGoalRoute: OnboardingGoalRoute,
+  OnboardingInvestingRoute: OnboardingInvestingRoute,
   OnboardingSaveRoute: OnboardingSaveRoute,
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,
@@ -6638,6 +6701,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingSubscriptionCancelRoute: ApiBillingSubscriptionCancelRoute,
   ApiBillingSubscriptionChangeRoute: ApiBillingSubscriptionChangeRoute,
   ApiBillingSubscriptionPreviewRoute: ApiBillingSubscriptionPreviewRoute,
+  ApiBuildersClaimCandidatesRoute: ApiBuildersClaimCandidatesRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiCalendarAvailabilityOverridesRoute: ApiCalendarAvailabilityOverridesRoute,
   ApiCalendarEventsEventIdRoute: ApiCalendarEventsEventIdRoute,

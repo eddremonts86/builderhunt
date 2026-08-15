@@ -1212,6 +1212,13 @@
       "when": 1786743574410,
       "tag": "0172_onboarding_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "7",
+      "when": 1786780677383,
+      "tag": "0173_conversion_onboarding_funnel",
+      "breakpoints": true
     }
   ]
 }

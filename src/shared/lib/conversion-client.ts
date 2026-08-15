@@ -58,7 +58,7 @@ const sentThisPageLoad = new Set<string>()
  * Typed as the event's own optional fields rather than a fresh shape, so a change to the contract
  * breaks this call site instead of letting the client build something the server will reject.
  */
-export type ConversionEventDetail = Pick<ConversionEvent, 'segment' | 'activationType'>
+export type ConversionEventDetail = Pick<ConversionEvent, 'segment' | 'activationType' | 'onboarding'>
 
 export function trackConversionEvent(
   name: ConversionEventName,
@@ -77,8 +77,17 @@ export function trackConversionEvent(
    * times, and collapsing that to one would erase exactly what this event exists to measure — so
    * the chosen value joins the key.
    */
+  /**
+   * A step is not a page load either.
+   *
+   * The same reasoning as the segment key above, one level further: five onboarding screens all emit
+   * `onboarding_step_viewed` on the same surface, and without the step in the key a single-page
+   * navigation through the flow would report the first screen and silently drop the rest — a funnel
+   * that could only ever show step one.
+   */
+  const stepKey = detail.onboarding ? `:${detail.onboarding.stepKey}` : ''
   const detailKey = detail.segment ? `:${detail.segment.previous ?? '-'}>${detail.segment.next ?? '-'}` : ''
-  const dedupeKey = `${sessionId}:${name}:${surface}:${variant}${detailKey}`
+  const dedupeKey = `${sessionId}:${name}:${surface}:${variant}${detailKey}${stepKey}`
   if (sentThisPageLoad.has(dedupeKey)) return
   sentThisPageLoad.add(dedupeKey)
 

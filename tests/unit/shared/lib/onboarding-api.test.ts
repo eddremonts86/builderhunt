@@ -64,10 +64,27 @@ describe('the status payload', () => {
     skippedCount: 0,
     eligible: true,
     legacy: { step: 2, completed: false },
+    rollout: { inCohort: true, percent: 50 },
   }
 
   it('validates a complete payload', () => {
     expect(onboardingStatusV2Schema.safeParse(valid).success).toBe(true)
+  })
+
+  /**
+   * The cohort is the server's answer, not the client's guess. A payload without it would let a
+   * client fall back to a default and decide the flow itself, which is the one thing the ramp cannot
+   * allow — the whole point is that a person's flow is decided in one place.
+   */
+  it('always carries the cohort decision', () => {
+    const { rollout: _rollout, ...withoutRollout } = valid
+    expect(onboardingStatusV2Schema.safeParse(withoutRollout).success).toBe(false)
+  })
+
+  it('refuses a percentage outside 0..100', () => {
+    for (const percent of [-1, 101, 12.5]) {
+      expect(onboardingStatusV2Schema.safeParse({ ...valid, rollout: { inCohort: false, percent } }).success).toBe(false)
+    }
   })
 
   /**

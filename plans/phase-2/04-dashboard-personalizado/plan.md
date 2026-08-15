@@ -1,7 +1,7 @@
 # Plan de entrega — dashboard personalizado por segmento
 
 > **Status**: `partially-implemented`
-> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../../implemented/phase-2/03-onboarding-segmentado/spec.md)
 > **Blocks**: nothing
 > **Reality check**: The compositor primitives, registry, accessible reordering, persistence API,
 > optimistic concurrency and tenant-isolation e2e coverage already exist. The remaining work is

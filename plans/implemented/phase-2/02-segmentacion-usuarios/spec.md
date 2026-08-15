@@ -3,7 +3,7 @@
 > **Status**: `implemented`
 > **Depends on**: nothing — the documented taxonomy is an explicitly provisional product hypothesis;
 > post-launch research may revise it but does not block implementation.
-> **Blocks**: [`03-onboarding-segmentado`](../../../phase-2/03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../../../phase-2/04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../../../phase-2/06-landing-segmentada/spec.md)
+> **Blocks**: [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../../../phase-2/04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../../../phase-2/06-landing-segmentada/spec.md)
 > **Reality check**: `auth_users` y `onboarding_progress` existen en
 > `src/shared/lib/db/schema.ts`; `/me` existe en `src/routes/_dashboard/me/index.tsx`. No existe un
 > segmento de usuario. `submitSegmentsResponseSchema` en `src/shared/lib/interview-api.ts` solo

@@ -78,6 +78,50 @@ export async function getBuilderIdentitySourceInfo(transaction: TenantTransactio
   return identity ?? null
 }
 
+/**
+ * Indexed identities whose handle is exactly this one (plan: phase-2/03-onboarding-segmentado).
+ *
+ * The building branch of onboarding asks somebody to find *themselves* in what BuilderHunt already
+ * indexed, and a claim needs a `builder_identities.id` — so the lookup is over the local index, not
+ * the federated search. That also makes the step deterministic: it does not depend on a third party
+ * answering.
+ *
+ * **Exact match, deliberately.** A prefix or fuzzy search over this table would be a handle
+ * enumerator: type `a` and read back everyone indexed. Somebody looking for their own account knows
+ * how it is spelled, so exactness costs them nothing and removes the oracle. Case is ignored because
+ * handles are not case-sensitive on any source that supports claiming.
+ *
+ * Restricted to `person` rows and to sources with a proof adapter — the GitHub connector indexes
+ * repositories too, and offering to "claim" one, or to claim an account on a source where no proof
+ * is possible, would be an offer the product cannot honour.
+ */
+export async function findClaimCandidatesByHandle(
+  transaction: TenantTransaction,
+  handle: string,
+  supportedSources: readonly string[],
+  limit = 10,
+) {
+  if (!handle.trim() || supportedSources.length === 0) return []
+  return transaction
+    .select({
+      id: builderIdentities.id,
+      source: builderIdentities.source,
+      sourceId: builderIdentities.sourceId,
+      username: builderIdentities.username,
+      displayName: builderIdentities.displayName,
+      avatarUrl: builderIdentities.avatarUrl,
+      profileUrl: builderIdentities.profileUrl,
+    })
+    .from(builderIdentities)
+    .where(and(
+      sql`lower(${builderIdentities.username}) = lower(${handle.trim()})`,
+      eq(builderIdentities.kind, 'person'),
+      inArray(builderIdentities.source, [...supportedSources]),
+    ))
+    .orderBy(asc(builderIdentities.source))
+    .limit(limit)
+}
+
 /** The caller's own pending claim on this identity, if any — the verify route reads the stored challenge/source from here rather than trusting client input. */
 export async function findPendingBuilderClaim(
   transaction: TenantTransaction,

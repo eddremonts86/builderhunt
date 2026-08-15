@@ -6,7 +6,7 @@
 > taxonomía documentada en [`../README.md`](../../../phase-2/README.md) (`hiring | investing | building | other`) como
 > hipótesis explícita, detrás de bandera; la investigación posterior la corrige. Es seguro porque
 > `user_segment` nunca concede permisos.
-> **Blocks**: [`03-onboarding-segmentado`](../../../phase-2/03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../../../phase-2/04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../../../phase-2/06-landing-segmentada/spec.md)
+> **Blocks**: [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../../../phase-2/04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../../../phase-2/06-landing-segmentada/spec.md)
 > **Reality check**: No hay tabla ni endpoints de preferencias; `/me` es el punto de integración
 > existente.
 
