@@ -27,6 +27,13 @@ import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
 import { useDashboardPreferences } from '~/modules/dashboard/ui/bento/useBentoDensity'
 import { useViewerRole } from '~/modules/dashboard/lib/use-viewer-role'
 import { defineWidgetRegistry, moveWidgetInOrder, orderedWidgets } from '~/modules/dashboard/lib/widget-registry'
+import {
+  assertPresetsMatchRegistry,
+  dashboardPresetFor,
+  resolvePresetLayout,
+} from '~/modules/dashboard/lib/dashboard-presets'
+import { useDashboardContext } from '~/modules/dashboard/lib/use-dashboard-context'
+import type { SegmentPreset } from '~/shared/lib/user-segments'
 import type { WidgetDependency } from '~/modules/dashboard/lib/contracts'
 import { ActivityWidget } from '~/modules/dashboard/ui/home/ActivityWidget'
 import { MetricWidget, type MetricWidgetProps } from '~/modules/dashboard/ui/home/MetricWidget'
@@ -114,6 +121,13 @@ interface HomeContext {
   triggers: AlertTrigger[]
   error: string | null
   statsData: MetricWidgetProps[]
+  /**
+   * Which route this dashboard is composing for (plan: phase-2/04).
+   *
+   * Carried on the context rather than read per widget, so the empty state and the widgets agree on
+   * one answer. `general` for a null segment and for any failure — the flow everybody already had.
+   */
+  presetId: SegmentPreset
   onQueriesChanged: () => void
   currentUserId: string
   /**
@@ -174,7 +188,17 @@ const SHIPPED_CAPABILITIES: ReadonlySet<WidgetDependency> = new Set<WidgetDepend
 const STAT_TITLES = ['Builders tracked', 'Seen active', 'Saved searches count'] as const
 const ctxTitle = (index: number) => STAT_TITLES[index] ?? 'Metric'
 
-const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
+/**
+ * Exported so the registry can be checked rather than described (plan: phase-2/04).
+ *
+ * `docs/architecture/dashboard-widget-inventory.md` is a derived document, and a derived document
+ * nobody verifies is accurate for exactly as long as nobody touches the dashboard. The inventory
+ * test imports this and fails when a widget is added, removed or renamed without the table moving.
+ *
+ * A value export, not a route export: this module is a component, so nothing here reaches the
+ * server layer and there is no client bundle to poison.
+ */
+export const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
   {
     id: 'first-hunt',
     title: 'Run your first hunt',
@@ -200,21 +224,31 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
       if (summary.kind === 'empty') return true
       return (summary.kind === 'ready' || summary.kind === 'stale') && summary.data.trackedBuilders === 0
     },
-    render: () => (
-      <div className="p-6 text-center">
-        <div className="inline-flex w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-4">
-          <Sparkles className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+    /*
+     * The one screen every route reaches, so it is the one that has to speak their language (plan:
+     * phase-2/04). It told everybody to run their first hunt — including a builder who came to claim
+     * a profile, for whom tracking nobody is the normal state rather than a gap to fill.
+     *
+     * It also covers the hole the widget inventory names: `profile-owner` hides when there is no
+     * claim, so a builder with nothing claimed would otherwise be left with tiles about strangers.
+     */
+    render: (ctx) => {
+      const { cta } = dashboardPresetFor(ctx.presetId)
+      return (
+        <div className="p-6 text-center" data-testid="dashboard-empty-cta" data-preset={ctx.presetId}>
+          <div className="inline-flex w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-4">
+            <Sparkles className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2 text-bh-text">{cta.heading}</h3>
+          <p className="text-sm text-bh-text-muted max-w-md mx-auto mb-4 font-light">
+            {cta.description}
+          </p>
+          <LinkButton to={cta.to} variant="primary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+            {cta.label} <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </LinkButton>
         </div>
-        <h3 className="text-xl font-semibold mb-2 text-bh-text">Run your first hunt</h3>
-        <p className="text-sm text-bh-text-muted max-w-md mx-auto mb-4 font-light">
-          Pick a topic you care about, a framework, a stack, a community, and we'll surface
-          the people actively shipping in it.
-        </p>
-        <LinkButton to="/search" variant="primary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
-          Start your first hunt <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-        </LinkButton>
-      </div>
-    ),
+      )
+    },
   },
 
   /*
@@ -757,6 +791,20 @@ const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
 ])
 
 /**
+ * The presets are checked here, where the registry is (plan: phase-2/04).
+ *
+ * Same reasoning as `defineWidgetRegistry`'s own throws: a preset naming a widget that no longer
+ * exists promotes nothing and says nothing, and one hiding the action queue would be a route doing
+ * what a user preference is already forbidden from doing. Both are silent at runtime, so they fail
+ * at import instead — a dashboard that renders with one route quietly wrong is worse than a
+ * dashboard that fails its own unit test.
+ */
+assertPresetsMatchRegistry(
+  new Set(HOME_WIDGETS.map((widget) => widget.id)),
+  new Set(HOME_WIDGETS.filter((widget) => widget.criticality === 'critical').map((widget) => widget.id)),
+)
+
+/**
  * Loads the organization-admin overview and renders the section, or nothing (plan 57, Admin track).
  *
  * ## Why the role is not checked here
@@ -800,6 +848,9 @@ export function DashboardPage() {
   const { preferences, setDensity, toggleHidden, togglePinned, setOrder, resetPreferences } = useDashboardPreferences()
   const density = preferences.density
   const viewerRole = useViewerRole()
+  // Which route this dashboard is composing for. Falls back to `general` on any failure — see the
+  // hook, and see `resolvePresetLayout` for what `general` contributes, which is nothing.
+  const { context: dashboardContext, isLoading: contextLoading } = useDashboardContext()
   const [customizeOpen, setCustomizeOpen] = React.useState(false)
   /*
    * Radix restores focus to whatever held it when the dialog opened — but this dialog is opened by a
@@ -1008,15 +1059,37 @@ export function DashboardPage() {
    * the spec and do not exist yet, so any widget declaring them is omitted rather than rendered
    * empty — an empty "Pipeline snapshot" implies a pipeline with nothing in it.
    */
+  /**
+   * The segment preset, resolved *before* the layout and *after* eligibility (plan: phase-2/04).
+   *
+   * `resolvePresetLayout` decides what the route contributes and what the person's own arrangement
+   * contributes, one dimension at a time. On `general` — a null segment, a failed context request,
+   * or a segment value from a future build — it contributes nothing at all, so this call is the
+   * identity and the dashboard everybody has today is byte-for-byte the page it was.
+   *
+   * Eligibility still runs first inside `orderedWidgets`: a preset may promote a widget the role
+   * cannot see, and the answer is that the role wins. A preset is presentation and grants nothing.
+   */
+  const presetLayout = React.useMemo(
+    () => resolvePresetLayout(dashboardPresetFor(dashboardContext.presetId), {
+      hiddenWidgetIds: preferences.hiddenWidgetIds,
+      pinnedWidgetIds: preferences.pinnedWidgetIds,
+      orderedWidgetIds: preferences.orderedWidgetIds,
+    }),
+    [dashboardContext.presetId, preferences.hiddenWidgetIds, preferences.orderedWidgetIds, preferences.pinnedWidgetIds],
+  )
+
   const resolved = React.useMemo(
     () => orderedWidgets(HOME_WIDGETS, {
       role: viewerRole,
-      available: SHIPPED_CAPABILITIES,
-      hidden: new Set(preferences.hiddenWidgetIds),
-      order: preferences.orderedWidgetIds,
-      pinned: preferences.pinnedWidgetIds,
+      // Served rather than compiled in, so "has this shipped" is answered by the deployment handling
+      // the request instead of by whatever build the browser happens to be holding.
+      available: new Set(dashboardContext.capabilities),
+      hidden: presetLayout.hidden,
+      order: presetLayout.order,
+      pinned: presetLayout.pinned,
     }),
-    [viewerRole, preferences.hiddenWidgetIds, preferences.orderedWidgetIds, preferences.pinnedWidgetIds],
+    [viewerRole, dashboardContext.capabilities, presetLayout],
   )
   const visibleWidgets = resolved.visible
 
@@ -1031,11 +1104,12 @@ export function DashboardPage() {
       triggers,
       error,
       statsData,
+      presetId: dashboardContext.presetId,
       onQueriesChanged: refetchQueries,
       currentUserId: currentUserId ?? '',
       overview,
     }),
-    [loading, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
+    [loading, queries, recent, sprints, triggers, error, statsData, dashboardContext.presetId, refetchQueries, currentUserId, overview],
   )
 
   /**
@@ -1155,7 +1229,12 @@ export function DashboardPage() {
       // Both, not just the lists. The projection is the core fetch now, so a `ready` that ignored it would let a
       // spec navigate away while the overview request was still open — which is the exact console noise this
       // attribute exists to prevent.
-      data-dashboard-state={loading || overview.isLoading ? 'loading' : 'ready'}
+      // The context joins the settle signal for two reasons, and the second is the one that bites.
+      // A spec navigating away mid-request gets the same aborted-fetch console noise this attribute
+      // exists to prevent — and the preset arrives with it, so `ready` before it landed would mean
+      // "settled" on a page that is about to reorder itself. An e2e that read the sequence there
+      // read the general one, which is how this was found.
+      data-dashboard-state={loading || overview.isLoading || contextLoading ? 'loading' : 'ready'}
       initial={reduceMotion ? false : fadeInUp.initial}
       animate={fadeInUp.animate}
       transition={fadeInUp.transition}

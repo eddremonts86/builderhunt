@@ -148,6 +148,18 @@ const zodEnv = z.object({
    * unreadable clamps to 0. An unreadable percentage must mean "off", never "everybody".
    */
   ONBOARDING_V2_ROLLOUT_PERCENT: z.string().default('0'),
+  /**
+   * Whether the dashboard composes from a segment preset (plan: phase-2/04-dashboard-personalizado).
+   *
+   * Off by default, and off means `general` for everybody — the layout every account already has.
+   * Enforced in `/api/dashboard/context`, which answers `presetId: 'general'` regardless of the
+   * stored segment, so there is exactly one place the decision lives and the client needs no branch
+   * that could drift out of step with it.
+   *
+   * A boolean rather than a percentage: unlike onboarding, nobody is ever mid-flow on a dashboard.
+   * Turning this off is a page that reorders on the next load, not somebody stranded.
+   */
+  DASHBOARD_PRESETS_ENABLED: z.enum(['true', 'false']).default('false'),
   // Plan: audit-trust — profile-removal/global-suppression subsystem. Off by default: a new
   // security-critical flow that hashes requester email/challenge with a dedicated key distinct
   // from BETTER_AUTH_SECRET (spec.md: "must not reuse BETTER_AUTH_SECRET").
