@@ -32,10 +32,21 @@
  */
 import type { SegmentPreset } from '~/shared/lib/user-segments'
 
+/**
+ * Where a route's call to action goes.
+ *
+ * A closed union rather than a string, so "a preset never invents a destination" is enforced by the
+ * compiler rather than asserted in a comment — and so the router's own typed `to` accepts it without
+ * a cast that would let a typo through as a dead link.
+ */
+export type DashboardCtaDestination = '/search' | '/sprints' | '/me'
+
 export interface DashboardPresetCta {
+  /** The tile's heading. */
+  heading: string
+  /** The button, which must not repeat the heading — one screen saying the same thing twice. */
   label: string
-  /** A path the product already has. A preset never invents a destination. */
-  to: string
+  to: DashboardCtaDestination
   description: string
 }
 
@@ -70,22 +81,29 @@ export const DASHBOARD_PRESETS: Record<SegmentPreset, DashboardPreset> = {
     id: 'general',
     lead: [],
     hidden: [],
+    /*
+     * Word for word what this tile said before there were routes. The general route is what every
+     * account has until it chooses a goal, so changing its copy would be changing the product for
+     * everybody — and the visual baseline for the empty dashboard is the evidence that it did not.
+     */
     cta: {
-      label: 'Run a search',
+      heading: 'Run your first hunt',
+      label: 'Start your first hunt',
       to: '/search',
-      description: 'Find people shipping in a stack, a topic or a community.',
+      description: "Pick a topic you care about, a framework, a stack, a community, and we'll surface the people actively shipping in it.",
     },
   },
 
-  /** `other` *is* the general experience, not a fifth variant. Same object, said explicitly. */
+  /** `other` *is* the general experience, not a fifth variant. Same copy, said explicitly. */
   other: {
     id: 'other',
     lead: [],
     hidden: [],
     cta: {
-      label: 'Run a search',
+      heading: 'Run your first hunt',
+      label: 'Start your first hunt',
       to: '/search',
-      description: 'Find people shipping in a stack, a topic or a community.',
+      description: "Pick a topic you care about, a framework, a stack, a community, and we'll surface the people actively shipping in it.",
     },
   },
 
@@ -101,9 +119,10 @@ export const DASHBOARD_PRESETS: Record<SegmentPreset, DashboardPreset> = {
     // recruiter does, and it is one of the five widgets that costs its own request.
     hidden: ['source-mix'],
     cta: {
-      label: 'Start a sourcing sprint',
+      heading: 'Start a sourcing sprint',
+      label: 'Create a sprint',
       to: '/sprints',
-      description: 'Give a role a deadline and let the sprint work the sources for you.',
+      description: 'Give a role a deadline and let the sprint work the sources for you, so a shortlist exists before you go looking for one.',
     },
   },
 
@@ -118,9 +137,10 @@ export const DASHBOARD_PRESETS: Record<SegmentPreset, DashboardPreset> = {
     // Both are about running a hiring process, which this route does not have.
     hidden: ['review', 'shortlists'],
     cta: {
-      label: 'Save a search',
+      heading: 'Save your first search',
+      label: 'Run a search',
       to: '/search',
-      description: 'Turn a thesis into a search that keeps running and tells you what it finds.',
+      description: 'Turn a thesis into a search that keeps running, and hear about what it finds instead of going back to look.',
     },
   },
 
@@ -138,9 +158,10 @@ export const DASHBOARD_PRESETS: Record<SegmentPreset, DashboardPreset> = {
     lead: ['profile-owner', 'activity', 'recent-builders'],
     hidden: ['review', 'shortlists', 'source-mix', 'alert-volume'],
     cta: {
-      label: 'Complete your profile',
+      heading: 'Complete your profile',
+      label: 'Go to my profile',
       to: '/me',
-      description: 'Add your topics and what you are open to. What you fill in is what people see.',
+      description: 'Add your topics and what you are open to. What you fill in is what people see — nothing else is shown.',
     },
   },
 }

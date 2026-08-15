@@ -36,9 +36,12 @@ describe('every route has a preset', () => {
 
   it('gives each route a CTA that goes somewhere', () => {
     for (const preset of Object.values(DASHBOARD_PRESETS)) {
+      expect(preset.cta.heading.length, preset.id).toBeGreaterThan(0)
       expect(preset.cta.label.length, preset.id).toBeGreaterThan(0)
       expect(preset.cta.to.startsWith('/'), preset.id).toBe(true)
       expect(preset.cta.description.length, preset.id).toBeGreaterThan(20)
+      // One screen saying the same thing twice reads as a template nobody filled in.
+      expect(preset.cta.label, preset.id).not.toBe(preset.cta.heading)
     }
   })
 })
@@ -75,6 +78,17 @@ describe('the general route changes nothing', () => {
   it('is what `other` resolves to as well', () => {
     expect(DASHBOARD_PRESETS.other.lead).toEqual(DASHBOARD_PRESETS.general.lead)
     expect(DASHBOARD_PRESETS.other.hidden).toEqual(DASHBOARD_PRESETS.general.hidden)
+    expect(DASHBOARD_PRESETS.other.cta).toEqual(DASHBOARD_PRESETS.general.cta)
+  })
+
+  /**
+   * The copy the empty dashboard has always shown, word for word. Changing it would change the
+   * product for every account without a segment, which is every account until the ramp starts —
+   * and the visual baseline for the empty dashboard is what proves it did not.
+   */
+  it('keeps the empty-state copy it had before there were routes', () => {
+    expect(DASHBOARD_PRESETS.general.cta.heading).toBe('Run your first hunt')
+    expect(DASHBOARD_PRESETS.general.cta.label).toBe('Start your first hunt')
   })
 })
 

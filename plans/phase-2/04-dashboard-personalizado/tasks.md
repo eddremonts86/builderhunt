@@ -80,18 +80,43 @@
   - El plan viaja para que el dashboard pueda decir "eso es de otro plan" en vez de esconder el
     widget. Esconderlo diría que la función no existe.
 
-- [ ] **Implementar presets**
+- [x] **Implementar presets**
   - Files: `src/modules/dashboard/ui/home/dashboard-presets.ts`, `tests/unit/modules/dashboard/ui/home/DashboardComposer.test.tsx`
   - Do: configurar contenido/CTA y empty states honestos por segmento.
   - Verify: component tests y screenshots mobile/desktop por preset.
+  - Result: el CTA vive en el preset y lo renderiza `first-hunt`, que es la única pantalla a la que
+    llega toda ruta en una cuenta nueva. Cubierto por `tests/e2e/dashboard-presets.spec.ts` (7 specs,
+    uno de ellos `@mobile-only`) y por los 23 unitarios de presets.
+  - Le decía a todo el mundo que corriera su primera búsqueda — **incluido un builder que vino a
+    reclamar su perfil**, para quien no seguir a nadie es el estado normal y no un hueco que llenar.
+    Además tapa el agujero que el inventario señala: `profile-owner` se esconde sin claim, así que un
+    builder sin nada reclamado se quedaba con tiles sobre desconocidos.
+  - **La copy de `general` es palabra por palabra la de antes**, y las 44 baselines visuales pasan
+    **sin regenerar una sola imagen**. Esa es la prueba de que la ruta que tiene todo el mundo no se
+    movió; un texto nuevo "equivalente" habría cambiado el producto para todas las cuentas sin
+    segmento, que son todas hasta que empiece la rampa.
+  - Encontrado mirando la captura del fallo: el encabezado y el botón decían lo mismo. El CTA tiene
+    `heading` y `label` separados y un test rechaza que coincidan — una pantalla repitiéndose lee
+    como una plantilla sin rellenar.
+  - Los ficheros no son los que lista la tarea: el preset ya vivía en `lib/dashboard-presets.ts`
+    desde la tarea 2, y un segundo módulo en `ui/home/` habría sido una segunda fuente de verdad.
 
-- [ ] **Integrar presets con las preferencias ya persistidas**
+- [x] **Integrar presets con las preferencias ya persistidas**
   - Files: `src/shared/lib/dashboard/preferences-contract.ts`, `src/shared/lib/repositories/dashboard-preferences.ts`, `src/routes/api/dashboard/preferences.ts`, `tests/e2e/dashboard-and-navigation.spec.ts`
   - Do: conservar `revision`, `schemaVersion`, `hiddenWidgetIds`, `pinnedWidgetIds` y
     `orderedWidgetIds`; definir cómo un cambio de segmento mantiene o restaura el layout sin crear
     una segunda API ni una segunda tabla.
   - Verify: los tests existentes de aislamiento/conflicto siguen verdes y un e2e cambia de segmento,
     conserva layout, restaura preset y refresca la página.
+  - Result: **ni una línea del contrato de preferencias cambió.** `revision`, `schemaVersion` y las
+    tres listas están intactas, no hay tabla nueva ni endpoint nuevo, y los 20 e2e de dashboard
+    (incluidos los de aislamiento y conflicto) siguen verdes.
+  - La regla es una sola frase: **el preset aplica a lo que nadie ha ordenado, dimensión a
+    dimensión.** Una lista con contenido es de la persona y gana; una vacía significa que nadie ha
+    ordenado nada y la ruta pone su default. Vaciar una lista es cómo se restaura el preset, que es
+    exactamente lo que el reset del diálogo ya escribe.
+  - Cubierto por tres specs: cambiar de segmento conserva el layout guardado, vaciarlo restaura la
+    ruta, y un widget que la ruta esconde sigue siendo restaurable.
 
 - [ ] **Medir rendimiento y rollout**
   - Files: `scripts/check-performance-budgets.mjs`, `.env.example`, `docs/operations/personalized-dashboard-rollout.md`

@@ -33,6 +33,7 @@ import {
   resolvePresetLayout,
 } from '~/modules/dashboard/lib/dashboard-presets'
 import { useDashboardContext } from '~/modules/dashboard/lib/use-dashboard-context'
+import type { SegmentPreset } from '~/shared/lib/user-segments'
 import type { WidgetDependency } from '~/modules/dashboard/lib/contracts'
 import { ActivityWidget } from '~/modules/dashboard/ui/home/ActivityWidget'
 import { MetricWidget, type MetricWidgetProps } from '~/modules/dashboard/ui/home/MetricWidget'
@@ -120,6 +121,13 @@ interface HomeContext {
   triggers: AlertTrigger[]
   error: string | null
   statsData: MetricWidgetProps[]
+  /**
+   * Which route this dashboard is composing for (plan: phase-2/04).
+   *
+   * Carried on the context rather than read per widget, so the empty state and the widgets agree on
+   * one answer. `general` for a null segment and for any failure — the flow everybody already had.
+   */
+  presetId: SegmentPreset
   onQueriesChanged: () => void
   currentUserId: string
   /**
@@ -216,21 +224,31 @@ export const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
       if (summary.kind === 'empty') return true
       return (summary.kind === 'ready' || summary.kind === 'stale') && summary.data.trackedBuilders === 0
     },
-    render: () => (
-      <div className="p-6 text-center">
-        <div className="inline-flex w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-4">
-          <Sparkles className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+    /*
+     * The one screen every route reaches, so it is the one that has to speak their language (plan:
+     * phase-2/04). It told everybody to run their first hunt — including a builder who came to claim
+     * a profile, for whom tracking nobody is the normal state rather than a gap to fill.
+     *
+     * It also covers the hole the widget inventory names: `profile-owner` hides when there is no
+     * claim, so a builder with nothing claimed would otherwise be left with tiles about strangers.
+     */
+    render: (ctx) => {
+      const { cta } = dashboardPresetFor(ctx.presetId)
+      return (
+        <div className="p-6 text-center" data-testid="dashboard-empty-cta" data-preset={ctx.presetId}>
+          <div className="inline-flex w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-4">
+            <Sparkles className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2 text-bh-text">{cta.heading}</h3>
+          <p className="text-sm text-bh-text-muted max-w-md mx-auto mb-4 font-light">
+            {cta.description}
+          </p>
+          <LinkButton to={cta.to} variant="primary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+            {cta.label} <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </LinkButton>
         </div>
-        <h3 className="text-xl font-semibold mb-2 text-bh-text">Run your first hunt</h3>
-        <p className="text-sm text-bh-text-muted max-w-md mx-auto mb-4 font-light">
-          Pick a topic you care about, a framework, a stack, a community, and we'll surface
-          the people actively shipping in it.
-        </p>
-        <LinkButton to="/search" variant="primary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
-          Start your first hunt <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-        </LinkButton>
-      </div>
-    ),
+      )
+    },
   },
 
   /*
@@ -832,7 +850,7 @@ export function DashboardPage() {
   const viewerRole = useViewerRole()
   // Which route this dashboard is composing for. Falls back to `general` on any failure — see the
   // hook, and see `resolvePresetLayout` for what `general` contributes, which is nothing.
-  const { context: dashboardContext } = useDashboardContext()
+  const { context: dashboardContext, isLoading: contextLoading } = useDashboardContext()
   const [customizeOpen, setCustomizeOpen] = React.useState(false)
   /*
    * Radix restores focus to whatever held it when the dialog opened — but this dialog is opened by a
@@ -1086,11 +1104,12 @@ export function DashboardPage() {
       triggers,
       error,
       statsData,
+      presetId: dashboardContext.presetId,
       onQueriesChanged: refetchQueries,
       currentUserId: currentUserId ?? '',
       overview,
     }),
-    [loading, queries, recent, sprints, triggers, error, statsData, refetchQueries, currentUserId, overview],
+    [loading, queries, recent, sprints, triggers, error, statsData, dashboardContext.presetId, refetchQueries, currentUserId, overview],
   )
 
   /**
@@ -1210,7 +1229,12 @@ export function DashboardPage() {
       // Both, not just the lists. The projection is the core fetch now, so a `ready` that ignored it would let a
       // spec navigate away while the overview request was still open — which is the exact console noise this
       // attribute exists to prevent.
-      data-dashboard-state={loading || overview.isLoading ? 'loading' : 'ready'}
+      // The context joins the settle signal for two reasons, and the second is the one that bites.
+      // A spec navigating away mid-request gets the same aborted-fetch console noise this attribute
+      // exists to prevent — and the preset arrives with it, so `ready` before it landed would mean
+      // "settled" on a page that is about to reorder itself. An e2e that read the sequence there
+      // read the general one, which is how this was found.
+      data-dashboard-state={loading || overview.isLoading || contextLoading ? 'loading' : 'ready'}
       initial={reduceMotion ? false : fadeInUp.initial}
       animate={fadeInUp.animate}
       transition={fadeInUp.transition}
