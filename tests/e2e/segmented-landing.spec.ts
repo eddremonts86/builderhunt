@@ -115,6 +115,23 @@ test('the goal hint reaches the page and is not a preference', async ({ page, ba
   expect(JSON.stringify(stored)).not.toContain('primary_segment')
 })
 
+/**
+ * The one link that leaves the public site carries the hint (plan: phase-2/06-landing-segmentada).
+ *
+ * In the served HTML, because that is where it has to be: the query is dropped by the form itself,
+ * and a hint that only exists once a client bundle has rewritten the href is a hint that a slow
+ * connection loses. What happens on the other side — the stash, its TTL, and a stored choice
+ * outranking it — is `onboarding-goal.spec.ts`.
+ */
+test.describe('the hint into sign-up', () => {
+  for (const page of PAGES) {
+    test(`/for/${page.slug} sends its own segment to the sign-up form`, async ({ request, baseURL }) => {
+      const html = await (await request.get(`${baseURL}/for/${page.slug}`)).text()
+      expect(html).toMatch(new RegExp(`href="/auth/sign-up\\?[^"]*goal=${page.segment}`))
+    })
+  }
+})
+
 test('the sitemap lists every segment page exactly once', async ({ request, baseURL }) => {
   const xml = await (await request.get(`${baseURL}/sitemap.xml`)).text()
   for (const content of PAGES) {

@@ -36,7 +36,13 @@ export function SegmentLandingPage({ page }: { page: SegmentPageContent }) {
           {page.cta.label}
           <ArrowRight className="w-4 h-4 ml-1" aria-hidden="true" />
         </LinkButton>
-        <LinkButton to="/auth/sign-up" variant="secondary">
+        {/*
+          The hint travels with the person who signs up from here, because this is the only link on
+          the page that leaves the public site. `SignUpPage` stashes it on success and the goal step
+          reads it once — see `landing-segment-hint.ts` for why it is a same-tab, expiring stash and
+          not a cookie.
+        */}
+        <LinkButton to="/auth/sign-up" search={{ goal: page.segment }} variant="secondary">
           Create an account
         </LinkButton>
       </div>

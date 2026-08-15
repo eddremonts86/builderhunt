@@ -77,10 +77,32 @@
   - Encontrado por el navegador: edité primero `HeroGlass.tsx`, que **no lo importa nadie**. Es código
     muerto y el cambio quedó revertido; la home tiene su propio hero en `HomePage.tsx`.
 
-- [ ] **Preservar hint hasta onboarding**
+- [x] **Preservar hint hasta onboarding**
   - Files: `src/shared/lib/landing-segment-hint.ts`, `src/modules/auth/components/SignUpPage.tsx`, `src/routes/onboarding/goal.tsx`
   - Do: validar, TTL, first-party storage y precedencia de preferencia persistida.
   - Verify: e2e landing → signup → goal y valores manipulados/expirados.
+  - Result: `stashSegmentHint` / `consumeSegmentHint` en `landing-segment-hint.ts`. El hueco era el
+    formulario: el CTA de la página de segmento llevaba `?goal=`, y **la query muere en `/auth/sign-up`**
+    — otra página, otra URL. El hint espera en `sessionStorage` mientras alguien rellena el formulario.
+  - `sessionStorage` y **no una cookie**: una cookie viaja al servidor en cada request, lo que convierte
+    una preselección en algo que el backend puede leer y usar, y lo único que este valor no puede hacer
+    nunca es entrar en una decisión. Tampoco `localStorage`, que sobreviviría a la visita y decidiría un
+    onboarding empezado semanas después desde un enlace que nadie recuerda haber pulsado.
+  - TTL de 30 minutos **escrito dentro del valor**, no delegado a lo que el navegador decida conservar.
+    Una entrada sin `expiresAt` cuenta como caducada — es la forma obvia de intentar hacer una permanente.
+  - **Un solo uso, y se borra antes de validarse.** Un hint que falla la validación es un hint que ya se
+    ha visto; dejarlo ahí significaría reparsear la misma basura en cada pantalla posterior que pregunte.
+  - Se revalida al leer: `sessionStorage` lo escribe cualquier cosa que corra en el origen, así que lo que
+    sale de ahí no merece más confianza que lo que salía de la URL. Nueve formas forjadas cubiertas en
+    unit tests, tres de ellas también en el navegador.
+  - **Precedencia: elección guardada > URL > stash.** Lo guardado es algo que esta persona dijo; un hint
+    es una suposición leída de una URL, y la URL es la mitad que controla otro. Lo peor que puede hacer
+    un enlace fabricado es ofrecer un cambio que aún hay que confirmar con Continue. La preferencia llega
+    por fetch, después del primer paint, y **solo pisa un formulario que nadie ha tocado**.
+  - Verificado en `tests/e2e/onboarding-goal.spec.ts`: la cadena entera en navegador — página pública,
+    formulario de alta real, y el paso de objetivo con la URL desnuda al otro lado — más caducado,
+    forjado, un solo uso, y las dos reglas de precedencia. La cuenta nueva termina con `primary_segment`
+    a `null`: sigue siendo solo una preselección.
 
 - [~] **Actualizar descubrimiento SEO**
   - Files: `src/routes/sitemap[.]xml.ts`, `src/routes/robots[.]txt.ts`, `src/routes/__root.tsx`
