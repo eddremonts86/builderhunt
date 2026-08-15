@@ -80,6 +80,9 @@ import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slu
 import { Route as LandingChangelogIndexRouteImport } from './routes/_landing/changelog/index'
 import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/changelog/$slug'
 import { Route as LandingExploreIndexRouteImport } from './routes/_landing/explore/index'
+import { Route as LandingForBuildersRouteImport } from './routes/_landing/for/builders'
+import { Route as LandingForHiringTeamsRouteImport } from './routes/_landing/for/hiring-teams'
+import { Route as LandingForInvestorsRouteImport } from './routes/_landing/for/investors'
 import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal/cookies'
 import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal/imprint'
 import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
@@ -673,6 +676,21 @@ const LandingChangelogSlugRoute = LandingChangelogSlugRouteImport.update({
 const LandingExploreIndexRoute = LandingExploreIndexRouteImport.update({
   id: '/explore/',
   path: '/explore/',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingForBuildersRoute = LandingForBuildersRouteImport.update({
+  id: '/for/builders',
+  path: '/for/builders',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingForHiringTeamsRoute = LandingForHiringTeamsRouteImport.update({
+  id: '/for/hiring-teams',
+  path: '/for/hiring-teams',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingForInvestorsRoute = LandingForInvestorsRouteImport.update({
+  id: '/for/investors',
+  path: '/for/investors',
   getParentRoute: () => LandingRouteRoute,
 } as any)
 const LandingLegalCookiesRoute = LandingLegalCookiesRouteImport.update({
@@ -2011,6 +2029,9 @@ export interface FileRoutesByFullPath {
   '/team/activity': typeof DashboardTeamActivityRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
+  '/for/builders': typeof LandingForBuildersRoute
+  '/for/hiring-teams': typeof LandingForHiringTeamsRoute
+  '/for/investors': typeof LandingForInvestorsRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -2312,6 +2333,9 @@ export interface FileRoutesByTo {
   '/team/activity': typeof DashboardTeamActivityRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
+  '/for/builders': typeof LandingForBuildersRoute
+  '/for/hiring-teams': typeof LandingForHiringTeamsRoute
+  '/for/investors': typeof LandingForInvestorsRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -2618,6 +2642,9 @@ export interface FileRoutesById {
   '/_dashboard/team/activity': typeof DashboardTeamActivityRoute
   '/_landing/blog/$slug': typeof LandingBlogSlugRoute
   '/_landing/changelog/$slug': typeof LandingChangelogSlugRoute
+  '/_landing/for/builders': typeof LandingForBuildersRoute
+  '/_landing/for/hiring-teams': typeof LandingForHiringTeamsRoute
+  '/_landing/for/investors': typeof LandingForInvestorsRoute
   '/_landing/legal/cookies': typeof LandingLegalCookiesRoute
   '/_landing/legal/imprint': typeof LandingLegalImprintRoute
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -2923,6 +2950,9 @@ export interface FileRouteTypes {
     | '/team/activity'
     | '/blog/$slug'
     | '/changelog/$slug'
+    | '/for/builders'
+    | '/for/hiring-teams'
+    | '/for/investors'
     | '/legal/cookies'
     | '/legal/imprint'
     | '/legal/privacy'
@@ -3224,6 +3254,9 @@ export interface FileRouteTypes {
     | '/team/activity'
     | '/blog/$slug'
     | '/changelog/$slug'
+    | '/for/builders'
+    | '/for/hiring-teams'
+    | '/for/investors'
     | '/legal/cookies'
     | '/legal/imprint'
     | '/legal/privacy'
@@ -3529,6 +3562,9 @@ export interface FileRouteTypes {
     | '/_dashboard/team/activity'
     | '/_landing/blog/$slug'
     | '/_landing/changelog/$slug'
+    | '/_landing/for/builders'
+    | '/_landing/for/hiring-teams'
+    | '/_landing/for/investors'
     | '/_landing/legal/cookies'
     | '/_landing/legal/imprint'
     | '/_landing/legal/privacy'
@@ -4474,6 +4510,27 @@ declare module '@tanstack/react-router' {
       path: '/explore'
       fullPath: '/explore/'
       preLoaderRoute: typeof LandingExploreIndexRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/for/builders': {
+      id: '/_landing/for/builders'
+      path: '/for/builders'
+      fullPath: '/for/builders'
+      preLoaderRoute: typeof LandingForBuildersRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/for/hiring-teams': {
+      id: '/_landing/for/hiring-teams'
+      path: '/for/hiring-teams'
+      fullPath: '/for/hiring-teams'
+      preLoaderRoute: typeof LandingForHiringTeamsRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/for/investors': {
+      id: '/_landing/for/investors'
+      path: '/for/investors'
+      fullPath: '/for/investors'
+      preLoaderRoute: typeof LandingForInvestorsRouteImport
       parentRoute: typeof LandingRouteRoute
     }
     '/_landing/legal/cookies': {
@@ -6231,6 +6288,9 @@ interface LandingRouteRouteChildren {
   LandingStatusRoute: typeof LandingStatusRoute
   LandingIndexRoute: typeof LandingIndexRoute
   LandingBlogSlugRoute: typeof LandingBlogSlugRoute
+  LandingForBuildersRoute: typeof LandingForBuildersRoute
+  LandingForHiringTeamsRoute: typeof LandingForHiringTeamsRoute
+  LandingForInvestorsRoute: typeof LandingForInvestorsRoute
   LandingLegalCookiesRoute: typeof LandingLegalCookiesRoute
   LandingLegalImprintRoute: typeof LandingLegalImprintRoute
   LandingLegalPrivacyRoute: typeof LandingLegalPrivacyRoute
@@ -6249,6 +6309,9 @@ const LandingRouteRouteChildren: LandingRouteRouteChildren = {
   LandingStatusRoute: LandingStatusRoute,
   LandingIndexRoute: LandingIndexRoute,
   LandingBlogSlugRoute: LandingBlogSlugRoute,
+  LandingForBuildersRoute: LandingForBuildersRoute,
+  LandingForHiringTeamsRoute: LandingForHiringTeamsRoute,
+  LandingForInvestorsRoute: LandingForInvestorsRoute,
   LandingLegalCookiesRoute: LandingLegalCookiesRoute,
   LandingLegalImprintRoute: LandingLegalImprintRoute,
   LandingLegalPrivacyRoute: LandingLegalPrivacyRoute,

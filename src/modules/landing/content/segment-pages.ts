@@ -39,6 +39,15 @@ export interface SegmentPageContent {
   segment: SegmentPageKey
   /** The path under `/for/`. Part of the contract because the sitemap and the tests both read it. */
   slug: string
+  /**
+   * The route, as a literal the router accepts.
+   *
+   * Three static routes rather than one `/for/$slug`, which is what the plan asks for and what SEO
+   * needs: the sitemap, the crawler and the router all know these three paths exist, and a dynamic
+   * segment that only ever accepts three values is a route that *looks* open-ended to everything
+   * that reads it.
+   */
+  path: '/for/hiring-teams' | '/for/investors' | '/for/builders'
   title: string
   metaDescription: string
   heading: string
@@ -59,6 +68,7 @@ export const SEGMENT_PAGES: Record<SegmentPageKey, SegmentPageContent> = {
   hiring: {
     segment: 'hiring',
     slug: 'hiring-teams',
+    path: '/for/hiring-teams',
     title: 'Find builders by what they ship',
     metaDescription:
       `Search across ${SEARCH_SOURCE_COUNT} public sources for people actively shipping in your stack, and keep the search running.`,
@@ -98,6 +108,7 @@ export const SEGMENT_PAGES: Record<SegmentPageKey, SegmentPageContent> = {
   investing: {
     segment: 'investing',
     slug: 'investors',
+    path: '/for/investors',
     title: 'Track what is being built, and by whom',
     metaDescription:
       `Save a thesis as a search that keeps running across ${SEARCH_SOURCE_COUNT} public sources, and hear about what it finds.`,
@@ -133,6 +144,7 @@ export const SEGMENT_PAGES: Record<SegmentPageKey, SegmentPageContent> = {
   building: {
     segment: 'building',
     slug: 'builders',
+    path: '/for/builders',
     title: 'Claim the profile we already indexed',
     metaDescription:
       'Your work is spread across five platforms. Claim the profile BuilderHunt indexed and decide what it says.',
