@@ -173,3 +173,18 @@ test('an unauthenticated visitor is sent to sign in', async ({ page }) => {
   await page.goto(`${harness.baseURL}/onboarding/building`)
   await page.waitForURL(/\/auth\/sign-in/)
 })
+
+/** The same smoke on the other branch — see the note in `onboarding-investing.spec.ts` for the tag. */
+test('the claim step fits a phone @mobile-only', async ({ page }) => {
+  await page.context().addCookies(harness.owner.storageState!.cookies)
+  await page.goto(`${harness.baseURL}/onboarding/building`)
+
+  await page.getByTestId('building-handle').fill(HANDLE)
+  await page.getByTestId('building-find').click()
+  await expect(page.getByTestId('building-candidates')).toBeVisible()
+
+  const viewportWidth = page.viewportSize()?.width ?? 0
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth)
+  expect(scrollWidth).toBeLessThanOrEqual(viewportWidth + 1)
+  await expect(page.getByTestId('building-claim').first()).toBeInViewport()
+})

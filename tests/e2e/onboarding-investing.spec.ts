@@ -195,3 +195,31 @@ test('an unauthenticated visitor is sent to sign in', async ({ page }) => {
   await page.goto(`${harness.baseURL}/onboarding/investing`)
   await page.waitForURL(/\/auth\/sign-in/)
 })
+
+/**
+ * The smoke the plan's Verify line asks for on a phone.
+ *
+ * The `mobile` project only runs tests tagged `@mobile-only`, so a spec that does not carry the tag
+ * has no mobile coverage however many times it is run with `--project=mobile` — the project's `grep`
+ * simply matches nothing and the run reports green.
+ *
+ * What it checks is the thing a small viewport actually breaks: the theme chips are a wrapping row
+ * and the composed-query preview is a long string, either of which can push the page wider than the
+ * screen. Horizontal overflow is the failure; the rest of the behaviour is covered above.
+ */
+test('the thesis step fits a phone @mobile-only', async ({ page }) => {
+  await page.context().addCookies(harness.owner.storageState!.cookies)
+  await page.goto(`${harness.baseURL}/onboarding/investing`)
+
+  await expect(page.getByTestId('investing-themes')).toBeVisible()
+  await page.getByTestId('investing-theme').first().click()
+  await page.getByTestId('investing-free-text').fill('a fairly long thesis about grid software and storage')
+  await expect(page.getByTestId('investing-preview')).toBeVisible()
+
+  const viewportWidth = page.viewportSize()?.width ?? 0
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth)
+  expect(scrollWidth).toBeLessThanOrEqual(viewportWidth + 1)
+
+  // The primary action has to be reachable, not merely present.
+  await expect(page.getByTestId('investing-save')).toBeInViewport()
+})

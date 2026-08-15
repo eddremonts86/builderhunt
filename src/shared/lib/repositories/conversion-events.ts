@@ -12,10 +12,25 @@ export function utcDay(date: Date): string {
 }
 
 /**
- * Insert-if-new. `(sessionId, name, surface, variant)` is uniquely indexed,
- * so a client retry (network blip, double-submit) is a silent no-op rather
- * than double-counting a funnel step — this is the idempotency the spec
- * requires, enforced at the database rather than re-derived in app code.
+ * Insert-if-new. The identity index is
+ * `(sessionId, name, surface, variant, coalesce(step_key,''), coalesce(segment_next,''))`, so a
+ * client retry (network blip, double-submit) is a silent no-op rather than double-counting a funnel
+ * step — this is the idempotency the spec requires, enforced at the database rather than re-derived
+ * in app code.
+ *
+ * ## The dimensions are written, not dropped
+ *
+ * This used to insert six columns and discard everything else the validated event carried. The
+ * segment context plan 02 added passed validation, reached here, and vanished — so the segmentation
+ * funnel it was built for could never have been computed from this table. Every field the contract
+ * accepts is persisted now, or there is no reason for the contract to accept it.
+ *
+ * ## Why no `target` on the conflict clause
+ *
+ * The identity index is an expression index (`coalesce(...)`), which a column list cannot name.
+ * A bare `onConflictDoNothing()` covers any unique violation, which is the intent anyway: this is
+ * insert-if-new, and the `id` is a fresh UUID per call, so there is no other constraint it could
+ * mask.
  *
  * `db` defaults to the real `builderhunt_app`-scoped singleton; tests pass a
  * disposable superuser connection instead of monkey-patching module state.
@@ -33,7 +48,14 @@ export async function recordConversionEvent(
     variant: event.variant,
     occurredAt: new Date(event.occurredAt),
     serverDay: utcDay(now),
-  }).onConflictDoNothing({ target: [conversionEvents.sessionId, conversionEvents.name, conversionEvents.surface, conversionEvents.variant] })
+    flowVersion: event.onboarding?.flowVersion ?? null,
+    preset: event.onboarding?.preset ?? null,
+    stepKey: event.onboarding?.stepKey ?? null,
+    segmentPrevious: event.segment?.previous ?? null,
+    segmentNext: event.segment?.next ?? null,
+    segmentSource: event.segment?.source ?? null,
+    activationType: event.activationType ?? null,
+  }).onConflictDoNothing()
 }
 
 /** Deletes raw events with `serverDay` older than `retainDays` (default 30). Idempotent — a repeated run against an already-pruned range deletes nothing. */
@@ -109,4 +131,62 @@ export async function countConversionSessionsByEvent(
     counts.set(row.name, { sessions: Number(row.sessions ?? 0), events: Number(row.events ?? 0) })
   }
   return counts
+}
+
+export interface OnboardingFunnelRow {
+  name: string
+  flowVersion: number | null
+  preset: string | null
+  stepKey: string | null
+  sessions: number
+  events: number
+}
+
+/**
+ * The onboarding funnel, split by flow version, route and step (plan:
+ * phase-2/03-onboarding-segmentado).
+ *
+ * One query, grouped four ways rather than one query per cell. The cell count is bounded by the
+ * table's own CHECK constraints, not by how much data exists: three event names, two flow versions,
+ * five presets and sixteen step keys is 480 rows at absolute worst, and in practice a fraction of
+ * that because a step key only ever appears on the route that contains it.
+ *
+ * Split by `flowVersion` because that is what a cohort rollout is for. "Completion fell" is not
+ * actionable; "completion fell on v2 while v1 held" is the sentence that stops a rollout, and it
+ * cannot be written from a stream that does not distinguish the two.
+ */
+export async function countOnboardingFunnelSessions(
+  variant: 'baseline' | 'treatment',
+  startDay: string,
+  endDay: string,
+  db: PostgresJsDatabase = platformDb,
+): Promise<OnboardingFunnelRow[]> {
+  // unbounded-read-ok: grouped by four enum-constrained columns, so the row count is bounded by the
+  // CHECK constraints on `conversion_events` rather than by the size of the window. A LIMIT here
+  // would drop a route or a step rather than bound anything.
+  const rows = await db.select({
+    name: conversionEvents.name,
+    flowVersion: conversionEvents.flowVersion,
+    preset: conversionEvents.preset,
+    stepKey: conversionEvents.stepKey,
+    sessions: sql<number>`count(distinct ${conversionEvents.sessionId})`,
+    events: sql<number>`count(*)`,
+  })
+    .from(conversionEvents)
+    .where(and(
+      inArray(conversionEvents.name, ['onboarding_step_viewed', 'onboarding_step_completed', 'onboarding_flow_exited']),
+      eq(conversionEvents.variant, variant),
+      gte(conversionEvents.serverDay, startDay),
+      sql`${conversionEvents.serverDay} <= ${endDay}`,
+    ))
+    .groupBy(conversionEvents.name, conversionEvents.flowVersion, conversionEvents.preset, conversionEvents.stepKey)
+
+  return rows.map((row) => ({
+    name: row.name,
+    flowVersion: row.flowVersion ?? null,
+    preset: row.preset ?? null,
+    stepKey: row.stepKey ?? null,
+    sessions: Number(row.sessions ?? 0),
+    events: Number(row.events ?? 0),
+  }))
 }

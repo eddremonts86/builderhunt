@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, Loader2, Search, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button, Input, LinkButton } from '~/components/ui'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
+import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
 
 /**
  * The building branch (plan: phase-2/03-onboarding-segmentado).
@@ -58,6 +59,7 @@ interface PendingClaim {
 
 function BuildingStep() {
   const navigate = useNavigate()
+  const step = useOnboardingStep('building')
   const [handle, setHandle] = React.useState('')
   const [searching, setSearching] = React.useState(false)
   const [searched, setSearched] = React.useState(false)
@@ -69,6 +71,7 @@ function BuildingStep() {
 
   const leave = async (skipping: boolean) => {
     setBusy(true)
+    step.exit()
     if (skipping) {
       await fetch('/api/onboarding/skip', { method: 'POST', credentials: 'include' }).catch(() => {})
     }
@@ -141,6 +144,7 @@ function BuildingStep() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'activate', activationType: 'builder_claim', refId: candidate.id }),
       }).catch(() => {})
+      await step.complete()
     } catch {
       setError('We could not reach the server.')
     } finally {

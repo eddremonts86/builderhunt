@@ -1,6 +1,6 @@
 # Tareas — onboarding segmentado
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md)
 > **Blocks**: [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md)
 > **Reality check**: `src/shared/lib/onboarding.ts` y sus rutas son la base obligatoria.
@@ -168,8 +168,38 @@
     egress bajo `E2E_MODE` y el challenge se acuña por claim, así que ningún perfil real puede
     contenerlo — el seam de `claim-sources` la sustituye, igual que en `claimable-profiles.spec.ts`.
 
-- [ ] **Instrumentar y desplegar gradualmente**
+- [x] **Instrumentar y desplegar gradualmente**
   - Files: `src/shared/lib/conversion-events.ts`, `src/shared/lib/conversion-client.ts`, `src/routes/api/admin/metrics/conversion.ts`, `.env.example`, `docs/operations/segmented-onboarding-rollout.md`
   - Do: extender la analítica de conversión existente con funnels por step/segment/version y
     feature flag por cohorte.
   - Verify: flag off sirve v1; flag on completa las tres ramas; smoke mobile/desktop.
+  - Result: `drizzle/0173_conversion_onboarding_funnel.sql`, tres eventos nuevos con su contexto,
+    `src/shared/lib/onboarding-rollout.ts` (14 tests), `src/shared/lib/useOnboardingStep.ts` en las
+    siete pantallas, el bloque `onboarding` en `/api/admin/metrics/conversion`,
+    `tests/e2e/onboarding-rollout.spec.ts` (6 specs) y
+    [`docs/operations/segmented-onboarding-rollout.md`](../../../docs/operations/segmented-onboarding-rollout.md).
+  - **El funnel de la fase 02 no existía, y no por estar incompleto.** `conversion_events` tenía un
+    CHECK con los siete eventos de landing y cuatro surfaces; `segment_selected` sobre `onboarding`
+    lo violaba, y la ruta de ingesta captura el fallo, lo registra y responde `{ok: true}`. Además
+    `recordConversionEvent` insertaba seis columnas y descartaba el contexto de segmento que el
+    contrato sí validaba. Comprobado contra la base real antes y después: `23514
+    conversion_events_name_check` → `INSERT ACCEPTED`.
+  - **El índice de identidad ahora lleva el step.** `(session, name, surface, variant)` es correcto
+    para un evento de landing que ocurre una vez, y es exactamente lo contrario para un flujo: el
+    segundo `onboarding_step_viewed` de una sesión es *otro paso*, no un reintento, y
+    `onConflictDoNothing` se lo habría tragado — un funnel por paso que solo podía enseñar el paso
+    uno. `coalesce(..., '')` porque un NULL nunca iguala a otro NULL en un índice único.
+  - **El reparto por cohorte es estable y solo suma.** `fnv1a(userId) % 100`, así que la misma
+    persona recibe siempre el mismo flujo y subir el porcentaje nunca le quita el flujo a alguien que
+    está a mitad. Un valor ilegible se satura a 0: "off" nunca puede ser "todo el mundo". El e2e no
+    reinicia el servidor para probar las dos posiciones — no puede — sino que a 50 % busca una cuenta
+    a cada lado de la línea, que además demuestra que el bucket controla la interfaz de verdad.
+  - **La máquina v2 por fin la mueve alguien.** `current_step_key` estaba construido, testeado y en
+    `null` para todo el mundo: ninguna pantalla lo avanzaba. Ahora lo hace `complete()`, y solo en
+    v2 — quien está fuera de la cohorte se salta el paso de objetivo, así que su segundo avance
+    nombraría un paso que el servidor no reconoce y todos los siguientes darían 409. Correctos, pero
+    ruido: lo cazó el colector estricto de `onboarding.spec.ts`.
+  - Smoke real de móvil añadido con `@mobile-only` en las dos ramas. Sin la etiqueta, el proyecto
+    `mobile` no ejecuta nada y `--project=mobile` reporta verde sin haber corrido un solo test.
+  - **No cubierto**: `flow_version` sigue a la cohorte, no al camino recorrido, así que alguien
+    dentro de la cohorte que teclee una URL de v1 se cuenta como v2. Documentado en el runbook.

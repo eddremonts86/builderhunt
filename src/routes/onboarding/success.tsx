@@ -4,7 +4,7 @@ import { Sparkles, ArrowRight, ListChecks } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { LinkButton } from '~/components/ui'
 import { successStepCopyFor } from '~/shared/lib/onboarding-shared'
-import type { SegmentPreset } from '~/shared/lib/user-segments'
+import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
 
 /**
  * The last step, which now says something different depending on the route (plan:
@@ -30,25 +30,7 @@ export const Route = createFileRoute('/onboarding/success')({
 })
 
 function SuccessStep() {
-  const [preset, setPreset] = React.useState<SegmentPreset>('general')
-
-  React.useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const response = await fetch('/api/onboarding/v2', { credentials: 'include' })
-        if (!response.ok || cancelled) return
-        const body = (await response.json()) as { preset?: SegmentPreset }
-        if (!cancelled && body.preset) setPreset(body.preset)
-      } catch {
-        // Deliberately silent: `general` is already the right answer.
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
+  const { preset } = useOnboardingStep('success')
   const copy = successStepCopyFor(preset)
 
   return (

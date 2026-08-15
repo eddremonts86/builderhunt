@@ -10,6 +10,7 @@ import {
 } from '~/shared/lib/onboarding-shared'
 import { saveAndArmThesis, type ArmOutcome } from '~/shared/lib/onboarding-investing'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
+import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
 
 /**
  * The investing thesis step (plan: phase-2/03-onboarding-segmentado).
@@ -51,6 +52,7 @@ const SCOPE_NOTICE =
 
 function InvestingThesisStep() {
   const navigate = useNavigate()
+  const step = useOnboardingStep('investing')
   const [selected, setSelected] = React.useState<readonly string[]>([])
   const [freeText, setFreeText] = React.useState('')
   const [saving, setSaving] = React.useState(false)
@@ -68,6 +70,7 @@ function InvestingThesisStep() {
 
   const skip = async () => {
     setSaving(true)
+    step.exit()
     try {
       await fetch('/api/onboarding/skip', { method: 'POST', credentials: 'include' })
     } catch {
@@ -103,6 +106,7 @@ function InvestingThesisStep() {
       body: JSON.stringify({ action: 'activate', activationType: 'saved_search_alert', refId: result.queryId }),
     }).catch(() => {})
 
+    await step.complete()
     setOutcome(result.outcome)
     setSaving(false)
   }

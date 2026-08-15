@@ -233,3 +233,61 @@ describe('activation', () => {
     expect(result.error).toMatch(/must not carry activationType/)
   })
 })
+
+/**
+ * The onboarding funnel's context (plan: phase-2/03-onboarding-segmentado).
+ *
+ * The step is a **key**, never v1's step number: `2` is a different screen on each route, so a funnel
+ * keyed on it would add four unrelated things together. And `flowVersion` is what makes the cohort
+ * rollout measurable at all — without it, a fall in completion cannot be told apart from a change in
+ * who was being onboarded that week.
+ */
+describe('the onboarding context', () => {
+  const base = {
+    sessionId: '11111111-2222-4333-8444-555555555555',
+    variant: 'baseline' as const,
+    occurredAt: '2026-08-14T10:00:00.000Z',
+  }
+  const onboarding = { flowVersion: 2 as const, preset: 'investing' as const, stepKey: 'investing_thesis' as const }
+
+  it('accepts a step event carrying version, route and step', () => {
+    for (const name of ['onboarding_step_viewed', 'onboarding_step_completed', 'onboarding_flow_exited']) {
+      const result = parseConversionEvent({ ...base, name, surface: 'onboarding', onboarding })
+      expect(result.ok, name).toBe(true)
+    }
+  })
+
+  it('refuses a step event with no context — it would be uncountable', () => {
+    const result = parseConversionEvent({ ...base, name: 'onboarding_step_viewed', surface: 'onboarding' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/requires onboarding context/)
+  })
+
+  it('refuses onboarding context on an event that has no business carrying it', () => {
+    const result = parseConversionEvent({ ...base, name: 'landing_view', surface: 'hero', onboarding })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/must not carry onboarding context/)
+  })
+
+  /** Closed enums, so a step name or a route cannot arrive as free text. */
+  it('refuses a step key or a preset outside the machine', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'onboarding',
+      onboarding: { ...onboarding, stepKey: 'thinking_about_it' },
+    }).ok).toBe(false)
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'onboarding',
+      onboarding: { ...onboarding, preset: 'recruiter' },
+    }).ok).toBe(false)
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'onboarding',
+      onboarding: { ...onboarding, flowVersion: 3 },
+    }).ok).toBe(false)
+  })
+
+  it('keeps the funnel events off every surface but onboarding', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'hero', onboarding,
+    }).ok).toBe(false)
+  })
+})

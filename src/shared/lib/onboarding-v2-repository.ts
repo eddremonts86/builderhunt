@@ -285,8 +285,13 @@ export async function recordActivation(
 }
 
 /** The wire shape, assembled in one place so the route never builds it by hand. */
-export function toStatusV2(state: OnboardingV2State, eligible: boolean): OnboardingStatusV2 {
+export function toStatusV2(
+  state: OnboardingV2State,
+  eligible: boolean,
+  rollout: { inCohort: boolean; percent: number } = { inCohort: false, percent: 0 },
+): OnboardingStatusV2 {
   return {
+    rollout,
     flowVersion: ONBOARDING_FLOW_VERSION,
     preset: state.preset,
     flow: [...flowFor(state.preset)],

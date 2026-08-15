@@ -1,6 +1,6 @@
 # Especificación — onboarding segmentado
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md)
 > **Blocks**: [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md)
 > **Reality check**: El onboarding actual está implementado en `src/routes/onboarding/`,

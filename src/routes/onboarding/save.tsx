@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate, useSearch, redirect } from '@tanstack/rea
 import { Bookmark, ArrowRight, AlertCircle, Loader2, ExternalLink, Check } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button, LinkButton } from '~/components/ui'
+import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
 
 interface Builder {
   id: string
@@ -37,6 +38,7 @@ const REQUIRED_SAVES = 3
 
 function SaveStep() {
   const navigate = useNavigate()
+  const step = useOnboardingStep('save')
   const { q } = useSearch({ from: Route.fullPath })
   const [results, setResults] = React.useState<Builder[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -157,6 +159,7 @@ function SaveStep() {
       body: JSON.stringify({ action: 'activate', activationType: 'tracked_builders' }),
     }).catch(() => {})
 
+    await step.complete()
     navigate({ to: '/onboarding/success' })
   }
 

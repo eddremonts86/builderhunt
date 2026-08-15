@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import {
   countConversionSessionsByEvent,
+  countOnboardingFunnelSessions,
   deleteExpiredConversionEvents,
   recordConversionEvent,
   utcDay,
@@ -226,5 +227,78 @@ describe('the funnel definitions cost one query, whatever their number', () => {
     statements = 0
     await countConversionSessionsByEvent([...eventNames, ...eventNames.map((n) => `${n}_v2`)], 'baseline', utcDay(now), utcDay(now), counting)
     expect(statements).toBe(1)
+  })
+})
+
+/**
+ * The dimensions actually land in the table (plan: phase-2/03-onboarding-segmentado).
+ *
+ * This is the half that was missing rather than wrong. `recordConversionEvent` inserted six columns
+ * and discarded everything else the validated event carried, so the segment context plan 02 added
+ * passed validation, reached the repository and vanished — and the table's CHECK constraint refused
+ * the event names outright, which the ingest route logs and answers `{ ok: true }` to. A funnel that
+ * cannot be computed from the rows is not instrumentation.
+ */
+describe('the funnel dimensions', () => {
+  const onboarding = { flowVersion: 2 as const, preset: 'hiring' as const, stepKey: 'hiring_search' as const }
+
+  it('accepts the segment and onboarding event names the database used to refuse', async () => {
+    await recordConversionEvent(event({
+      name: 'segment_selected', surface: 'onboarding', sessionId: 'dim-1',
+      segment: { previous: null, next: 'hiring', source: 'onboarding' },
+    }), new Date('2026-08-15T10:00:00Z'), db)
+
+    await recordConversionEvent(event({
+      name: 'onboarding_step_viewed', surface: 'onboarding', sessionId: 'dim-1', onboarding,
+    }), new Date('2026-08-15T10:00:00Z'), db)
+
+    const rows = await countOnboardingFunnelSessions('baseline', '2026-08-15', '2026-08-15', db)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      name: 'onboarding_step_viewed', flowVersion: 2, preset: 'hiring', stepKey: 'hiring_search', sessions: 1,
+    })
+  })
+
+  /**
+   * The identity index carries the step key, so the second step in a session is a new row. Without
+   * it, `onConflictDoNothing` swallowed every step after the first and the funnel could only ever
+   * have shown step one.
+   */
+  it('does not collapse two different steps in one session', async () => {
+    for (const stepKey of ['welcome', 'goal', 'hiring_search'] as const) {
+      await recordConversionEvent(event({
+        name: 'onboarding_step_viewed', surface: 'onboarding', sessionId: 'dim-2',
+        onboarding: { flowVersion: 2, preset: 'hiring', stepKey },
+      }), new Date('2026-08-16T10:00:00Z'), db)
+    }
+
+    const rows = await countOnboardingFunnelSessions('baseline', '2026-08-16', '2026-08-16', db)
+    expect(rows.map((row) => row.stepKey).sort()).toEqual(['goal', 'hiring_search', 'welcome'])
+  })
+
+  /** The same step twice in one session is still a retry, and still a no-op. */
+  it('still collapses a genuine retry', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      await recordConversionEvent(event({
+        name: 'onboarding_step_completed', surface: 'onboarding', sessionId: 'dim-3', onboarding,
+      }), new Date('2026-08-17T10:00:00Z'), db)
+    }
+
+    const rows = await countOnboardingFunnelSessions('baseline', '2026-08-17', '2026-08-17', db)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].events).toBe(1)
+  })
+
+  /** Split by version, because that is the question a cohort ramp asks. */
+  it('separates the two flow versions', async () => {
+    for (const [session, flowVersion] of [['dim-4', 1], ['dim-5', 2]] as const) {
+      await recordConversionEvent(event({
+        name: 'onboarding_step_viewed', surface: 'onboarding', sessionId: session,
+        onboarding: { flowVersion, preset: 'general', stepKey: 'welcome' },
+      }), new Date('2026-08-18T10:00:00Z'), db)
+    }
+
+    const rows = await countOnboardingFunnelSessions('baseline', '2026-08-18', '2026-08-18', db)
+    expect(rows.map((row) => row.flowVersion).sort()).toEqual([1, 2])
   })
 })

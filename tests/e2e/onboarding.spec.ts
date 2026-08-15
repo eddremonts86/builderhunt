@@ -366,15 +366,12 @@ test('full onboarding journey: welcome → starter query → three saves → suc
     await page.getByTestId('onboarding-start').click()
 
     /**
-     * v2 inserts the goal step between welcome and search (plan phase-2/03). This journey is about
-     * the v1 flow, so it answers the question and moves on rather than asserting on it —
-     * `goal.spec` owns the goal step's own behaviour. "I would rather not say" is used because it
-     * is the path that must work with the segmentation feature in either position: it writes
-     * nothing, so it cannot depend on the flag.
+     * Straight to the search step, with no goal step in between — this is v1, and v1 is what an
+     * account gets while `ONBOARDING_V2_ROLLOUT_PERCENT` is 0, which is the default and what this
+     * harness runs with. The detour through the goal step that used to be here was needed while
+     * `welcome` linked to it unconditionally; the cohort ramp is what removed it.
+     * `onboarding-rollout.spec.ts` owns the other side of that fork.
      */
-    await page.waitForURL(/\/onboarding\/goal/)
-    await page.getByRole('button', { name: /rather not say/i }).click()
-
     await page.waitForURL(/\/onboarding\/search/)
     await step2Done
     await expect(page.getByRole('heading', { name: 'What are you looking for?' })).toBeVisible()

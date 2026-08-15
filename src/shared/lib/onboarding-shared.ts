@@ -279,3 +279,62 @@ export const SUCCESS_STEP_COPY: Record<SegmentPreset, SuccessStepCopy> = {
 export function successStepCopyFor(preset: SegmentPreset): SuccessStepCopy {
   return SUCCESS_STEP_COPY[preset] ?? SUCCESS_STEP_COPY.general
 }
+
+/** The onboarding screens that report a position in the flow. */
+export const ONBOARDING_ROUTE_NAMES = [
+  'welcome',
+  'goal',
+  'search',
+  'save',
+  'investing',
+  'building',
+  'success',
+] as const
+export type OnboardingRouteName = (typeof ONBOARDING_ROUTE_NAMES)[number]
+
+/**
+ * Which step key a screen is, on a given route (plan: phase-2/03-onboarding-segmentado).
+ *
+ * A screen is not a step: `onboarding/search` is `hiring_search` on one route and
+ * `investing_discovery` on another, and a funnel that recorded "the search screen" would add four
+ * different things together. Written out per route rather than derived from a position, because the
+ * flows have different lengths and an index would quietly drift the day one of them gains a step.
+ *
+ * `building` and `investing` map the screens they never visit to the general keys. They can still be
+ * reached by typing the URL, and reporting a step from another route's flow would be worse than
+ * reporting the general one — `resumeStep` would then bounce the person back to the start.
+ */
+const STEP_KEY_BY_ROUTE: Record<OnboardingRouteName, Record<SegmentPreset, string>> = {
+  welcome: { general: 'welcome', other: 'welcome', hiring: 'welcome', investing: 'welcome', building: 'welcome' },
+  goal: { general: 'goal', other: 'goal', hiring: 'goal', investing: 'goal', building: 'goal' },
+  search: {
+    general: 'general_search',
+    other: 'general_search',
+    hiring: 'hiring_search',
+    investing: 'investing_discovery',
+    building: 'general_search',
+  },
+  save: {
+    general: 'general_save',
+    other: 'general_save',
+    hiring: 'hiring_save',
+    investing: 'investing_save',
+    building: 'general_save',
+  },
+  investing: {
+    general: 'general_search', other: 'general_search', hiring: 'general_search',
+    investing: 'investing_thesis', building: 'general_search',
+  },
+  building: {
+    general: 'general_search', other: 'general_search', hiring: 'general_search',
+    investing: 'general_search', building: 'building_locate',
+  },
+  success: {
+    general: 'confirmation', other: 'confirmation', hiring: 'confirmation',
+    investing: 'confirmation', building: 'confirmation',
+  },
+}
+
+export function stepKeyForRoute(route: OnboardingRouteName, preset: SegmentPreset): string {
+  return STEP_KEY_BY_ROUTE[route][preset] ?? STEP_KEY_BY_ROUTE[route].general
+}

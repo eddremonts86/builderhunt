@@ -136,6 +136,18 @@ const zodEnv = z.object({
   // `/api/me/preferences` answers 404. Rows already written survive a flip back to `false` — the
   // flag governs the interface, never the data.
   USER_SEGMENTATION_ENABLED: z.enum(['true', 'false']).default('false'),
+  /**
+   * Percentage of accounts on onboarding v2 (plan: phase-2/03-onboarding-segmentado).
+   *
+   * A percentage rather than a boolean because the spec asks for a cohort ramp with a stop
+   * condition. `0` is the default and means every account keeps the v1 flow — the two live side by
+   * side, so this is a client-side choice of route, not a deploy. The bucket is stable per user
+   * (`onboarding-rollout.ts`), so raising this only ever adds people.
+   *
+   * A string here, like every other flag, and parsed with `parseRolloutPercent` so anything
+   * unreadable clamps to 0. An unreadable percentage must mean "off", never "everybody".
+   */
+  ONBOARDING_V2_ROLLOUT_PERCENT: z.string().default('0'),
   // Plan: audit-trust — profile-removal/global-suppression subsystem. Off by default: a new
   // security-critical flow that hashes requester email/challenge with a dedicated key distinct
   // from BETTER_AUTH_SECRET (spec.md: "must not reuse BETTER_AUTH_SECRET").

@@ -9,7 +9,13 @@ import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { computeConversionRate, CONVERSION_VARIANTS } from '~/shared/lib/conversion-events'
-import { countConversionSessionsByEvent, utcDay } from '~/shared/lib/repositories/conversion-events'
+import {
+  countConversionSessionsByEvent,
+  countOnboardingFunnelSessions,
+  utcDay,
+} from '~/shared/lib/repositories/conversion-events'
+import { parseRolloutPercent } from '~/shared/lib/onboarding-rollout'
+import { env } from '~/shared/lib/env'
 
 /**
  * The widest window this endpoint will read (plan 57, Admin track).
@@ -115,7 +121,47 @@ export const Route = createFileRoute('/api/admin/metrics/conversion')({
             }
           }
 
-          return Response.json({ start, end, variant, metrics })
+          /**
+           * The onboarding funnel, split by flow version and route (plan:
+           * phase-2/03-onboarding-segmentado).
+           *
+           * A second query rather than a second endpoint, because it answers the same question in
+           * the same window and an admin comparing the two should not have to line up two requests.
+           *
+           * Completion is `confirmation` viewed over `welcome` viewed, per `(flowVersion, preset)`.
+           * Split by version because that is what the cohort rollout is for: "completion fell" is
+           * not actionable, "completion fell on v2 while v1 held" is the sentence that stops a
+           * ramp — and it cannot be written from a stream that does not distinguish the two.
+           */
+          const onboardingRows = await countOnboardingFunnelSessions(variant, start, end)
+          const cells = new Map<string, { viewedFirst: number; viewedLast: number }>()
+          for (const row of onboardingRows) {
+            if (row.name !== 'onboarding_step_viewed') continue
+            const key = `${row.flowVersion ?? 'unknown'}:${row.preset ?? 'unknown'}`
+            const cell = cells.get(key) ?? { viewedFirst: 0, viewedLast: 0 }
+            if (row.stepKey === 'welcome') cell.viewedFirst += row.sessions
+            if (row.stepKey === 'confirmation') cell.viewedLast += row.sessions
+            cells.set(key, cell)
+          }
+          const onboardingCompletion: Record<string, ReturnType<typeof computeConversionRate>> = {}
+          for (const [key, cell] of cells) {
+            onboardingCompletion[key] = computeConversionRate(cell.viewedLast, cell.viewedFirst)
+          }
+
+          return Response.json({
+            start,
+            end,
+            variant,
+            metrics,
+            onboarding: {
+              /** What the ramp is set to right now, so a reading is interpretable without a shell. */
+              rolloutPercent: parseRolloutPercent(env.ONBOARDING_V2_ROLLOUT_PERCENT),
+              /** Keyed `<flowVersion>:<preset>` — completion of the flow, not of any single step. */
+              completion: onboardingCompletion,
+              /** Every (event, version, route, step) cell, so a drop can be located rather than guessed at. */
+              steps: onboardingRows,
+            },
+          })
         } catch (err) {
           const response = platformAdminErrorResponse(err)
           if (response) return response

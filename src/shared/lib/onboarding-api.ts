@@ -87,6 +87,19 @@ export const onboardingStatusV2Schema = z.object({
     step: z.number().int().min(0).max(3),
     completed: z.boolean(),
   }),
+  /**
+   * Whether this account is in the v2 cohort, decided on the server (plan:
+   * phase-2/03-onboarding-segmentado).
+   *
+   * The two flows are live at once, so the rollout is a client-side choice of route — `welcome`
+   * links to the goal step for somebody in the cohort and straight to the v1 search step for
+   * everybody else. The decision is answered here rather than computed in the browser so a client
+   * cannot opt itself in, and so there is one place it is made.
+   */
+  rollout: z.object({
+    inCohort: z.boolean(),
+    percent: z.number().int().min(0).max(100),
+  }),
 }).strict()
 
 export type OnboardingStatusV2 = z.infer<typeof onboardingStatusV2Schema>
