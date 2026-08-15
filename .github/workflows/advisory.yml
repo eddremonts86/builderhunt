@@ -182,6 +182,19 @@ jobs:
       # pages that do not exist with it off, and the *off* state has its own per-worker server —
       # `segmented-landing-flag.spec.ts` sets it to 'false' through the harness.
       SEGMENTED_LANDING_ENABLED: 'true'
+      # The rest of phase 2, matching `.env.example` so a developer's machine and this job run the
+      # same configuration. `check-env-fidelity` refuses the alternative: a key set locally and
+      # absent here means "local is green" would not mean CI is, because absent is not the same as
+      # off — it is whatever `env.ts` defaults to.
+      #
+      # Safe to pin globally only because every spec that asserts on one of these sets it for
+      # itself. `onboarding.spec.ts` pins the ramp to 0 for its own server precisely so this line
+      # cannot decide which onboarding flow it tests, and `onboarding-rollout.spec.ts` owns the
+      # other side of that fork the same way.
+      USER_SEGMENTATION_ENABLED: 'true'
+      DASHBOARD_PRESETS_ENABLED: 'true'
+      ONBOARDING_V2_ROLLOUT_PERCENT: '100'
+      CONVERSION_EVENTS_ENABLED: 'true'
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       # The billing suite drives the fake provider, but the page still renders its unavailable state
@@ -418,6 +431,19 @@ jobs:
       # pages that do not exist with it off, and the *off* state has its own per-worker server —
       # `segmented-landing-flag.spec.ts` sets it to 'false' through the harness.
       SEGMENTED_LANDING_ENABLED: 'true'
+      # The rest of phase 2, matching `.env.example` so a developer's machine and this job run the
+      # same configuration. `check-env-fidelity` refuses the alternative: a key set locally and
+      # absent here means "local is green" would not mean CI is, because absent is not the same as
+      # off — it is whatever `env.ts` defaults to.
+      #
+      # Safe to pin globally only because every spec that asserts on one of these sets it for
+      # itself. `onboarding.spec.ts` pins the ramp to 0 for its own server precisely so this line
+      # cannot decide which onboarding flow it tests, and `onboarding-rollout.spec.ts` owns the
+      # other side of that fork the same way.
+      USER_SEGMENTATION_ENABLED: 'true'
+      DASHBOARD_PRESETS_ENABLED: 'true'
+      ONBOARDING_V2_ROLLOUT_PERCENT: '100'
+      CONVERSION_EVENTS_ENABLED: 'true'
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       # The billing suite drives the fake provider, but the page still renders its unavailable state
