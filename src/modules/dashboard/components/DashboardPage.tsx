@@ -174,7 +174,17 @@ const SHIPPED_CAPABILITIES: ReadonlySet<WidgetDependency> = new Set<WidgetDepend
 const STAT_TITLES = ['Builders tracked', 'Seen active', 'Saved searches count'] as const
 const ctxTitle = (index: number) => STAT_TITLES[index] ?? 'Metric'
 
-const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
+/**
+ * Exported so the registry can be checked rather than described (plan: phase-2/04).
+ *
+ * `docs/architecture/dashboard-widget-inventory.md` is a derived document, and a derived document
+ * nobody verifies is accurate for exactly as long as nobody touches the dashboard. The inventory
+ * test imports this and fails when a widget is added, removed or renamed without the table moving.
+ *
+ * A value export, not a route export: this module is a component, so nothing here reaches the
+ * server layer and there is no client bundle to poison.
+ */
+export const HOME_WIDGETS = defineWidgetRegistry<HomeContext>([
   {
     id: 'first-hunt',
     title: 'Run your first hunt',
