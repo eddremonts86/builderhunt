@@ -4,7 +4,7 @@
  * silent on failure — a dropped analytics POST must never prevent signup,
  * search, or navigation.
  */
-import { parseConversionEvent, type ConversionEventName, type ConversionSurface } from './conversion-events'
+import { parseConversionEvent, type ConversionEvent, type ConversionEventName, type ConversionSurface } from './conversion-events'
 import { getStableVariant } from './conversion-variant'
 
 const SESSION_ID_KEY = 'bh-conversion-session-id'
@@ -52,16 +52,37 @@ const sentThisPageLoad = new Set<string>()
  * analytics consent. Never throws, never awaits — callers should not (and
  * do not need to) block on this.
  */
-export function trackConversionEvent(name: ConversionEventName, surface: ConversionSurface): void {
+/**
+ * The extra payload the segment and activation events carry (plan: phase-2/02-segmentacion-usuarios).
+ *
+ * Typed as the event's own optional fields rather than a fresh shape, so a change to the contract
+ * breaks this call site instead of letting the client build something the server will reject.
+ */
+export type ConversionEventDetail = Pick<ConversionEvent, 'segment' | 'activationType'>
+
+export function trackConversionEvent(
+  name: ConversionEventName,
+  surface: ConversionSurface,
+  detail: ConversionEventDetail = {},
+): void {
   if (!hasAnalyticsConsent()) return
 
   const sessionId = getConversionSessionId()
   const variant = getStableVariant()
-  const dedupeKey = `${sessionId}:${name}:${surface}:${variant}`
+  /**
+   * A segment change is not once-per-page-load.
+   *
+   * The landing events are each meant to fire once, so the dedupe key is (session, name, surface,
+   * variant). Somebody who tries three segments before settling has genuinely changed it three
+   * times, and collapsing that to one would erase exactly what this event exists to measure — so
+   * the chosen value joins the key.
+   */
+  const detailKey = detail.segment ? `:${detail.segment.previous ?? '-'}>${detail.segment.next ?? '-'}` : ''
+  const dedupeKey = `${sessionId}:${name}:${surface}:${variant}${detailKey}`
   if (sentThisPageLoad.has(dedupeKey)) return
   sentThisPageLoad.add(dedupeKey)
 
-  const candidate = { name, surface, sessionId, variant, occurredAt: new Date().toISOString() }
+  const candidate = { name, surface, sessionId, variant, occurredAt: new Date().toISOString(), ...detail }
   const parsed = parseConversionEvent(candidate)
   // Fail closed: an internally-constructed event should always be valid: if
   // it isn't (a future refactor breaks the (name, surface) contract), don't

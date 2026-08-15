@@ -31,6 +31,7 @@ import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
 import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
+import { Route as OnboardingGoalRouteImport } from './routes/onboarding/goal'
 import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
 import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
@@ -250,8 +251,10 @@ import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
+import { Route as ApiMePreferencesIndexRouteImport } from './routes/api/me/preferences/index'
 import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
 import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
+import { Route as ApiOnboardingV2IndexRouteImport } from './routes/api/onboarding/v2/index'
 import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/api/organizations/deletion/immediate'
 import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
 import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
@@ -413,6 +416,11 @@ const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
   id: '/builders/$builderId',
   path: '/builders/$builderId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingGoalRoute = OnboardingGoalRouteImport.update({
+  id: '/goal',
+  path: '/goal',
+  getParentRoute: () => OnboardingRouteRoute,
 } as any)
 const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
   id: '/save',
@@ -1583,6 +1591,11 @@ const ApiMeDeleteAccountIndexRoute = ApiMeDeleteAccountIndexRouteImport.update({
   path: '/api/me/delete-account/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMePreferencesIndexRoute = ApiMePreferencesIndexRouteImport.update({
+  id: '/api/me/preferences/',
+  path: '/api/me/preferences/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
   id: '/api/me/sessions/',
   path: '/api/me/sessions/',
@@ -1591,6 +1604,11 @@ const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
 const ApiMeStepupIndexRoute = ApiMeStepupIndexRouteImport.update({
   id: '/api/me/stepup/',
   path: '/api/me/stepup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingV2IndexRoute = ApiOnboardingV2IndexRouteImport.update({
+  id: '/api/onboarding/v2/',
+  path: '/api/onboarding/v2/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOrganizationsDeletionImmediateRoute =
@@ -1932,6 +1950,7 @@ export interface FileRoutesByFullPath {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/goal': typeof OnboardingGoalRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2165,8 +2184,10 @@ export interface FileRoutesByFullPath {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences/': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
+  '/api/onboarding/v2/': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -2227,6 +2248,7 @@ export interface FileRoutesByTo {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/goal': typeof OnboardingGoalRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2459,8 +2481,10 @@ export interface FileRoutesByTo {
   '/api/me/builders': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup': typeof ApiMeStepupIndexRoute
+  '/api/onboarding/v2': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -2524,6 +2548,7 @@ export interface FileRoutesById {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/goal': typeof OnboardingGoalRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2758,8 +2783,10 @@ export interface FileRoutesById {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences/': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
+  '/api/onboarding/v2/': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -2823,6 +2850,7 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/goal'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3056,8 +3084,10 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/preferences/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
+    | '/api/onboarding/v2/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
     | '/api/admin/billing/events/$eventId'
@@ -3118,6 +3148,7 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/goal'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3350,8 +3381,10 @@ export interface FileRouteTypes {
     | '/api/me/builders'
     | '/api/me/data-export'
     | '/api/me/delete-account'
+    | '/api/me/preferences'
     | '/api/me/sessions'
     | '/api/me/stepup'
+    | '/api/onboarding/v2'
     | '/api/organizations/invitations'
     | '/api/scheduling/invitations'
     | '/api/admin/billing/events/$eventId'
@@ -3414,6 +3447,7 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/goal'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3648,8 +3682,10 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/preferences/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
+    | '/api/onboarding/v2/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
     | '/api/admin/billing/events/$eventId'
@@ -3863,8 +3899,10 @@ export interface RootRouteChildren {
   ApiMeBuildersIndexRoute: typeof ApiMeBuildersIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
+  ApiMePreferencesIndexRoute: typeof ApiMePreferencesIndexRoute
   ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
+  ApiOnboardingV2IndexRoute: typeof ApiOnboardingV2IndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiSchedulingInvitationsIndexRoute: typeof ApiSchedulingInvitationsIndexRoute
   ApiAdminBillingEventsEventIdRoute: typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -4043,6 +4081,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/builders/$builderId'
       preLoaderRoute: typeof BuildersBuilderIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/goal': {
+      id: '/onboarding/goal'
+      path: '/goal'
+      fullPath: '/onboarding/goal'
+      preLoaderRoute: typeof OnboardingGoalRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
     '/onboarding/save': {
       id: '/onboarding/save'
@@ -5577,6 +5622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeDeleteAccountIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/me/preferences/': {
+      id: '/api/me/preferences/'
+      path: '/api/me/preferences'
+      fullPath: '/api/me/preferences/'
+      preLoaderRoute: typeof ApiMePreferencesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/sessions/': {
       id: '/api/me/sessions/'
       path: '/api/me/sessions'
@@ -5589,6 +5641,13 @@ declare module '@tanstack/react-router' {
       path: '/api/me/stepup'
       fullPath: '/api/me/stepup/'
       preLoaderRoute: typeof ApiMeStepupIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/v2/': {
+      id: '/api/onboarding/v2/'
+      path: '/api/onboarding/v2'
+      fullPath: '/api/onboarding/v2/'
+      preLoaderRoute: typeof ApiOnboardingV2IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/organizations/deletion/immediate': {
@@ -6143,6 +6202,7 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 )
 
 interface OnboardingRouteRouteChildren {
+  OnboardingGoalRoute: typeof OnboardingGoalRoute
   OnboardingSaveRoute: typeof OnboardingSaveRoute
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
@@ -6150,6 +6210,7 @@ interface OnboardingRouteRouteChildren {
 }
 
 const OnboardingRouteRouteChildren: OnboardingRouteRouteChildren = {
+  OnboardingGoalRoute: OnboardingGoalRoute,
   OnboardingSaveRoute: OnboardingSaveRoute,
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,
@@ -6619,8 +6680,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeBuildersIndexRoute: ApiMeBuildersIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
+  ApiMePreferencesIndexRoute: ApiMePreferencesIndexRoute,
   ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
   ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
+  ApiOnboardingV2IndexRoute: ApiOnboardingV2IndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
   ApiSchedulingInvitationsIndexRoute: ApiSchedulingInvitationsIndexRoute,
   ApiAdminBillingEventsEventIdRoute:

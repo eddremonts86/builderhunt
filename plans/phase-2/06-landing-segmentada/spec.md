@@ -1,7 +1,7 @@
 # Especificación — landing segmentada
 
 > **Status**: `pending`
-> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md)
 > **Blocks**: nothing
 > **Reality check**: La home pública usa `src/modules/landing/components/HomePage.tsx`; existe
 > routing público, SEO, sitemap, pricing y analytics de conversión. La landing actual contiene casos

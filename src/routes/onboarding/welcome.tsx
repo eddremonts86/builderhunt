@@ -85,7 +85,11 @@ function WelcomeStep() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <LinkButton to="/onboarding/search" variant="primary" className="inline-flex" data-testid="onboarding-start">
+          {/* v2 inserts the goal step between welcome and the action (plan phase-2/03). The step
+              itself tolerates the segmentation feature being off — a 404 from the preferences API
+              lets somebody through rather than stranding them — so this link is safe with the flag
+              in either position, and no second code path is needed for the two cases. */}
+          <LinkButton to="/onboarding/goal" variant="primary" className="inline-flex" data-testid="onboarding-start">
             Show me how
             <ArrowRight className="w-4 h-4" aria-hidden="true" />
           </LinkButton>

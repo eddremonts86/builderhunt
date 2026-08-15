@@ -123,3 +123,113 @@ describe('computeConversionRate', () => {
     expect(smallWidth).toBeGreaterThan(largeWidth)
   })
 })
+
+/**
+ * Segmentation events (plan: phase-2/02-segmentacion-usuarios).
+ *
+ * The stream already refused free text and identity; what these events add is *which* choice
+ * somebody made, which is an enum on both ends. The rules worth pinning are the two the schema
+ * cannot express on its own: context is required on exactly the events that describe a choice, and
+ * forbidden on the ones that do not — a landing event carrying segment context would mean a surface
+ * is sending data it has no business holding.
+ */
+describe('segment events', () => {
+  const base = {
+    sessionId: '11111111-2222-4333-8444-555555555555',
+    variant: 'baseline' as const,
+    occurredAt: '2026-08-14T10:00:00.000Z',
+  }
+  const context = { previous: null, next: 'hiring' as const, source: 'settings' as const }
+
+  it('accepts a selection carrying its context', () => {
+    const result = parseConversionEvent({
+      ...base, name: 'segment_selected', surface: 'settings', segment: context,
+    })
+    expect(result.ok).toBe(true)
+    expect(result.event?.segment).toEqual(context)
+  })
+
+  it('accepts a change from one segment to another, and a clear', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'segment_changed', surface: 'settings',
+      segment: { previous: 'hiring', next: 'investing', source: 'settings' },
+    }).ok).toBe(true)
+
+    // Clearing is a real event; `next: null` is the whole point of the field being nullable.
+    expect(parseConversionEvent({
+      ...base, name: 'segment_changed', surface: 'settings',
+      segment: { previous: 'hiring', next: null, source: 'settings' },
+    }).ok).toBe(true)
+  })
+
+  it('refuses a segment event with no context, because it would be uncountable', () => {
+    const result = parseConversionEvent({ ...base, name: 'segment_selected', surface: 'settings' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/requires segment context/)
+  })
+
+  it('refuses segment context on an event that is not about a segment', () => {
+    const result = parseConversionEvent({ ...base, name: 'landing_view', surface: 'hero', segment: context })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/must not carry segment context/)
+  })
+
+  it('refuses anything in the context that is not one of the three allowed fields', () => {
+    for (const extra of ['email', 'name', 'query', 'builderId', 'userId']) {
+      const result = parseConversionEvent({
+        ...base, name: 'segment_selected', surface: 'settings',
+        segment: { ...context, [extra]: 'anything' },
+      })
+      expect(result.ok, `${extra} must be rejected`).toBe(false)
+    }
+  })
+
+  it('keeps each event on the surfaces it can actually happen on', () => {
+    // A skip only exists in a flow that can be skipped.
+    expect(parseConversionEvent({
+      ...base, name: 'segment_skipped', surface: 'onboarding',
+      segment: { previous: null, next: null, source: 'onboarding' },
+    }).ok).toBe(true)
+    expect(parseConversionEvent({
+      ...base, name: 'segment_skipped', surface: 'settings',
+      segment: { previous: null, next: null, source: 'settings' },
+    }).ok).toBe(false)
+    // And no segment event belongs on the landing hero.
+    expect(parseConversionEvent({
+      ...base, name: 'segment_selected', surface: 'hero', segment: context,
+    }).ok).toBe(false)
+  })
+})
+
+describe('activation', () => {
+  const base = {
+    sessionId: '11111111-2222-4333-8444-555555555555',
+    variant: 'baseline' as const,
+    occurredAt: '2026-08-14T10:00:00.000Z',
+  }
+
+  it('requires a coarse activation type', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'activation_reached', surface: 'explore', activationType: 'first_search',
+    }).ok).toBe(true)
+
+    const missing = parseConversionEvent({ ...base, name: 'activation_reached', surface: 'explore' })
+    expect(missing.ok).toBe(false)
+    expect(missing.error).toMatch(/requires activationType/)
+  })
+
+  /** An enum, so "which search" can never be what gets recorded. */
+  it('refuses an activation type outside the list', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'activation_reached', surface: 'explore', activationType: 'searched for rust',
+    }).ok).toBe(false)
+  })
+
+  it('refuses activationType on any other event', () => {
+    const result = parseConversionEvent({
+      ...base, name: 'landing_view', surface: 'hero', activationType: 'first_search',
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/must not carry activationType/)
+  })
+})

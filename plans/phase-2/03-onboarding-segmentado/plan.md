@@ -1,7 +1,7 @@
 # Plan de entrega — onboarding segmentado
 
 > **Status**: `pending`
-> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md)
 > **Blocks**: [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md)
 > **Reality check**: Se debe evolucionar la state machine y rutas actuales, no crear otro onboarding.
 

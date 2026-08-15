@@ -2,7 +2,7 @@
 
 > **Status**: `pending`
 > **Depends on**:
->   - [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md) (typed user preference contract)
+>   - [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md) (typed user preference contract)
 >   - [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md) (segmento `building` ya definido)
 >   - [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md) (existing dashboard registry and preferences)
 >   - [`06-landing-segmentada`](../06-landing-segmentada/spec.md) (typed building landing contract)

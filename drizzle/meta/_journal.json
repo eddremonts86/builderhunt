@@ -1198,6 +1198,20 @@
       "when": 1786470544836,
       "tag": "0170_platform_admin_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "7",
+      "when": 1786737933107,
+      "tag": "0171_user_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "7",
+      "when": 1786743574410,
+      "tag": "0172_onboarding_v2",
+      "breakpoints": true
     }
   ]
 }

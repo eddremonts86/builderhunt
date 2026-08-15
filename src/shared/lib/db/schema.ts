@@ -967,6 +967,24 @@ export const onboardingProgress = pgTable(
     firstQueryId: text('first_query_id'),
     firstBuilderIds: jsonb('first_builder_ids').$type<string[]>().default([]).notNull(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    /**
+     * Onboarding v2 (Plan: phase-2/03-onboarding-segmentado). All nullable, and the v1 columns
+     * above are kept rather than replaced.
+     *
+     * A row written by v1 has `flow_version` null and `step` 0..3; a row written by v2 has
+     * `flow_version` 2 and a `current_step_key`. Both are readable, which is what lets the new flow
+     * roll out by cohort instead of by migration — and what lets a rollback leave people where they
+     * were rather than dropping them back to the start.
+     *
+     * `activation_type` and `activation_ref_id` record *what* somebody did, not that they finished:
+     * v1 counted a completed flow as an activated user, so its activation rate described the flow
+     * rather than the product.
+     */
+    flowVersion: integer('flow_version'),
+    currentStepKey: text('current_step_key'),
+    activationType: text('activation_type'),
+    activationRefId: text('activation_ref_id'),
+    activatedAt: timestamp('activated_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -4434,3 +4452,43 @@ export const platformBetaMode = pgTable(
     check('platform_beta_mode_revision_check', sql`${table.revision} >= 0`),
   ],
 )
+
+// ---------------------------------------------------------------------------
+// User preferences (Plan: phase-2/02-segmentacion-usuarios)
+// ---------------------------------------------------------------------------
+
+/**
+ * The person's own preferences, keyed on the account rather than on a workspace.
+ *
+ * ## Why account-subject and not tenant-private
+ *
+ * A segment describes what somebody is *here to do*, and that does not change when they switch
+ * organisation: the same person recruiting in two workspaces is recruiting in both. Storing it per
+ * membership would ask them the same question again for every workspace they join, and would make
+ * "which answer is current" a question with no answer. The spec says to revisit only if real
+ * evidence shows per-workspace goals, and not to pre-build for it.
+ *
+ * The consequence is the RLS rule: rows are filtered on `app.user_id` alone. There is deliberately
+ * no `organization_id` on this table, so there is nothing for a tenant filter to key on and no way
+ * for a workspace switch to change what is returned.
+ *
+ * ## Why every segment column is nullable
+ *
+ * Every account that already exists has no segment and is allowed to keep it that way. `null` means
+ * "not chosen", is a first-class state rather than an error, and `resolveSegmentPreset` in
+ * `src/shared/lib/user-segments.ts` is the single place that turns it into the `general` preset.
+ * A `NOT NULL DEFAULT 'other'` would have been the tempting shortcut and would have destroyed the
+ * distinction between "told us they are something else" and "never asked".
+ *
+ * `segment_schema_version` records which taxonomy a row was written under, so a later revision
+ * migrates values explicitly instead of silently reinterpreting them.
+ */
+export const userPreferences = pgTable('user_preferences', {
+  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+  primarySegment: text('primary_segment'),
+  segmentSource: text('segment_source'),
+  segmentSchemaVersion: integer('segment_schema_version'),
+  segmentSelectedAt: timestamp('segment_selected_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
