@@ -69,6 +69,15 @@ export interface LoadRunInput {
   samples: ObservabilitySample[]
   /** Set when the run never reached steady state. Produces `aborted`, not a threshold verdict. */
   abortedReason?: string
+  /**
+   * How the thousand authenticated sessions were obtained.
+   *
+   * `minted` means the run wrote `auth_sessions` rows directly and never called `/sign-in/email`, so
+   * that route is **not** part of what the report certifies. Reported rather than assumed: plan 55
+   * requires the certification to state it, and a reader comparing two runs has to be able to see that
+   * one of them skipped a code path the other exercised.
+   */
+  sessionOrigin?: 'signed-in' | 'minted'
 }
 
 export interface ThresholdCheck {
@@ -81,6 +90,8 @@ export interface ThresholdCheck {
 export interface LoadReport {
   runId: string
   poolMode: 'direct' | 'transaction'
+  /** See `LoadRunInput.sessionOrigin`. Always present on reports written from 2026-08-14. */
+  sessionOrigin: 'signed-in' | 'minted'
   commit: string | null
   startedAt: string
   endedAt: string
@@ -286,6 +297,7 @@ export function buildLoadReport(input: LoadRunInput): LoadReport {
   const report: LoadReport = {
     runId: input.runId,
     poolMode: input.poolMode,
+    sessionOrigin: input.sessionOrigin ?? 'signed-in',
     commit: input.commit,
     startedAt: input.startedAt,
     endedAt: input.endedAt,
@@ -330,6 +342,11 @@ export function renderLoadReportMarkdown(report: LoadReport): string {
   lines.push(`# Load ${report.verdict.toUpperCase()} — ${report.runId}`)
   lines.push('')
   lines.push(`- pool mode: \`${report.poolMode}\``)
+  lines.push(
+    report.sessionOrigin === 'minted'
+      ? '- sessions: **minted** — written straight into `auth_sessions`, so `/sign-in/email` is NOT part of this result'
+      : '- sessions: signed in through `/sign-in/email`',
+  )
   lines.push(`- commit: \`${report.commit ?? 'unknown'}\``)
   lines.push(`- window: ${report.startedAt} → ${report.endedAt}`)
   lines.push(`- offered: ${report.offeredRatePerSecond} req/s over ${report.totals.requests} requests`)

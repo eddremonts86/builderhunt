@@ -20,11 +20,25 @@
  * `aborted` verdict says "this run proved nothing"; a `fail` verdict would say "the system cannot do this",
  * which would be a false statement about the product.
  *
- * A run larger than the limiter allows needs the limit raised on the disposable load host by whoever owns
- * it. That is an operator decision about a throwaway environment, not something a script should quietly
- * take.
+ * ## So a 1,000-user run does not sign in at all — it mints (added 2026-08-14)
+ *
+ * Both escapes the plan considered turned out not to exist. Pacing: `signInAll` has no rate parameter,
+ * and the ramp it might have used runs *after* sign-in, not during it. Raising the cap: it is a literal
+ * in `better-auth.ts`, so that is a code change and a redeploy of the app whose capacity is being
+ * measured — and on a public site it removes a real brute-force guard for the length of the window.
+ *
+ * `mintSessions` writes the `auth_sessions` rows directly and builds the cookies with `better-auth`'s own
+ * `makeSignature`, so a thousand sessions cost one batched insert instead of ~53 minutes of paced traffic,
+ * and no protection is touched. `signInAll` stays: the smoke profile is small enough to sign in honestly,
+ * and one real sign-in is what teaches `mintSessions` the cookie name and proves its signing.
+ *
+ * The trade-off is that a minted run does not exercise `/sign-in/email`. `spec.md` already says rate
+ * limiting is not part of the capacity fix and sign-in is startup rather than the measured workload — but
+ * it is a decision, and the certification report has to state it.
  */
 
+import postgres from 'postgres'
+import { generateRandomString, makeSignature } from 'better-auth/crypto'
 import { LOOPBACK_FIXTURE_PASSWORD } from './seed'
 
 /**
@@ -182,6 +196,13 @@ export interface FixtureUserRef {
   email: string
   organizationId: string
   sprintId: string
+  /**
+   * Present on manifests seeded from 2026-08-14. `mintSessions` needs it for `auth_sessions.user_id`,
+   * and it is carried explicitly rather than parsed back out of `email` — the seed happens to write
+   * `${userId}@load.local`, and a run that silently depended on that shape would break the day the
+   * fixture's email format changed for an unrelated reason.
+   */
+  userId?: string
 }
 
 export interface SignInAllOptions {
@@ -231,4 +252,151 @@ export async function signInAll(options: SignInAllOptions): Promise<LoadSession[
   await Promise.all(Array.from({ length: Math.max(1, options.concurrency) }, () => worker()))
   if (rateLimited) throw new LoadAuthRateLimitedError(sessions.length, options.users.length)
   return sessions
+}
+
+/**
+ * What one real sign-in teaches us, so nothing below is hardcoded.
+ *
+ * Nothing in `better-auth.ts` configures `cookiePrefix` or `useSecureCookies`, so the cookie's name is
+ * the library's default and a dependency upgrade could move it. Reading it from a live response costs
+ * one request — far under the 20-per-minute limiter — and it is also the only way to prove that the
+ * signature this module produces is the one the server verifies. Without that proof a format drift
+ * would surface as every route answering 401 on a run that already cost two hours.
+ */
+export interface SessionCookieShape {
+  /** e.g. `better-auth.session_token`. Never assumed. */
+  name: string
+  /** The `auth_sessions.token` half of the cookie, before the dot. */
+  token: string
+  /** The signature half, as the server produced it. */
+  signature: string
+}
+
+const SESSION_COOKIE_MARKER = 'session_token'
+
+/** Splits `name=value` pairs out of the `Cookie` header shape `cookieHeaderFrom` returns. */
+function findSessionCookie(cookieHeader: string): { name: string; value: string } {
+  for (const pair of cookieHeader.split(';')) {
+    const index = pair.indexOf('=')
+    if (index === -1) continue
+    const name = pair.slice(0, index).trim()
+    if (name.includes(SESSION_COOKIE_MARKER)) return { name, value: pair.slice(index + 1).trim() }
+  }
+  throw new LoadAuthError(
+    `sign-in set no cookie whose name contains "${SESSION_COOKIE_MARKER}" — better-auth's cookie naming has changed`,
+  )
+}
+
+/**
+ * Signs one fixture user in and reports the session cookie's shape.
+ *
+ * The value is percent-encoded on the wire because the signature is standard base64 and carries `+`, `/`
+ * and `=`; `tests/e2e/auth-and-sessions.spec.ts` decodes it the same way before matching
+ * `auth_sessions.token`.
+ */
+export async function probeSessionCookie(options: SignInOptions): Promise<SessionCookieShape> {
+  const cookieHeader = await signInFixtureUser(options)
+  const { name, value } = findSessionCookie(cookieHeader)
+  const decoded = decodeURIComponent(value)
+  const dot = decoded.indexOf('.')
+  if (dot <= 0 || dot === decoded.length - 1) {
+    throw new LoadAuthError('the session cookie is not `token.signature` — better-auth\'s cookie format has changed')
+  }
+  return { name, token: decoded.slice(0, dot), signature: decoded.slice(dot + 1) }
+}
+
+export interface MintSessionsOptions {
+  /** The load database `pnpm load:seed` wrote to. Never the application's own. */
+  databaseUrl: string
+  users: readonly FixtureUserRef[]
+  /** The app's `BETTER_AUTH_SECRET`. Without it a minted cookie cannot be signed, so this refuses. */
+  secret: string
+  /** From `probeSessionCookie`. Passing a guess here is the one way to make this silently wrong. */
+  cookie: SessionCookieShape
+  /** Scopes the inserted rows so `cleanup.ts` removes them with everything else. */
+  runId: string
+  /** Session lifetime. Only has to outlast the run. */
+  ttlMs?: number
+  onProgress?: (minted: number, total: number) => void
+}
+
+const MINT_BATCH = 500
+const DEFAULT_SESSION_TTL_MS = 12 * 60 * 60 * 1000
+
+/**
+ * Builds a cookie header for a token the way better-auth does: `name=urlencode(token.signature)`.
+ *
+ * Exported for the test that checks this against a real sign-in rather than against itself.
+ */
+export async function signSessionCookie(name: string, token: string, secret: string): Promise<string> {
+  const signature = await makeSignature(token, secret)
+  return `${name}=${encodeURIComponent(`${token}.${signature}`)}`
+}
+
+/**
+ * Writes one `auth_sessions` row per fixture user and returns the cookies that authenticate as them.
+ *
+ * `active_organization_id` is set from the fixture rather than left null: it is what every tenant-scoped
+ * route reads, and a minted session without it authenticates as a user with no active organization —
+ * which the routes correctly refuse, and which would read as an authorization bug rather than as this
+ * function forgetting a column.
+ */
+export async function mintSessions(options: MintSessionsOptions): Promise<LoadSession[]> {
+  if (!options.secret) {
+    throw new LoadAuthError('mintSessions needs BETTER_AUTH_SECRET — refusing rather than minting cookies the app cannot verify')
+  }
+
+  // Prove the signing before writing anything. `probeSessionCookie` handed us a token the server itself
+  // signed; if our signature over that same token differs, every row we are about to write is useless.
+  const ours = await makeSignature(options.cookie.token, options.secret)
+  if (ours !== options.cookie.signature) {
+    throw new LoadAuthError(
+      'the signature this harness produces does not match the one the server produced for the same token — ' +
+        'BETTER_AUTH_SECRET differs from the running app, or better-auth changed how it signs cookies',
+    )
+  }
+
+  const missing = options.users.find((user) => !user.userId)
+  if (missing) {
+    throw new LoadAuthError(
+      `fixture user ${missing.email} carries no userId — reseed with \`pnpm load:seed\`; manifests written before 2026-08-14 predate the field`,
+    )
+  }
+
+  const sql = postgres(options.databaseUrl, { max: 4, prepare: false, idle_timeout: 20 })
+  try {
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + (options.ttlMs ?? DEFAULT_SESSION_TTL_MS))
+    const sessions: LoadSession[] = []
+    const rows: Record<string, unknown>[] = []
+
+    for (const [index, user] of options.users.entries()) {
+      const token = generateRandomString(32)
+      rows.push({
+        id: `ld_${options.runId}_ses${String(index).padStart(4, '0')}`,
+        user_id: user.userId,
+        token,
+        expires_at: expiresAt,
+        active_organization_id: user.organizationId,
+        created_at: now,
+        updated_at: now,
+      })
+      sessions.push({
+        email: user.email,
+        organizationId: user.organizationId,
+        sprintId: user.sprintId,
+        cookie: await signSessionCookie(options.cookie.name, token, options.secret),
+      })
+    }
+
+    for (let offset = 0; offset < rows.length; offset += MINT_BATCH) {
+      const batch = rows.slice(offset, offset + MINT_BATCH)
+      await sql`insert into auth_sessions ${sql(batch)}`
+      options.onProgress?.(Math.min(offset + batch.length, rows.length), rows.length)
+    }
+
+    return sessions
+  } finally {
+    await sql.end({ timeout: 5 })
+  }
 }

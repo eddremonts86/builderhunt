@@ -88,7 +88,7 @@
 
 ## Phase 1 — Direct baseline
 
-- [ ] **Mint fixture sessions in the database instead of signing 1,000 users in**
+- [x] **Mint fixture sessions in the database instead of signing 1,000 users in**
   - Files: `scripts/load/auth.ts`, `scripts/load/seed.ts`, `scripts/load/runner.ts`,
     `tests/unit/scripts/load/auth.test.ts`, `docs/operations/load-testing.md`
   - Do: Add `mintSessions()` beside `signInAll`. For each fixture user: a token from
@@ -121,8 +121,25 @@
     limit raised for the window"; on 2026-08-14 neither lever existed (`signInAll` has no rate
     parameter, and the cap is a literal, not configuration). Pacing would have worked and cost ~53
     minutes of every run. Minting is less code, costs seconds, and touches no protection at all.
+  - Found while building it: the signature is **standard** base64, not base64url — it carries `+`,
+    `/` and `=`, so the cookie has to be percent-encoded. `tests/e2e/auth-and-sessions.spec.ts`
+    already implied this by decoding before matching `auth_sessions.token`, and sending the raw value
+    would have produced a cookie the server parsed differently than it was written.
+  - `userId` was added to `LoadFixtureUser` rather than parsed back out of the fixture email. The seed
+    happens to write `${userId}@load.local`, so it *is* derivable today — and a consumer relying on
+    that would keep working until the address format changed for an unrelated reason, then fail as a
+    wrong `user_id` rather than a missing one. `mintSessions` refuses a manifest without it and names
+    the reseed.
+  - Result: `mintSessions`, `probeSessionCookie` and `signSessionCookie` in `auth.ts`; the runner
+    mints whenever `LOAD_SESSION_DATABASE_URL`/`LOAD_DATABASE_URL` is set and signs in otherwise, so
+    the smoke's honest sign-in path is unchanged. 8 unit tests (`mint-sessions.test.ts`, including the
+    batched insert against a disposable database) and 3 e2e (`load-minted-session.spec.ts`): a minted
+    cookie answers 200 on `/api/dashboard/overview`, the same route refuses the same request without
+    it, and a cookie signed with the wrong secret is refused — so the guard is not theatre. The report
+    now carries `sessionOrigin`, and its Markdown says in the header when `/sign-in/email` was not
+    part of the result.
 
-- [ ] **Let the soak set its duration without silently dropping its own thresholds**
+- [x] **Let the soak set its duration without silently dropping its own thresholds**
   - Files: `scripts/load/runner.ts`, `scripts/load/config.ts`,
     `tests/unit/scripts/load/runner-config.test.ts`
   - Do: Separate duration from profile. `--seconds` is the only way to ask for anything other than
@@ -142,6 +159,11 @@
     `steadySeconds`; nothing else about the contract changes between stages". The only mechanism
     that overrides it changes two other things. Found 2026-08-14 while writing the certification
     runbook, before any run had been attempted.
+  - Result: `configFromFlags` is now exported and tested directly. `--seconds` sets only
+    `steadySeconds`; `--users` still widens the offered-rate window, because it genuinely invalidates
+    it; and a new `--ramp` covers the one legitimate need the old coupling served — a short manual run
+    that wants to skip the two-minute ramp on purpose. 6 unit tests in `runner-config.test.ts`, one of
+    which pins `--seconds=7200` to a 120-second ramp and the unmodified 400–500 req/s window.
 
 - [ ] **Run and record the direct 10-minute baseline**
   - Files: `docs/operations/load-baseline-<date>.md`
@@ -461,6 +483,7 @@ docker/pgbouncer` passes; running each architecture reports `PgBouncer 1.25.2`; 
     approval, not code". Two thirds of that is now wrong. The host is no longer needed — the target
     is the production instance with the fixture in a disposable database — and it is *not* true that
     no code remains. Two harness gaps, both found before any run was attempted and both now the first
-    two open tasks in Phase 1 above: nothing can obtain 1,000 sessions under the sign-in limiter, and
-    `--seconds` silently drops the offered-rate threshold it is supposed to certify. What remains is
-    those two changes, a window and an approval.
+    two tasks in Phase 1 above: nothing could obtain 1,000 sessions under the sign-in limiter, and
+    `--seconds` silently dropped the offered-rate threshold it is supposed to certify. **Both were
+    implemented the same day.** What remains is a window and an approval — which is what the note
+    originally claimed, and now is actually true.
