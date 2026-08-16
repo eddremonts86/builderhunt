@@ -14,7 +14,7 @@ import * as React from 'react'
 import { ArrowDown, ArrowUp, Map as MapIcon, Plus, Save, Trash2, X } from 'lucide-react'
 import { Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { Button } from '~/components/ui/button'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, EmptyCell, PrimaryCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import { emptyTableSearch } from '~/shared/lib/table/query-url'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
@@ -40,6 +40,13 @@ const CATEGORIES = ['integrations', 'features', 'infrastructure', 'general'] as 
 
 /** Items whose id carries this prefix are owned by `content/roadmap/*.md`. */
 const FILE_MANAGED_PREFIX = 'content-roadmap-'
+
+/** Planned is the resting state, in progress is the one worth watching, shipped is done. */
+const ROADMAP_STATUS_TONES: Record<string, StatusTone> = {
+  shipped: 'success',
+  in_progress: 'warning',
+  planned: 'neutral',
+}
 
 export function RoadmapManager() {
   const [items, setItems] = React.useState<RoadmapItem[]>([])
@@ -261,76 +268,87 @@ export function RoadmapManager() {
           >
             <ArrowDown className="h-3 w-3" />
           </button>
-          <span className="tabular-nums text-xs text-bh-text-dim">{item.sortOrder}</span>
+          <span className="tbl-cell-number">{item.sortOrder}</span>
         </span>
       ),
+      // Not `number`: the cell is two buttons and a figure, so it needs the actions column's
+      // trailing stickiness rather than 88px of right-aligned digits.
+      kind: 'actions',
       sortable: true,
       value: (item) => item.sortOrder,
     },
     {
       id: 'title',
       header: 'Item',
+      kind: 'primary',
       sortable: true,
       priority: 'primary',
       value: (item) => item.title,
       cell: (item) => (
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-medium">{item.title}</span>
-            {item.id.startsWith(FILE_MANAGED_PREFIX) && (
+        <PrimaryCell
+          title={item.title}
+          meta={item.description}
+          leading={item.id.startsWith(FILE_MANAGED_PREFIX)
+            ? (
+              // Not a status: it says where this row is *edited*, which is a warning attached to
+              // the item's identity rather than a stage of its life. It keeps its own tone so it
+              // cannot be mistaken for one of the five in the Status column beside it.
               <span
-                className="rounded border border-bh-cyan/30 bg-bh-cyan/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bh-cyan-text"
+                className="tbl-chip"
+                data-tone="accent"
                 title={`Defined by content/roadmap/${item.id.slice(FILE_MANAGED_PREFIX.length)}.md — edits here are overwritten by the next content:sync`}
               >
                 in git
               </span>
-            )}
-          </span>
-          {item.description && (
-            <span className="block truncate text-xs text-bh-text-muted">{item.description}</span>
-          )}
-        </span>
+              )
+            : undefined}
+        />
       ),
     },
     {
       id: 'status',
       header: 'Status',
+      kind: 'status',
       sortable: true,
       groupable: true,
       value: (item) => item.status,
-      cell: (item) => (
-        <span className={`text-[10px] font-bold uppercase tracking-wider ${
-          item.status === 'shipped' ? 'text-bh-success'
-            : item.status === 'in_progress' ? 'text-bh-warning' : 'text-bh-text-dim'
-        }`}>
-          {item.status}
-        </span>
-      ),
+      cell: (item) => <StatusCell label={item.status} tone={ROADMAP_STATUS_TONES[item.status] ?? 'neutral'} />,
     },
     {
       id: 'category',
       header: 'Category',
+      kind: 'category',
       priority: 'detail',
       value: (item) => item.category,
-      cell: (item) => item.category ?? '—',
+      cell: (item) => item.category ?? <EmptyCell label="Uncategorised" />,
     },
     {
       id: 'shipEstimate',
       header: 'Estimate',
+      kind: 'category',
       priority: 'secondary',
       value: (item) => item.shipEstimate,
-      cell: (item) => item.shipEstimate ?? '—',
+      cell: (item) => item.shipEstimate ?? <EmptyCell label="No estimate" />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       cell: (item) => (
         <span className="flex items-center gap-2">
           <Button type="button" onClick={() => startEdit(item)} variant="secondary" size="sm" data-testid="admin-roadmap-edit">
             Edit
           </Button>
-          <Button type="button" onClick={() => void remove(item.id)} variant="secondary" size="sm" data-testid="admin-roadmap-delete">
+          <Button
+            type="button"
+            onClick={() => void remove(item.id)}
+            variant="secondary"
+            size="sm"
+            // An icon-only button has no inner text a screen reader can read, so without this it
+            // announced as "button" — fifty of them, one per row, and one of them deletes.
+            aria-label={`Delete ${item.title}`}
+            data-testid="admin-roadmap-delete"
+          >
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
         </span>

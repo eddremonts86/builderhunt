@@ -5,6 +5,7 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button, LinkButton } from '~/components/ui'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
+import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
 
 export const Route = createFileRoute('/onboarding/welcome')({
   beforeLoad: async () => {
@@ -35,6 +36,7 @@ const VALUE_PROPS = [
 function WelcomeStep() {
   const navigate = useNavigate()
   const [skipping, setSkipping] = React.useState(false)
+  const step = useOnboardingStep('welcome')
 
   React.useEffect(() => {
     // Mark step 1 as visited
@@ -48,6 +50,7 @@ function WelcomeStep() {
 
   const skip = async () => {
     setSkipping(true)
+    step.exit()
     try {
       await fetch('/api/onboarding/skip', { method: 'POST', credentials: 'include' })
     } catch {
@@ -59,6 +62,19 @@ function WelcomeStep() {
     if (next) navigate({ href: next })
     else navigate({ to: '/dashboard' })
   }
+
+  /**
+   * Where "Show me how" leads — the one place the two flows fork.
+   *
+   * v2 inserts the goal step between welcome and the action; v1 goes straight to the search step.
+   * Both are live, so the rollout is this choice and nothing else: no deploy, no migration, and a
+   * rollback is the same choice made the other way. The cohort is decided on the server
+   * (`/api/onboarding/v2` answers `rollout.inCohort`) so a client cannot opt itself in.
+   *
+   * Until the status has resolved, this points at v1 — the flow everybody had. Guessing the other
+   * way would flash the goal step at somebody who is not in the cohort.
+   */
+  const start = step.inCohort ? '/onboarding/goal' : '/onboarding/search'
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6">
@@ -85,10 +101,21 @@ function WelcomeStep() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <LinkButton to="/onboarding/search" variant="primary" className="inline-flex" data-testid="onboarding-start">
+          {/* A button rather than a link: the destination is decided at click time and the step has
+              to be recorded before the navigation. `LinkButton` takes no click handler. */}
+          <Button
+            variant="primary"
+            className="inline-flex"
+            data-testid="onboarding-start"
+            data-flow-version={step.inCohort ? '2' : '1'}
+            onClick={() => {
+              void step.complete()
+              void navigate({ to: start })
+            }}
+          >
             Show me how
             <ArrowRight className="w-4 h-4" aria-hidden="true" />
-          </LinkButton>
+          </Button>
           <Button
             onClick={skip}
             disabled={skipping}

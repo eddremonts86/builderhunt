@@ -1,49 +1,146 @@
 # Tareas — dashboard personalizado por segmento
 
 > **Status**: `partially-implemented`
-> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md), [`03-onboarding-segmentado`](../../implemented/phase-2/03-onboarding-segmentado/spec.md)
 > **Blocks**: nothing
 > **Reality check**: The registry, compositor primitives, customization UI and persistence are
 > already implemented in `src/modules/dashboard/lib/widget-registry.ts`, `DashboardPage.tsx`,
 > `DashboardCustomizeDialog.tsx` and `/api/dashboard/preferences`. Extend them; do not replace them.
 
-- [ ] **Inventariar widgets y dependencias**
+- [x] **Inventariar widgets y dependencias**
   - Files: `docs/architecture/dashboard-widget-inventory.md`
   - Do: listar widget ID, componente, endpoint, permiso, entitlement, coste y estado vacío.
   - Verify: cada widget actual aparece una sola vez.
+  - Result: [`docs/architecture/dashboard-widget-inventory.md`](../../../docs/architecture/dashboard-widget-inventory.md)
+    con los 21 widgets, y `tests/unit/modules/dashboard/dashboard-widget-inventory.test.ts` (4 tests)
+    que lo compara contra `HOME_WIDGETS`. Un documento derivado que nadie verifica es exacto justo
+    hasta que alguien toca el dashboard, así que el test es lo que lo mantiene cierto.
+  - **Lo encontró su propio test**: el primer borrador tenía 18 widgets, no 21. Los tres `stat-*` se
+    generan desde una lista con spread en vez de escribirse, así que leer el registro no los enseña.
+  - Dieciséis de veintiuno no cuestan petición propia: leen secciones de un único
+    `GET /api/dashboard/overview`. Los cinco que sí (`sprints`, `recommendations`, `alerts`,
+    `saved-searches`, `recent-builders`) son los que un preset puede encarecer — no al promoverlos,
+    sino al **desocultarlos**.
+  - **Ningún widget está gateado por plan, y es deliberado.** El entitlement se aplica en cada fuente
+    de datos, así que un widget en un workspace gratuito enseña su estado honesto en vez de
+    desaparecer. Un preset no puede convertirse en una segunda superficie de entitlement: ocultar
+    `alerts` diría que la función no existe, que es un mensaje distinto del verdadero.
 
-- [ ] **Añadir presets al registro existente**
+- [x] **Añadir presets al registro existente**
   - Files: `src/modules/dashboard/lib/widget-registry.ts`, `src/modules/dashboard/lib/dashboard-presets.ts`, `tests/unit/modules/dashboard/lib/dashboard-presets.test.ts`
   - Do: mantener el registro actual y añadir contratos exhaustivos para
     general/hiring/investing/building y fallback; `DashboardPage.HOME_WIDGETS` se mueve al registro
     compartido solo si el import no crea un ciclo.
   - Verify: unit tests para orden, IDs únicos, permiso y segmento desconocido.
+  - Result: `src/modules/dashboard/lib/dashboard-presets.ts` y 22 tests, contra el registro real y no
+    contra un fixture — un preset es una lista de IDs de widget, y el fallo que importa es justo que
+    esos IDs dejen de coincidir con el dashboard, que un fixture ocultaría por definición.
+  - **Un preset es una instrucción parcial**, no un layout: nombra con qué empieza la ruta y qué
+    esconde, y lo que no menciona conserva su posición en el registro. Un preset que listara los 21
+    widgets serían cuatro copias casi idénticas del registro, y la diferencia entre rutas — lo único
+    que merece revisión — quedaría invisible.
+  - **`general` no nombra nada**, así que resolverlo es demostrablemente la identidad y el dashboard
+    que todo el mundo tiene hoy no se mueve. `other`, segmento nulo, petición fallida y un valor de
+    un build futuro caen ahí.
+  - `HOME_WIDGETS` **no** se movió al registro compartido: se exporta desde `DashboardPage` y el
+    preset se valida ahí mismo con `assertPresetsMatchRegistry`, al cargar el módulo. Mover 600
+    líneas de JSX para que un fichero de datos pudiera importarlas habría sido un refactor con
+    riesgo y sin lector.
 
-- [ ] **Aplicar el preset en el compositor existente**
+- [x] **Aplicar el preset en el compositor existente**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, `src/modules/dashboard/lib/dashboard-presets.ts`
   - Do: reproducir el dashboard actual como preset general, resolver el preset antes de
     `orderedWidgets`, y conservar los test IDs y controles de personalización existentes.
   - Verify: visual baseline y E2E actuales sin regresión.
+  - Result: `resolvePresetLayout` se resuelve antes de `orderedWidgets`, así que la elegibilidad por
+    rol y por dependencia sigue corriendo primero — un preset puede promover un widget que el rol no
+    ve, y la respuesta es que gana el rol. Un preset es presentación y no concede nada.
+  - **El preset aplica a lo que nadie ha ordenado, dimensión a dimensión.** Un único flag de "¿está
+    personalizado?" tiraría el preset entero en cuanto alguien fijara un tile; fusionar los oculto
+    haría imposible restaurar un widget que la ruta esconde, y "Restaurar" es un control que el
+    diálogo ya ofrece. Vaciar una lista es cómo vuelve el default de la ruta — sin segunda API y sin
+    segunda tabla, que es justo lo que pide la tarea 6.
+  - Verificado: 20 e2e de dashboard y **44 baselines visuales** verdes sin regenerar una sola imagen.
 
-- [ ] **Exponer contexto de dashboard**
+- [x] **Exponer contexto de dashboard**
   - Files: `src/routes/api/dashboard/context.ts`, `src/shared/lib/dashboard-api.ts`
   - Do: devolver segmento, preset ID y capabilities, nunca datos no autorizados.
   - Verify: HTTP tests por null/segment/role/entitlement.
+  - Result: `src/routes/api/dashboard/context.ts`, `src/shared/lib/dashboard-api.ts`,
+    `src/modules/dashboard/lib/use-dashboard-context.ts` y
+    `tests/e2e/api/dashboard-context.spec.ts` (8 specs, los cuatro ejes que pide el Verify).
+  - Pequeño a propósito: el spec prohíbe un endpoint gigante por segmento, así que este contesta
+    **qué ruta** y cada widget sigue leyendo la fuente que ya leía. Un preset cambia el orden de la
+    página, nunca lo que la página pide.
+  - **El segmento sale del servidor, nunca de la petición.** No hay campo con el que un cliente pueda
+    nombrar segmento, rol u organización, y un e2e lo prueba mandando ambos en la query string.
+  - Las capabilities ahora se sirven en vez de solo compilarse: "esto ha salido" es un hecho del
+    despliegue que atiende la petición, y un cliente que lo decidiera solo se quedaría con su
+    respuesta a través de un rollback.
+  - El plan viaja para que el dashboard pueda decir "eso es de otro plan" en vez de esconder el
+    widget. Esconderlo diría que la función no existe.
 
-- [ ] **Implementar presets**
+- [x] **Implementar presets**
   - Files: `src/modules/dashboard/ui/home/dashboard-presets.ts`, `tests/unit/modules/dashboard/ui/home/DashboardComposer.test.tsx`
   - Do: configurar contenido/CTA y empty states honestos por segmento.
   - Verify: component tests y screenshots mobile/desktop por preset.
+  - Result: el CTA vive en el preset y lo renderiza `first-hunt`, que es la única pantalla a la que
+    llega toda ruta en una cuenta nueva. Cubierto por `tests/e2e/dashboard-presets.spec.ts` (7 specs,
+    uno de ellos `@mobile-only`) y por los 23 unitarios de presets.
+  - Le decía a todo el mundo que corriera su primera búsqueda — **incluido un builder que vino a
+    reclamar su perfil**, para quien no seguir a nadie es el estado normal y no un hueco que llenar.
+    Además tapa el agujero que el inventario señala: `profile-owner` se esconde sin claim, así que un
+    builder sin nada reclamado se quedaba con tiles sobre desconocidos.
+  - **La copy de `general` es palabra por palabra la de antes**, y las 44 baselines visuales pasan
+    **sin regenerar una sola imagen**. Esa es la prueba de que la ruta que tiene todo el mundo no se
+    movió; un texto nuevo "equivalente" habría cambiado el producto para todas las cuentas sin
+    segmento, que son todas hasta que empiece la rampa.
+  - Encontrado mirando la captura del fallo: el encabezado y el botón decían lo mismo. El CTA tiene
+    `heading` y `label` separados y un test rechaza que coincidan — una pantalla repitiéndose lee
+    como una plantilla sin rellenar.
+  - Los ficheros no son los que lista la tarea: el preset ya vivía en `lib/dashboard-presets.ts`
+    desde la tarea 2, y un segundo módulo en `ui/home/` habría sido una segunda fuente de verdad.
 
-- [ ] **Integrar presets con las preferencias ya persistidas**
+- [x] **Integrar presets con las preferencias ya persistidas**
   - Files: `src/shared/lib/dashboard/preferences-contract.ts`, `src/shared/lib/repositories/dashboard-preferences.ts`, `src/routes/api/dashboard/preferences.ts`, `tests/e2e/dashboard-and-navigation.spec.ts`
   - Do: conservar `revision`, `schemaVersion`, `hiddenWidgetIds`, `pinnedWidgetIds` y
     `orderedWidgetIds`; definir cómo un cambio de segmento mantiene o restaura el layout sin crear
     una segunda API ni una segunda tabla.
   - Verify: los tests existentes de aislamiento/conflicto siguen verdes y un e2e cambia de segmento,
     conserva layout, restaura preset y refresca la página.
+  - Result: **ni una línea del contrato de preferencias cambió.** `revision`, `schemaVersion` y las
+    tres listas están intactas, no hay tabla nueva ni endpoint nuevo, y los 20 e2e de dashboard
+    (incluidos los de aislamiento y conflicto) siguen verdes.
+  - La regla es una sola frase: **el preset aplica a lo que nadie ha ordenado, dimensión a
+    dimensión.** Una lista con contenido es de la persona y gana; una vacía significa que nadie ha
+    ordenado nada y la ruta pone su default. Vaciar una lista es cómo se restaura el preset, que es
+    exactamente lo que el reset del diálogo ya escribe.
+  - Cubierto por tres specs: cambiar de segmento conserva el layout guardado, vaciarlo restaura la
+    ruta, y un widget que la ruta esconde sigue siendo restaurable.
 
-- [ ] **Medir rendimiento y rollout**
+- [~] **Medir rendimiento y rollout**
   - Files: `scripts/check-performance-budgets.mjs`, `.env.example`, `docs/operations/personalized-dashboard-rollout.md`
   - Do: eventos por widget y flag para preset general/segmentado.
   - Verify: Lighthouse budgets, E2E settle signal y smoke con widget fallido.
+  - Hecho: `DASHBOARD_PRESETS_ENABLED` (off por defecto),
+    [`docs/operations/personalized-dashboard-rollout.md`](../../../docs/operations/personalized-dashboard-rollout.md),
+    el settle signal ampliado, el smoke con un widget caído, y los budgets de Lighthouse verdes
+    dentro de `ci:local`.
+  - **El flag se aplica en `/api/dashboard/context` y en ningún otro sitio**, así que apagarlo es una
+    variable y un reinicio, y el navegador no tiene una rama propia que pueda desincronizarse. Es un
+    booleano y no un porcentaje: en un dashboard nadie está a mitad de un flujo.
+  - La decisión se extrajo a `resolveDashboardPresetId`, una función pura, porque el flag **no se
+    puede probar en las dos posiciones por e2e**: `env` se congela al cargar el módulo y el harness
+    cachea un servidor por worker. Las dos posiciones son ahora dos líneas de un unitario.
+  - `scripts/check-performance-budgets.mjs` no se tocó: mide tamaños de imagen, y un preset no añade
+    ninguna petición — dieciséis de veintiún widgets leen secciones de un único `overview`, y los
+    cinco que piden por su cuenta lo hacen al montar, ocupen la posición que ocupen.
+  - **No hecho: los eventos por widget.** Impresión e interacción por widget son una superficie de
+    instrumentación de veintiún componentes, y lo que hay hoy es la telemetría propia de la cola de
+    acciones más el funnel de onboarding. Está escrito en el runbook con todas las letras: *no se
+    debe subir la rampa con la promesa de medirla*, porque decidir si una ruta es mejor que `general`
+    necesita los eventos primero. Es trabajo de su propio plan, no un remate de este.
+  - **Conocido**: la página pinta en orden general y reordena al llegar el contexto. Para una cuenta
+    en `general` — todas, hasta que esto se encienda — no hay reordenación ninguna; para una
+    segmentada hay una, y la alternativa era retrasar el primer pintado de todo el mundo detrás de
+    una lectura de preferencias.

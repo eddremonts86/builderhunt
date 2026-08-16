@@ -1,7 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { HomePage } from '~/modules/landing/components/HomePage'
+import { getSegmentedLandingEnabled } from '~/shared/lib/segmented-landing-flag'
 
 export const Route = createFileRoute('/_landing/')({
+  // Resolved here rather than read in the component: `env.ts` hands the browser a stub, so a
+  // component asking it directly would hide the selector on every client render whatever the server
+  // has configured. See `segmented-landing-flag.ts`.
+  beforeLoad: async () => ({ segmentedLanding: await getSegmentedLandingEnabled() }),
   component: HomeRoute,
 })
 
@@ -14,6 +19,6 @@ export const Route = createFileRoute('/_landing/')({
  * resolved once, in that layout's `beforeLoad`, and read from route context here.
  */
 function HomeRoute() {
-  const { user } = Route.useRouteContext()
-  return <HomePage isAuthed={!!user.userId} />
+  const { user, segmentedLanding } = Route.useRouteContext()
+  return <HomePage isAuthed={!!user.userId} showSegmentSelector={segmentedLanding} />
 }

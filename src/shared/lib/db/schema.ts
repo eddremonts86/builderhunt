@@ -967,6 +967,24 @@ export const onboardingProgress = pgTable(
     firstQueryId: text('first_query_id'),
     firstBuilderIds: jsonb('first_builder_ids').$type<string[]>().default([]).notNull(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    /**
+     * Onboarding v2 (Plan: phase-2/03-onboarding-segmentado). All nullable, and the v1 columns
+     * above are kept rather than replaced.
+     *
+     * A row written by v1 has `flow_version` null and `step` 0..3; a row written by v2 has
+     * `flow_version` 2 and a `current_step_key`. Both are readable, which is what lets the new flow
+     * roll out by cohort instead of by migration — and what lets a rollback leave people where they
+     * were rather than dropping them back to the start.
+     *
+     * `activation_type` and `activation_ref_id` record *what* somebody did, not that they finished:
+     * v1 counted a completed flow as an activated user, so its activation rate described the flow
+     * rather than the product.
+     */
+    flowVersion: integer('flow_version'),
+    currentStepKey: text('current_step_key'),
+    activationType: text('activation_type'),
+    activationRefId: text('activation_ref_id'),
+    activatedAt: timestamp('activated_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -2340,8 +2358,29 @@ export const workSampleAnalyses = pgTable(
  * what `conversion-events.ts`'s closed schema allows. `serverDay` is the
  * server-computed UTC calendar day (not the client's `occurredAt`), used for
  * date-range aggregate queries without re-parsing every row's timestamp.
- * `(sessionId, name, surface, variant)` is unique so a retried client
- * request is a no-op rather than double-counting a funnel step.
+ *
+ * ## The dimension columns (plan: phase-2/03-onboarding-segmentado)
+ *
+ * Everything below `createdAt` is nullable and applies to a subset of events —
+ * `conversion-events.ts` decides which name may carry which, and the checks
+ * here only bound the vocabulary. They exist because the funnel this table was
+ * built for had one path: name, surface, variant. A segmented funnel has to
+ * answer "which route, which step, which flow version", and none of those could
+ * be expressed, so the segment context plan 02 was already sending had nowhere
+ * to land and was dropped on the way in.
+ *
+ * ## Why the identity index carries `step_key` and `segment_next`
+ *
+ * `(sessionId, name, surface, variant)` alone made a retried client request a
+ * no-op, which is right for a landing event that fires once. It is wrong for a
+ * flow: the second `onboarding_step_viewed` in a session is a *different step*,
+ * not a retry, and `onConflictDoNothing` would have silently swallowed every
+ * step after the first — a per-step funnel that could only ever show step one.
+ * The same applies to somebody who tries three segments before settling.
+ *
+ * `coalesce(..., '')` because a NULL never equals a NULL in a unique index, so
+ * the columns being null for landing events would otherwise disable the
+ * constraint for exactly the rows it was written for.
  */
 export const conversionEvents = pgTable(
   'conversion_events',
@@ -2354,9 +2393,26 @@ export const conversionEvents = pgTable(
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     serverDay: text('server_day').notNull(), // 'YYYY-MM-DD', UTC
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    /** 1 or 2 — which onboarding flow the event came from, so the two cohorts can be compared. */
+    flowVersion: integer('flow_version'),
+    /** The route through onboarding: `general`, `hiring`, `investing`, `building`, `other`. */
+    preset: text('preset'),
+    /** The step key from `onboarding-v2.ts` — never a step number, which means different things per route. */
+    stepKey: text('step_key'),
+    segmentPrevious: text('segment_previous'),
+    segmentNext: text('segment_next'),
+    segmentSource: text('segment_source'),
+    activationType: text('activation_type'),
   },
   (table) => [
-    uniqueIndex('conversion_events_identity_unique').on(table.sessionId, table.name, table.surface, table.variant),
+    uniqueIndex('conversion_events_identity_unique').on(
+      table.sessionId,
+      table.name,
+      table.surface,
+      table.variant,
+      sql`coalesce(${table.stepKey}, '')`,
+      sql`coalesce(${table.segmentNext}, '')`,
+    ),
     // Note (2026-07-29): the single-column `conversion_events_server_day_idx`
     // was removed. PG18's planner answers `WHERE server_day BETWEEN $1 AND $2`
     // via a skip scan on the composite `(name, server_day)` index with the
@@ -2369,11 +2425,26 @@ export const conversionEvents = pgTable(
       'conversion_events_name_check',
       sql`${table.name} in (
         'landing_view', 'hero_signup_click', 'hero_explore_click',
-        'explore_search_complete', 'explore_signup_click', 'signup_submit', 'signup_complete'
+        'explore_search_complete', 'explore_signup_click', 'signup_submit', 'signup_complete',
+        'segment_prompt_viewed', 'segment_selected', 'segment_changed', 'segment_skipped',
+        'activation_reached', 'onboarding_step_viewed', 'onboarding_step_completed',
+        'onboarding_flow_exited',
+        'segment_page_viewed', 'segment_selector_click', 'segment_page_cta_click'
       )`,
     ),
-    check('conversion_events_surface_check', sql`${table.surface} in ('hero', 'final_cta', 'explore', 'signup')`),
+    check(
+      'conversion_events_surface_check',
+      sql`${table.surface} in ('hero', 'final_cta', 'explore', 'signup', 'onboarding', 'settings', 'segment_page')`,
+    ),
     check('conversion_events_variant_check', sql`${table.variant} in ('baseline', 'treatment')`),
+    check(
+      'conversion_events_flow_version_check',
+      sql`${table.flowVersion} is null or ${table.flowVersion} in (1, 2)`,
+    ),
+    check(
+      'conversion_events_preset_check',
+      sql`${table.preset} is null or ${table.preset} in ('general', 'hiring', 'investing', 'building', 'other')`,
+    ),
   ],
 )
 
@@ -4434,3 +4505,43 @@ export const platformBetaMode = pgTable(
     check('platform_beta_mode_revision_check', sql`${table.revision} >= 0`),
   ],
 )
+
+// ---------------------------------------------------------------------------
+// User preferences (Plan: phase-2/02-segmentacion-usuarios)
+// ---------------------------------------------------------------------------
+
+/**
+ * The person's own preferences, keyed on the account rather than on a workspace.
+ *
+ * ## Why account-subject and not tenant-private
+ *
+ * A segment describes what somebody is *here to do*, and that does not change when they switch
+ * organisation: the same person recruiting in two workspaces is recruiting in both. Storing it per
+ * membership would ask them the same question again for every workspace they join, and would make
+ * "which answer is current" a question with no answer. The spec says to revisit only if real
+ * evidence shows per-workspace goals, and not to pre-build for it.
+ *
+ * The consequence is the RLS rule: rows are filtered on `app.user_id` alone. There is deliberately
+ * no `organization_id` on this table, so there is nothing for a tenant filter to key on and no way
+ * for a workspace switch to change what is returned.
+ *
+ * ## Why every segment column is nullable
+ *
+ * Every account that already exists has no segment and is allowed to keep it that way. `null` means
+ * "not chosen", is a first-class state rather than an error, and `resolveSegmentPreset` in
+ * `src/shared/lib/user-segments.ts` is the single place that turns it into the `general` preset.
+ * A `NOT NULL DEFAULT 'other'` would have been the tempting shortcut and would have destroyed the
+ * distinction between "told us they are something else" and "never asked".
+ *
+ * `segment_schema_version` records which taxonomy a row was written under, so a later revision
+ * migrates values explicitly instead of silently reinterpreting them.
+ */
+export const userPreferences = pgTable('user_preferences', {
+  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+  primarySegment: text('primary_segment'),
+  segmentSource: text('segment_source'),
+  segmentSchemaVersion: integer('segment_schema_version'),
+  segmentSelectedAt: timestamp('segment_selected_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})

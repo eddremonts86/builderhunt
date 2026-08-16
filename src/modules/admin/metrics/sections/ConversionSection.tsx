@@ -1,10 +1,11 @@
-// table-surface-bounded: six named funnel steps, each an aggregate over the requested window — one row per
+// table-surface-semantic: six named funnel steps, each an aggregate over the requested window — one row per
 // step from a fixed `METRIC_DEFINITIONS` list, so the row count is decided by code and not by how much data
 // exists. The marker moved here with the table when the metrics page split into sections; it used to sit at the
 // top of `AdminMetricsPage.tsx`, and `check-table-surfaces` caught the omission on the move.
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, ExternalLink, Filter } from 'lucide-react'
+import { SemanticTable, type SemanticColumn } from '~/shared/components/table'
 import { MetricSectionView } from '../MetricSectionView'
 import type { SectionWidgetProps } from '../MetricSectionView'
 
@@ -62,6 +63,44 @@ function formatRate(rate: number | null): string {
 function formatCi(ci: [number, number] | null): string | null {
   return ci ? `${(ci[0] * 100).toFixed(1)}–${(ci[1] * 100).toFixed(1)}%` : null
 }
+
+interface FunnelRow {
+  key: string
+  baseline: ConversionRate | undefined
+  treatment: ConversionRate | undefined
+}
+
+/**
+ * One variant's cell: the rate, then the counts it came from, then the interval — or the reason
+ * there is no interval.
+ *
+ * All three, always. A rate on its own is unactionable: 33.3% over three sessions and 33.3% over
+ * nine thousand are the same number and completely different facts, and it was showing only the
+ * first version of this cell that made an operator escalate a "collapsing funnel" that was four
+ * visits on a Sunday. `low n` is the honest substitute for an interval the sample cannot support —
+ * never an invented one.
+ */
+function VariantCell({ sample }: { sample: ConversionRate | undefined }) {
+  const interval = sample && !sample.insufficientSample ? formatCi(sample.ci95) : null
+  return (
+    <>
+      <span className="font-semibold">{formatRate(sample?.rate ?? null)}</span>
+      <span className="tbl-cell-meta ml-1 inline">({sample?.numerator ?? 0}/{sample?.denominator ?? 0})</span>
+      {sample?.insufficientSample && (
+        <span className="tbl-cell-meta ml-1 inline" title="Sample too small for a confidence interval">low n</span>
+      )}
+      {interval && <span className="tbl-cell-meta ml-1 inline">{interval}</span>}
+    </>
+  )
+}
+
+const FUNNEL_COLUMNS: SemanticColumn<FunnelRow>[] = [
+  // The step name is the row's identity: without `scope="row"` a screen reader reads "12.0%" with
+  // no idea which of six funnel steps it belongs to.
+  { id: 'step', header: 'Step', rowHeader: true, cell: (row) => METRIC_LABELS[row.key] },
+  { id: 'baseline', header: 'Baseline', cell: (row) => <VariantCell sample={row.baseline} /> },
+  { id: 'treatment', header: 'Treatment', cell: (row) => <VariantCell sample={row.treatment} /> },
+]
 
 export function ConversionSection({ state }: SectionWidgetProps) {
   const [conversion, setConversion] = React.useState<{ baseline: ConversionResponse; treatment: ConversionResponse } | null>(null)
@@ -181,40 +220,13 @@ export function ConversionFunnelSection({
           </Link>
         </p>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-bh-text-dim border-b border-bh-border">
-              <th className="py-2 pr-4">Step</th>
-              <th className="py-2 pr-4">Baseline</th>
-              <th className="py-2 pr-4">Treatment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {METRIC_ORDER.map((key) => {
-              const b = baseline.metrics[key]
-              const t = treatment.metrics[key]
-              return (
-                <tr key={key} className="border-b border-bh-border/50" data-testid={`metrics-conversion-row-${key}`}>
-                  <td className="py-2 pr-4 text-bh-text">{METRIC_LABELS[key]}</td>
-                  <td className="py-2 pr-4">
-                    <span className="font-semibold">{formatRate(b?.rate ?? null)}</span>
-                    <span className="text-bh-text-dim ml-1">({b?.numerator ?? 0}/{b?.denominator ?? 0})</span>
-                    {b?.insufficientSample && <span className="text-bh-text-dim ml-1" title="Sample too small for a confidence interval">low n</span>}
-                    {b && !b.insufficientSample && formatCi(b.ci95) && <span className="text-bh-text-dim ml-1 text-xs">{formatCi(b.ci95)}</span>}
-                  </td>
-                  <td className="py-2 pr-4">
-                    <span className="font-semibold">{formatRate(t?.rate ?? null)}</span>
-                    <span className="text-bh-text-dim ml-1">({t?.numerator ?? 0}/{t?.denominator ?? 0})</span>
-                    {t?.insufficientSample && <span className="text-bh-text-dim ml-1" title="Sample too small for a confidence interval">low n</span>}
-                    {t && !t.insufficientSample && formatCi(t.ci95) && <span className="text-bh-text-dim ml-1 text-xs">{formatCi(t.ci95)}</span>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <SemanticTable
+        caption="Landing funnel conversion rate per step, baseline against treatment"
+        columns={FUNNEL_COLUMNS}
+        rows={METRIC_ORDER.map((key) => ({ key, baseline: baseline.metrics[key], treatment: treatment.metrics[key] }))}
+        rowKey={(row) => row.key}
+        rowTestId={(row) => `metrics-conversion-row-${row.key}`}
+      />
     </section>
   )
 }

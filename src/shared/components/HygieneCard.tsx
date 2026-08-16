@@ -1,6 +1,8 @@
-// table-surface-ok: a fixed summary of one profile's hygiene checks, not a queried collection.
+// table-surface-semantic: a fixed summary of one profile's repository signals — a handful of rows
+// read rather than operated, bounded by the enrichment envelope rather than by a query.
 import * as React from 'react'
 import { Check, X, Activity, GitPullRequest, FileText, Zap } from 'lucide-react'
+import { EmptyCell, RatioCell, SemanticTable, type SemanticColumn } from '~/shared/components/table'
 import {
   computeHygiene,
   estimateRepoSignalsFromBuilder,
@@ -49,6 +51,36 @@ function ScoreRing({ score }: { score: number }) {
     </div>
   )
 }
+
+/** A tick or a cross, with the meaning in text rather than in the glyph alone (WCAG 1.4.1). */
+function Signal({ present, label }: { present: boolean; label: string }) {
+  return present
+    ? <Check className="w-3 h-3 text-bh-success inline" aria-label={label} />
+    : <X className="w-3 h-3 text-bh-text-dim inline" aria-label={`No ${label.toLowerCase()}`} />
+}
+
+const REPO_SIGNAL_COLUMNS: SemanticColumn<RepoSignals>[] = [
+  // The repository name is the row's identity, and the only cell here allowed to ellipsize.
+  { id: 'repo', header: 'Repo', rowHeader: true, cell: (repo) => <span className="truncate block max-w-[140px]" title={repo.name}>{repo.name}</span> },
+  {
+    id: 'closeRate',
+    header: 'Close rate',
+    align: 'end',
+    // No issues at all is not a 0% close rate — it is no rate. Printing 0% there reads as a
+    // repository that ignores its issues, which is the opposite of what it means.
+    cell: (repo) => {
+      const total = repo.openIssues + repo.closedIssues
+      return total === 0 ? <EmptyCell label="No issues" /> : <RatioCell value={repo.closedIssues / total} />
+    },
+  },
+  {
+    id: 'docs',
+    header: 'Docs',
+    align: 'center',
+    cell: (repo) => <Signal present={repo.hasReadme && repo.hasContributing && repo.hasLicense} label="Complete docs" />,
+  },
+  { id: 'ci', header: 'CI', align: 'center', cell: (repo) => <Signal present={repo.hasWorkflows} label="CI configured" /> },
+]
 
 function formatRelativeDate(iso: string): string {
   const ms = Date.parse(iso)
@@ -196,36 +228,13 @@ export function HygieneCard({ builderId, source, builder }: HygieneCardProps) {
       </ul>
 
       {typeof real === 'object' && real.signals.length > 0 && (
-        <div className="mt-4 border-t border-bh-border/40 pt-3">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-bh-text-dim uppercase tracking-wider text-[10px]">
-                <th className="text-left font-medium pb-1">Repo</th>
-                <th className="text-right font-medium pb-1">Close rate</th>
-                <th className="text-center font-medium pb-1">Docs</th>
-                <th className="text-center font-medium pb-1">CI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {repos.map((r) => {
-                const total = r.openIssues + r.closedIssues
-                const closeRate = total === 0 ? null : Math.round((r.closedIssues / total) * 100)
-                const hasDocs = r.hasReadme && r.hasContributing && r.hasLicense
-                return (
-                  <tr key={r.name} className="text-bh-text-muted">
-                    <td className="py-1 truncate max-w-[120px]" title={r.name}>{r.name}</td>
-                    <td className="text-right">{closeRate === null ? '—' : `${closeRate}%`}</td>
-                    <td className="text-center">
-                      {hasDocs ? <Check className="w-3 h-3 text-bh-success inline" /> : <X className="w-3 h-3 text-bh-text-dim inline" />}
-                    </td>
-                    <td className="text-center">
-                      {r.hasWorkflows ? <Check className="w-3 h-3 text-bh-success inline" /> : <X className="w-3 h-3 text-bh-text-dim inline" />}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <SemanticTable
+            caption="Per-repository hygiene signals behind this score"
+            columns={REPO_SIGNAL_COLUMNS}
+            rows={repos}
+            rowKey={(repo) => repo.name}
+          />
         </div>
       )}
     </div>

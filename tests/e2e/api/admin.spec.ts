@@ -495,12 +495,20 @@ test.describe('a platform admin', () => {
     const legacy = await harness.admin.api!.fetch('/api/admin/metrics')
     expect(legacy.status()).toBe(200)
     const legacyBody = await legacy.json()
-    expect(Object.keys(legacyBody).sort()).toEqual(
-      // `removals` is conditional on `PROFILE_REMOVAL_ENABLED`, so it is allowed to be absent but not extra.
-      Object.keys(legacyBody).includes('removals')
-        ? ['db', 'discovery', 'generatedAt', 'interviews', 'inProcess', 'removals', 'server'].sort()
-        : ['db', 'discovery', 'generatedAt', 'interviews', 'inProcess', 'server'].sort(),
-    )
+    /**
+     * Two keys are flag-conditional, so each is allowed to be *absent* and never to be *extra*:
+     * `removals` behind `PROFILE_REMOVAL_ENABLED` and `segments` behind `USER_SEGMENTATION_ENABLED`.
+     *
+     * Written as a subtraction from the full set rather than as two branches. `segments` was added
+     * with the segmentation feature and this assertion never saw it, because the flag was off
+     * everywhere until `.env.example` turned it on for developers — a conditional key list that has
+     * to be edited by hand acquires exactly one blind spot per flag nobody has switched on yet.
+     */
+    const CONDITIONAL_KEYS = ['removals', 'segments']
+    const expectedKeys = ['db', 'discovery', 'generatedAt', 'interviews', 'inProcess', 'server']
+      .concat(CONDITIONAL_KEYS.filter((key) => Object.keys(legacyBody).includes(key)))
+      .sort()
+    expect(Object.keys(legacyBody).sort()).toEqual(expectedKeys)
     // And nothing in it is a collection whose length is decided by how much data exists.
     for (const [key, value] of Object.entries(legacyBody)) {
       expect(Array.isArray(value), `${key} must not be a row collection`).toBe(false)

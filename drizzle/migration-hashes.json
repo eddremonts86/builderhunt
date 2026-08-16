@@ -684,6 +684,22 @@
     "0170_platform_admin_preferences": {
       "sql": "7d23933a5f8fbc1b0a5e128c15eb1d645673c428c9039eb2a3b96f774f7a7b4a",
       "snapshot": "4220c498ccd04dda96bc315915154a306029dae05d7070e8a5b302316421b429"
+    },
+    "0171_user_preferences": {
+      "sql": "f57c98b6e5d095e1fddcfffc4a8491f47ec2e6b1644255a943b7fce691437c5d",
+      "snapshot": "9a95efaae8b9e85c2b20e29c7dbd4607482149b2ee696c8cf0c059f71cdf8630"
+    },
+    "0172_onboarding_v2": {
+      "sql": "137e6ec15ea662117cd26ad7627c8c9c4b58b4462e0efd0815e94606d33b70d6",
+      "snapshot": "003438c58677747a5e4a106a6164d5c9af3347bc8aa1cd27b959fc480202d463"
+    },
+    "0173_conversion_onboarding_funnel": {
+      "sql": "32681b1d4b3f5f1928027556da62587713492cd612f7d2e49033e1dda89afb2c",
+      "snapshot": "7df8f8f9fd1a1288cc61352331887560a281d744daf18f42b7e8e12457e9fbb1"
+    },
+    "0174_segmented_landing_funnel": {
+      "sql": "fa4d1ea422c862c12ed60bd5f145e97a17ba1e633719c7c25840de6ccf0e6f58",
+      "snapshot": "f3ea68673808b030949e16f17cefee2fce14dfedaf7873d5fbfb4ec21703bac6"
     }
   }
 }

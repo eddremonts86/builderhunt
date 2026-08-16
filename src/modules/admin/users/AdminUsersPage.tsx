@@ -5,7 +5,7 @@ import { Users, Edit3, X, Save, ExternalLink, ShieldCheck, AlertTriangle } from 
 import { PLAN_PRICING, type PlanTier } from '~/shared/lib/billing-shared'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { Button } from '~/components/ui/button'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, IdentityCell } from '~/shared/components/table'
 import { emptyTableSearch, tableSearchToParams } from '~/shared/lib/table/query-url'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery, TableSearch } from '~/shared/lib/table/types'
@@ -236,46 +236,49 @@ export function AdminUsersPage() {
     {
       id: 'name',
       header: 'User',
+      kind: 'identity',
       sortable: true,
       priority: 'primary',
       value: (user) => user.name,
-      cell: (user) => (
-        <span className="min-w-0">
-          <span className="block truncate font-medium text-bh-text">{user.name}</span>
-          <span className="block truncate text-xs text-bh-text-dim">{user.email}</span>
-        </span>
-      ),
+      cell: (user) => <IdentityCell name={user.name} meta={user.email} />,
     },
     {
       id: 'billing',
       header: 'Organization & entitlement',
+      // Wider than a category and not a status: the cell carries an organization name *and* its
+      // entitlement, which is the row's second identity rather than a classification of it.
+      kind: 'primary',
       value: (user) => user.billing?.entitlementTier ?? null,
       cell: (user) => <BillingCell billing={user.billing} />,
     },
     {
       id: 'endsAt',
       header: 'Ends at',
-      align: 'end',
+      kind: 'date',
       priority: 'secondary',
       value: (user) => user.billing?.trialEndsAt ?? user.billing?.currentPeriodEnd ?? null,
       cell: (user) => (
-        <span data-testid={`admin-user-ends-at-${user.userId}`}>
-          {user.billing?.trialEndsAt
-            ? <span title="Expiry set on a manual grant">{new Date(user.billing.trialEndsAt).toLocaleDateString()}</span>
-            : user.billing?.currentPeriodEnd
-              ? <span title="End of the current Stripe billing period">{new Date(user.billing.currentPeriodEnd).toLocaleDateString()}</span>
-              : '—'}
+        // The `title` is the part worth keeping: the same date means "a manual grant expires" or
+        // "the Stripe period rolls over" depending on which field it came from, and an operator
+        // acting on the wrong one revokes access somebody paid for.
+        <span
+          data-testid={`admin-user-ends-at-${user.userId}`}
+          title={user.billing?.trialEndsAt
+            ? 'Expiry set on a manual grant'
+            : user.billing?.currentPeriodEnd ? 'End of the current Stripe billing period' : undefined}
+        >
+          <DateCell value={user.billing?.trialEndsAt ?? user.billing?.currentPeriodEnd ?? null} />
         </span>
       ),
     },
     {
       id: 'createdAt',
       header: 'Joined',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (user) => user.createdAt,
-      cell: (user) => new Date(user.createdAt).toLocaleDateString(),
+      cell: (user) => <DateCell value={user.createdAt} />,
     },
   ], [])
 
@@ -312,6 +315,9 @@ export function AdminUsersPage() {
 
       <DataTable
         label="Platform users"
+        // Avatar-less identity rows still carry two lines (name over email), which is the
+        // reference's identity density.
+        density="lg"
         columns={columns}
         page={page}
         query={search.query}

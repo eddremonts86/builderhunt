@@ -1198,6 +1198,34 @@
       "when": 1786470544836,
       "tag": "0170_platform_admin_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "7",
+      "when": 1786737933107,
+      "tag": "0171_user_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "7",
+      "when": 1786743574410,
+      "tag": "0172_onboarding_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "7",
+      "when": 1786780677383,
+      "tag": "0173_conversion_onboarding_funnel",
+      "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1786795382089,
+      "tag": "0174_segmented_landing_funnel",
+      "breakpoints": true
     }
   ]
 }

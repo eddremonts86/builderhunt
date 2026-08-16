@@ -9,316 +9,319 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
-import { Route as OnboardingRouteRouteImport } from './routes/onboarding/route'
-import { Route as AuthRouteRouteImport } from './routes/auth/route'
-import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
-import { Route as LandingIndexRouteImport } from './routes/_landing/index'
-import { Route as ScheduleInvitationIdRouteImport } from './routes/schedule/$invitationId'
-import { Route as RSlugRouteImport } from './routes/r/$slug'
-import { Route as PortfolioClaimIdRouteImport } from './routes/portfolio/$claimId'
-import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
-import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
-import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
-import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
-import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
-import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
-import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
-import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
-import { Route as AuthResetRouteImport } from './routes/auth/reset'
-import { Route as AuthForgotRouteImport } from './routes/auth/forgot'
-import { Route as ApiHealthRouteImport } from './routes/api/health'
-import { Route as ApiBetaModeRouteImport } from './routes/api/beta-mode'
-import { Route as LandingStatusRouteImport } from './routes/_landing/status'
-import { Route as LandingSecurityRouteImport } from './routes/_landing/security'
-import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
-import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
-import { Route as LandingCrawlerRouteImport } from './routes/_landing/crawler'
-import { Route as LandingChangelogRouteImport } from './routes/_landing/changelog'
+import { Route as LandingRouteRouteImport } from './routes/_landing/route'
+import { Route as AuthRouteRouteImport } from './routes/auth/route'
+import { Route as OnboardingRouteRouteImport } from './routes/onboarding/route'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
-import { Route as ApiWorkSamplesIndexRouteImport } from './routes/api/work-samples/index'
-import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
-import { Route as ApiSprintsIndexRouteImport } from './routes/api/sprints/index'
-import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
-import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
-import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
-import { Route as ApiOrganizationsIndexRouteImport } from './routes/api/organizations/index'
-import { Route as ApiListsIndexRouteImport } from './routes/api/lists/index'
-import { Route as ApiInterviewsIndexRouteImport } from './routes/api/interviews/index'
-import { Route as ApiIncidentsIndexRouteImport } from './routes/api/incidents/index'
-import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
-import { Route as ApiChangelogIndexRouteImport } from './routes/api/changelog/index'
-import { Route as ApiAlertsIndexRouteImport } from './routes/api/alerts/index'
-import { Route as LandingExploreIndexRouteImport } from './routes/_landing/explore/index'
-import { Route as LandingChangelogIndexRouteImport } from './routes/_landing/changelog/index'
-import { Route as LandingBlogIndexRouteImport } from './routes/_landing/blog/index'
-import { Route as DashboardSprintsIndexRouteImport } from './routes/_dashboard/sprints/index'
-import { Route as DashboardSolutionsIndexRouteImport } from './routes/_dashboard/solutions/index'
-import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
-import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
-import { Route as DashboardListsIndexRouteImport } from './routes/_dashboard/lists/index'
-import { Route as DashboardInterviewsIndexRouteImport } from './routes/_dashboard/interviews/index'
-import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
-import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
-import { Route as DashboardCalendarIndexRouteImport } from './routes/_dashboard/calendar/index'
+import { Route as LandingIndexRouteImport } from './routes/_landing/index'
+import { Route as LandingChangelogRouteImport } from './routes/_landing/changelog'
+import { Route as LandingCrawlerRouteImport } from './routes/_landing/crawler'
+import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
+import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
+import { Route as LandingSecurityRouteImport } from './routes/_landing/security'
+import { Route as LandingStatusRouteImport } from './routes/_landing/status'
+import { Route as ApiBetaModeRouteImport } from './routes/api/beta-mode'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as AuthForgotRouteImport } from './routes/auth/forgot'
+import { Route as AuthResetRouteImport } from './routes/auth/reset'
+import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
+import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
+import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
+import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
+import { Route as OnboardingBuildingRouteImport } from './routes/onboarding/building'
+import { Route as OnboardingGoalRouteImport } from './routes/onboarding/goal'
+import { Route as OnboardingInvestingRouteImport } from './routes/onboarding/investing'
+import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
+import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
+import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
+import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
+import { Route as PortfolioClaimIdRouteImport } from './routes/portfolio/$claimId'
+import { Route as RSlugRouteImport } from './routes/r/$slug'
+import { Route as ScheduleInvitationIdRouteImport } from './routes/schedule/$invitationId'
 import { Route as DashboardAdminIndexRouteImport } from './routes/_dashboard/admin/index'
-import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
-import { Route as ApiWorkSamplesAnalyzeRouteImport } from './routes/api/work-samples/analyze'
-import { Route as ApiWorkSamplesIdRouteImport } from './routes/api/work-samples/$id'
-import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/stripe'
-import { Route as ApiStatusSummaryRouteImport } from './routes/api/status/summary'
-import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
-import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
-import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
-import { Route as ApiSolutionsRunsRouteImport } from './routes/api/solutions/runs'
-import { Route as ApiSolutionsGenerateRouteImport } from './routes/api/solutions/generate'
-import { Route as ApiSolutionsConfigRouteImport } from './routes/api/solutions/config'
-import { Route as ApiSolutionsBriefsRouteImport } from './routes/api/solutions/briefs'
-import { Route as ApiSolutionsBillingStateRouteImport } from './routes/api/solutions/billing-state'
-import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
-import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
-import { Route as ApiPrivacyProfileRemovalRouteImport } from './routes/api/privacy/profile-removal'
-import { Route as ApiPortfolioClaimIdRouteImport } from './routes/api/portfolio/$claimId'
-import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
-import { Route as ApiOrganizationsTransferOwnershipPreviewRouteImport } from './routes/api/organizations/transfer-ownership-preview'
-import { Route as ApiOrganizationsTransferOwnershipRouteImport } from './routes/api/organizations/transfer-ownership'
-import { Route as ApiOrganizationsTeamRouteImport } from './routes/api/organizations/team'
-import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
-import { Route as ApiOrganizationsDeletionRouteImport } from './routes/api/organizations/deletion'
-import { Route as ApiOrganizationsActivityRouteImport } from './routes/api/organizations/activity'
-import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
-import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
-import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
-import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
-import { Route as ApiOgBlogRouteImport } from './routes/api/og/blog'
-import { Route as ApiListsListIdRouteImport } from './routes/api/lists/$listId'
-import { Route as ApiInterviewsSharedRouteImport } from './routes/api/interviews/shared'
-import { Route as ApiFingerprintMatchRouteImport } from './routes/api/fingerprint/match'
-import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
-import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
-import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
-import { Route as ApiE2eBillingProviderRouteImport } from './routes/api/e2e/billing-provider'
-import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
-import { Route as ApiDashboardPreferencesRouteImport } from './routes/api/dashboard/preferences'
-import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
-import { Route as ApiDashboardOrganizationAdminRouteImport } from './routes/api/dashboard/organization-admin'
-import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
-import { Route as ApiCalendarNotificationsRouteImport } from './routes/api/calendar/notifications'
-import { Route as ApiCalendarFeedRouteImport } from './routes/api/calendar/feed'
-import { Route as ApiCalendarExportDoticsRouteImport } from './routes/api/calendar/export[.]ics'
-import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
-import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
-import { Route as ApiBillingSummaryRouteImport } from './routes/api/billing/summary'
-import { Route as ApiBillingRefundsRouteImport } from './routes/api/billing/refunds'
-import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
-import { Route as ApiBillingDisputesRouteImport } from './routes/api/billing/disputes'
-import { Route as ApiBillingContactRouteImport } from './routes/api/billing/contact'
-import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as ApiAnalyticsConversionRouteImport } from './routes/api/analytics/conversion'
-import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
-import { Route as ApiAlertsIdRouteImport } from './routes/api/alerts/$id'
-import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
-import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
-import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
-import { Route as ApiAdminSearchSourcesRouteImport } from './routes/api/admin/search-sources'
-import { Route as ApiAdminPreferencesRouteImport } from './routes/api/admin/preferences'
-import { Route as LandingPrivacyRemoveRouteImport } from './routes/_landing/privacy/remove'
-import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
-import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
-import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal/imprint'
-import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal/cookies'
-import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/changelog/$slug'
-import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
-import { Route as DashboardTeamActivityRouteImport } from './routes/_dashboard/team/activity'
-import { Route as DashboardSprintsNewRouteImport } from './routes/_dashboard/sprints/new'
-import { Route as DashboardSettingsTeamRouteImport } from './routes/_dashboard/settings/team'
-import { Route as DashboardSettingsSecurityRouteImport } from './routes/_dashboard/settings/security'
-import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
-import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
-import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/lists/$listId'
-import { Route as DashboardInterviewsInvitationsRouteImport } from './routes/_dashboard/interviews/invitations'
-import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
-import { Route as DashboardAdminSourcesRouteImport } from './routes/_dashboard/admin/sources'
-import { Route as DashboardAdminSolutionsGoldSetRouteImport } from './routes/_dashboard/admin/solutions-gold-set'
-import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
-import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
-import { Route as DashboardAdminOperationsRouteImport } from './routes/_dashboard/admin/operations'
-import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
-import { Route as DashboardAdminIntegrationsRouteImport } from './routes/_dashboard/admin/integrations'
-import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
-import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/admin/disputes'
-import { Route as DashboardAdminContentRouteImport } from './routes/_dashboard/admin/content'
-import { Route as DashboardAdminClaimsRouteImport } from './routes/_dashboard/admin/claims'
-import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
-import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
-import { Route as DashboardAdminAccessRequestsRouteImport } from './routes/_dashboard/admin/access-requests'
 import { Route as DashboardAdminAbuseRouteImport } from './routes/_dashboard/admin/abuse'
-import { Route as ApiSchedulingInvitationsIndexRouteImport } from './routes/api/scheduling/invitations/index'
-import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
-import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
-import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
-import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
-import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
-import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders/index'
-import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
-import { Route as ApiCalendarEventsIndexRouteImport } from './routes/api/calendar/events/index'
-import { Route as ApiCalendarAvailabilityIndexRouteImport } from './routes/api/calendar/availability/index'
-import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
-import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/triggers/index'
-import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
-import { Route as ApiAdminSeoIndexRouteImport } from './routes/api/admin/seo/index'
-import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
-import { Route as ApiAdminOperationsIndexRouteImport } from './routes/api/admin/operations/index'
-import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/metrics/index'
-import { Route as ApiAdminIntegrationsIndexRouteImport } from './routes/api/admin/integrations/index'
-import { Route as ApiAdminIncidentsIndexRouteImport } from './routes/api/admin/incidents/index'
-import { Route as ApiAdminHumanLinksIndexRouteImport } from './routes/api/admin/human-links/index'
-import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/changelog/index'
-import { Route as ApiAdminBuilderClaimsIndexRouteImport } from './routes/api/admin/builder-claims/index'
-import { Route as ApiAdminAccessRequestsIndexRouteImport } from './routes/api/admin/access-requests/index'
-import { Route as ApiAdminAbuseIndexRouteImport } from './routes/api/admin/abuse/index'
-import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_dashboard/sprints/$sprintId/index'
-import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_dashboard/settings/billing/index'
-import { Route as DashboardInterviewsInterviewIdIndexRouteImport } from './routes/_dashboard/interviews/$interviewId/index'
+import { Route as DashboardAdminAccessRequestsRouteImport } from './routes/_dashboard/admin/access-requests'
+import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
+import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
+import { Route as DashboardAdminClaimsRouteImport } from './routes/_dashboard/admin/claims'
+import { Route as DashboardAdminContentRouteImport } from './routes/_dashboard/admin/content'
+import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/admin/disputes'
+import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
+import { Route as DashboardAdminIntegrationsRouteImport } from './routes/_dashboard/admin/integrations'
+import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
+import { Route as DashboardAdminOperationsRouteImport } from './routes/_dashboard/admin/operations'
+import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
+import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
+import { Route as DashboardAdminSolutionsGoldSetRouteImport } from './routes/_dashboard/admin/solutions-gold-set'
+import { Route as DashboardAdminSourcesRouteImport } from './routes/_dashboard/admin/sources'
+import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
+import { Route as DashboardCalendarIndexRouteImport } from './routes/_dashboard/calendar/index'
+import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
+import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
+import { Route as DashboardInterviewsIndexRouteImport } from './routes/_dashboard/interviews/index'
+import { Route as DashboardInterviewsInvitationsRouteImport } from './routes/_dashboard/interviews/invitations'
+import { Route as DashboardListsIndexRouteImport } from './routes/_dashboard/lists/index'
+import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/lists/$listId'
+import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
+import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
+import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
+import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
+import { Route as DashboardSettingsSecurityRouteImport } from './routes/_dashboard/settings/security'
+import { Route as DashboardSettingsTeamRouteImport } from './routes/_dashboard/settings/team'
+import { Route as DashboardSolutionsIndexRouteImport } from './routes/_dashboard/solutions/index'
+import { Route as DashboardSprintsIndexRouteImport } from './routes/_dashboard/sprints/index'
+import { Route as DashboardSprintsNewRouteImport } from './routes/_dashboard/sprints/new'
+import { Route as DashboardTeamActivityRouteImport } from './routes/_dashboard/team/activity'
+import { Route as LandingBlogIndexRouteImport } from './routes/_landing/blog/index'
+import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
+import { Route as LandingChangelogIndexRouteImport } from './routes/_landing/changelog/index'
+import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/changelog/$slug'
+import { Route as LandingExploreIndexRouteImport } from './routes/_landing/explore/index'
+import { Route as LandingForBuildersRouteImport } from './routes/_landing/for/builders'
+import { Route as LandingForHiringTeamsRouteImport } from './routes/_landing/for/hiring-teams'
+import { Route as LandingForInvestorsRouteImport } from './routes/_landing/for/investors'
+import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal/cookies'
+import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal/imprint'
+import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
+import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
+import { Route as LandingPrivacyRemoveRouteImport } from './routes/_landing/privacy/remove'
+import { Route as ApiAdminPreferencesRouteImport } from './routes/api/admin/preferences'
+import { Route as ApiAdminSearchSourcesRouteImport } from './routes/api/admin/search-sources'
+import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
+import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
+import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
+import { Route as ApiAlertsIndexRouteImport } from './routes/api/alerts/index'
+import { Route as ApiAlertsIdRouteImport } from './routes/api/alerts/$id'
+import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
+import { Route as ApiAnalyticsConversionRouteImport } from './routes/api/analytics/conversion'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
+import { Route as ApiBillingContactRouteImport } from './routes/api/billing/contact'
+import { Route as ApiBillingDisputesRouteImport } from './routes/api/billing/disputes'
+import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
+import { Route as ApiBillingRefundsRouteImport } from './routes/api/billing/refunds'
+import { Route as ApiBillingSummaryRouteImport } from './routes/api/billing/summary'
+import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
+import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
+import { Route as ApiCalendarExportDoticsRouteImport } from './routes/api/calendar/export[.]ics'
+import { Route as ApiCalendarFeedRouteImport } from './routes/api/calendar/feed'
+import { Route as ApiCalendarNotificationsRouteImport } from './routes/api/calendar/notifications'
+import { Route as ApiChangelogIndexRouteImport } from './routes/api/changelog/index'
+import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
+import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
+import { Route as ApiDashboardContextRouteImport } from './routes/api/dashboard/context'
+import { Route as ApiDashboardOrganizationAdminRouteImport } from './routes/api/dashboard/organization-admin'
+import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
+import { Route as ApiDashboardPreferencesRouteImport } from './routes/api/dashboard/preferences'
+import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
+import { Route as ApiE2eBillingProviderRouteImport } from './routes/api/e2e/billing-provider'
+import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
+import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
+import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
+import { Route as ApiFingerprintMatchRouteImport } from './routes/api/fingerprint/match'
+import { Route as ApiIncidentsIndexRouteImport } from './routes/api/incidents/index'
+import { Route as ApiInterviewsIndexRouteImport } from './routes/api/interviews/index'
+import { Route as ApiInterviewsSharedRouteImport } from './routes/api/interviews/shared'
+import { Route as ApiListsIndexRouteImport } from './routes/api/lists/index'
+import { Route as ApiListsListIdRouteImport } from './routes/api/lists/$listId'
+import { Route as ApiOgBlogRouteImport } from './routes/api/og/blog'
+import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
+import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
+import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
+import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
+import { Route as ApiOrganizationsIndexRouteImport } from './routes/api/organizations/index'
+import { Route as ApiOrganizationsActivityRouteImport } from './routes/api/organizations/activity'
+import { Route as ApiOrganizationsDeletionRouteImport } from './routes/api/organizations/deletion'
+import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
+import { Route as ApiOrganizationsTeamRouteImport } from './routes/api/organizations/team'
+import { Route as ApiOrganizationsTransferOwnershipRouteImport } from './routes/api/organizations/transfer-ownership'
+import { Route as ApiOrganizationsTransferOwnershipPreviewRouteImport } from './routes/api/organizations/transfer-ownership-preview'
+import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
+import { Route as ApiPortfolioClaimIdRouteImport } from './routes/api/portfolio/$claimId'
+import { Route as ApiPrivacyProfileRemovalRouteImport } from './routes/api/privacy/profile-removal'
+import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
+import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
+import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
+import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
+import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
+import { Route as ApiSolutionsBillingStateRouteImport } from './routes/api/solutions/billing-state'
+import { Route as ApiSolutionsBriefsRouteImport } from './routes/api/solutions/briefs'
+import { Route as ApiSolutionsConfigRouteImport } from './routes/api/solutions/config'
+import { Route as ApiSolutionsGenerateRouteImport } from './routes/api/solutions/generate'
+import { Route as ApiSolutionsRunsRouteImport } from './routes/api/solutions/runs'
+import { Route as ApiSprintsIndexRouteImport } from './routes/api/sprints/index'
+import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
+import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
+import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
+import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
+import { Route as ApiStatusSummaryRouteImport } from './routes/api/status/summary'
+import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/stripe'
+import { Route as ApiWorkSamplesIndexRouteImport } from './routes/api/work-samples/index'
+import { Route as ApiWorkSamplesIdRouteImport } from './routes/api/work-samples/$id'
+import { Route as ApiWorkSamplesAnalyzeRouteImport } from './routes/api/work-samples/analyze'
+import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
-import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
-import { Route as ApiSolutionsRunsRunIdRouteImport } from './routes/api/solutions/runs.$runId'
-import { Route as ApiSolutionsBriefsBriefIdRouteImport } from './routes/api/solutions/briefs.$briefId'
-import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
-import { Route as ApiQueriesIdVisibilityRouteImport } from './routes/api/queries/$id/visibility'
-import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
-import { Route as ApiQueriesIdFeedCapabilityRouteImport } from './routes/api/queries/$id/feed-capability'
-import { Route as ApiPrivacyProfileRemovalVerifyRouteImport } from './routes/api/privacy/profile-removal/verify'
-import { Route as ApiOrganizationsTeamMembersRouteImport } from './routes/api/organizations/team/members'
-import { Route as ApiOrganizationsTeamInvitationsRouteImport } from './routes/api/organizations/team/invitations'
-import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
-import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
-import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
-import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/api/organizations/deletion/immediate'
-import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
-import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
-import { Route as ApiInterviewsInterviewIdTranscriptionTokenRouteImport } from './routes/api/interviews/$interviewId/transcription-token'
-import { Route as ApiInterviewsInterviewIdSuggestionsRouteImport } from './routes/api/interviews/$interviewId/suggestions'
-import { Route as ApiInterviewsInterviewIdSessionRouteImport } from './routes/api/interviews/$interviewId/session'
-import { Route as ApiInterviewsInterviewIdSegmentsRouteImport } from './routes/api/interviews/$interviewId/segments'
-import { Route as ApiInterviewsInterviewIdReportRouteImport } from './routes/api/interviews/$interviewId/report'
-import { Route as ApiInterviewsInterviewIdFinalizeRouteImport } from './routes/api/interviews/$interviewId/finalize'
-import { Route as ApiCalendarEventsEventIdRouteImport } from './routes/api/calendar/events/$eventId'
-import { Route as ApiCalendarAvailabilityOverridesRouteImport } from './routes/api/calendar/availability/overrides'
-import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
-import { Route as ApiBuildersBuilderIdViewsRouteImport } from './routes/api/builders/$builderId/views'
-import { Route as ApiBuildersBuilderIdTimelineRouteImport } from './routes/api/builders/$builderId/timeline'
-import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
-import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
-import { Route as ApiBuildersBuilderIdHygieneRouteImport } from './routes/api/builders/$builderId/hygiene'
-import { Route as ApiBuildersBuilderIdFingerprintRouteImport } from './routes/api/builders/$builderId/fingerprint'
-import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './routes/api/builders/$builderId/evidence-refresh'
-import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
-import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
-import { Route as ApiBillingSubscriptionPreviewRouteImport } from './routes/api/billing/subscription/preview'
-import { Route as ApiBillingSubscriptionChangeRouteImport } from './routes/api/billing/subscription/change'
-import { Route as ApiBillingSubscriptionCancelRouteImport } from './routes/api/billing/subscription/cancel'
-import { Route as ApiBillingContactVerifyRouteImport } from './routes/api/billing/contact/verify'
-import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
-import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billing/checkout/status'
-import { Route as ApiBillingCheckoutCreditsRouteImport } from './routes/api/billing/checkout/credits'
-import { Route as ApiAlertsTriggersUnreadCountRouteImport } from './routes/api/alerts/triggers/unread-count'
-import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
-import { Route as ApiAlertsIdTestSendRouteImport } from './routes/api/alerts/$id/test-send'
-import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
-import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
-import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
-import { Route as ApiAdminSolutionsSourcesRouteImport } from './routes/api/admin/solutions/sources'
-import { Route as ApiAdminSolutionsGoldBriefsRouteImport } from './routes/api/admin/solutions/gold-briefs'
-import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
-import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
-import { Route as ApiAdminOperationsJobKeyRouteImport } from './routes/api/admin/operations/$jobKey'
-import { Route as ApiAdminMetricsTrustRouteImport } from './routes/api/admin/metrics/trust'
-import { Route as ApiAdminMetricsSectionsRouteImport } from './routes/api/admin/metrics/sections'
-import { Route as ApiAdminMetricsRunRetentionRouteImport } from './routes/api/admin/metrics/run-retention'
-import { Route as ApiAdminMetricsOverviewRouteImport } from './routes/api/admin/metrics/overview'
-import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
-import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
-import { Route as ApiAdminInterviewsRunRetentionRouteImport } from './routes/api/admin/interviews/run-retention'
-import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
-import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
-import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
-import { Route as ApiAdminDocumentsRunWorkerRouteImport } from './routes/api/admin/documents/run-worker'
-import { Route as ApiAdminDocumentsRunWebImportsRouteImport } from './routes/api/admin/documents/run-web-imports'
-import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
-import { Route as ApiAdminDevpostRunWorkerRouteImport } from './routes/api/admin/devpost/run-worker'
-import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
-import { Route as ApiAdminCalendarRunWorkerRouteImport } from './routes/api/admin/calendar/run-worker'
-import { Route as ApiAdminCalendarRunRemindersRouteImport } from './routes/api/admin/calendar/run-reminders'
-import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
-import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
-import { Route as ApiAdminBillingRefundsRouteImport } from './routes/api/admin/billing/refunds'
-import { Route as ApiAdminBillingReconcileRouteImport } from './routes/api/admin/billing/reconcile'
-import { Route as ApiAdminBillingMetricsRouteImport } from './routes/api/admin/billing/metrics'
-import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/billing/disputes'
-import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
-import { Route as ApiAdminBillingBetaModeRouteImport } from './routes/api/admin/billing/beta-mode'
-import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
-import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/admin/analytics/run-retention'
-import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
-import { Route as ApiAdminActivityRunRetentionRouteImport } from './routes/api/admin/activity/run-retention'
-import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
-import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
+import { Route as DashboardInterviewsInterviewIdIndexRouteImport } from './routes/_dashboard/interviews/$interviewId/index'
 import { Route as DashboardInterviewsInterviewIdLiveRouteImport } from './routes/_dashboard/interviews/$interviewId/live'
-import { Route as ApiPublicSchedulingInvitationIdIndexRouteImport } from './routes/api/public/scheduling/$invitationId/index'
-import { Route as ApiListsListIdItemsIndexRouteImport } from './routes/api/lists/$listId/items/index'
-import { Route as ApiInterviewsInterviewIdParticipantsIndexRouteImport } from './routes/api/interviews/$interviewId/participants/index'
-import { Route as ApiInterviewsInterviewIdBriefIndexRouteImport } from './routes/api/interviews/$interviewId/brief/index'
-import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
+import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_dashboard/settings/billing/index'
+import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
+import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_dashboard/sprints/$sprintId/index'
+import { Route as ApiAdminAbuseIndexRouteImport } from './routes/api/admin/abuse/index'
+import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
+import { Route as ApiAdminAccessRequestsIndexRouteImport } from './routes/api/admin/access-requests/index'
+import { Route as ApiAdminActivityRunRetentionRouteImport } from './routes/api/admin/activity/run-retention'
+import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
+import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/admin/analytics/run-retention'
+import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
+import { Route as ApiAdminBillingBetaModeRouteImport } from './routes/api/admin/billing/beta-mode'
+import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
+import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/billing/disputes'
+import { Route as ApiAdminBillingMetricsRouteImport } from './routes/api/admin/billing/metrics'
+import { Route as ApiAdminBillingReconcileRouteImport } from './routes/api/admin/billing/reconcile'
+import { Route as ApiAdminBillingRefundsRouteImport } from './routes/api/admin/billing/refunds'
+import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
+import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
+import { Route as ApiAdminBuilderClaimsIndexRouteImport } from './routes/api/admin/builder-claims/index'
+import { Route as ApiAdminCalendarRunRemindersRouteImport } from './routes/api/admin/calendar/run-reminders'
+import { Route as ApiAdminCalendarRunWorkerRouteImport } from './routes/api/admin/calendar/run-worker'
+import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/changelog/index'
+import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
+import { Route as ApiAdminDevpostRunWorkerRouteImport } from './routes/api/admin/devpost/run-worker'
+import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
+import { Route as ApiAdminDocumentsRunWebImportsRouteImport } from './routes/api/admin/documents/run-web-imports'
+import { Route as ApiAdminDocumentsRunWorkerRouteImport } from './routes/api/admin/documents/run-worker'
+import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
+import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
+import { Route as ApiAdminHumanLinksIndexRouteImport } from './routes/api/admin/human-links/index'
+import { Route as ApiAdminIncidentsIndexRouteImport } from './routes/api/admin/incidents/index'
+import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
+import { Route as ApiAdminIntegrationsIndexRouteImport } from './routes/api/admin/integrations/index'
+import { Route as ApiAdminInterviewsRunRetentionRouteImport } from './routes/api/admin/interviews/run-retention'
+import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
+import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/metrics/index'
+import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
+import { Route as ApiAdminMetricsOverviewRouteImport } from './routes/api/admin/metrics/overview'
+import { Route as ApiAdminMetricsRunRetentionRouteImport } from './routes/api/admin/metrics/run-retention'
+import { Route as ApiAdminMetricsSectionsRouteImport } from './routes/api/admin/metrics/sections'
+import { Route as ApiAdminMetricsTrustRouteImport } from './routes/api/admin/metrics/trust'
+import { Route as ApiAdminOperationsIndexRouteImport } from './routes/api/admin/operations/index'
+import { Route as ApiAdminOperationsJobKeyRouteImport } from './routes/api/admin/operations/$jobKey'
+import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
+import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
+import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
+import { Route as ApiAdminSeoIndexRouteImport } from './routes/api/admin/seo/index'
+import { Route as ApiAdminSolutionsGoldBriefsRouteImport } from './routes/api/admin/solutions/gold-briefs'
+import { Route as ApiAdminSolutionsSourcesRouteImport } from './routes/api/admin/solutions/sources'
+import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
+import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
+import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
+import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
+import { Route as ApiAlertsIdTestSendRouteImport } from './routes/api/alerts/$id/test-send'
+import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/triggers/index'
+import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
+import { Route as ApiAlertsTriggersUnreadCountRouteImport } from './routes/api/alerts/triggers/unread-count'
+import { Route as ApiBillingCheckoutCreditsRouteImport } from './routes/api/billing/checkout/credits'
+import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billing/checkout/status'
+import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
+import { Route as ApiBillingContactVerifyRouteImport } from './routes/api/billing/contact/verify'
+import { Route as ApiBillingSubscriptionCancelRouteImport } from './routes/api/billing/subscription/cancel'
+import { Route as ApiBillingSubscriptionChangeRouteImport } from './routes/api/billing/subscription/change'
+import { Route as ApiBillingSubscriptionPreviewRouteImport } from './routes/api/billing/subscription/preview'
+import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
+import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
+import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './routes/api/builders/$builderId/evidence-refresh'
+import { Route as ApiBuildersBuilderIdFingerprintRouteImport } from './routes/api/builders/$builderId/fingerprint'
+import { Route as ApiBuildersBuilderIdHygieneRouteImport } from './routes/api/builders/$builderId/hygiene'
+import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
+import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
+import { Route as ApiBuildersBuilderIdTimelineRouteImport } from './routes/api/builders/$builderId/timeline'
+import { Route as ApiBuildersBuilderIdViewsRouteImport } from './routes/api/builders/$builderId/views'
+import { Route as ApiBuildersClaimCandidatesRouteImport } from './routes/api/builders/claim/candidates'
+import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
+import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
+import { Route as ApiCalendarAvailabilityIndexRouteImport } from './routes/api/calendar/availability/index'
+import { Route as ApiCalendarAvailabilityOverridesRouteImport } from './routes/api/calendar/availability/overrides'
+import { Route as ApiCalendarEventsIndexRouteImport } from './routes/api/calendar/events/index'
+import { Route as ApiCalendarEventsEventIdRouteImport } from './routes/api/calendar/events/$eventId'
+import { Route as ApiInterviewsInterviewIdFinalizeRouteImport } from './routes/api/interviews/$interviewId/finalize'
+import { Route as ApiInterviewsInterviewIdReportRouteImport } from './routes/api/interviews/$interviewId/report'
+import { Route as ApiInterviewsInterviewIdSegmentsRouteImport } from './routes/api/interviews/$interviewId/segments'
+import { Route as ApiInterviewsInterviewIdSessionRouteImport } from './routes/api/interviews/$interviewId/session'
+import { Route as ApiInterviewsInterviewIdSuggestionsRouteImport } from './routes/api/interviews/$interviewId/suggestions'
+import { Route as ApiInterviewsInterviewIdTranscriptionTokenRouteImport } from './routes/api/interviews/$interviewId/transcription-token'
+import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
+import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
+import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders/index'
+import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
+import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
+import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
+import { Route as ApiMePreferencesIndexRouteImport } from './routes/api/me/preferences/index'
+import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
+import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
+import { Route as ApiOnboardingV2IndexRouteImport } from './routes/api/onboarding/v2/index'
+import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/api/organizations/deletion/immediate'
+import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
+import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
+import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
+import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
+import { Route as ApiOrganizationsTeamInvitationsRouteImport } from './routes/api/organizations/team/invitations'
+import { Route as ApiOrganizationsTeamMembersRouteImport } from './routes/api/organizations/team/members'
+import { Route as ApiPrivacyProfileRemovalVerifyRouteImport } from './routes/api/privacy/profile-removal/verify'
+import { Route as ApiQueriesIdFeedCapabilityRouteImport } from './routes/api/queries/$id/feed-capability'
+import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
+import { Route as ApiQueriesIdVisibilityRouteImport } from './routes/api/queries/$id/visibility'
+import { Route as ApiSchedulingInvitationsIndexRouteImport } from './routes/api/scheduling/invitations/index'
+import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
+import { Route as ApiSolutionsBriefsBriefIdRouteImport } from './routes/api/solutions/briefs.$briefId'
+import { Route as ApiSolutionsRunsRunIdRouteImport } from './routes/api/solutions/runs.$runId'
+import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiAdminBillingEventsIndexRouteImport } from './routes/api/admin/billing/events/index'
-import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
-import { Route as ApiSchedulingInvitationsInvitationIdRevokeRouteImport } from './routes/api/scheduling/invitations/$invitationId/revoke'
-import { Route as ApiPublicSchedulingInvitationIdWithdrawRouteImport } from './routes/api/public/scheduling/$invitationId/withdraw'
-import { Route as ApiPublicSchedulingInvitationIdUploadsRouteImport } from './routes/api/public/scheduling/$invitationId/uploads'
-import { Route as ApiPublicSchedulingInvitationIdSubmissionRouteImport } from './routes/api/public/scheduling/$invitationId/submission'
-import { Route as ApiPublicSchedulingInvitationIdSlotsRouteImport } from './routes/api/public/scheduling/$invitationId/slots'
-import { Route as ApiPublicSchedulingInvitationIdSessionRouteImport } from './routes/api/public/scheduling/$invitationId/session'
-import { Route as ApiPublicSchedulingInvitationIdRescheduleRouteImport } from './routes/api/public/scheduling/$invitationId/reschedule'
-import { Route as ApiPublicSchedulingInvitationIdDeclineRouteImport } from './routes/api/public/scheduling/$invitationId/decline'
-import { Route as ApiPublicSchedulingInvitationIdCancelRouteImport } from './routes/api/public/scheduling/$invitationId/cancel'
-import { Route as ApiPublicSchedulingInvitationIdBookRouteImport } from './routes/api/public/scheduling/$invitationId/book'
-import { Route as ApiOrganizationsInvitationsInvitationIdReviewRouteImport } from './routes/api/organizations/invitations/$invitationId/review'
-import { Route as ApiOrganizationsInvitationsInvitationIdRejectRouteImport } from './routes/api/organizations/invitations/$invitationId/reject'
-import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
-import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
-import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
-import { Route as ApiMeBuilderClaimsClaimIdPortfolioRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio'
-import { Route as ApiListsListIdItemsItemIdRouteImport } from './routes/api/lists/$listId/items/$itemId'
-import { Route as ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport } from './routes/api/interviews/$interviewId/participants/$participantId'
-import { Route as ApiInterviewsInterviewIdBriefVersionRouteImport } from './routes/api/interviews/$interviewId/brief/$version'
-import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
-import { Route as ApiBuildersBuilderIdClaimVerifyRouteImport } from './routes/api/builders/$builderId/claim/verify'
-import { Route as ApiAdminOperationsJobKeyRunRouteImport } from './routes/api/admin/operations/$jobKey/run'
-import { Route as ApiAdminBuilderClaimsClaimIdRevokeRouteImport } from './routes/api/admin/builder-claims/$claimId/revoke'
 import { Route as ApiAdminBillingEventsEventIdRouteImport } from './routes/api/admin/billing/events/$eventId'
-import { Route as ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/unpublish'
-import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/publish'
+import { Route as ApiAdminBuilderClaimsClaimIdRevokeRouteImport } from './routes/api/admin/builder-claims/$claimId/revoke'
+import { Route as ApiAdminOperationsJobKeyRunRouteImport } from './routes/api/admin/operations/$jobKey/run'
+import { Route as ApiBuildersBuilderIdClaimVerifyRouteImport } from './routes/api/builders/$builderId/claim/verify'
+import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
+import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
+import { Route as ApiInterviewsInterviewIdBriefIndexRouteImport } from './routes/api/interviews/$interviewId/brief/index'
+import { Route as ApiInterviewsInterviewIdBriefVersionRouteImport } from './routes/api/interviews/$interviewId/brief/$version'
+import { Route as ApiInterviewsInterviewIdParticipantsIndexRouteImport } from './routes/api/interviews/$interviewId/participants/index'
+import { Route as ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport } from './routes/api/interviews/$interviewId/participants/$participantId'
+import { Route as ApiListsListIdItemsIndexRouteImport } from './routes/api/lists/$listId/items/index'
+import { Route as ApiListsListIdItemsItemIdRouteImport } from './routes/api/lists/$listId/items/$itemId'
+import { Route as ApiMeBuilderClaimsClaimIdPortfolioRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio'
+import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
+import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
+import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
+import { Route as ApiOrganizationsInvitationsInvitationIdRejectRouteImport } from './routes/api/organizations/invitations/$invitationId/reject'
+import { Route as ApiOrganizationsInvitationsInvitationIdReviewRouteImport } from './routes/api/organizations/invitations/$invitationId/review'
+import { Route as ApiPublicSchedulingInvitationIdIndexRouteImport } from './routes/api/public/scheduling/$invitationId/index'
+import { Route as ApiPublicSchedulingInvitationIdBookRouteImport } from './routes/api/public/scheduling/$invitationId/book'
+import { Route as ApiPublicSchedulingInvitationIdCancelRouteImport } from './routes/api/public/scheduling/$invitationId/cancel'
+import { Route as ApiPublicSchedulingInvitationIdDeclineRouteImport } from './routes/api/public/scheduling/$invitationId/decline'
+import { Route as ApiPublicSchedulingInvitationIdRescheduleRouteImport } from './routes/api/public/scheduling/$invitationId/reschedule'
+import { Route as ApiPublicSchedulingInvitationIdSessionRouteImport } from './routes/api/public/scheduling/$invitationId/session'
+import { Route as ApiPublicSchedulingInvitationIdSlotsRouteImport } from './routes/api/public/scheduling/$invitationId/slots'
+import { Route as ApiPublicSchedulingInvitationIdSubmissionRouteImport } from './routes/api/public/scheduling/$invitationId/submission'
+import { Route as ApiPublicSchedulingInvitationIdUploadsRouteImport } from './routes/api/public/scheduling/$invitationId/uploads'
+import { Route as ApiPublicSchedulingInvitationIdWithdrawRouteImport } from './routes/api/public/scheduling/$invitationId/withdraw'
+import { Route as ApiSchedulingInvitationsInvitationIdRevokeRouteImport } from './routes/api/scheduling/invitations/$invitationId/revoke'
+import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
 import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
-import { Route as ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRouteImport } from './routes/api/scheduling/invitations/$invitationId/documents/$documentId/download'
-import { Route as ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRouteImport } from './routes/api/public/scheduling/$invitationId/uploads/$documentId/complete'
+import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/publish'
+import { Route as ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/unpublish'
 import { Route as ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport } from './routes/api/public/scheduling/$invitationId/links/$linkId/import'
+import { Route as ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRouteImport } from './routes/api/public/scheduling/$invitationId/uploads/$documentId/complete'
+import { Route as ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRouteImport } from './routes/api/scheduling/invitations/$invitationId/documents/$documentId/download'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
+const DashboardRouteRoute = DashboardRouteRouteImport.update({
+  id: '/_dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
-  id: '/robots.txt',
-  path: '/robots.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingRouteRoute = OnboardingRouteRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
+const LandingRouteRoute = LandingRouteRouteImport.update({
+  id: '/_landing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRouteRoute = AuthRouteRouteImport.update({
@@ -326,117 +329,29 @@ const AuthRouteRoute = AuthRouteRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LandingRouteRoute = LandingRouteRouteImport.update({
-  id: '/_landing',
+const OnboardingRouteRoute = OnboardingRouteRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRouteRoute = DashboardRouteRouteImport.update({
-  id: '/_dashboard',
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardAlertsRoute = DashboardAlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => DashboardRouteRoute,
 } as any)
 const LandingIndexRoute = LandingIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const ScheduleInvitationIdRoute = ScheduleInvitationIdRouteImport.update({
-  id: '/schedule/$invitationId',
-  path: '/schedule/$invitationId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RSlugRoute = RSlugRouteImport.update({
-  id: '/r/$slug',
-  path: '/r/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortfolioClaimIdRoute = PortfolioClaimIdRouteImport.update({
-  id: '/portfolio/$claimId',
-  path: '/portfolio/$claimId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
-  id: '/welcome',
-  path: '/welcome',
-  getParentRoute: () => OnboardingRouteRoute,
-} as any)
-const OnboardingSuccessRoute = OnboardingSuccessRouteImport.update({
-  id: '/success',
-  path: '/success',
-  getParentRoute: () => OnboardingRouteRoute,
-} as any)
-const OnboardingSearchRoute = OnboardingSearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => OnboardingRouteRoute,
-} as any)
-const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
-  id: '/save',
-  path: '/save',
-  getParentRoute: () => OnboardingRouteRoute,
-} as any)
-const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
-  id: '/builders/$builderId',
-  path: '/builders/$builderId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BlogAtomDotxmlRoute = BlogAtomDotxmlRouteImport.update({
-  id: '/blog/atom.xml',
-  path: '/blog/atom.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthSignUpRoute = AuthSignUpRouteImport.update({
-  id: '/sign-up',
-  path: '/sign-up',
-  getParentRoute: () => AuthRouteRoute,
-} as any)
-const AuthSignInRoute = AuthSignInRouteImport.update({
-  id: '/sign-in',
-  path: '/sign-in',
-  getParentRoute: () => AuthRouteRoute,
-} as any)
-const AuthResetRoute = AuthResetRouteImport.update({
-  id: '/reset',
-  path: '/reset',
-  getParentRoute: () => AuthRouteRoute,
-} as any)
-const AuthForgotRoute = AuthForgotRouteImport.update({
-  id: '/forgot',
-  path: '/forgot',
-  getParentRoute: () => AuthRouteRoute,
-} as any)
-const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: '/api/health',
-  path: '/api/health',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBetaModeRoute = ApiBetaModeRouteImport.update({
-  id: '/api/beta-mode',
-  path: '/api/beta-mode',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LandingStatusRoute = LandingStatusRouteImport.update({
-  id: '/status',
-  path: '/status',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingSecurityRoute = LandingSecurityRouteImport.update({
-  id: '/security',
-  path: '/security',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingRoadmapRoute = LandingRoadmapRouteImport.update({
-  id: '/roadmap',
-  path: '/roadmap',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingPricingRoute = LandingPricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingCrawlerRoute = LandingCrawlerRouteImport.update({
-  id: '/crawler',
-  path: '/crawler',
   getParentRoute: () => LandingRouteRoute,
 } as any)
 const LandingChangelogRoute = LandingChangelogRouteImport.update({
@@ -444,605 +359,129 @@ const LandingChangelogRoute = LandingChangelogRouteImport.update({
   path: '/changelog',
   getParentRoute: () => LandingRouteRoute,
 } as any)
-const DashboardAlertsRoute = DashboardAlertsRouteImport.update({
-  id: '/alerts',
-  path: '/alerts',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const ApiWorkSamplesIndexRoute = ApiWorkSamplesIndexRouteImport.update({
-  id: '/api/work-samples/',
-  path: '/api/work-samples/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiStatusIndexRoute = ApiStatusIndexRouteImport.update({
-  id: '/api/status/',
-  path: '/api/status/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSprintsIndexRoute = ApiSprintsIndexRouteImport.update({
-  id: '/api/sprints/',
-  path: '/api/sprints/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiRoadmapIndexRoute = ApiRoadmapIndexRouteImport.update({
-  id: '/api/roadmap/',
-  path: '/api/roadmap/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiRecommendationsIndexRoute = ApiRecommendationsIndexRouteImport.update({
-  id: '/api/recommendations/',
-  path: '/api/recommendations/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiQueriesIndexRoute = ApiQueriesIndexRouteImport.update({
-  id: '/api/queries/',
-  path: '/api/queries/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOrganizationsIndexRoute = ApiOrganizationsIndexRouteImport.update({
-  id: '/api/organizations/',
-  path: '/api/organizations/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiListsIndexRoute = ApiListsIndexRouteImport.update({
-  id: '/api/lists/',
-  path: '/api/lists/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiInterviewsIndexRoute = ApiInterviewsIndexRouteImport.update({
-  id: '/api/interviews/',
-  path: '/api/interviews/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiIncidentsIndexRoute = ApiIncidentsIndexRouteImport.update({
-  id: '/api/incidents/',
-  path: '/api/incidents/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiConsentIndexRoute = ApiConsentIndexRouteImport.update({
-  id: '/api/consent/',
-  path: '/api/consent/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiChangelogIndexRoute = ApiChangelogIndexRouteImport.update({
-  id: '/api/changelog/',
-  path: '/api/changelog/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAlertsIndexRoute = ApiAlertsIndexRouteImport.update({
-  id: '/api/alerts/',
-  path: '/api/alerts/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LandingExploreIndexRoute = LandingExploreIndexRouteImport.update({
-  id: '/explore/',
-  path: '/explore/',
+const LandingCrawlerRoute = LandingCrawlerRouteImport.update({
+  id: '/crawler',
+  path: '/crawler',
   getParentRoute: () => LandingRouteRoute,
 } as any)
-const LandingChangelogIndexRoute = LandingChangelogIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => LandingChangelogRoute,
-} as any)
-const LandingBlogIndexRoute = LandingBlogIndexRouteImport.update({
-  id: '/blog/',
-  path: '/blog/',
+const LandingPricingRoute = LandingPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => LandingRouteRoute,
 } as any)
-const DashboardSprintsIndexRoute = DashboardSprintsIndexRouteImport.update({
-  id: '/sprints/',
-  path: '/sprints/',
-  getParentRoute: () => DashboardRouteRoute,
+const LandingRoadmapRoute = LandingRoadmapRouteImport.update({
+  id: '/roadmap',
+  path: '/roadmap',
+  getParentRoute: () => LandingRouteRoute,
 } as any)
-const DashboardSolutionsIndexRoute = DashboardSolutionsIndexRouteImport.update({
-  id: '/solutions/',
-  path: '/solutions/',
-  getParentRoute: () => DashboardRouteRoute,
+const LandingSecurityRoute = LandingSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => LandingRouteRoute,
 } as any)
-const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
-  id: '/search/',
-  path: '/search/',
-  getParentRoute: () => DashboardRouteRoute,
+const LandingStatusRoute = LandingStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => LandingRouteRoute,
 } as any)
-const DashboardMeIndexRoute = DashboardMeIndexRouteImport.update({
-  id: '/me/',
-  path: '/me/',
-  getParentRoute: () => DashboardRouteRoute,
+const ApiBetaModeRoute = ApiBetaModeRouteImport.update({
+  id: '/api/beta-mode',
+  path: '/api/beta-mode',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardListsIndexRoute = DashboardListsIndexRouteImport.update({
-  id: '/lists/',
-  path: '/lists/',
-  getParentRoute: () => DashboardRouteRoute,
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardInterviewsIndexRoute =
-  DashboardInterviewsIndexRouteImport.update({
-    id: '/interviews/',
-    path: '/interviews/',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardExportsIndexRoute = DashboardExportsIndexRouteImport.update({
-  id: '/exports/',
-  path: '/exports/',
-  getParentRoute: () => DashboardRouteRoute,
+const AuthForgotRoute = AuthForgotRouteImport.update({
+  id: '/forgot',
+  path: '/forgot',
+  getParentRoute: () => AuthRouteRoute,
 } as any)
-const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
-  id: '/dashboard/',
-  path: '/dashboard/',
-  getParentRoute: () => DashboardRouteRoute,
+const AuthResetRoute = AuthResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
+  getParentRoute: () => AuthRouteRoute,
 } as any)
-const DashboardCalendarIndexRoute = DashboardCalendarIndexRouteImport.update({
-  id: '/calendar/',
-  path: '/calendar/',
-  getParentRoute: () => DashboardRouteRoute,
+const AuthSignInRoute = AuthSignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthSignUpRoute = AuthSignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const BlogAtomDotxmlRoute = BlogAtomDotxmlRouteImport.update({
+  id: '/blog/atom.xml',
+  path: '/blog/atom.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
+  id: '/builders/$builderId',
+  path: '/builders/$builderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingBuildingRoute = OnboardingBuildingRouteImport.update({
+  id: '/building',
+  path: '/building',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingGoalRoute = OnboardingGoalRouteImport.update({
+  id: '/goal',
+  path: '/goal',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingInvestingRoute = OnboardingInvestingRouteImport.update({
+  id: '/investing',
+  path: '/investing',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
+  id: '/save',
+  path: '/save',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingSearchRoute = OnboardingSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingSuccessRoute = OnboardingSuccessRouteImport.update({
+  id: '/success',
+  path: '/success',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => OnboardingRouteRoute,
+} as any)
+const PortfolioClaimIdRoute = PortfolioClaimIdRouteImport.update({
+  id: '/portfolio/$claimId',
+  path: '/portfolio/$claimId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RSlugRoute = RSlugRouteImport.update({
+  id: '/r/$slug',
+  path: '/r/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScheduleInvitationIdRoute = ScheduleInvitationIdRouteImport.update({
+  id: '/schedule/$invitationId',
+  path: '/schedule/$invitationId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardAdminIndexRoute = DashboardAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
-  id: '/team/invite/$invitationId',
-  path: '/team/invite/$invitationId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWorkSamplesAnalyzeRoute = ApiWorkSamplesAnalyzeRouteImport.update({
-  id: '/api/work-samples/analyze',
-  path: '/api/work-samples/analyze',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWorkSamplesIdRoute = ApiWorkSamplesIdRouteImport.update({
-  id: '/api/work-samples/$id',
-  path: '/api/work-samples/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWebhooksStripeRoute = ApiWebhooksStripeRouteImport.update({
-  id: '/api/webhooks/stripe',
-  path: '/api/webhooks/stripe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiStatusSummaryRoute = ApiStatusSummaryRouteImport.update({
-  id: '/api/status/summary',
-  path: '/api/status/summary',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiStatusSubscribeRoute = ApiStatusSubscribeRouteImport.update({
-  id: '/api/status/subscribe',
-  path: '/api/status/subscribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSprintsPreviewRoute = ApiSprintsPreviewRouteImport.update({
-  id: '/api/sprints/preview',
-  path: '/api/sprints/preview',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSprintsSprintIdRoute = ApiSprintsSprintIdRouteImport.update({
-  id: '/api/sprints/$sprintId',
-  path: '/api/sprints/$sprintId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSolutionsRunsRoute = ApiSolutionsRunsRouteImport.update({
-  id: '/api/solutions/runs',
-  path: '/api/solutions/runs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSolutionsGenerateRoute = ApiSolutionsGenerateRouteImport.update({
-  id: '/api/solutions/generate',
-  path: '/api/solutions/generate',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSolutionsConfigRoute = ApiSolutionsConfigRouteImport.update({
-  id: '/api/solutions/config',
-  path: '/api/solutions/config',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSolutionsBriefsRoute = ApiSolutionsBriefsRouteImport.update({
-  id: '/api/solutions/briefs',
-  path: '/api/solutions/briefs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSolutionsBillingStateRoute =
-  ApiSolutionsBillingStateRouteImport.update({
-    id: '/api/solutions/billing-state',
-    path: '/api/solutions/billing-state',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
-  id: '/api/search/semantic',
-  path: '/api/search/semantic',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
-  id: '/api/search/builders',
-  path: '/api/search/builders',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPrivacyProfileRemovalRoute =
-  ApiPrivacyProfileRemovalRouteImport.update({
-    id: '/api/privacy/profile-removal',
-    path: '/api/privacy/profile-removal',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPortfolioClaimIdRoute = ApiPortfolioClaimIdRouteImport.update({
-  id: '/api/portfolio/$claimId',
-  path: '/api/portfolio/$claimId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
-  id: '/api/plans/me',
-  path: '/api/plans/me',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOrganizationsTransferOwnershipPreviewRoute =
-  ApiOrganizationsTransferOwnershipPreviewRouteImport.update({
-    id: '/api/organizations/transfer-ownership-preview',
-    path: '/api/organizations/transfer-ownership-preview',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiOrganizationsTransferOwnershipRoute =
-  ApiOrganizationsTransferOwnershipRouteImport.update({
-    id: '/api/organizations/transfer-ownership',
-    path: '/api/organizations/transfer-ownership',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiOrganizationsTeamRoute = ApiOrganizationsTeamRouteImport.update({
-  id: '/api/organizations/team',
-  path: '/api/organizations/team',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOrganizationsSwitchRoute = ApiOrganizationsSwitchRouteImport.update({
-  id: '/api/organizations/switch',
-  path: '/api/organizations/switch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOrganizationsDeletionRoute =
-  ApiOrganizationsDeletionRouteImport.update({
-    id: '/api/organizations/deletion',
-    path: '/api/organizations/deletion',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiOrganizationsActivityRoute =
-  ApiOrganizationsActivityRouteImport.update({
-    id: '/api/organizations/activity',
-    path: '/api/organizations/activity',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
-  id: '/api/onboarding/status',
-  path: '/api/onboarding/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOnboardingSkipRoute = ApiOnboardingSkipRouteImport.update({
-  id: '/api/onboarding/skip',
-  path: '/api/onboarding/skip',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOnboardingCompleteRoute = ApiOnboardingCompleteRouteImport.update({
-  id: '/api/onboarding/complete',
-  path: '/api/onboarding/complete',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOgExploreRoute = ApiOgExploreRouteImport.update({
-  id: '/api/og/explore',
-  path: '/api/og/explore',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOgBlogRoute = ApiOgBlogRouteImport.update({
-  id: '/api/og/blog',
-  path: '/api/og/blog',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiListsListIdRoute = ApiListsListIdRouteImport.update({
-  id: '/api/lists/$listId',
-  path: '/api/lists/$listId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiInterviewsSharedRoute = ApiInterviewsSharedRouteImport.update({
-  id: '/api/interviews/shared',
-  path: '/api/interviews/shared',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFingerprintMatchRoute = ApiFingerprintMatchRouteImport.update({
-  id: '/api/fingerprint/match',
-  path: '/api/fingerprint/match',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
-  id: '/api/feeds/$searchId',
-  path: '/api/feeds/$searchId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiExportBuildersRoute = ApiExportBuildersRouteImport.update({
-  id: '/api/export/builders',
-  path: '/api/export/builders',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiE2eOutboxRoute = ApiE2eOutboxRouteImport.update({
-  id: '/api/e2e/outbox',
-  path: '/api/e2e/outbox',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiE2eBillingProviderRoute = ApiE2eBillingProviderRouteImport.update({
-  id: '/api/e2e/billing-provider',
-  path: '/api/e2e/billing-provider',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDashboardStatsRoute = ApiDashboardStatsRouteImport.update({
-  id: '/api/dashboard/stats',
-  path: '/api/dashboard/stats',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDashboardPreferencesRoute = ApiDashboardPreferencesRouteImport.update({
-  id: '/api/dashboard/preferences',
-  path: '/api/dashboard/preferences',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
-  id: '/api/dashboard/overview',
-  path: '/api/dashboard/overview',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDashboardOrganizationAdminRoute =
-  ApiDashboardOrganizationAdminRouteImport.update({
-    id: '/api/dashboard/organization-admin',
-    path: '/api/dashboard/organization-admin',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiChangelogSlugRoute = ApiChangelogSlugRouteImport.update({
-  id: '/api/changelog/$slug',
-  path: '/api/changelog/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCalendarNotificationsRoute =
-  ApiCalendarNotificationsRouteImport.update({
-    id: '/api/calendar/notifications',
-    path: '/api/calendar/notifications',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiCalendarFeedRoute = ApiCalendarFeedRouteImport.update({
-  id: '/api/calendar/feed',
-  path: '/api/calendar/feed',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCalendarExportDoticsRoute = ApiCalendarExportDoticsRouteImport.update({
-  id: '/api/calendar/export.ics',
-  path: '/api/calendar/export.ics',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBuildersTrackRoute = ApiBuildersTrackRouteImport.update({
-  id: '/api/builders/track',
-  path: '/api/builders/track',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
-  id: '/api/builders/$builderId',
-  path: '/api/builders/$builderId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingSummaryRoute = ApiBillingSummaryRouteImport.update({
-  id: '/api/billing/summary',
-  path: '/api/billing/summary',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingRefundsRoute = ApiBillingRefundsRouteImport.update({
-  id: '/api/billing/refunds',
-  path: '/api/billing/refunds',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
-  id: '/api/billing/portal',
-  path: '/api/billing/portal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingDisputesRoute = ApiBillingDisputesRouteImport.update({
-  id: '/api/billing/disputes',
-  path: '/api/billing/disputes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingContactRoute = ApiBillingContactRouteImport.update({
-  id: '/api/billing/contact',
-  path: '/api/billing/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBillingAutoRechargeRoute = ApiBillingAutoRechargeRouteImport.update({
-  id: '/api/billing/auto-recharge',
-  path: '/api/billing/auto-recharge',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAnalyticsConversionRoute = ApiAnalyticsConversionRouteImport.update({
-  id: '/api/analytics/conversion',
-  path: '/api/analytics/conversion',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAlertsTestTriggerRoute = ApiAlertsTestTriggerRouteImport.update({
-  id: '/api/alerts/test-trigger',
-  path: '/api/alerts/test-trigger',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAlertsIdRoute = ApiAlertsIdRouteImport.update({
-  id: '/api/alerts/$id',
-  path: '/api/alerts/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAiEmbedRoute = ApiAiEmbedRouteImport.update({
-  id: '/api/ai/embed',
-  path: '/api/ai/embed',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAiConfigRoute = ApiAiConfigRouteImport.update({
-  id: '/api/ai/config',
-  path: '/api/ai/config',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAiCompleteRoute = ApiAiCompleteRouteImport.update({
-  id: '/api/ai/complete',
-  path: '/api/ai/complete',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminSearchSourcesRoute = ApiAdminSearchSourcesRouteImport.update({
-  id: '/api/admin/search-sources',
-  path: '/api/admin/search-sources',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminPreferencesRoute = ApiAdminPreferencesRouteImport.update({
-  id: '/api/admin/preferences',
-  path: '/api/admin/preferences',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LandingPrivacyRemoveRoute = LandingPrivacyRemoveRouteImport.update({
-  id: '/privacy/remove',
-  path: '/privacy/remove',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingLegalTermsRoute = LandingLegalTermsRouteImport.update({
-  id: '/legal/terms',
-  path: '/legal/terms',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingLegalPrivacyRoute = LandingLegalPrivacyRouteImport.update({
-  id: '/legal/privacy',
-  path: '/legal/privacy',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingLegalImprintRoute = LandingLegalImprintRouteImport.update({
-  id: '/legal/imprint',
-  path: '/legal/imprint',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingLegalCookiesRoute = LandingLegalCookiesRouteImport.update({
-  id: '/legal/cookies',
-  path: '/legal/cookies',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const LandingChangelogSlugRoute = LandingChangelogSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => LandingChangelogRoute,
-} as any)
-const LandingBlogSlugRoute = LandingBlogSlugRouteImport.update({
-  id: '/blog/$slug',
-  path: '/blog/$slug',
-  getParentRoute: () => LandingRouteRoute,
-} as any)
-const DashboardTeamActivityRoute = DashboardTeamActivityRouteImport.update({
-  id: '/team/activity',
-  path: '/team/activity',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardSprintsNewRoute = DashboardSprintsNewRouteImport.update({
-  id: '/sprints/new',
-  path: '/sprints/new',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardSettingsTeamRoute = DashboardSettingsTeamRouteImport.update({
-  id: '/settings/team',
-  path: '/settings/team',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardSettingsSecurityRoute =
-  DashboardSettingsSecurityRouteImport.update({
-    id: '/settings/security',
-    path: '/settings/security',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsPrivacyRoute =
-  DashboardSettingsPrivacyRouteImport.update({
-    id: '/settings/privacy',
-    path: '/settings/privacy',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsBillingRoute =
-  DashboardSettingsBillingRouteImport.update({
-    id: '/settings/billing',
-    path: '/settings/billing',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardListsListIdRoute = DashboardListsListIdRouteImport.update({
-  id: '/lists/$listId',
-  path: '/lists/$listId',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardInterviewsInvitationsRoute =
-  DashboardInterviewsInvitationsRouteImport.update({
-    id: '/interviews/invitations',
-    path: '/interviews/invitations',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardAdminUsersRoute = DashboardAdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminSourcesRoute = DashboardAdminSourcesRouteImport.update({
-  id: '/admin/sources',
-  path: '/admin/sources',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminSolutionsGoldSetRoute =
-  DashboardAdminSolutionsGoldSetRouteImport.update({
-    id: '/admin/solutions-gold-set',
-    path: '/admin/solutions-gold-set',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardAdminRoadmapRoute = DashboardAdminRoadmapRouteImport.update({
-  id: '/admin/roadmap',
-  path: '/admin/roadmap',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminRefundsRoute = DashboardAdminRefundsRouteImport.update({
-  id: '/admin/refunds',
-  path: '/admin/refunds',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminOperationsRoute =
-  DashboardAdminOperationsRouteImport.update({
-    id: '/admin/operations',
-    path: '/admin/operations',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardAdminMetricsRoute = DashboardAdminMetricsRouteImport.update({
-  id: '/admin/metrics',
-  path: '/admin/metrics',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminIntegrationsRoute =
-  DashboardAdminIntegrationsRouteImport.update({
-    id: '/admin/integrations',
-    path: '/admin/integrations',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardAdminIncidentsRoute = DashboardAdminIncidentsRouteImport.update({
-  id: '/admin/incidents',
-  path: '/admin/incidents',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminDisputesRoute = DashboardAdminDisputesRouteImport.update({
-  id: '/admin/disputes',
-  path: '/admin/disputes',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminContentRoute = DashboardAdminContentRouteImport.update({
-  id: '/admin/content',
-  path: '/admin/content',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminClaimsRoute = DashboardAdminClaimsRouteImport.update({
-  id: '/admin/claims',
-  path: '/admin/claims',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
-  id: '/admin/changelog',
-  path: '/admin/changelog',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardAdminBillingRoute = DashboardAdminBillingRouteImport.update({
-  id: '/admin/billing',
-  path: '/admin/billing',
+const DashboardAdminAbuseRoute = DashboardAdminAbuseRouteImport.update({
+  id: '/admin/abuse',
+  path: '/admin/abuse',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardAdminAccessRequestsRoute =
@@ -1051,141 +490,633 @@ const DashboardAdminAccessRequestsRoute =
     path: '/admin/access-requests',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
-const DashboardAdminAbuseRoute = DashboardAdminAbuseRouteImport.update({
-  id: '/admin/abuse',
-  path: '/admin/abuse',
+const DashboardAdminBillingRoute = DashboardAdminBillingRouteImport.update({
+  id: '/admin/billing',
+  path: '/admin/billing',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const ApiSchedulingInvitationsIndexRoute =
-  ApiSchedulingInvitationsIndexRouteImport.update({
-    id: '/api/scheduling/invitations/',
-    path: '/api/scheduling/invitations/',
+const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
+  id: '/admin/changelog',
+  path: '/admin/changelog',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminClaimsRoute = DashboardAdminClaimsRouteImport.update({
+  id: '/admin/claims',
+  path: '/admin/claims',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminContentRoute = DashboardAdminContentRouteImport.update({
+  id: '/admin/content',
+  path: '/admin/content',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminDisputesRoute = DashboardAdminDisputesRouteImport.update({
+  id: '/admin/disputes',
+  path: '/admin/disputes',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminIncidentsRoute = DashboardAdminIncidentsRouteImport.update({
+  id: '/admin/incidents',
+  path: '/admin/incidents',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminIntegrationsRoute =
+  DashboardAdminIntegrationsRouteImport.update({
+    id: '/admin/integrations',
+    path: '/admin/integrations',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardAdminMetricsRoute = DashboardAdminMetricsRouteImport.update({
+  id: '/admin/metrics',
+  path: '/admin/metrics',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminOperationsRoute =
+  DashboardAdminOperationsRouteImport.update({
+    id: '/admin/operations',
+    path: '/admin/operations',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardAdminRefundsRoute = DashboardAdminRefundsRouteImport.update({
+  id: '/admin/refunds',
+  path: '/admin/refunds',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminRoadmapRoute = DashboardAdminRoadmapRouteImport.update({
+  id: '/admin/roadmap',
+  path: '/admin/roadmap',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminSolutionsGoldSetRoute =
+  DashboardAdminSolutionsGoldSetRouteImport.update({
+    id: '/admin/solutions-gold-set',
+    path: '/admin/solutions-gold-set',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardAdminSourcesRoute = DashboardAdminSourcesRouteImport.update({
+  id: '/admin/sources',
+  path: '/admin/sources',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminUsersRoute = DashboardAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardCalendarIndexRoute = DashboardCalendarIndexRouteImport.update({
+  id: '/calendar/',
+  path: '/calendar/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
+  id: '/dashboard/',
+  path: '/dashboard/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardExportsIndexRoute = DashboardExportsIndexRouteImport.update({
+  id: '/exports/',
+  path: '/exports/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardInterviewsIndexRoute =
+  DashboardInterviewsIndexRouteImport.update({
+    id: '/interviews/',
+    path: '/interviews/',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardInterviewsInvitationsRoute =
+  DashboardInterviewsInvitationsRouteImport.update({
+    id: '/interviews/invitations',
+    path: '/interviews/invitations',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardListsIndexRoute = DashboardListsIndexRouteImport.update({
+  id: '/lists/',
+  path: '/lists/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardListsListIdRoute = DashboardListsListIdRouteImport.update({
+  id: '/lists/$listId',
+  path: '/lists/$listId',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardMeIndexRoute = DashboardMeIndexRouteImport.update({
+  id: '/me/',
+  path: '/me/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
+  id: '/search/',
+  path: '/search/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSettingsBillingRoute =
+  DashboardSettingsBillingRouteImport.update({
+    id: '/settings/billing',
+    path: '/settings/billing',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardSettingsPrivacyRoute =
+  DashboardSettingsPrivacyRouteImport.update({
+    id: '/settings/privacy',
+    path: '/settings/privacy',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardSettingsSecurityRoute =
+  DashboardSettingsSecurityRouteImport.update({
+    id: '/settings/security',
+    path: '/settings/security',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardSettingsTeamRoute = DashboardSettingsTeamRouteImport.update({
+  id: '/settings/team',
+  path: '/settings/team',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSolutionsIndexRoute = DashboardSolutionsIndexRouteImport.update({
+  id: '/solutions/',
+  path: '/solutions/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSprintsIndexRoute = DashboardSprintsIndexRouteImport.update({
+  id: '/sprints/',
+  path: '/sprints/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSprintsNewRoute = DashboardSprintsNewRouteImport.update({
+  id: '/sprints/new',
+  path: '/sprints/new',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardTeamActivityRoute = DashboardTeamActivityRouteImport.update({
+  id: '/team/activity',
+  path: '/team/activity',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const LandingBlogIndexRoute = LandingBlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingBlogSlugRoute = LandingBlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingChangelogIndexRoute = LandingChangelogIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LandingChangelogRoute,
+} as any)
+const LandingChangelogSlugRoute = LandingChangelogSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => LandingChangelogRoute,
+} as any)
+const LandingExploreIndexRoute = LandingExploreIndexRouteImport.update({
+  id: '/explore/',
+  path: '/explore/',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingForBuildersRoute = LandingForBuildersRouteImport.update({
+  id: '/for/builders',
+  path: '/for/builders',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingForHiringTeamsRoute = LandingForHiringTeamsRouteImport.update({
+  id: '/for/hiring-teams',
+  path: '/for/hiring-teams',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingForInvestorsRoute = LandingForInvestorsRouteImport.update({
+  id: '/for/investors',
+  path: '/for/investors',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingLegalCookiesRoute = LandingLegalCookiesRouteImport.update({
+  id: '/legal/cookies',
+  path: '/legal/cookies',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingLegalImprintRoute = LandingLegalImprintRouteImport.update({
+  id: '/legal/imprint',
+  path: '/legal/imprint',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingLegalPrivacyRoute = LandingLegalPrivacyRouteImport.update({
+  id: '/legal/privacy',
+  path: '/legal/privacy',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingLegalTermsRoute = LandingLegalTermsRouteImport.update({
+  id: '/legal/terms',
+  path: '/legal/terms',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingPrivacyRemoveRoute = LandingPrivacyRemoveRouteImport.update({
+  id: '/privacy/remove',
+  path: '/privacy/remove',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const ApiAdminPreferencesRoute = ApiAdminPreferencesRouteImport.update({
+  id: '/api/admin/preferences',
+  path: '/api/admin/preferences',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSearchSourcesRoute = ApiAdminSearchSourcesRouteImport.update({
+  id: '/api/admin/search-sources',
+  path: '/api/admin/search-sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiCompleteRoute = ApiAiCompleteRouteImport.update({
+  id: '/api/ai/complete',
+  path: '/api/ai/complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiConfigRoute = ApiAiConfigRouteImport.update({
+  id: '/api/ai/config',
+  path: '/api/ai/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiEmbedRoute = ApiAiEmbedRouteImport.update({
+  id: '/api/ai/embed',
+  path: '/api/ai/embed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsIndexRoute = ApiAlertsIndexRouteImport.update({
+  id: '/api/alerts/',
+  path: '/api/alerts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsIdRoute = ApiAlertsIdRouteImport.update({
+  id: '/api/alerts/$id',
+  path: '/api/alerts/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsTestTriggerRoute = ApiAlertsTestTriggerRouteImport.update({
+  id: '/api/alerts/test-trigger',
+  path: '/api/alerts/test-trigger',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnalyticsConversionRoute = ApiAnalyticsConversionRouteImport.update({
+  id: '/api/analytics/conversion',
+  path: '/api/analytics/conversion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingAutoRechargeRoute = ApiBillingAutoRechargeRouteImport.update({
+  id: '/api/billing/auto-recharge',
+  path: '/api/billing/auto-recharge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingContactRoute = ApiBillingContactRouteImport.update({
+  id: '/api/billing/contact',
+  path: '/api/billing/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingDisputesRoute = ApiBillingDisputesRouteImport.update({
+  id: '/api/billing/disputes',
+  path: '/api/billing/disputes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
+  id: '/api/billing/portal',
+  path: '/api/billing/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingRefundsRoute = ApiBillingRefundsRouteImport.update({
+  id: '/api/billing/refunds',
+  path: '/api/billing/refunds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingSummaryRoute = ApiBillingSummaryRouteImport.update({
+  id: '/api/billing/summary',
+  path: '/api/billing/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
+  id: '/api/builders/$builderId',
+  path: '/api/builders/$builderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBuildersTrackRoute = ApiBuildersTrackRouteImport.update({
+  id: '/api/builders/track',
+  path: '/api/builders/track',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarExportDoticsRoute = ApiCalendarExportDoticsRouteImport.update({
+  id: '/api/calendar/export.ics',
+  path: '/api/calendar/export.ics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarFeedRoute = ApiCalendarFeedRouteImport.update({
+  id: '/api/calendar/feed',
+  path: '/api/calendar/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarNotificationsRoute =
+  ApiCalendarNotificationsRouteImport.update({
+    id: '/api/calendar/notifications',
+    path: '/api/calendar/notifications',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiOrganizationsInvitationsIndexRoute =
-  ApiOrganizationsInvitationsIndexRouteImport.update({
-    id: '/api/organizations/invitations/',
-    path: '/api/organizations/invitations/',
+const ApiChangelogIndexRoute = ApiChangelogIndexRouteImport.update({
+  id: '/api/changelog/',
+  path: '/api/changelog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChangelogSlugRoute = ApiChangelogSlugRouteImport.update({
+  id: '/api/changelog/$slug',
+  path: '/api/changelog/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiConsentIndexRoute = ApiConsentIndexRouteImport.update({
+  id: '/api/consent/',
+  path: '/api/consent/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardContextRoute = ApiDashboardContextRouteImport.update({
+  id: '/api/dashboard/context',
+  path: '/api/dashboard/context',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardOrganizationAdminRoute =
+  ApiDashboardOrganizationAdminRouteImport.update({
+    id: '/api/dashboard/organization-admin',
+    path: '/api/dashboard/organization-admin',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiMeStepupIndexRoute = ApiMeStepupIndexRouteImport.update({
-  id: '/api/me/stepup/',
-  path: '/api/me/stepup/',
+const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
+  id: '/api/dashboard/overview',
+  path: '/api/dashboard/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
-  id: '/api/me/sessions/',
-  path: '/api/me/sessions/',
+const ApiDashboardPreferencesRoute = ApiDashboardPreferencesRouteImport.update({
+  id: '/api/dashboard/preferences',
+  path: '/api/dashboard/preferences',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMeDeleteAccountIndexRoute = ApiMeDeleteAccountIndexRouteImport.update({
-  id: '/api/me/delete-account/',
-  path: '/api/me/delete-account/',
+const ApiDashboardStatsRoute = ApiDashboardStatsRouteImport.update({
+  id: '/api/dashboard/stats',
+  path: '/api/dashboard/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMeDataExportIndexRoute = ApiMeDataExportIndexRouteImport.update({
-  id: '/api/me/data-export/',
-  path: '/api/me/data-export/',
+const ApiE2eBillingProviderRoute = ApiE2eBillingProviderRouteImport.update({
+  id: '/api/e2e/billing-provider',
+  path: '/api/e2e/billing-provider',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMeBuildersIndexRoute = ApiMeBuildersIndexRouteImport.update({
-  id: '/api/me/builders/',
-  path: '/api/me/builders/',
+const ApiE2eOutboxRoute = ApiE2eOutboxRouteImport.update({
+  id: '/api/e2e/outbox',
+  path: '/api/e2e/outbox',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMeBuilderIndexRoute = ApiMeBuilderIndexRouteImport.update({
-  id: '/api/me/builder/',
-  path: '/api/me/builder/',
+const ApiExportBuildersRoute = ApiExportBuildersRouteImport.update({
+  id: '/api/export/builders',
+  path: '/api/export/builders',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCalendarEventsIndexRoute = ApiCalendarEventsIndexRouteImport.update({
-  id: '/api/calendar/events/',
-  path: '/api/calendar/events/',
+const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
+  id: '/api/feeds/$searchId',
+  path: '/api/feeds/$searchId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCalendarAvailabilityIndexRoute =
-  ApiCalendarAvailabilityIndexRouteImport.update({
-    id: '/api/calendar/availability/',
-    path: '/api/calendar/availability/',
+const ApiFingerprintMatchRoute = ApiFingerprintMatchRouteImport.update({
+  id: '/api/fingerprint/match',
+  path: '/api/fingerprint/match',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIncidentsIndexRoute = ApiIncidentsIndexRouteImport.update({
+  id: '/api/incidents/',
+  path: '/api/incidents/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInterviewsIndexRoute = ApiInterviewsIndexRouteImport.update({
+  id: '/api/interviews/',
+  path: '/api/interviews/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInterviewsSharedRoute = ApiInterviewsSharedRouteImport.update({
+  id: '/api/interviews/shared',
+  path: '/api/interviews/shared',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiListsIndexRoute = ApiListsIndexRouteImport.update({
+  id: '/api/lists/',
+  path: '/api/lists/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiListsListIdRoute = ApiListsListIdRouteImport.update({
+  id: '/api/lists/$listId',
+  path: '/api/lists/$listId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOgBlogRoute = ApiOgBlogRouteImport.update({
+  id: '/api/og/blog',
+  path: '/api/og/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOgExploreRoute = ApiOgExploreRouteImport.update({
+  id: '/api/og/explore',
+  path: '/api/og/explore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingCompleteRoute = ApiOnboardingCompleteRouteImport.update({
+  id: '/api/onboarding/complete',
+  path: '/api/onboarding/complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingSkipRoute = ApiOnboardingSkipRouteImport.update({
+  id: '/api/onboarding/skip',
+  path: '/api/onboarding/skip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
+  id: '/api/onboarding/status',
+  path: '/api/onboarding/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrganizationsIndexRoute = ApiOrganizationsIndexRouteImport.update({
+  id: '/api/organizations/',
+  path: '/api/organizations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrganizationsActivityRoute =
+  ApiOrganizationsActivityRouteImport.update({
+    id: '/api/organizations/activity',
+    path: '/api/organizations/activity',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiBuildersRecentIndexRoute = ApiBuildersRecentIndexRouteImport.update({
-  id: '/api/builders/recent/',
-  path: '/api/builders/recent/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAlertsTriggersIndexRoute = ApiAlertsTriggersIndexRouteImport.update({
-  id: '/api/alerts/triggers/',
-  path: '/api/alerts/triggers/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminUsersIndexRoute = ApiAdminUsersIndexRouteImport.update({
-  id: '/api/admin/users/',
-  path: '/api/admin/users/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminSeoIndexRoute = ApiAdminSeoIndexRouteImport.update({
-  id: '/api/admin/seo/',
-  path: '/api/admin/seo/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminRoadmapIndexRoute = ApiAdminRoadmapIndexRouteImport.update({
-  id: '/api/admin/roadmap/',
-  path: '/api/admin/roadmap/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminOperationsIndexRoute = ApiAdminOperationsIndexRouteImport.update({
-  id: '/api/admin/operations/',
-  path: '/api/admin/operations/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminMetricsIndexRoute = ApiAdminMetricsIndexRouteImport.update({
-  id: '/api/admin/metrics/',
-  path: '/api/admin/metrics/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminIntegrationsIndexRoute =
-  ApiAdminIntegrationsIndexRouteImport.update({
-    id: '/api/admin/integrations/',
-    path: '/api/admin/integrations/',
+const ApiOrganizationsDeletionRoute =
+  ApiOrganizationsDeletionRouteImport.update({
+    id: '/api/organizations/deletion',
+    path: '/api/organizations/deletion',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiAdminIncidentsIndexRoute = ApiAdminIncidentsIndexRouteImport.update({
-  id: '/api/admin/incidents/',
-  path: '/api/admin/incidents/',
+const ApiOrganizationsSwitchRoute = ApiOrganizationsSwitchRouteImport.update({
+  id: '/api/organizations/switch',
+  path: '/api/organizations/switch',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAdminHumanLinksIndexRoute = ApiAdminHumanLinksIndexRouteImport.update({
-  id: '/api/admin/human-links/',
-  path: '/api/admin/human-links/',
+const ApiOrganizationsTeamRoute = ApiOrganizationsTeamRouteImport.update({
+  id: '/api/organizations/team',
+  path: '/api/organizations/team',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAdminChangelogIndexRoute = ApiAdminChangelogIndexRouteImport.update({
-  id: '/api/admin/changelog/',
-  path: '/api/admin/changelog/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminBuilderClaimsIndexRoute =
-  ApiAdminBuilderClaimsIndexRouteImport.update({
-    id: '/api/admin/builder-claims/',
-    path: '/api/admin/builder-claims/',
+const ApiOrganizationsTransferOwnershipRoute =
+  ApiOrganizationsTransferOwnershipRouteImport.update({
+    id: '/api/organizations/transfer-ownership',
+    path: '/api/organizations/transfer-ownership',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiAdminAccessRequestsIndexRoute =
-  ApiAdminAccessRequestsIndexRouteImport.update({
-    id: '/api/admin/access-requests/',
-    path: '/api/admin/access-requests/',
+const ApiOrganizationsTransferOwnershipPreviewRoute =
+  ApiOrganizationsTransferOwnershipPreviewRouteImport.update({
+    id: '/api/organizations/transfer-ownership-preview',
+    path: '/api/organizations/transfer-ownership-preview',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiAdminAbuseIndexRoute = ApiAdminAbuseIndexRouteImport.update({
-  id: '/api/admin/abuse/',
-  path: '/api/admin/abuse/',
+const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
+  id: '/api/plans/me',
+  path: '/api/plans/me',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardSprintsSprintIdIndexRoute =
-  DashboardSprintsSprintIdIndexRouteImport.update({
-    id: '/sprints/$sprintId/',
-    path: '/sprints/$sprintId/',
+const ApiPortfolioClaimIdRoute = ApiPortfolioClaimIdRouteImport.update({
+  id: '/api/portfolio/$claimId',
+  path: '/api/portfolio/$claimId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPrivacyProfileRemovalRoute =
+  ApiPrivacyProfileRemovalRouteImport.update({
+    id: '/api/privacy/profile-removal',
+    path: '/api/privacy/profile-removal',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiQueriesIndexRoute = ApiQueriesIndexRouteImport.update({
+  id: '/api/queries/',
+  path: '/api/queries/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRecommendationsIndexRoute = ApiRecommendationsIndexRouteImport.update({
+  id: '/api/recommendations/',
+  path: '/api/recommendations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRoadmapIndexRoute = ApiRoadmapIndexRouteImport.update({
+  id: '/api/roadmap/',
+  path: '/api/roadmap/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
+  id: '/api/search/builders',
+  path: '/api/search/builders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
+  id: '/api/search/semantic',
+  path: '/api/search/semantic',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSolutionsBillingStateRoute =
+  ApiSolutionsBillingStateRouteImport.update({
+    id: '/api/solutions/billing-state',
+    path: '/api/solutions/billing-state',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSolutionsBriefsRoute = ApiSolutionsBriefsRouteImport.update({
+  id: '/api/solutions/briefs',
+  path: '/api/solutions/briefs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSolutionsConfigRoute = ApiSolutionsConfigRouteImport.update({
+  id: '/api/solutions/config',
+  path: '/api/solutions/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSolutionsGenerateRoute = ApiSolutionsGenerateRouteImport.update({
+  id: '/api/solutions/generate',
+  path: '/api/solutions/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSolutionsRunsRoute = ApiSolutionsRunsRouteImport.update({
+  id: '/api/solutions/runs',
+  path: '/api/solutions/runs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSprintsIndexRoute = ApiSprintsIndexRouteImport.update({
+  id: '/api/sprints/',
+  path: '/api/sprints/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSprintsSprintIdRoute = ApiSprintsSprintIdRouteImport.update({
+  id: '/api/sprints/$sprintId',
+  path: '/api/sprints/$sprintId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSprintsPreviewRoute = ApiSprintsPreviewRouteImport.update({
+  id: '/api/sprints/preview',
+  path: '/api/sprints/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatusIndexRoute = ApiStatusIndexRouteImport.update({
+  id: '/api/status/',
+  path: '/api/status/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatusSubscribeRoute = ApiStatusSubscribeRouteImport.update({
+  id: '/api/status/subscribe',
+  path: '/api/status/subscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatusSummaryRoute = ApiStatusSummaryRouteImport.update({
+  id: '/api/status/summary',
+  path: '/api/status/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksStripeRoute = ApiWebhooksStripeRouteImport.update({
+  id: '/api/webhooks/stripe',
+  path: '/api/webhooks/stripe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkSamplesIndexRoute = ApiWorkSamplesIndexRouteImport.update({
+  id: '/api/work-samples/',
+  path: '/api/work-samples/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkSamplesIdRoute = ApiWorkSamplesIdRouteImport.update({
+  id: '/api/work-samples/$id',
+  path: '/api/work-samples/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkSamplesAnalyzeRoute = ApiWorkSamplesAnalyzeRouteImport.update({
+  id: '/api/work-samples/analyze',
+  path: '/api/work-samples/analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
+  id: '/team/invite/$invitationId',
+  path: '/team/invite/$invitationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardBuilderBuilderIdIndexRoute =
+  DashboardBuilderBuilderIdIndexRouteImport.update({
+    id: '/builder/$builderId/',
+    path: '/builder/$builderId/',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardInterviewsInterviewIdIndexRoute =
+  DashboardInterviewsInterviewIdIndexRouteImport.update({
+    id: '/interviews/$interviewId/',
+    path: '/interviews/$interviewId/',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardInterviewsInterviewIdLiveRoute =
+  DashboardInterviewsInterviewIdLiveRouteImport.update({
+    id: '/interviews/$interviewId/live',
+    path: '/interviews/$interviewId/live',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
 const DashboardSettingsBillingIndexRoute =
@@ -1194,445 +1125,60 @@ const DashboardSettingsBillingIndexRoute =
     path: '/',
     getParentRoute: () => DashboardSettingsBillingRoute,
   } as any)
-const DashboardInterviewsInterviewIdIndexRoute =
-  DashboardInterviewsInterviewIdIndexRouteImport.update({
-    id: '/interviews/$interviewId/',
-    path: '/interviews/$interviewId/',
+const DashboardSettingsBillingReturnRoute =
+  DashboardSettingsBillingReturnRouteImport.update({
+    id: '/return',
+    path: '/return',
+    getParentRoute: () => DashboardSettingsBillingRoute,
+  } as any)
+const DashboardSprintsSprintIdIndexRoute =
+  DashboardSprintsSprintIdIndexRouteImport.update({
+    id: '/sprints/$sprintId/',
+    path: '/sprints/$sprintId/',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
-const DashboardBuilderBuilderIdIndexRoute =
-  DashboardBuilderBuilderIdIndexRouteImport.update({
-    id: '/builder/$builderId/',
-    path: '/builder/$builderId/',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const ApiSprintsSprintIdResultsRoute =
-  ApiSprintsSprintIdResultsRouteImport.update({
-    id: '/results',
-    path: '/results',
-    getParentRoute: () => ApiSprintsSprintIdRoute,
-  } as any)
-const ApiSolutionsRunsRunIdRoute = ApiSolutionsRunsRunIdRouteImport.update({
-  id: '/$runId',
-  path: '/$runId',
-  getParentRoute: () => ApiSolutionsRunsRoute,
-} as any)
-const ApiSolutionsBriefsBriefIdRoute =
-  ApiSolutionsBriefsBriefIdRouteImport.update({
-    id: '/$briefId',
-    path: '/$briefId',
-    getParentRoute: () => ApiSolutionsBriefsRoute,
-  } as any)
-const ApiSchedulingInvitationsInvitationIdRoute =
-  ApiSchedulingInvitationsInvitationIdRouteImport.update({
-    id: '/api/scheduling/invitations/$invitationId',
-    path: '/api/scheduling/invitations/$invitationId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiQueriesIdVisibilityRoute = ApiQueriesIdVisibilityRouteImport.update({
-  id: '/api/queries/$id/visibility',
-  path: '/api/queries/$id/visibility',
+const ApiAdminAbuseIndexRoute = ApiAdminAbuseIndexRouteImport.update({
+  id: '/api/admin/abuse/',
+  path: '/api/admin/abuse/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiQueriesIdShareRoute = ApiQueriesIdShareRouteImport.update({
-  id: '/api/queries/$id/share',
-  path: '/api/queries/$id/share',
+const ApiAdminAbuseClustersRoute = ApiAdminAbuseClustersRouteImport.update({
+  id: '/api/admin/abuse/clusters',
+  path: '/api/admin/abuse/clusters',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiQueriesIdFeedCapabilityRoute =
-  ApiQueriesIdFeedCapabilityRouteImport.update({
-    id: '/api/queries/$id/feed-capability',
-    path: '/api/queries/$id/feed-capability',
+const ApiAdminAccessRequestsIndexRoute =
+  ApiAdminAccessRequestsIndexRouteImport.update({
+    id: '/api/admin/access-requests/',
+    path: '/api/admin/access-requests/',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPrivacyProfileRemovalVerifyRoute =
-  ApiPrivacyProfileRemovalVerifyRouteImport.update({
-    id: '/verify',
-    path: '/verify',
-    getParentRoute: () => ApiPrivacyProfileRemovalRoute,
-  } as any)
-const ApiOrganizationsTeamMembersRoute =
-  ApiOrganizationsTeamMembersRouteImport.update({
-    id: '/members',
-    path: '/members',
-    getParentRoute: () => ApiOrganizationsTeamRoute,
-  } as any)
-const ApiOrganizationsTeamInvitationsRoute =
-  ApiOrganizationsTeamInvitationsRouteImport.update({
-    id: '/invitations',
-    path: '/invitations',
-    getParentRoute: () => ApiOrganizationsTeamRoute,
-  } as any)
-const ApiOrganizationsMembersMemberIdRoute =
-  ApiOrganizationsMembersMemberIdRouteImport.update({
-    id: '/api/organizations/members/$memberId',
-    path: '/api/organizations/members/$memberId',
+const ApiAdminActivityRunRetentionRoute =
+  ApiAdminActivityRunRetentionRouteImport.update({
+    id: '/api/admin/activity/run-retention',
+    path: '/api/admin/activity/run-retention',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiOrganizationsInvitationsMineRoute =
-  ApiOrganizationsInvitationsMineRouteImport.update({
-    id: '/api/organizations/invitations/mine',
-    path: '/api/organizations/invitations/mine',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiOrganizationsInvitationsInvitationIdRoute =
-  ApiOrganizationsInvitationsInvitationIdRouteImport.update({
-    id: '/api/organizations/invitations/$invitationId',
-    path: '/api/organizations/invitations/$invitationId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiOrganizationsDeletionImmediateRoute =
-  ApiOrganizationsDeletionImmediateRouteImport.update({
-    id: '/immediate',
-    path: '/immediate',
-    getParentRoute: () => ApiOrganizationsDeletionRoute,
-  } as any)
-const ApiMeDataExportIdRoute = ApiMeDataExportIdRouteImport.update({
-  id: '/api/me/data-export/$id',
-  path: '/api/me/data-export/$id',
+const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
+  id: '/api/admin/alerts/run-worker',
+  path: '/api/admin/alerts/run-worker',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMeBuilderBuilderIdRoute = ApiMeBuilderBuilderIdRouteImport.update({
-  id: '/api/me/builder/$builderId',
-  path: '/api/me/builder/$builderId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiInterviewsInterviewIdTranscriptionTokenRoute =
-  ApiInterviewsInterviewIdTranscriptionTokenRouteImport.update({
-    id: '/api/interviews/$interviewId/transcription-token',
-    path: '/api/interviews/$interviewId/transcription-token',
+const ApiAdminAnalyticsRunRetentionRoute =
+  ApiAdminAnalyticsRunRetentionRouteImport.update({
+    id: '/api/admin/analytics/run-retention',
+    path: '/api/admin/analytics/run-retention',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiInterviewsInterviewIdSuggestionsRoute =
-  ApiInterviewsInterviewIdSuggestionsRouteImport.update({
-    id: '/api/interviews/$interviewId/suggestions',
-    path: '/api/interviews/$interviewId/suggestions',
+const ApiAdminBillingAccountingExportRoute =
+  ApiAdminBillingAccountingExportRouteImport.update({
+    id: '/api/admin/billing/accounting-export',
+    path: '/api/admin/billing/accounting-export',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiInterviewsInterviewIdSessionRoute =
-  ApiInterviewsInterviewIdSessionRouteImport.update({
-    id: '/api/interviews/$interviewId/session',
-    path: '/api/interviews/$interviewId/session',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiInterviewsInterviewIdSegmentsRoute =
-  ApiInterviewsInterviewIdSegmentsRouteImport.update({
-    id: '/api/interviews/$interviewId/segments',
-    path: '/api/interviews/$interviewId/segments',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiInterviewsInterviewIdReportRoute =
-  ApiInterviewsInterviewIdReportRouteImport.update({
-    id: '/api/interviews/$interviewId/report',
-    path: '/api/interviews/$interviewId/report',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiInterviewsInterviewIdFinalizeRoute =
-  ApiInterviewsInterviewIdFinalizeRouteImport.update({
-    id: '/api/interviews/$interviewId/finalize',
-    path: '/api/interviews/$interviewId/finalize',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiCalendarEventsEventIdRoute =
-  ApiCalendarEventsEventIdRouteImport.update({
-    id: '/api/calendar/events/$eventId',
-    path: '/api/calendar/events/$eventId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiCalendarAvailabilityOverridesRoute =
-  ApiCalendarAvailabilityOverridesRouteImport.update({
-    id: '/api/calendar/availability/overrides',
-    path: '/api/calendar/availability/overrides',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiBuildersClaimVerifyRoute = ApiBuildersClaimVerifyRouteImport.update({
-  id: '/api/builders/claim/verify',
-  path: '/api/builders/claim/verify',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiBuildersBuilderIdViewsRoute =
-  ApiBuildersBuilderIdViewsRouteImport.update({
-    id: '/views',
-    path: '/views',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdTimelineRoute =
-  ApiBuildersBuilderIdTimelineRouteImport.update({
-    id: '/timeline',
-    path: '/timeline',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdSynergyRoute =
-  ApiBuildersBuilderIdSynergyRouteImport.update({
-    id: '/synergy',
-    path: '/synergy',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdNotesRoute =
-  ApiBuildersBuilderIdNotesRouteImport.update({
-    id: '/notes',
-    path: '/notes',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdHygieneRoute =
-  ApiBuildersBuilderIdHygieneRouteImport.update({
-    id: '/hygiene',
-    path: '/hygiene',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdFingerprintRoute =
-  ApiBuildersBuilderIdFingerprintRouteImport.update({
-    id: '/fingerprint',
-    path: '/fingerprint',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdEvidenceRefreshRoute =
-  ApiBuildersBuilderIdEvidenceRefreshRouteImport.update({
-    id: '/evidence-refresh',
-    path: '/evidence-refresh',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdEnrichmentRoute =
-  ApiBuildersBuilderIdEnrichmentRouteImport.update({
-    id: '/enrichment',
-    path: '/enrichment',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdClaimRoute =
-  ApiBuildersBuilderIdClaimRouteImport.update({
-    id: '/claim',
-    path: '/claim',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBillingSubscriptionPreviewRoute =
-  ApiBillingSubscriptionPreviewRouteImport.update({
-    id: '/api/billing/subscription/preview',
-    path: '/api/billing/subscription/preview',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiBillingSubscriptionChangeRoute =
-  ApiBillingSubscriptionChangeRouteImport.update({
-    id: '/api/billing/subscription/change',
-    path: '/api/billing/subscription/change',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiBillingSubscriptionCancelRoute =
-  ApiBillingSubscriptionCancelRouteImport.update({
-    id: '/api/billing/subscription/cancel',
-    path: '/api/billing/subscription/cancel',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiBillingContactVerifyRoute = ApiBillingContactVerifyRouteImport.update({
-  id: '/verify',
-  path: '/verify',
-  getParentRoute: () => ApiBillingContactRoute,
-} as any)
-const ApiBillingCheckoutSubscriptionRoute =
-  ApiBillingCheckoutSubscriptionRouteImport.update({
-    id: '/api/billing/checkout/subscription',
-    path: '/api/billing/checkout/subscription',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiBillingCheckoutStatusRoute =
-  ApiBillingCheckoutStatusRouteImport.update({
-    id: '/api/billing/checkout/status',
-    path: '/api/billing/checkout/status',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiBillingCheckoutCreditsRoute =
-  ApiBillingCheckoutCreditsRouteImport.update({
-    id: '/api/billing/checkout/credits',
-    path: '/api/billing/checkout/credits',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAlertsTriggersUnreadCountRoute =
-  ApiAlertsTriggersUnreadCountRouteImport.update({
-    id: '/api/alerts/triggers/unread-count',
-    path: '/api/alerts/triggers/unread-count',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAlertsTriggersIdRoute = ApiAlertsTriggersIdRouteImport.update({
-  id: '/api/alerts/triggers/$id',
-  path: '/api/alerts/triggers/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAlertsIdTestSendRoute = ApiAlertsIdTestSendRouteImport.update({
-  id: '/test-send',
-  path: '/test-send',
-  getParentRoute: () => ApiAlertsIdRoute,
-} as any)
-const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
-  id: '/api/admin/users/$userId',
-  path: '/api/admin/users/$userId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminStatusSnapshotRoute = ApiAdminStatusSnapshotRouteImport.update({
-  id: '/api/admin/status/snapshot',
-  path: '/api/admin/status/snapshot',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminSprintsRunWorkerRoute =
-  ApiAdminSprintsRunWorkerRouteImport.update({
-    id: '/api/admin/sprints/run-worker',
-    path: '/api/admin/sprints/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminSolutionsSourcesRoute =
-  ApiAdminSolutionsSourcesRouteImport.update({
-    id: '/api/admin/solutions/sources',
-    path: '/api/admin/solutions/sources',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminSolutionsGoldBriefsRoute =
-  ApiAdminSolutionsGoldBriefsRouteImport.update({
-    id: '/api/admin/solutions/gold-briefs',
-    path: '/api/admin/solutions/gold-briefs',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
-  id: '/api/admin/roadmap/$id',
-  path: '/api/admin/roadmap/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminOperationsSyncSchedulesRoute =
-  ApiAdminOperationsSyncSchedulesRouteImport.update({
-    id: '/api/admin/operations/sync-schedules',
-    path: '/api/admin/operations/sync-schedules',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminOperationsJobKeyRoute =
-  ApiAdminOperationsJobKeyRouteImport.update({
-    id: '/api/admin/operations/$jobKey',
-    path: '/api/admin/operations/$jobKey',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminMetricsTrustRoute = ApiAdminMetricsTrustRouteImport.update({
-  id: '/api/admin/metrics/trust',
-  path: '/api/admin/metrics/trust',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminMetricsSectionsRoute = ApiAdminMetricsSectionsRouteImport.update({
-  id: '/api/admin/metrics/sections',
-  path: '/api/admin/metrics/sections',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminMetricsRunRetentionRoute =
-  ApiAdminMetricsRunRetentionRouteImport.update({
-    id: '/api/admin/metrics/run-retention',
-    path: '/api/admin/metrics/run-retention',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminMetricsOverviewRoute = ApiAdminMetricsOverviewRouteImport.update({
-  id: '/api/admin/metrics/overview',
-  path: '/api/admin/metrics/overview',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminMetricsConversionRoute =
-  ApiAdminMetricsConversionRouteImport.update({
-    id: '/api/admin/metrics/conversion',
-    path: '/api/admin/metrics/conversion',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminLegalRunWorkerRoute = ApiAdminLegalRunWorkerRouteImport.update({
-  id: '/api/admin/legal/run-worker',
-  path: '/api/admin/legal/run-worker',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminInterviewsRunRetentionRoute =
-  ApiAdminInterviewsRunRetentionRouteImport.update({
-    id: '/api/admin/interviews/run-retention',
-    path: '/api/admin/interviews/run-retention',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminIncidentsIdRoute = ApiAdminIncidentsIdRouteImport.update({
-  id: '/api/admin/incidents/$id',
-  path: '/api/admin/incidents/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminEnrichmentRunWorkerRoute =
-  ApiAdminEnrichmentRunWorkerRouteImport.update({
-    id: '/api/admin/enrichment/run-worker',
-    path: '/api/admin/enrichment/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminEmbeddingsRunWorkerRoute =
-  ApiAdminEmbeddingsRunWorkerRouteImport.update({
-    id: '/api/admin/embeddings/run-worker',
-    path: '/api/admin/embeddings/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminDocumentsRunWorkerRoute =
-  ApiAdminDocumentsRunWorkerRouteImport.update({
-    id: '/api/admin/documents/run-worker',
-    path: '/api/admin/documents/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminDocumentsRunWebImportsRoute =
-  ApiAdminDocumentsRunWebImportsRouteImport.update({
-    id: '/api/admin/documents/run-web-imports',
-    path: '/api/admin/documents/run-web-imports',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminDiscoveryRunWorkerRoute =
-  ApiAdminDiscoveryRunWorkerRouteImport.update({
-    id: '/api/admin/discovery/run-worker',
-    path: '/api/admin/discovery/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminDevpostRunWorkerRoute =
-  ApiAdminDevpostRunWorkerRouteImport.update({
-    id: '/api/admin/devpost/run-worker',
-    path: '/api/admin/devpost/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
-  id: '/api/admin/changelog/$id',
-  path: '/api/admin/changelog/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminCalendarRunWorkerRoute =
-  ApiAdminCalendarRunWorkerRouteImport.update({
-    id: '/api/admin/calendar/run-worker',
-    path: '/api/admin/calendar/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminCalendarRunRemindersRoute =
-  ApiAdminCalendarRunRemindersRouteImport.update({
-    id: '/api/admin/calendar/run-reminders',
-    path: '/api/admin/calendar/run-reminders',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminBillingRunWorkerRoute =
-  ApiAdminBillingRunWorkerRouteImport.update({
-    id: '/api/admin/billing/run-worker',
-    path: '/api/admin/billing/run-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminBillingRiskExceptionsRoute =
-  ApiAdminBillingRiskExceptionsRouteImport.update({
-    id: '/api/admin/billing/risk-exceptions',
-    path: '/api/admin/billing/risk-exceptions',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminBillingRefundsRoute = ApiAdminBillingRefundsRouteImport.update({
-  id: '/api/admin/billing/refunds',
-  path: '/api/admin/billing/refunds',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminBillingReconcileRoute =
-  ApiAdminBillingReconcileRouteImport.update({
-    id: '/api/admin/billing/reconcile',
-    path: '/api/admin/billing/reconcile',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminBillingMetricsRoute = ApiAdminBillingMetricsRouteImport.update({
-  id: '/api/admin/billing/metrics',
-  path: '/api/admin/billing/metrics',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminBillingDisputesRoute = ApiAdminBillingDisputesRouteImport.update({
-  id: '/api/admin/billing/disputes',
-  path: '/api/admin/billing/disputes',
+const ApiAdminBillingBetaModeRoute = ApiAdminBillingBetaModeRouteImport.update({
+  id: '/api/admin/billing/beta-mode',
+  path: '/api/admin/billing/beta-mode',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdminBillingConfigurationRoute =
@@ -1641,229 +1187,570 @@ const ApiAdminBillingConfigurationRoute =
     path: '/api/admin/billing/configuration',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiAdminBillingBetaModeRoute = ApiAdminBillingBetaModeRouteImport.update({
-  id: '/api/admin/billing/beta-mode',
-  path: '/api/admin/billing/beta-mode',
+const ApiAdminBillingDisputesRoute = ApiAdminBillingDisputesRouteImport.update({
+  id: '/api/admin/billing/disputes',
+  path: '/api/admin/billing/disputes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAdminBillingAccountingExportRoute =
-  ApiAdminBillingAccountingExportRouteImport.update({
-    id: '/api/admin/billing/accounting-export',
-    path: '/api/admin/billing/accounting-export',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminAnalyticsRunRetentionRoute =
-  ApiAdminAnalyticsRunRetentionRouteImport.update({
-    id: '/api/admin/analytics/run-retention',
-    path: '/api/admin/analytics/run-retention',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
-  id: '/api/admin/alerts/run-worker',
-  path: '/api/admin/alerts/run-worker',
+const ApiAdminBillingMetricsRoute = ApiAdminBillingMetricsRouteImport.update({
+  id: '/api/admin/billing/metrics',
+  path: '/api/admin/billing/metrics',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAdminActivityRunRetentionRoute =
-  ApiAdminActivityRunRetentionRouteImport.update({
-    id: '/api/admin/activity/run-retention',
-    path: '/api/admin/activity/run-retention',
+const ApiAdminBillingReconcileRoute =
+  ApiAdminBillingReconcileRouteImport.update({
+    id: '/api/admin/billing/reconcile',
+    path: '/api/admin/billing/reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiAdminAbuseClustersRoute = ApiAdminAbuseClustersRouteImport.update({
-  id: '/api/admin/abuse/clusters',
-  path: '/api/admin/abuse/clusters',
+const ApiAdminBillingRefundsRoute = ApiAdminBillingRefundsRouteImport.update({
+  id: '/api/admin/billing/refunds',
+  path: '/api/admin/billing/refunds',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardSettingsBillingReturnRoute =
-  DashboardSettingsBillingReturnRouteImport.update({
-    id: '/return',
-    path: '/return',
-    getParentRoute: () => DashboardSettingsBillingRoute,
-  } as any)
-const DashboardInterviewsInterviewIdLiveRoute =
-  DashboardInterviewsInterviewIdLiveRouteImport.update({
-    id: '/interviews/$interviewId/live',
-    path: '/interviews/$interviewId/live',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const ApiPublicSchedulingInvitationIdIndexRoute =
-  ApiPublicSchedulingInvitationIdIndexRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/',
-    path: '/api/public/scheduling/$invitationId/',
+const ApiAdminBillingRiskExceptionsRoute =
+  ApiAdminBillingRiskExceptionsRouteImport.update({
+    id: '/api/admin/billing/risk-exceptions',
+    path: '/api/admin/billing/risk-exceptions',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiListsListIdItemsIndexRoute =
-  ApiListsListIdItemsIndexRouteImport.update({
-    id: '/items/',
-    path: '/items/',
-    getParentRoute: () => ApiListsListIdRoute,
-  } as any)
-const ApiInterviewsInterviewIdParticipantsIndexRoute =
-  ApiInterviewsInterviewIdParticipantsIndexRouteImport.update({
-    id: '/api/interviews/$interviewId/participants/',
-    path: '/api/interviews/$interviewId/participants/',
+const ApiAdminBillingRunWorkerRoute =
+  ApiAdminBillingRunWorkerRouteImport.update({
+    id: '/api/admin/billing/run-worker',
+    path: '/api/admin/billing/run-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiInterviewsInterviewIdBriefIndexRoute =
-  ApiInterviewsInterviewIdBriefIndexRouteImport.update({
-    id: '/api/interviews/$interviewId/brief/',
-    path: '/api/interviews/$interviewId/brief/',
+const ApiAdminBuilderClaimsIndexRoute =
+  ApiAdminBuilderClaimsIndexRouteImport.update({
+    id: '/api/admin/builder-claims/',
+    path: '/api/admin/builder-claims/',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiBuildersBuilderIdEvidenceIndexRoute =
-  ApiBuildersBuilderIdEvidenceIndexRouteImport.update({
-    id: '/evidence/',
-    path: '/evidence/',
+const ApiAdminCalendarRunRemindersRoute =
+  ApiAdminCalendarRunRemindersRouteImport.update({
+    id: '/api/admin/calendar/run-reminders',
+    path: '/api/admin/calendar/run-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminCalendarRunWorkerRoute =
+  ApiAdminCalendarRunWorkerRouteImport.update({
+    id: '/api/admin/calendar/run-worker',
+    path: '/api/admin/calendar/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminChangelogIndexRoute = ApiAdminChangelogIndexRouteImport.update({
+  id: '/api/admin/changelog/',
+  path: '/api/admin/changelog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
+  id: '/api/admin/changelog/$id',
+  path: '/api/admin/changelog/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminDevpostRunWorkerRoute =
+  ApiAdminDevpostRunWorkerRouteImport.update({
+    id: '/api/admin/devpost/run-worker',
+    path: '/api/admin/devpost/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminDiscoveryRunWorkerRoute =
+  ApiAdminDiscoveryRunWorkerRouteImport.update({
+    id: '/api/admin/discovery/run-worker',
+    path: '/api/admin/discovery/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminDocumentsRunWebImportsRoute =
+  ApiAdminDocumentsRunWebImportsRouteImport.update({
+    id: '/api/admin/documents/run-web-imports',
+    path: '/api/admin/documents/run-web-imports',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminDocumentsRunWorkerRoute =
+  ApiAdminDocumentsRunWorkerRouteImport.update({
+    id: '/api/admin/documents/run-worker',
+    path: '/api/admin/documents/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminEmbeddingsRunWorkerRoute =
+  ApiAdminEmbeddingsRunWorkerRouteImport.update({
+    id: '/api/admin/embeddings/run-worker',
+    path: '/api/admin/embeddings/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminEnrichmentRunWorkerRoute =
+  ApiAdminEnrichmentRunWorkerRouteImport.update({
+    id: '/api/admin/enrichment/run-worker',
+    path: '/api/admin/enrichment/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminHumanLinksIndexRoute = ApiAdminHumanLinksIndexRouteImport.update({
+  id: '/api/admin/human-links/',
+  path: '/api/admin/human-links/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminIncidentsIndexRoute = ApiAdminIncidentsIndexRouteImport.update({
+  id: '/api/admin/incidents/',
+  path: '/api/admin/incidents/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminIncidentsIdRoute = ApiAdminIncidentsIdRouteImport.update({
+  id: '/api/admin/incidents/$id',
+  path: '/api/admin/incidents/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminIntegrationsIndexRoute =
+  ApiAdminIntegrationsIndexRouteImport.update({
+    id: '/api/admin/integrations/',
+    path: '/api/admin/integrations/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminInterviewsRunRetentionRoute =
+  ApiAdminInterviewsRunRetentionRouteImport.update({
+    id: '/api/admin/interviews/run-retention',
+    path: '/api/admin/interviews/run-retention',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminLegalRunWorkerRoute = ApiAdminLegalRunWorkerRouteImport.update({
+  id: '/api/admin/legal/run-worker',
+  path: '/api/admin/legal/run-worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMetricsIndexRoute = ApiAdminMetricsIndexRouteImport.update({
+  id: '/api/admin/metrics/',
+  path: '/api/admin/metrics/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMetricsConversionRoute =
+  ApiAdminMetricsConversionRouteImport.update({
+    id: '/api/admin/metrics/conversion',
+    path: '/api/admin/metrics/conversion',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminMetricsOverviewRoute = ApiAdminMetricsOverviewRouteImport.update({
+  id: '/api/admin/metrics/overview',
+  path: '/api/admin/metrics/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMetricsRunRetentionRoute =
+  ApiAdminMetricsRunRetentionRouteImport.update({
+    id: '/api/admin/metrics/run-retention',
+    path: '/api/admin/metrics/run-retention',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminMetricsSectionsRoute = ApiAdminMetricsSectionsRouteImport.update({
+  id: '/api/admin/metrics/sections',
+  path: '/api/admin/metrics/sections',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMetricsTrustRoute = ApiAdminMetricsTrustRouteImport.update({
+  id: '/api/admin/metrics/trust',
+  path: '/api/admin/metrics/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminOperationsIndexRoute = ApiAdminOperationsIndexRouteImport.update({
+  id: '/api/admin/operations/',
+  path: '/api/admin/operations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminOperationsJobKeyRoute =
+  ApiAdminOperationsJobKeyRouteImport.update({
+    id: '/api/admin/operations/$jobKey',
+    path: '/api/admin/operations/$jobKey',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminOperationsSyncSchedulesRoute =
+  ApiAdminOperationsSyncSchedulesRouteImport.update({
+    id: '/api/admin/operations/sync-schedules',
+    path: '/api/admin/operations/sync-schedules',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminRoadmapIndexRoute = ApiAdminRoadmapIndexRouteImport.update({
+  id: '/api/admin/roadmap/',
+  path: '/api/admin/roadmap/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
+  id: '/api/admin/roadmap/$id',
+  path: '/api/admin/roadmap/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSeoIndexRoute = ApiAdminSeoIndexRouteImport.update({
+  id: '/api/admin/seo/',
+  path: '/api/admin/seo/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSolutionsGoldBriefsRoute =
+  ApiAdminSolutionsGoldBriefsRouteImport.update({
+    id: '/api/admin/solutions/gold-briefs',
+    path: '/api/admin/solutions/gold-briefs',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminSolutionsSourcesRoute =
+  ApiAdminSolutionsSourcesRouteImport.update({
+    id: '/api/admin/solutions/sources',
+    path: '/api/admin/solutions/sources',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminSprintsRunWorkerRoute =
+  ApiAdminSprintsRunWorkerRouteImport.update({
+    id: '/api/admin/sprints/run-worker',
+    path: '/api/admin/sprints/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminStatusSnapshotRoute = ApiAdminStatusSnapshotRouteImport.update({
+  id: '/api/admin/status/snapshot',
+  path: '/api/admin/status/snapshot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUsersIndexRoute = ApiAdminUsersIndexRouteImport.update({
+  id: '/api/admin/users/',
+  path: '/api/admin/users/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
+  id: '/api/admin/users/$userId',
+  path: '/api/admin/users/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsIdTestSendRoute = ApiAlertsIdTestSendRouteImport.update({
+  id: '/test-send',
+  path: '/test-send',
+  getParentRoute: () => ApiAlertsIdRoute,
+} as any)
+const ApiAlertsTriggersIndexRoute = ApiAlertsTriggersIndexRouteImport.update({
+  id: '/api/alerts/triggers/',
+  path: '/api/alerts/triggers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsTriggersIdRoute = ApiAlertsTriggersIdRouteImport.update({
+  id: '/api/alerts/triggers/$id',
+  path: '/api/alerts/triggers/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsTriggersUnreadCountRoute =
+  ApiAlertsTriggersUnreadCountRouteImport.update({
+    id: '/api/alerts/triggers/unread-count',
+    path: '/api/alerts/triggers/unread-count',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingCheckoutCreditsRoute =
+  ApiBillingCheckoutCreditsRouteImport.update({
+    id: '/api/billing/checkout/credits',
+    path: '/api/billing/checkout/credits',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingCheckoutStatusRoute =
+  ApiBillingCheckoutStatusRouteImport.update({
+    id: '/api/billing/checkout/status',
+    path: '/api/billing/checkout/status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingCheckoutSubscriptionRoute =
+  ApiBillingCheckoutSubscriptionRouteImport.update({
+    id: '/api/billing/checkout/subscription',
+    path: '/api/billing/checkout/subscription',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingContactVerifyRoute = ApiBillingContactVerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => ApiBillingContactRoute,
+} as any)
+const ApiBillingSubscriptionCancelRoute =
+  ApiBillingSubscriptionCancelRouteImport.update({
+    id: '/api/billing/subscription/cancel',
+    path: '/api/billing/subscription/cancel',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingSubscriptionChangeRoute =
+  ApiBillingSubscriptionChangeRouteImport.update({
+    id: '/api/billing/subscription/change',
+    path: '/api/billing/subscription/change',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingSubscriptionPreviewRoute =
+  ApiBillingSubscriptionPreviewRouteImport.update({
+    id: '/api/billing/subscription/preview',
+    path: '/api/billing/subscription/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBuildersBuilderIdClaimRoute =
+  ApiBuildersBuilderIdClaimRouteImport.update({
+    id: '/claim',
+    path: '/claim',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdEnrichmentRoute =
+  ApiBuildersBuilderIdEnrichmentRouteImport.update({
+    id: '/enrichment',
+    path: '/enrichment',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdEvidenceRefreshRoute =
+  ApiBuildersBuilderIdEvidenceRefreshRouteImport.update({
+    id: '/evidence-refresh',
+    path: '/evidence-refresh',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdFingerprintRoute =
+  ApiBuildersBuilderIdFingerprintRouteImport.update({
+    id: '/fingerprint',
+    path: '/fingerprint',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdHygieneRoute =
+  ApiBuildersBuilderIdHygieneRouteImport.update({
+    id: '/hygiene',
+    path: '/hygiene',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdNotesRoute =
+  ApiBuildersBuilderIdNotesRouteImport.update({
+    id: '/notes',
+    path: '/notes',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdSynergyRoute =
+  ApiBuildersBuilderIdSynergyRouteImport.update({
+    id: '/synergy',
+    path: '/synergy',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdTimelineRoute =
+  ApiBuildersBuilderIdTimelineRouteImport.update({
+    id: '/timeline',
+    path: '/timeline',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdViewsRoute =
+  ApiBuildersBuilderIdViewsRouteImport.update({
+    id: '/views',
+    path: '/views',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersClaimCandidatesRoute =
+  ApiBuildersClaimCandidatesRouteImport.update({
+    id: '/api/builders/claim/candidates',
+    path: '/api/builders/claim/candidates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBuildersClaimVerifyRoute = ApiBuildersClaimVerifyRouteImport.update({
+  id: '/api/builders/claim/verify',
+  path: '/api/builders/claim/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBuildersRecentIndexRoute = ApiBuildersRecentIndexRouteImport.update({
+  id: '/api/builders/recent/',
+  path: '/api/builders/recent/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarAvailabilityIndexRoute =
+  ApiCalendarAvailabilityIndexRouteImport.update({
+    id: '/api/calendar/availability/',
+    path: '/api/calendar/availability/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiCalendarAvailabilityOverridesRoute =
+  ApiCalendarAvailabilityOverridesRouteImport.update({
+    id: '/api/calendar/availability/overrides',
+    path: '/api/calendar/availability/overrides',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiCalendarEventsIndexRoute = ApiCalendarEventsIndexRouteImport.update({
+  id: '/api/calendar/events/',
+  path: '/api/calendar/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarEventsEventIdRoute =
+  ApiCalendarEventsEventIdRouteImport.update({
+    id: '/api/calendar/events/$eventId',
+    path: '/api/calendar/events/$eventId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdFinalizeRoute =
+  ApiInterviewsInterviewIdFinalizeRouteImport.update({
+    id: '/api/interviews/$interviewId/finalize',
+    path: '/api/interviews/$interviewId/finalize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdReportRoute =
+  ApiInterviewsInterviewIdReportRouteImport.update({
+    id: '/api/interviews/$interviewId/report',
+    path: '/api/interviews/$interviewId/report',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdSegmentsRoute =
+  ApiInterviewsInterviewIdSegmentsRouteImport.update({
+    id: '/api/interviews/$interviewId/segments',
+    path: '/api/interviews/$interviewId/segments',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdSessionRoute =
+  ApiInterviewsInterviewIdSessionRouteImport.update({
+    id: '/api/interviews/$interviewId/session',
+    path: '/api/interviews/$interviewId/session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdSuggestionsRoute =
+  ApiInterviewsInterviewIdSuggestionsRouteImport.update({
+    id: '/api/interviews/$interviewId/suggestions',
+    path: '/api/interviews/$interviewId/suggestions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdTranscriptionTokenRoute =
+  ApiInterviewsInterviewIdTranscriptionTokenRouteImport.update({
+    id: '/api/interviews/$interviewId/transcription-token',
+    path: '/api/interviews/$interviewId/transcription-token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiMeBuilderIndexRoute = ApiMeBuilderIndexRouteImport.update({
+  id: '/api/me/builder/',
+  path: '/api/me/builder/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeBuilderBuilderIdRoute = ApiMeBuilderBuilderIdRouteImport.update({
+  id: '/api/me/builder/$builderId',
+  path: '/api/me/builder/$builderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeBuildersIndexRoute = ApiMeBuildersIndexRouteImport.update({
+  id: '/api/me/builders/',
+  path: '/api/me/builders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeDataExportIndexRoute = ApiMeDataExportIndexRouteImport.update({
+  id: '/api/me/data-export/',
+  path: '/api/me/data-export/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeDataExportIdRoute = ApiMeDataExportIdRouteImport.update({
+  id: '/api/me/data-export/$id',
+  path: '/api/me/data-export/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeDeleteAccountIndexRoute = ApiMeDeleteAccountIndexRouteImport.update({
+  id: '/api/me/delete-account/',
+  path: '/api/me/delete-account/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMePreferencesIndexRoute = ApiMePreferencesIndexRouteImport.update({
+  id: '/api/me/preferences/',
+  path: '/api/me/preferences/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
+  id: '/api/me/sessions/',
+  path: '/api/me/sessions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeStepupIndexRoute = ApiMeStepupIndexRouteImport.update({
+  id: '/api/me/stepup/',
+  path: '/api/me/stepup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingV2IndexRoute = ApiOnboardingV2IndexRouteImport.update({
+  id: '/api/onboarding/v2/',
+  path: '/api/onboarding/v2/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrganizationsDeletionImmediateRoute =
+  ApiOrganizationsDeletionImmediateRouteImport.update({
+    id: '/immediate',
+    path: '/immediate',
+    getParentRoute: () => ApiOrganizationsDeletionRoute,
+  } as any)
+const ApiOrganizationsInvitationsIndexRoute =
+  ApiOrganizationsInvitationsIndexRouteImport.update({
+    id: '/api/organizations/invitations/',
+    path: '/api/organizations/invitations/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOrganizationsInvitationsInvitationIdRoute =
+  ApiOrganizationsInvitationsInvitationIdRouteImport.update({
+    id: '/api/organizations/invitations/$invitationId',
+    path: '/api/organizations/invitations/$invitationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOrganizationsInvitationsMineRoute =
+  ApiOrganizationsInvitationsMineRouteImport.update({
+    id: '/api/organizations/invitations/mine',
+    path: '/api/organizations/invitations/mine',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOrganizationsMembersMemberIdRoute =
+  ApiOrganizationsMembersMemberIdRouteImport.update({
+    id: '/api/organizations/members/$memberId',
+    path: '/api/organizations/members/$memberId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOrganizationsTeamInvitationsRoute =
+  ApiOrganizationsTeamInvitationsRouteImport.update({
+    id: '/invitations',
+    path: '/invitations',
+    getParentRoute: () => ApiOrganizationsTeamRoute,
+  } as any)
+const ApiOrganizationsTeamMembersRoute =
+  ApiOrganizationsTeamMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => ApiOrganizationsTeamRoute,
+  } as any)
+const ApiPrivacyProfileRemovalVerifyRoute =
+  ApiPrivacyProfileRemovalVerifyRouteImport.update({
+    id: '/verify',
+    path: '/verify',
+    getParentRoute: () => ApiPrivacyProfileRemovalRoute,
+  } as any)
+const ApiQueriesIdFeedCapabilityRoute =
+  ApiQueriesIdFeedCapabilityRouteImport.update({
+    id: '/api/queries/$id/feed-capability',
+    path: '/api/queries/$id/feed-capability',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiQueriesIdShareRoute = ApiQueriesIdShareRouteImport.update({
+  id: '/api/queries/$id/share',
+  path: '/api/queries/$id/share',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiQueriesIdVisibilityRoute = ApiQueriesIdVisibilityRouteImport.update({
+  id: '/api/queries/$id/visibility',
+  path: '/api/queries/$id/visibility',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSchedulingInvitationsIndexRoute =
+  ApiSchedulingInvitationsIndexRouteImport.update({
+    id: '/api/scheduling/invitations/',
+    path: '/api/scheduling/invitations/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSchedulingInvitationsInvitationIdRoute =
+  ApiSchedulingInvitationsInvitationIdRouteImport.update({
+    id: '/api/scheduling/invitations/$invitationId',
+    path: '/api/scheduling/invitations/$invitationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSolutionsBriefsBriefIdRoute =
+  ApiSolutionsBriefsBriefIdRouteImport.update({
+    id: '/$briefId',
+    path: '/$briefId',
+    getParentRoute: () => ApiSolutionsBriefsRoute,
+  } as any)
+const ApiSolutionsRunsRunIdRoute = ApiSolutionsRunsRunIdRouteImport.update({
+  id: '/$runId',
+  path: '/$runId',
+  getParentRoute: () => ApiSolutionsRunsRoute,
+} as any)
+const ApiSprintsSprintIdResultsRoute =
+  ApiSprintsSprintIdResultsRouteImport.update({
+    id: '/results',
+    path: '/results',
+    getParentRoute: () => ApiSprintsSprintIdRoute,
   } as any)
 const ApiAdminBillingEventsIndexRoute =
   ApiAdminBillingEventsIndexRouteImport.update({
     id: '/api/admin/billing/events/',
     path: '/api/admin/billing/events/',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiSchedulingInvitationsInvitationIdSendRoute =
-  ApiSchedulingInvitationsInvitationIdSendRouteImport.update({
-    id: '/send',
-    path: '/send',
-    getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
-  } as any)
-const ApiSchedulingInvitationsInvitationIdRevokeRoute =
-  ApiSchedulingInvitationsInvitationIdRevokeRouteImport.update({
-    id: '/revoke',
-    path: '/revoke',
-    getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
-  } as any)
-const ApiPublicSchedulingInvitationIdWithdrawRoute =
-  ApiPublicSchedulingInvitationIdWithdrawRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/withdraw',
-    path: '/api/public/scheduling/$invitationId/withdraw',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdUploadsRoute =
-  ApiPublicSchedulingInvitationIdUploadsRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/uploads',
-    path: '/api/public/scheduling/$invitationId/uploads',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdSubmissionRoute =
-  ApiPublicSchedulingInvitationIdSubmissionRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/submission',
-    path: '/api/public/scheduling/$invitationId/submission',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdSlotsRoute =
-  ApiPublicSchedulingInvitationIdSlotsRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/slots',
-    path: '/api/public/scheduling/$invitationId/slots',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdSessionRoute =
-  ApiPublicSchedulingInvitationIdSessionRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/session',
-    path: '/api/public/scheduling/$invitationId/session',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdRescheduleRoute =
-  ApiPublicSchedulingInvitationIdRescheduleRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/reschedule',
-    path: '/api/public/scheduling/$invitationId/reschedule',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdDeclineRoute =
-  ApiPublicSchedulingInvitationIdDeclineRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/decline',
-    path: '/api/public/scheduling/$invitationId/decline',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdCancelRoute =
-  ApiPublicSchedulingInvitationIdCancelRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/cancel',
-    path: '/api/public/scheduling/$invitationId/cancel',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSchedulingInvitationIdBookRoute =
-  ApiPublicSchedulingInvitationIdBookRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/book',
-    path: '/api/public/scheduling/$invitationId/book',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiOrganizationsInvitationsInvitationIdReviewRoute =
-  ApiOrganizationsInvitationsInvitationIdReviewRouteImport.update({
-    id: '/review',
-    path: '/review',
-    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
-  } as any)
-const ApiOrganizationsInvitationsInvitationIdRejectRoute =
-  ApiOrganizationsInvitationsInvitationIdRejectRouteImport.update({
-    id: '/reject',
-    path: '/reject',
-    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
-  } as any)
-const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
-  ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
-    id: '/accept',
-    path: '/accept',
-    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
-  } as any)
-const ApiMeBuilderBuilderIdRestrictProcessingRoute =
-  ApiMeBuilderBuilderIdRestrictProcessingRouteImport.update({
-    id: '/restrict-processing',
-    path: '/restrict-processing',
-    getParentRoute: () => ApiMeBuilderBuilderIdRoute,
-  } as any)
-const ApiMeBuilderBuilderIdEvidenceProvenanceRoute =
-  ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport.update({
-    id: '/evidence-provenance',
-    path: '/evidence-provenance',
-    getParentRoute: () => ApiMeBuilderBuilderIdRoute,
-  } as any)
-const ApiMeBuilderClaimsClaimIdPortfolioRoute =
-  ApiMeBuilderClaimsClaimIdPortfolioRouteImport.update({
-    id: '/api/me/builder-claims/$claimId/portfolio',
-    path: '/api/me/builder-claims/$claimId/portfolio',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiListsListIdItemsItemIdRoute =
-  ApiListsListIdItemsItemIdRouteImport.update({
-    id: '/items/$itemId',
-    path: '/items/$itemId',
-    getParentRoute: () => ApiListsListIdRoute,
-  } as any)
-const ApiInterviewsInterviewIdParticipantsParticipantIdRoute =
-  ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport.update({
-    id: '/api/interviews/$interviewId/participants/$participantId',
-    path: '/api/interviews/$interviewId/participants/$participantId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiInterviewsInterviewIdBriefVersionRoute =
-  ApiInterviewsInterviewIdBriefVersionRouteImport.update({
-    id: '/api/interviews/$interviewId/brief/$version',
-    path: '/api/interviews/$interviewId/brief/$version',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
-  ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport.update({
-    id: '/evidence/$evidenceId',
-    path: '/evidence/$evidenceId',
-    getParentRoute: () => ApiBuildersBuilderIdRoute,
-  } as any)
-const ApiBuildersBuilderIdClaimVerifyRoute =
-  ApiBuildersBuilderIdClaimVerifyRouteImport.update({
-    id: '/verify',
-    path: '/verify',
-    getParentRoute: () => ApiBuildersBuilderIdClaimRoute,
-  } as any)
-const ApiAdminOperationsJobKeyRunRoute =
-  ApiAdminOperationsJobKeyRunRouteImport.update({
-    id: '/run',
-    path: '/run',
-    getParentRoute: () => ApiAdminOperationsJobKeyRoute,
-  } as any)
-const ApiAdminBuilderClaimsClaimIdRevokeRoute =
-  ApiAdminBuilderClaimsClaimIdRevokeRouteImport.update({
-    id: '/api/admin/builder-claims/$claimId/revoke',
-    path: '/api/admin/builder-claims/$claimId/revoke',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiAdminBillingEventsEventIdRoute =
@@ -1872,11 +1759,185 @@ const ApiAdminBillingEventsEventIdRoute =
     path: '/api/admin/billing/events/$eventId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute =
-  ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport.update({
-    id: '/unpublish',
-    path: '/unpublish',
-    getParentRoute: () => ApiMeBuilderClaimsClaimIdPortfolioRoute,
+const ApiAdminBuilderClaimsClaimIdRevokeRoute =
+  ApiAdminBuilderClaimsClaimIdRevokeRouteImport.update({
+    id: '/api/admin/builder-claims/$claimId/revoke',
+    path: '/api/admin/builder-claims/$claimId/revoke',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminOperationsJobKeyRunRoute =
+  ApiAdminOperationsJobKeyRunRouteImport.update({
+    id: '/run',
+    path: '/run',
+    getParentRoute: () => ApiAdminOperationsJobKeyRoute,
+  } as any)
+const ApiBuildersBuilderIdClaimVerifyRoute =
+  ApiBuildersBuilderIdClaimVerifyRouteImport.update({
+    id: '/verify',
+    path: '/verify',
+    getParentRoute: () => ApiBuildersBuilderIdClaimRoute,
+  } as any)
+const ApiBuildersBuilderIdEvidenceIndexRoute =
+  ApiBuildersBuilderIdEvidenceIndexRouteImport.update({
+    id: '/evidence/',
+    path: '/evidence/',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
+  ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport.update({
+    id: '/evidence/$evidenceId',
+    path: '/evidence/$evidenceId',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiInterviewsInterviewIdBriefIndexRoute =
+  ApiInterviewsInterviewIdBriefIndexRouteImport.update({
+    id: '/api/interviews/$interviewId/brief/',
+    path: '/api/interviews/$interviewId/brief/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdBriefVersionRoute =
+  ApiInterviewsInterviewIdBriefVersionRouteImport.update({
+    id: '/api/interviews/$interviewId/brief/$version',
+    path: '/api/interviews/$interviewId/brief/$version',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdParticipantsIndexRoute =
+  ApiInterviewsInterviewIdParticipantsIndexRouteImport.update({
+    id: '/api/interviews/$interviewId/participants/',
+    path: '/api/interviews/$interviewId/participants/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdParticipantsParticipantIdRoute =
+  ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport.update({
+    id: '/api/interviews/$interviewId/participants/$participantId',
+    path: '/api/interviews/$interviewId/participants/$participantId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiListsListIdItemsIndexRoute =
+  ApiListsListIdItemsIndexRouteImport.update({
+    id: '/items/',
+    path: '/items/',
+    getParentRoute: () => ApiListsListIdRoute,
+  } as any)
+const ApiListsListIdItemsItemIdRoute =
+  ApiListsListIdItemsItemIdRouteImport.update({
+    id: '/items/$itemId',
+    path: '/items/$itemId',
+    getParentRoute: () => ApiListsListIdRoute,
+  } as any)
+const ApiMeBuilderClaimsClaimIdPortfolioRoute =
+  ApiMeBuilderClaimsClaimIdPortfolioRouteImport.update({
+    id: '/api/me/builder-claims/$claimId/portfolio',
+    path: '/api/me/builder-claims/$claimId/portfolio',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiMeBuilderBuilderIdEvidenceProvenanceRoute =
+  ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport.update({
+    id: '/evidence-provenance',
+    path: '/evidence-provenance',
+    getParentRoute: () => ApiMeBuilderBuilderIdRoute,
+  } as any)
+const ApiMeBuilderBuilderIdRestrictProcessingRoute =
+  ApiMeBuilderBuilderIdRestrictProcessingRouteImport.update({
+    id: '/restrict-processing',
+    path: '/restrict-processing',
+    getParentRoute: () => ApiMeBuilderBuilderIdRoute,
+  } as any)
+const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
+  ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
+    id: '/accept',
+    path: '/accept',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
+  } as any)
+const ApiOrganizationsInvitationsInvitationIdRejectRoute =
+  ApiOrganizationsInvitationsInvitationIdRejectRouteImport.update({
+    id: '/reject',
+    path: '/reject',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
+  } as any)
+const ApiOrganizationsInvitationsInvitationIdReviewRoute =
+  ApiOrganizationsInvitationsInvitationIdReviewRouteImport.update({
+    id: '/review',
+    path: '/review',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
+  } as any)
+const ApiPublicSchedulingInvitationIdIndexRoute =
+  ApiPublicSchedulingInvitationIdIndexRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/',
+    path: '/api/public/scheduling/$invitationId/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdBookRoute =
+  ApiPublicSchedulingInvitationIdBookRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/book',
+    path: '/api/public/scheduling/$invitationId/book',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdCancelRoute =
+  ApiPublicSchedulingInvitationIdCancelRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/cancel',
+    path: '/api/public/scheduling/$invitationId/cancel',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdDeclineRoute =
+  ApiPublicSchedulingInvitationIdDeclineRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/decline',
+    path: '/api/public/scheduling/$invitationId/decline',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdRescheduleRoute =
+  ApiPublicSchedulingInvitationIdRescheduleRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/reschedule',
+    path: '/api/public/scheduling/$invitationId/reschedule',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdSessionRoute =
+  ApiPublicSchedulingInvitationIdSessionRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/session',
+    path: '/api/public/scheduling/$invitationId/session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdSlotsRoute =
+  ApiPublicSchedulingInvitationIdSlotsRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/slots',
+    path: '/api/public/scheduling/$invitationId/slots',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdSubmissionRoute =
+  ApiPublicSchedulingInvitationIdSubmissionRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/submission',
+    path: '/api/public/scheduling/$invitationId/submission',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdUploadsRoute =
+  ApiPublicSchedulingInvitationIdUploadsRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/uploads',
+    path: '/api/public/scheduling/$invitationId/uploads',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdWithdrawRoute =
+  ApiPublicSchedulingInvitationIdWithdrawRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/withdraw',
+    path: '/api/public/scheduling/$invitationId/withdraw',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSchedulingInvitationsInvitationIdRevokeRoute =
+  ApiSchedulingInvitationsInvitationIdRevokeRouteImport.update({
+    id: '/revoke',
+    path: '/revoke',
+    getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
+  } as any)
+const ApiSchedulingInvitationsInvitationIdSendRoute =
+  ApiSchedulingInvitationsInvitationIdSendRouteImport.update({
+    id: '/send',
+    path: '/send',
+    getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
+  } as any)
+const ApiAdminBillingEventsEventIdReplayRoute =
+  ApiAdminBillingEventsEventIdReplayRouteImport.update({
+    id: '/replay',
+    path: '/replay',
+    getParentRoute: () => ApiAdminBillingEventsEventIdRoute,
   } as any)
 const ApiMeBuilderClaimsClaimIdPortfolioPublishRoute =
   ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport.update({
@@ -1884,11 +1945,23 @@ const ApiMeBuilderClaimsClaimIdPortfolioPublishRoute =
     path: '/publish',
     getParentRoute: () => ApiMeBuilderClaimsClaimIdPortfolioRoute,
   } as any)
-const ApiAdminBillingEventsEventIdReplayRoute =
-  ApiAdminBillingEventsEventIdReplayRouteImport.update({
-    id: '/replay',
-    path: '/replay',
-    getParentRoute: () => ApiAdminBillingEventsEventIdRoute,
+const ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute =
+  ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport.update({
+    id: '/unpublish',
+    path: '/unpublish',
+    getParentRoute: () => ApiMeBuilderClaimsClaimIdPortfolioRoute,
+  } as any)
+const ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute =
+  ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/links/$linkId/import',
+    path: '/api/public/scheduling/$invitationId/links/$linkId/import',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRoute =
+  ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRouteImport.update({
+    id: '/$documentId/complete',
+    path: '/$documentId/complete',
+    getParentRoute: () => ApiPublicSchedulingInvitationIdUploadsRoute,
   } as any)
 const ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRoute =
   ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRouteImport.update(
@@ -1898,18 +1971,6 @@ const ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRoute =
       getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
     } as any,
   )
-const ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRoute =
-  ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRouteImport.update({
-    id: '/$documentId/complete',
-    path: '/$documentId/complete',
-    getParentRoute: () => ApiPublicSchedulingInvitationIdUploadsRoute,
-  } as any)
-const ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute =
-  ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport.update({
-    id: '/api/public/scheduling/$invitationId/links/$linkId/import',
-    path: '/api/public/scheduling/$invitationId/links/$linkId/import',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
@@ -1932,6 +1993,9 @@ export interface FileRoutesByFullPath {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/building': typeof OnboardingBuildingRoute
+  '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -1965,6 +2029,9 @@ export interface FileRoutesByFullPath {
   '/team/activity': typeof DashboardTeamActivityRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
+  '/for/builders': typeof LandingForBuildersRoute
+  '/for/hiring-teams': typeof LandingForHiringTeamsRoute
+  '/for/investors': typeof LandingForInvestorsRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -1991,6 +2058,7 @@ export interface FileRoutesByFullPath {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/context': typeof ApiDashboardContextRoute
   '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
@@ -2116,6 +2184,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
+  '/api/builders/claim/candidates': typeof ApiBuildersClaimCandidatesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2165,8 +2234,10 @@ export interface FileRoutesByFullPath {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences/': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
+  '/api/onboarding/v2/': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -2227,6 +2298,9 @@ export interface FileRoutesByTo {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/building': typeof OnboardingBuildingRoute
+  '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2259,6 +2333,9 @@ export interface FileRoutesByTo {
   '/team/activity': typeof DashboardTeamActivityRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
+  '/for/builders': typeof LandingForBuildersRoute
+  '/for/hiring-teams': typeof LandingForHiringTeamsRoute
+  '/for/investors': typeof LandingForInvestorsRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -2285,6 +2362,7 @@ export interface FileRoutesByTo {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/context': typeof ApiDashboardContextRoute
   '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
@@ -2410,6 +2488,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
+  '/api/builders/claim/candidates': typeof ApiBuildersClaimCandidatesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2459,8 +2538,10 @@ export interface FileRoutesByTo {
   '/api/me/builders': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup': typeof ApiMeStepupIndexRoute
+  '/api/onboarding/v2': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -2524,6 +2605,9 @@ export interface FileRoutesById {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/building': typeof OnboardingBuildingRoute
+  '/onboarding/goal': typeof OnboardingGoalRoute
+  '/onboarding/investing': typeof OnboardingInvestingRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
@@ -2558,6 +2642,9 @@ export interface FileRoutesById {
   '/_dashboard/team/activity': typeof DashboardTeamActivityRoute
   '/_landing/blog/$slug': typeof LandingBlogSlugRoute
   '/_landing/changelog/$slug': typeof LandingChangelogSlugRoute
+  '/_landing/for/builders': typeof LandingForBuildersRoute
+  '/_landing/for/hiring-teams': typeof LandingForHiringTeamsRoute
+  '/_landing/for/investors': typeof LandingForInvestorsRoute
   '/_landing/legal/cookies': typeof LandingLegalCookiesRoute
   '/_landing/legal/imprint': typeof LandingLegalImprintRoute
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -2584,6 +2671,7 @@ export interface FileRoutesById {
   '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
+  '/api/dashboard/context': typeof ApiDashboardContextRoute
   '/api/dashboard/organization-admin': typeof ApiDashboardOrganizationAdminRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/dashboard/preferences': typeof ApiDashboardPreferencesRoute
@@ -2709,6 +2797,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
+  '/api/builders/claim/candidates': typeof ApiBuildersClaimCandidatesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2758,8 +2847,10 @@ export interface FileRoutesById {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/preferences/': typeof ApiMePreferencesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
+  '/api/onboarding/v2/': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -2823,6 +2914,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/building'
+    | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -2856,6 +2950,9 @@ export interface FileRouteTypes {
     | '/team/activity'
     | '/blog/$slug'
     | '/changelog/$slug'
+    | '/for/builders'
+    | '/for/hiring-teams'
+    | '/for/investors'
     | '/legal/cookies'
     | '/legal/imprint'
     | '/legal/privacy'
@@ -2882,6 +2979,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/context'
     | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
@@ -3007,6 +3105,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/$builderId/views'
+    | '/api/builders/claim/candidates'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -3056,8 +3155,10 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/preferences/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
+    | '/api/onboarding/v2/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
     | '/api/admin/billing/events/$eventId'
@@ -3118,6 +3219,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/building'
+    | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3150,6 +3254,9 @@ export interface FileRouteTypes {
     | '/team/activity'
     | '/blog/$slug'
     | '/changelog/$slug'
+    | '/for/builders'
+    | '/for/hiring-teams'
+    | '/for/investors'
     | '/legal/cookies'
     | '/legal/imprint'
     | '/legal/privacy'
@@ -3176,6 +3283,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/context'
     | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
@@ -3301,6 +3409,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/$builderId/views'
+    | '/api/builders/claim/candidates'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -3350,8 +3459,10 @@ export interface FileRouteTypes {
     | '/api/me/builders'
     | '/api/me/data-export'
     | '/api/me/delete-account'
+    | '/api/me/preferences'
     | '/api/me/sessions'
     | '/api/me/stepup'
+    | '/api/onboarding/v2'
     | '/api/organizations/invitations'
     | '/api/scheduling/invitations'
     | '/api/admin/billing/events/$eventId'
@@ -3414,6 +3525,9 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
+    | '/onboarding/building'
+    | '/onboarding/goal'
+    | '/onboarding/investing'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
@@ -3448,6 +3562,9 @@ export interface FileRouteTypes {
     | '/_dashboard/team/activity'
     | '/_landing/blog/$slug'
     | '/_landing/changelog/$slug'
+    | '/_landing/for/builders'
+    | '/_landing/for/hiring-teams'
+    | '/_landing/for/investors'
     | '/_landing/legal/cookies'
     | '/_landing/legal/imprint'
     | '/_landing/legal/privacy'
@@ -3474,6 +3591,7 @@ export interface FileRouteTypes {
     | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
+    | '/api/dashboard/context'
     | '/api/dashboard/organization-admin'
     | '/api/dashboard/overview'
     | '/api/dashboard/preferences'
@@ -3599,6 +3717,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/$builderId/views'
+    | '/api/builders/claim/candidates'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -3648,8 +3767,10 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/preferences/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
+    | '/api/onboarding/v2/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
     | '/api/admin/billing/events/$eventId'
@@ -3726,6 +3847,7 @@ export interface RootRouteChildren {
   ApiCalendarFeedRoute: typeof ApiCalendarFeedRoute
   ApiCalendarNotificationsRoute: typeof ApiCalendarNotificationsRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
+  ApiDashboardContextRoute: typeof ApiDashboardContextRoute
   ApiDashboardOrganizationAdminRoute: typeof ApiDashboardOrganizationAdminRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
   ApiDashboardPreferencesRoute: typeof ApiDashboardPreferencesRoute
@@ -3825,6 +3947,7 @@ export interface RootRouteChildren {
   ApiBillingSubscriptionCancelRoute: typeof ApiBillingSubscriptionCancelRoute
   ApiBillingSubscriptionChangeRoute: typeof ApiBillingSubscriptionChangeRoute
   ApiBillingSubscriptionPreviewRoute: typeof ApiBillingSubscriptionPreviewRoute
+  ApiBuildersClaimCandidatesRoute: typeof ApiBuildersClaimCandidatesRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiCalendarAvailabilityOverridesRoute: typeof ApiCalendarAvailabilityOverridesRoute
   ApiCalendarEventsEventIdRoute: typeof ApiCalendarEventsEventIdRoute
@@ -3863,8 +3986,10 @@ export interface RootRouteChildren {
   ApiMeBuildersIndexRoute: typeof ApiMeBuildersIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
+  ApiMePreferencesIndexRoute: typeof ApiMePreferencesIndexRoute
   ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
+  ApiOnboardingV2IndexRoute: typeof ApiOnboardingV2IndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiSchedulingInvitationsIndexRoute: typeof ApiSchedulingInvitationsIndexRoute
   ApiAdminBillingEventsEventIdRoute: typeof ApiAdminBillingEventsEventIdRouteWithChildren
@@ -3890,32 +4015,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/robots.txt': {
-      id: '/robots.txt'
-      path: '/robots.txt'
-      fullPath: '/robots.txt'
-      preLoaderRoute: typeof RobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteRouteImport
+    '/_dashboard': {
+      id: '/_dashboard'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof DashboardRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_landing': {
@@ -3925,158 +4029,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandingRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_dashboard': {
-      id: '/_dashboard'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof DashboardRouteRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_dashboard/alerts': {
+      id: '/_dashboard/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof DashboardAlertsRouteImport
+      parentRoute: typeof DashboardRouteRoute
     }
     '/_landing/': {
       id: '/_landing/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof LandingIndexRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/schedule/$invitationId': {
-      id: '/schedule/$invitationId'
-      path: '/schedule/$invitationId'
-      fullPath: '/schedule/$invitationId'
-      preLoaderRoute: typeof ScheduleInvitationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/r/$slug': {
-      id: '/r/$slug'
-      path: '/r/$slug'
-      fullPath: '/r/$slug'
-      preLoaderRoute: typeof RSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portfolio/$claimId': {
-      id: '/portfolio/$claimId'
-      path: '/portfolio/$claimId'
-      fullPath: '/portfolio/$claimId'
-      preLoaderRoute: typeof PortfolioClaimIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding/welcome': {
-      id: '/onboarding/welcome'
-      path: '/welcome'
-      fullPath: '/onboarding/welcome'
-      preLoaderRoute: typeof OnboardingWelcomeRouteImport
-      parentRoute: typeof OnboardingRouteRoute
-    }
-    '/onboarding/success': {
-      id: '/onboarding/success'
-      path: '/success'
-      fullPath: '/onboarding/success'
-      preLoaderRoute: typeof OnboardingSuccessRouteImport
-      parentRoute: typeof OnboardingRouteRoute
-    }
-    '/onboarding/search': {
-      id: '/onboarding/search'
-      path: '/search'
-      fullPath: '/onboarding/search'
-      preLoaderRoute: typeof OnboardingSearchRouteImport
-      parentRoute: typeof OnboardingRouteRoute
-    }
-    '/onboarding/save': {
-      id: '/onboarding/save'
-      path: '/save'
-      fullPath: '/onboarding/save'
-      preLoaderRoute: typeof OnboardingSaveRouteImport
-      parentRoute: typeof OnboardingRouteRoute
-    }
-    '/builders/$builderId': {
-      id: '/builders/$builderId'
-      path: '/builders/$builderId'
-      fullPath: '/builders/$builderId'
-      preLoaderRoute: typeof BuildersBuilderIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/blog/atom.xml': {
-      id: '/blog/atom.xml'
-      path: '/blog/atom.xml'
-      fullPath: '/blog/atom.xml'
-      preLoaderRoute: typeof BlogAtomDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/sign-up': {
-      id: '/auth/sign-up'
-      path: '/sign-up'
-      fullPath: '/auth/sign-up'
-      preLoaderRoute: typeof AuthSignUpRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
-    '/auth/sign-in': {
-      id: '/auth/sign-in'
-      path: '/sign-in'
-      fullPath: '/auth/sign-in'
-      preLoaderRoute: typeof AuthSignInRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
-    '/auth/reset': {
-      id: '/auth/reset'
-      path: '/reset'
-      fullPath: '/auth/reset'
-      preLoaderRoute: typeof AuthResetRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
-    '/auth/forgot': {
-      id: '/auth/forgot'
-      path: '/forgot'
-      fullPath: '/auth/forgot'
-      preLoaderRoute: typeof AuthForgotRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
-    '/api/health': {
-      id: '/api/health'
-      path: '/api/health'
-      fullPath: '/api/health'
-      preLoaderRoute: typeof ApiHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/beta-mode': {
-      id: '/api/beta-mode'
-      path: '/api/beta-mode'
-      fullPath: '/api/beta-mode'
-      preLoaderRoute: typeof ApiBetaModeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_landing/status': {
-      id: '/_landing/status'
-      path: '/status'
-      fullPath: '/status'
-      preLoaderRoute: typeof LandingStatusRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/security': {
-      id: '/_landing/security'
-      path: '/security'
-      fullPath: '/security'
-      preLoaderRoute: typeof LandingSecurityRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/roadmap': {
-      id: '/_landing/roadmap'
-      path: '/roadmap'
-      fullPath: '/roadmap'
-      preLoaderRoute: typeof LandingRoadmapRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/pricing': {
-      id: '/_landing/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof LandingPricingRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/crawler': {
-      id: '/_landing/crawler'
-      path: '/crawler'
-      fullPath: '/crawler'
-      preLoaderRoute: typeof LandingCrawlerRouteImport
       parentRoute: typeof LandingRouteRoute
     }
     '/_landing/changelog': {
@@ -4086,830 +4078,172 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandingChangelogRouteImport
       parentRoute: typeof LandingRouteRoute
     }
-    '/_dashboard/alerts': {
-      id: '/_dashboard/alerts'
-      path: '/alerts'
-      fullPath: '/alerts'
-      preLoaderRoute: typeof DashboardAlertsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/api/work-samples/': {
-      id: '/api/work-samples/'
-      path: '/api/work-samples'
-      fullPath: '/api/work-samples/'
-      preLoaderRoute: typeof ApiWorkSamplesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/status/': {
-      id: '/api/status/'
-      path: '/api/status'
-      fullPath: '/api/status/'
-      preLoaderRoute: typeof ApiStatusIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sprints/': {
-      id: '/api/sprints/'
-      path: '/api/sprints'
-      fullPath: '/api/sprints/'
-      preLoaderRoute: typeof ApiSprintsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/roadmap/': {
-      id: '/api/roadmap/'
-      path: '/api/roadmap'
-      fullPath: '/api/roadmap/'
-      preLoaderRoute: typeof ApiRoadmapIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/recommendations/': {
-      id: '/api/recommendations/'
-      path: '/api/recommendations'
-      fullPath: '/api/recommendations/'
-      preLoaderRoute: typeof ApiRecommendationsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/queries/': {
-      id: '/api/queries/'
-      path: '/api/queries'
-      fullPath: '/api/queries/'
-      preLoaderRoute: typeof ApiQueriesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/': {
-      id: '/api/organizations/'
-      path: '/api/organizations'
-      fullPath: '/api/organizations/'
-      preLoaderRoute: typeof ApiOrganizationsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/lists/': {
-      id: '/api/lists/'
-      path: '/api/lists'
-      fullPath: '/api/lists/'
-      preLoaderRoute: typeof ApiListsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/': {
-      id: '/api/interviews/'
-      path: '/api/interviews'
-      fullPath: '/api/interviews/'
-      preLoaderRoute: typeof ApiInterviewsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/incidents/': {
-      id: '/api/incidents/'
-      path: '/api/incidents'
-      fullPath: '/api/incidents/'
-      preLoaderRoute: typeof ApiIncidentsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/consent/': {
-      id: '/api/consent/'
-      path: '/api/consent'
-      fullPath: '/api/consent/'
-      preLoaderRoute: typeof ApiConsentIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/changelog/': {
-      id: '/api/changelog/'
-      path: '/api/changelog'
-      fullPath: '/api/changelog/'
-      preLoaderRoute: typeof ApiChangelogIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/alerts/': {
-      id: '/api/alerts/'
-      path: '/api/alerts'
-      fullPath: '/api/alerts/'
-      preLoaderRoute: typeof ApiAlertsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_landing/explore/': {
-      id: '/_landing/explore/'
-      path: '/explore'
-      fullPath: '/explore/'
-      preLoaderRoute: typeof LandingExploreIndexRouteImport
+    '/_landing/crawler': {
+      id: '/_landing/crawler'
+      path: '/crawler'
+      fullPath: '/crawler'
+      preLoaderRoute: typeof LandingCrawlerRouteImport
       parentRoute: typeof LandingRouteRoute
     }
-    '/_landing/changelog/': {
-      id: '/_landing/changelog/'
-      path: '/'
-      fullPath: '/changelog/'
-      preLoaderRoute: typeof LandingChangelogIndexRouteImport
-      parentRoute: typeof LandingChangelogRoute
-    }
-    '/_landing/blog/': {
-      id: '/_landing/blog/'
-      path: '/blog'
-      fullPath: '/blog/'
-      preLoaderRoute: typeof LandingBlogIndexRouteImport
+    '/_landing/pricing': {
+      id: '/_landing/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof LandingPricingRouteImport
       parentRoute: typeof LandingRouteRoute
     }
-    '/_dashboard/sprints/': {
-      id: '/_dashboard/sprints/'
-      path: '/sprints'
-      fullPath: '/sprints/'
-      preLoaderRoute: typeof DashboardSprintsIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+    '/_landing/roadmap': {
+      id: '/_landing/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof LandingRoadmapRouteImport
+      parentRoute: typeof LandingRouteRoute
     }
-    '/_dashboard/solutions/': {
-      id: '/_dashboard/solutions/'
-      path: '/solutions'
-      fullPath: '/solutions/'
-      preLoaderRoute: typeof DashboardSolutionsIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+    '/_landing/security': {
+      id: '/_landing/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof LandingSecurityRouteImport
+      parentRoute: typeof LandingRouteRoute
     }
-    '/_dashboard/search/': {
-      id: '/_dashboard/search/'
+    '/_landing/status': {
+      id: '/_landing/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof LandingStatusRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/api/beta-mode': {
+      id: '/api/beta-mode'
+      path: '/api/beta-mode'
+      fullPath: '/api/beta-mode'
+      preLoaderRoute: typeof ApiBetaModeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/forgot': {
+      id: '/auth/forgot'
+      path: '/forgot'
+      fullPath: '/auth/forgot'
+      preLoaderRoute: typeof AuthForgotRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/reset': {
+      id: '/auth/reset'
+      path: '/reset'
+      fullPath: '/auth/reset'
+      preLoaderRoute: typeof AuthResetRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/sign-in': {
+      id: '/auth/sign-in'
+      path: '/sign-in'
+      fullPath: '/auth/sign-in'
+      preLoaderRoute: typeof AuthSignInRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/sign-up': {
+      id: '/auth/sign-up'
+      path: '/sign-up'
+      fullPath: '/auth/sign-up'
+      preLoaderRoute: typeof AuthSignUpRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/blog/atom.xml': {
+      id: '/blog/atom.xml'
+      path: '/blog/atom.xml'
+      fullPath: '/blog/atom.xml'
+      preLoaderRoute: typeof BlogAtomDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/builders/$builderId': {
+      id: '/builders/$builderId'
+      path: '/builders/$builderId'
+      fullPath: '/builders/$builderId'
+      preLoaderRoute: typeof BuildersBuilderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/building': {
+      id: '/onboarding/building'
+      path: '/building'
+      fullPath: '/onboarding/building'
+      preLoaderRoute: typeof OnboardingBuildingRouteImport
+      parentRoute: typeof OnboardingRouteRoute
+    }
+    '/onboarding/goal': {
+      id: '/onboarding/goal'
+      path: '/goal'
+      fullPath: '/onboarding/goal'
+      preLoaderRoute: typeof OnboardingGoalRouteImport
+      parentRoute: typeof OnboardingRouteRoute
+    }
+    '/onboarding/investing': {
+      id: '/onboarding/investing'
+      path: '/investing'
+      fullPath: '/onboarding/investing'
+      preLoaderRoute: typeof OnboardingInvestingRouteImport
+      parentRoute: typeof OnboardingRouteRoute
+    }
+    '/onboarding/save': {
+      id: '/onboarding/save'
+      path: '/save'
+      fullPath: '/onboarding/save'
+      preLoaderRoute: typeof OnboardingSaveRouteImport
+      parentRoute: typeof OnboardingRouteRoute
+    }
+    '/onboarding/search': {
+      id: '/onboarding/search'
       path: '/search'
-      fullPath: '/search/'
-      preLoaderRoute: typeof DashboardSearchIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+      fullPath: '/onboarding/search'
+      preLoaderRoute: typeof OnboardingSearchRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
-    '/_dashboard/me/': {
-      id: '/_dashboard/me/'
-      path: '/me'
-      fullPath: '/me/'
-      preLoaderRoute: typeof DashboardMeIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+    '/onboarding/success': {
+      id: '/onboarding/success'
+      path: '/success'
+      fullPath: '/onboarding/success'
+      preLoaderRoute: typeof OnboardingSuccessRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
-    '/_dashboard/lists/': {
-      id: '/_dashboard/lists/'
-      path: '/lists'
-      fullPath: '/lists/'
-      preLoaderRoute: typeof DashboardListsIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+    '/onboarding/welcome': {
+      id: '/onboarding/welcome'
+      path: '/welcome'
+      fullPath: '/onboarding/welcome'
+      preLoaderRoute: typeof OnboardingWelcomeRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
-    '/_dashboard/interviews/': {
-      id: '/_dashboard/interviews/'
-      path: '/interviews'
-      fullPath: '/interviews/'
-      preLoaderRoute: typeof DashboardInterviewsIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+    '/portfolio/$claimId': {
+      id: '/portfolio/$claimId'
+      path: '/portfolio/$claimId'
+      fullPath: '/portfolio/$claimId'
+      preLoaderRoute: typeof PortfolioClaimIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_dashboard/exports/': {
-      id: '/_dashboard/exports/'
-      path: '/exports'
-      fullPath: '/exports/'
-      preLoaderRoute: typeof DashboardExportsIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+    '/r/$slug': {
+      id: '/r/$slug'
+      path: '/r/$slug'
+      fullPath: '/r/$slug'
+      preLoaderRoute: typeof RSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_dashboard/dashboard/': {
-      id: '/_dashboard/dashboard/'
-      path: '/dashboard'
-      fullPath: '/dashboard/'
-      preLoaderRoute: typeof DashboardDashboardIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/calendar/': {
-      id: '/_dashboard/calendar/'
-      path: '/calendar'
-      fullPath: '/calendar/'
-      preLoaderRoute: typeof DashboardCalendarIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+    '/schedule/$invitationId': {
+      id: '/schedule/$invitationId'
+      path: '/schedule/$invitationId'
+      fullPath: '/schedule/$invitationId'
+      preLoaderRoute: typeof ScheduleInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_dashboard/admin/': {
       id: '/_dashboard/admin/'
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof DashboardAdminIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/team/invite/$invitationId': {
-      id: '/team/invite/$invitationId'
-      path: '/team/invite/$invitationId'
-      fullPath: '/team/invite/$invitationId'
-      preLoaderRoute: typeof TeamInviteInvitationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/work-samples/analyze': {
-      id: '/api/work-samples/analyze'
-      path: '/api/work-samples/analyze'
-      fullPath: '/api/work-samples/analyze'
-      preLoaderRoute: typeof ApiWorkSamplesAnalyzeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/work-samples/$id': {
-      id: '/api/work-samples/$id'
-      path: '/api/work-samples/$id'
-      fullPath: '/api/work-samples/$id'
-      preLoaderRoute: typeof ApiWorkSamplesIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/webhooks/stripe': {
-      id: '/api/webhooks/stripe'
-      path: '/api/webhooks/stripe'
-      fullPath: '/api/webhooks/stripe'
-      preLoaderRoute: typeof ApiWebhooksStripeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/status/summary': {
-      id: '/api/status/summary'
-      path: '/api/status/summary'
-      fullPath: '/api/status/summary'
-      preLoaderRoute: typeof ApiStatusSummaryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/status/subscribe': {
-      id: '/api/status/subscribe'
-      path: '/api/status/subscribe'
-      fullPath: '/api/status/subscribe'
-      preLoaderRoute: typeof ApiStatusSubscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sprints/preview': {
-      id: '/api/sprints/preview'
-      path: '/api/sprints/preview'
-      fullPath: '/api/sprints/preview'
-      preLoaderRoute: typeof ApiSprintsPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sprints/$sprintId': {
-      id: '/api/sprints/$sprintId'
-      path: '/api/sprints/$sprintId'
-      fullPath: '/api/sprints/$sprintId'
-      preLoaderRoute: typeof ApiSprintsSprintIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/solutions/runs': {
-      id: '/api/solutions/runs'
-      path: '/api/solutions/runs'
-      fullPath: '/api/solutions/runs'
-      preLoaderRoute: typeof ApiSolutionsRunsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/solutions/generate': {
-      id: '/api/solutions/generate'
-      path: '/api/solutions/generate'
-      fullPath: '/api/solutions/generate'
-      preLoaderRoute: typeof ApiSolutionsGenerateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/solutions/config': {
-      id: '/api/solutions/config'
-      path: '/api/solutions/config'
-      fullPath: '/api/solutions/config'
-      preLoaderRoute: typeof ApiSolutionsConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/solutions/briefs': {
-      id: '/api/solutions/briefs'
-      path: '/api/solutions/briefs'
-      fullPath: '/api/solutions/briefs'
-      preLoaderRoute: typeof ApiSolutionsBriefsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/solutions/billing-state': {
-      id: '/api/solutions/billing-state'
-      path: '/api/solutions/billing-state'
-      fullPath: '/api/solutions/billing-state'
-      preLoaderRoute: typeof ApiSolutionsBillingStateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/search/semantic': {
-      id: '/api/search/semantic'
-      path: '/api/search/semantic'
-      fullPath: '/api/search/semantic'
-      preLoaderRoute: typeof ApiSearchSemanticRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/search/builders': {
-      id: '/api/search/builders'
-      path: '/api/search/builders'
-      fullPath: '/api/search/builders'
-      preLoaderRoute: typeof ApiSearchBuildersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/privacy/profile-removal': {
-      id: '/api/privacy/profile-removal'
-      path: '/api/privacy/profile-removal'
-      fullPath: '/api/privacy/profile-removal'
-      preLoaderRoute: typeof ApiPrivacyProfileRemovalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/portfolio/$claimId': {
-      id: '/api/portfolio/$claimId'
-      path: '/api/portfolio/$claimId'
-      fullPath: '/api/portfolio/$claimId'
-      preLoaderRoute: typeof ApiPortfolioClaimIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/plans/me': {
-      id: '/api/plans/me'
-      path: '/api/plans/me'
-      fullPath: '/api/plans/me'
-      preLoaderRoute: typeof ApiPlansMeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/transfer-ownership-preview': {
-      id: '/api/organizations/transfer-ownership-preview'
-      path: '/api/organizations/transfer-ownership-preview'
-      fullPath: '/api/organizations/transfer-ownership-preview'
-      preLoaderRoute: typeof ApiOrganizationsTransferOwnershipPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/transfer-ownership': {
-      id: '/api/organizations/transfer-ownership'
-      path: '/api/organizations/transfer-ownership'
-      fullPath: '/api/organizations/transfer-ownership'
-      preLoaderRoute: typeof ApiOrganizationsTransferOwnershipRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/team': {
-      id: '/api/organizations/team'
-      path: '/api/organizations/team'
-      fullPath: '/api/organizations/team'
-      preLoaderRoute: typeof ApiOrganizationsTeamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/switch': {
-      id: '/api/organizations/switch'
-      path: '/api/organizations/switch'
-      fullPath: '/api/organizations/switch'
-      preLoaderRoute: typeof ApiOrganizationsSwitchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/deletion': {
-      id: '/api/organizations/deletion'
-      path: '/api/organizations/deletion'
-      fullPath: '/api/organizations/deletion'
-      preLoaderRoute: typeof ApiOrganizationsDeletionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/activity': {
-      id: '/api/organizations/activity'
-      path: '/api/organizations/activity'
-      fullPath: '/api/organizations/activity'
-      preLoaderRoute: typeof ApiOrganizationsActivityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/onboarding/status': {
-      id: '/api/onboarding/status'
-      path: '/api/onboarding/status'
-      fullPath: '/api/onboarding/status'
-      preLoaderRoute: typeof ApiOnboardingStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/onboarding/skip': {
-      id: '/api/onboarding/skip'
-      path: '/api/onboarding/skip'
-      fullPath: '/api/onboarding/skip'
-      preLoaderRoute: typeof ApiOnboardingSkipRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/onboarding/complete': {
-      id: '/api/onboarding/complete'
-      path: '/api/onboarding/complete'
-      fullPath: '/api/onboarding/complete'
-      preLoaderRoute: typeof ApiOnboardingCompleteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/og/explore': {
-      id: '/api/og/explore'
-      path: '/api/og/explore'
-      fullPath: '/api/og/explore'
-      preLoaderRoute: typeof ApiOgExploreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/og/blog': {
-      id: '/api/og/blog'
-      path: '/api/og/blog'
-      fullPath: '/api/og/blog'
-      preLoaderRoute: typeof ApiOgBlogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/lists/$listId': {
-      id: '/api/lists/$listId'
-      path: '/api/lists/$listId'
-      fullPath: '/api/lists/$listId'
-      preLoaderRoute: typeof ApiListsListIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/shared': {
-      id: '/api/interviews/shared'
-      path: '/api/interviews/shared'
-      fullPath: '/api/interviews/shared'
-      preLoaderRoute: typeof ApiInterviewsSharedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/fingerprint/match': {
-      id: '/api/fingerprint/match'
-      path: '/api/fingerprint/match'
-      fullPath: '/api/fingerprint/match'
-      preLoaderRoute: typeof ApiFingerprintMatchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/feeds/$searchId': {
-      id: '/api/feeds/$searchId'
-      path: '/api/feeds/$searchId'
-      fullPath: '/api/feeds/$searchId'
-      preLoaderRoute: typeof ApiFeedsSearchIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/export/builders': {
-      id: '/api/export/builders'
-      path: '/api/export/builders'
-      fullPath: '/api/export/builders'
-      preLoaderRoute: typeof ApiExportBuildersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/e2e/outbox': {
-      id: '/api/e2e/outbox'
-      path: '/api/e2e/outbox'
-      fullPath: '/api/e2e/outbox'
-      preLoaderRoute: typeof ApiE2eOutboxRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/e2e/billing-provider': {
-      id: '/api/e2e/billing-provider'
-      path: '/api/e2e/billing-provider'
-      fullPath: '/api/e2e/billing-provider'
-      preLoaderRoute: typeof ApiE2eBillingProviderRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/dashboard/stats': {
-      id: '/api/dashboard/stats'
-      path: '/api/dashboard/stats'
-      fullPath: '/api/dashboard/stats'
-      preLoaderRoute: typeof ApiDashboardStatsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/dashboard/preferences': {
-      id: '/api/dashboard/preferences'
-      path: '/api/dashboard/preferences'
-      fullPath: '/api/dashboard/preferences'
-      preLoaderRoute: typeof ApiDashboardPreferencesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/dashboard/overview': {
-      id: '/api/dashboard/overview'
-      path: '/api/dashboard/overview'
-      fullPath: '/api/dashboard/overview'
-      preLoaderRoute: typeof ApiDashboardOverviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/dashboard/organization-admin': {
-      id: '/api/dashboard/organization-admin'
-      path: '/api/dashboard/organization-admin'
-      fullPath: '/api/dashboard/organization-admin'
-      preLoaderRoute: typeof ApiDashboardOrganizationAdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/changelog/$slug': {
-      id: '/api/changelog/$slug'
-      path: '/api/changelog/$slug'
-      fullPath: '/api/changelog/$slug'
-      preLoaderRoute: typeof ApiChangelogSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/calendar/notifications': {
-      id: '/api/calendar/notifications'
-      path: '/api/calendar/notifications'
-      fullPath: '/api/calendar/notifications'
-      preLoaderRoute: typeof ApiCalendarNotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/calendar/feed': {
-      id: '/api/calendar/feed'
-      path: '/api/calendar/feed'
-      fullPath: '/api/calendar/feed'
-      preLoaderRoute: typeof ApiCalendarFeedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/calendar/export.ics': {
-      id: '/api/calendar/export.ics'
-      path: '/api/calendar/export.ics'
-      fullPath: '/api/calendar/export.ics'
-      preLoaderRoute: typeof ApiCalendarExportDoticsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/builders/track': {
-      id: '/api/builders/track'
-      path: '/api/builders/track'
-      fullPath: '/api/builders/track'
-      preLoaderRoute: typeof ApiBuildersTrackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/builders/$builderId': {
-      id: '/api/builders/$builderId'
-      path: '/api/builders/$builderId'
-      fullPath: '/api/builders/$builderId'
-      preLoaderRoute: typeof ApiBuildersBuilderIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/summary': {
-      id: '/api/billing/summary'
-      path: '/api/billing/summary'
-      fullPath: '/api/billing/summary'
-      preLoaderRoute: typeof ApiBillingSummaryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/refunds': {
-      id: '/api/billing/refunds'
-      path: '/api/billing/refunds'
-      fullPath: '/api/billing/refunds'
-      preLoaderRoute: typeof ApiBillingRefundsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/portal': {
-      id: '/api/billing/portal'
-      path: '/api/billing/portal'
-      fullPath: '/api/billing/portal'
-      preLoaderRoute: typeof ApiBillingPortalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/disputes': {
-      id: '/api/billing/disputes'
-      path: '/api/billing/disputes'
-      fullPath: '/api/billing/disputes'
-      preLoaderRoute: typeof ApiBillingDisputesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/contact': {
-      id: '/api/billing/contact'
-      path: '/api/billing/contact'
-      fullPath: '/api/billing/contact'
-      preLoaderRoute: typeof ApiBillingContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/auto-recharge': {
-      id: '/api/billing/auto-recharge'
-      path: '/api/billing/auto-recharge'
-      fullPath: '/api/billing/auto-recharge'
-      preLoaderRoute: typeof ApiBillingAutoRechargeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/analytics/conversion': {
-      id: '/api/analytics/conversion'
-      path: '/api/analytics/conversion'
-      fullPath: '/api/analytics/conversion'
-      preLoaderRoute: typeof ApiAnalyticsConversionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/alerts/test-trigger': {
-      id: '/api/alerts/test-trigger'
-      path: '/api/alerts/test-trigger'
-      fullPath: '/api/alerts/test-trigger'
-      preLoaderRoute: typeof ApiAlertsTestTriggerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/alerts/$id': {
-      id: '/api/alerts/$id'
-      path: '/api/alerts/$id'
-      fullPath: '/api/alerts/$id'
-      preLoaderRoute: typeof ApiAlertsIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ai/embed': {
-      id: '/api/ai/embed'
-      path: '/api/ai/embed'
-      fullPath: '/api/ai/embed'
-      preLoaderRoute: typeof ApiAiEmbedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ai/config': {
-      id: '/api/ai/config'
-      path: '/api/ai/config'
-      fullPath: '/api/ai/config'
-      preLoaderRoute: typeof ApiAiConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ai/complete': {
-      id: '/api/ai/complete'
-      path: '/api/ai/complete'
-      fullPath: '/api/ai/complete'
-      preLoaderRoute: typeof ApiAiCompleteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/search-sources': {
-      id: '/api/admin/search-sources'
-      path: '/api/admin/search-sources'
-      fullPath: '/api/admin/search-sources'
-      preLoaderRoute: typeof ApiAdminSearchSourcesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/preferences': {
-      id: '/api/admin/preferences'
-      path: '/api/admin/preferences'
-      fullPath: '/api/admin/preferences'
-      preLoaderRoute: typeof ApiAdminPreferencesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_landing/privacy/remove': {
-      id: '/_landing/privacy/remove'
-      path: '/privacy/remove'
-      fullPath: '/privacy/remove'
-      preLoaderRoute: typeof LandingPrivacyRemoveRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/legal/terms': {
-      id: '/_landing/legal/terms'
-      path: '/legal/terms'
-      fullPath: '/legal/terms'
-      preLoaderRoute: typeof LandingLegalTermsRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/legal/privacy': {
-      id: '/_landing/legal/privacy'
-      path: '/legal/privacy'
-      fullPath: '/legal/privacy'
-      preLoaderRoute: typeof LandingLegalPrivacyRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/legal/imprint': {
-      id: '/_landing/legal/imprint'
-      path: '/legal/imprint'
-      fullPath: '/legal/imprint'
-      preLoaderRoute: typeof LandingLegalImprintRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/legal/cookies': {
-      id: '/_landing/legal/cookies'
-      path: '/legal/cookies'
-      fullPath: '/legal/cookies'
-      preLoaderRoute: typeof LandingLegalCookiesRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_landing/changelog/$slug': {
-      id: '/_landing/changelog/$slug'
-      path: '/$slug'
-      fullPath: '/changelog/$slug'
-      preLoaderRoute: typeof LandingChangelogSlugRouteImport
-      parentRoute: typeof LandingChangelogRoute
-    }
-    '/_landing/blog/$slug': {
-      id: '/_landing/blog/$slug'
-      path: '/blog/$slug'
-      fullPath: '/blog/$slug'
-      preLoaderRoute: typeof LandingBlogSlugRouteImport
-      parentRoute: typeof LandingRouteRoute
-    }
-    '/_dashboard/team/activity': {
-      id: '/_dashboard/team/activity'
-      path: '/team/activity'
-      fullPath: '/team/activity'
-      preLoaderRoute: typeof DashboardTeamActivityRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/sprints/new': {
-      id: '/_dashboard/sprints/new'
-      path: '/sprints/new'
-      fullPath: '/sprints/new'
-      preLoaderRoute: typeof DashboardSprintsNewRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/settings/team': {
-      id: '/_dashboard/settings/team'
-      path: '/settings/team'
-      fullPath: '/settings/team'
-      preLoaderRoute: typeof DashboardSettingsTeamRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/settings/security': {
-      id: '/_dashboard/settings/security'
-      path: '/settings/security'
-      fullPath: '/settings/security'
-      preLoaderRoute: typeof DashboardSettingsSecurityRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/settings/privacy': {
-      id: '/_dashboard/settings/privacy'
-      path: '/settings/privacy'
-      fullPath: '/settings/privacy'
-      preLoaderRoute: typeof DashboardSettingsPrivacyRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/settings/billing': {
-      id: '/_dashboard/settings/billing'
-      path: '/settings/billing'
-      fullPath: '/settings/billing'
-      preLoaderRoute: typeof DashboardSettingsBillingRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/lists/$listId': {
-      id: '/_dashboard/lists/$listId'
-      path: '/lists/$listId'
-      fullPath: '/lists/$listId'
-      preLoaderRoute: typeof DashboardListsListIdRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/interviews/invitations': {
-      id: '/_dashboard/interviews/invitations'
-      path: '/interviews/invitations'
-      fullPath: '/interviews/invitations'
-      preLoaderRoute: typeof DashboardInterviewsInvitationsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/users': {
-      id: '/_dashboard/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof DashboardAdminUsersRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/sources': {
-      id: '/_dashboard/admin/sources'
-      path: '/admin/sources'
-      fullPath: '/admin/sources'
-      preLoaderRoute: typeof DashboardAdminSourcesRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/solutions-gold-set': {
-      id: '/_dashboard/admin/solutions-gold-set'
-      path: '/admin/solutions-gold-set'
-      fullPath: '/admin/solutions-gold-set'
-      preLoaderRoute: typeof DashboardAdminSolutionsGoldSetRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/roadmap': {
-      id: '/_dashboard/admin/roadmap'
-      path: '/admin/roadmap'
-      fullPath: '/admin/roadmap'
-      preLoaderRoute: typeof DashboardAdminRoadmapRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/refunds': {
-      id: '/_dashboard/admin/refunds'
-      path: '/admin/refunds'
-      fullPath: '/admin/refunds'
-      preLoaderRoute: typeof DashboardAdminRefundsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/operations': {
-      id: '/_dashboard/admin/operations'
-      path: '/admin/operations'
-      fullPath: '/admin/operations'
-      preLoaderRoute: typeof DashboardAdminOperationsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/metrics': {
-      id: '/_dashboard/admin/metrics'
-      path: '/admin/metrics'
-      fullPath: '/admin/metrics'
-      preLoaderRoute: typeof DashboardAdminMetricsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/integrations': {
-      id: '/_dashboard/admin/integrations'
-      path: '/admin/integrations'
-      fullPath: '/admin/integrations'
-      preLoaderRoute: typeof DashboardAdminIntegrationsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/incidents': {
-      id: '/_dashboard/admin/incidents'
-      path: '/admin/incidents'
-      fullPath: '/admin/incidents'
-      preLoaderRoute: typeof DashboardAdminIncidentsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/disputes': {
-      id: '/_dashboard/admin/disputes'
-      path: '/admin/disputes'
-      fullPath: '/admin/disputes'
-      preLoaderRoute: typeof DashboardAdminDisputesRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/content': {
-      id: '/_dashboard/admin/content'
-      path: '/admin/content'
-      fullPath: '/admin/content'
-      preLoaderRoute: typeof DashboardAdminContentRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/claims': {
-      id: '/_dashboard/admin/claims'
-      path: '/admin/claims'
-      fullPath: '/admin/claims'
-      preLoaderRoute: typeof DashboardAdminClaimsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/changelog': {
-      id: '/_dashboard/admin/changelog'
-      path: '/admin/changelog'
-      fullPath: '/admin/changelog'
-      preLoaderRoute: typeof DashboardAdminChangelogRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/billing': {
-      id: '/_dashboard/admin/billing'
-      path: '/admin/billing'
-      fullPath: '/admin/billing'
-      preLoaderRoute: typeof DashboardAdminBillingRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/_dashboard/admin/access-requests': {
-      id: '/_dashboard/admin/access-requests'
-      path: '/admin/access-requests'
-      fullPath: '/admin/access-requests'
-      preLoaderRoute: typeof DashboardAdminAccessRequestsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/admin/abuse': {
@@ -4919,179 +4253,865 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminAbuseRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/api/scheduling/invitations/': {
-      id: '/api/scheduling/invitations/'
-      path: '/api/scheduling/invitations'
-      fullPath: '/api/scheduling/invitations/'
-      preLoaderRoute: typeof ApiSchedulingInvitationsIndexRouteImport
+    '/_dashboard/admin/access-requests': {
+      id: '/_dashboard/admin/access-requests'
+      path: '/admin/access-requests'
+      fullPath: '/admin/access-requests'
+      preLoaderRoute: typeof DashboardAdminAccessRequestsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/billing': {
+      id: '/_dashboard/admin/billing'
+      path: '/admin/billing'
+      fullPath: '/admin/billing'
+      preLoaderRoute: typeof DashboardAdminBillingRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/changelog': {
+      id: '/_dashboard/admin/changelog'
+      path: '/admin/changelog'
+      fullPath: '/admin/changelog'
+      preLoaderRoute: typeof DashboardAdminChangelogRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/claims': {
+      id: '/_dashboard/admin/claims'
+      path: '/admin/claims'
+      fullPath: '/admin/claims'
+      preLoaderRoute: typeof DashboardAdminClaimsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/content': {
+      id: '/_dashboard/admin/content'
+      path: '/admin/content'
+      fullPath: '/admin/content'
+      preLoaderRoute: typeof DashboardAdminContentRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/disputes': {
+      id: '/_dashboard/admin/disputes'
+      path: '/admin/disputes'
+      fullPath: '/admin/disputes'
+      preLoaderRoute: typeof DashboardAdminDisputesRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/incidents': {
+      id: '/_dashboard/admin/incidents'
+      path: '/admin/incidents'
+      fullPath: '/admin/incidents'
+      preLoaderRoute: typeof DashboardAdminIncidentsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/integrations': {
+      id: '/_dashboard/admin/integrations'
+      path: '/admin/integrations'
+      fullPath: '/admin/integrations'
+      preLoaderRoute: typeof DashboardAdminIntegrationsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/metrics': {
+      id: '/_dashboard/admin/metrics'
+      path: '/admin/metrics'
+      fullPath: '/admin/metrics'
+      preLoaderRoute: typeof DashboardAdminMetricsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/operations': {
+      id: '/_dashboard/admin/operations'
+      path: '/admin/operations'
+      fullPath: '/admin/operations'
+      preLoaderRoute: typeof DashboardAdminOperationsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/refunds': {
+      id: '/_dashboard/admin/refunds'
+      path: '/admin/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof DashboardAdminRefundsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/roadmap': {
+      id: '/_dashboard/admin/roadmap'
+      path: '/admin/roadmap'
+      fullPath: '/admin/roadmap'
+      preLoaderRoute: typeof DashboardAdminRoadmapRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/solutions-gold-set': {
+      id: '/_dashboard/admin/solutions-gold-set'
+      path: '/admin/solutions-gold-set'
+      fullPath: '/admin/solutions-gold-set'
+      preLoaderRoute: typeof DashboardAdminSolutionsGoldSetRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/sources': {
+      id: '/_dashboard/admin/sources'
+      path: '/admin/sources'
+      fullPath: '/admin/sources'
+      preLoaderRoute: typeof DashboardAdminSourcesRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/users': {
+      id: '/_dashboard/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof DashboardAdminUsersRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/calendar/': {
+      id: '/_dashboard/calendar/'
+      path: '/calendar'
+      fullPath: '/calendar/'
+      preLoaderRoute: typeof DashboardCalendarIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/dashboard/': {
+      id: '/_dashboard/dashboard/'
+      path: '/dashboard'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardDashboardIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/exports/': {
+      id: '/_dashboard/exports/'
+      path: '/exports'
+      fullPath: '/exports/'
+      preLoaderRoute: typeof DashboardExportsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/interviews/': {
+      id: '/_dashboard/interviews/'
+      path: '/interviews'
+      fullPath: '/interviews/'
+      preLoaderRoute: typeof DashboardInterviewsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/interviews/invitations': {
+      id: '/_dashboard/interviews/invitations'
+      path: '/interviews/invitations'
+      fullPath: '/interviews/invitations'
+      preLoaderRoute: typeof DashboardInterviewsInvitationsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/lists/': {
+      id: '/_dashboard/lists/'
+      path: '/lists'
+      fullPath: '/lists/'
+      preLoaderRoute: typeof DashboardListsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/lists/$listId': {
+      id: '/_dashboard/lists/$listId'
+      path: '/lists/$listId'
+      fullPath: '/lists/$listId'
+      preLoaderRoute: typeof DashboardListsListIdRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/me/': {
+      id: '/_dashboard/me/'
+      path: '/me'
+      fullPath: '/me/'
+      preLoaderRoute: typeof DashboardMeIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/search/': {
+      id: '/_dashboard/search/'
+      path: '/search'
+      fullPath: '/search/'
+      preLoaderRoute: typeof DashboardSearchIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/settings/billing': {
+      id: '/_dashboard/settings/billing'
+      path: '/settings/billing'
+      fullPath: '/settings/billing'
+      preLoaderRoute: typeof DashboardSettingsBillingRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/settings/privacy': {
+      id: '/_dashboard/settings/privacy'
+      path: '/settings/privacy'
+      fullPath: '/settings/privacy'
+      preLoaderRoute: typeof DashboardSettingsPrivacyRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/settings/security': {
+      id: '/_dashboard/settings/security'
+      path: '/settings/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof DashboardSettingsSecurityRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/settings/team': {
+      id: '/_dashboard/settings/team'
+      path: '/settings/team'
+      fullPath: '/settings/team'
+      preLoaderRoute: typeof DashboardSettingsTeamRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/solutions/': {
+      id: '/_dashboard/solutions/'
+      path: '/solutions'
+      fullPath: '/solutions/'
+      preLoaderRoute: typeof DashboardSolutionsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/sprints/': {
+      id: '/_dashboard/sprints/'
+      path: '/sprints'
+      fullPath: '/sprints/'
+      preLoaderRoute: typeof DashboardSprintsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/sprints/new': {
+      id: '/_dashboard/sprints/new'
+      path: '/sprints/new'
+      fullPath: '/sprints/new'
+      preLoaderRoute: typeof DashboardSprintsNewRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/team/activity': {
+      id: '/_dashboard/team/activity'
+      path: '/team/activity'
+      fullPath: '/team/activity'
+      preLoaderRoute: typeof DashboardTeamActivityRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_landing/blog/': {
+      id: '/_landing/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof LandingBlogIndexRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/blog/$slug': {
+      id: '/_landing/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof LandingBlogSlugRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/changelog/': {
+      id: '/_landing/changelog/'
+      path: '/'
+      fullPath: '/changelog/'
+      preLoaderRoute: typeof LandingChangelogIndexRouteImport
+      parentRoute: typeof LandingChangelogRoute
+    }
+    '/_landing/changelog/$slug': {
+      id: '/_landing/changelog/$slug'
+      path: '/$slug'
+      fullPath: '/changelog/$slug'
+      preLoaderRoute: typeof LandingChangelogSlugRouteImport
+      parentRoute: typeof LandingChangelogRoute
+    }
+    '/_landing/explore/': {
+      id: '/_landing/explore/'
+      path: '/explore'
+      fullPath: '/explore/'
+      preLoaderRoute: typeof LandingExploreIndexRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/for/builders': {
+      id: '/_landing/for/builders'
+      path: '/for/builders'
+      fullPath: '/for/builders'
+      preLoaderRoute: typeof LandingForBuildersRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/for/hiring-teams': {
+      id: '/_landing/for/hiring-teams'
+      path: '/for/hiring-teams'
+      fullPath: '/for/hiring-teams'
+      preLoaderRoute: typeof LandingForHiringTeamsRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/for/investors': {
+      id: '/_landing/for/investors'
+      path: '/for/investors'
+      fullPath: '/for/investors'
+      preLoaderRoute: typeof LandingForInvestorsRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/legal/cookies': {
+      id: '/_landing/legal/cookies'
+      path: '/legal/cookies'
+      fullPath: '/legal/cookies'
+      preLoaderRoute: typeof LandingLegalCookiesRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/legal/imprint': {
+      id: '/_landing/legal/imprint'
+      path: '/legal/imprint'
+      fullPath: '/legal/imprint'
+      preLoaderRoute: typeof LandingLegalImprintRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/legal/privacy': {
+      id: '/_landing/legal/privacy'
+      path: '/legal/privacy'
+      fullPath: '/legal/privacy'
+      preLoaderRoute: typeof LandingLegalPrivacyRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/legal/terms': {
+      id: '/_landing/legal/terms'
+      path: '/legal/terms'
+      fullPath: '/legal/terms'
+      preLoaderRoute: typeof LandingLegalTermsRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/privacy/remove': {
+      id: '/_landing/privacy/remove'
+      path: '/privacy/remove'
+      fullPath: '/privacy/remove'
+      preLoaderRoute: typeof LandingPrivacyRemoveRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/api/admin/preferences': {
+      id: '/api/admin/preferences'
+      path: '/api/admin/preferences'
+      fullPath: '/api/admin/preferences'
+      preLoaderRoute: typeof ApiAdminPreferencesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/organizations/invitations/': {
-      id: '/api/organizations/invitations/'
-      path: '/api/organizations/invitations'
-      fullPath: '/api/organizations/invitations/'
-      preLoaderRoute: typeof ApiOrganizationsInvitationsIndexRouteImport
+    '/api/admin/search-sources': {
+      id: '/api/admin/search-sources'
+      path: '/api/admin/search-sources'
+      fullPath: '/api/admin/search-sources'
+      preLoaderRoute: typeof ApiAdminSearchSourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/stepup/': {
-      id: '/api/me/stepup/'
-      path: '/api/me/stepup'
-      fullPath: '/api/me/stepup/'
-      preLoaderRoute: typeof ApiMeStepupIndexRouteImport
+    '/api/ai/complete': {
+      id: '/api/ai/complete'
+      path: '/api/ai/complete'
+      fullPath: '/api/ai/complete'
+      preLoaderRoute: typeof ApiAiCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/sessions/': {
-      id: '/api/me/sessions/'
-      path: '/api/me/sessions'
-      fullPath: '/api/me/sessions/'
-      preLoaderRoute: typeof ApiMeSessionsIndexRouteImport
+    '/api/ai/config': {
+      id: '/api/ai/config'
+      path: '/api/ai/config'
+      fullPath: '/api/ai/config'
+      preLoaderRoute: typeof ApiAiConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/delete-account/': {
-      id: '/api/me/delete-account/'
-      path: '/api/me/delete-account'
-      fullPath: '/api/me/delete-account/'
-      preLoaderRoute: typeof ApiMeDeleteAccountIndexRouteImport
+    '/api/ai/embed': {
+      id: '/api/ai/embed'
+      path: '/api/ai/embed'
+      fullPath: '/api/ai/embed'
+      preLoaderRoute: typeof ApiAiEmbedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/data-export/': {
-      id: '/api/me/data-export/'
-      path: '/api/me/data-export'
-      fullPath: '/api/me/data-export/'
-      preLoaderRoute: typeof ApiMeDataExportIndexRouteImport
+    '/api/alerts/': {
+      id: '/api/alerts/'
+      path: '/api/alerts'
+      fullPath: '/api/alerts/'
+      preLoaderRoute: typeof ApiAlertsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/builders/': {
-      id: '/api/me/builders/'
-      path: '/api/me/builders'
-      fullPath: '/api/me/builders/'
-      preLoaderRoute: typeof ApiMeBuildersIndexRouteImport
+    '/api/alerts/$id': {
+      id: '/api/alerts/$id'
+      path: '/api/alerts/$id'
+      fullPath: '/api/alerts/$id'
+      preLoaderRoute: typeof ApiAlertsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/builder/': {
-      id: '/api/me/builder/'
-      path: '/api/me/builder'
-      fullPath: '/api/me/builder/'
-      preLoaderRoute: typeof ApiMeBuilderIndexRouteImport
+    '/api/alerts/test-trigger': {
+      id: '/api/alerts/test-trigger'
+      path: '/api/alerts/test-trigger'
+      fullPath: '/api/alerts/test-trigger'
+      preLoaderRoute: typeof ApiAlertsTestTriggerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/calendar/events/': {
-      id: '/api/calendar/events/'
-      path: '/api/calendar/events'
-      fullPath: '/api/calendar/events/'
-      preLoaderRoute: typeof ApiCalendarEventsIndexRouteImport
+    '/api/analytics/conversion': {
+      id: '/api/analytics/conversion'
+      path: '/api/analytics/conversion'
+      fullPath: '/api/analytics/conversion'
+      preLoaderRoute: typeof ApiAnalyticsConversionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/calendar/availability/': {
-      id: '/api/calendar/availability/'
-      path: '/api/calendar/availability'
-      fullPath: '/api/calendar/availability/'
-      preLoaderRoute: typeof ApiCalendarAvailabilityIndexRouteImport
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/builders/recent/': {
-      id: '/api/builders/recent/'
-      path: '/api/builders/recent'
-      fullPath: '/api/builders/recent/'
-      preLoaderRoute: typeof ApiBuildersRecentIndexRouteImport
+    '/api/billing/auto-recharge': {
+      id: '/api/billing/auto-recharge'
+      path: '/api/billing/auto-recharge'
+      fullPath: '/api/billing/auto-recharge'
+      preLoaderRoute: typeof ApiBillingAutoRechargeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/alerts/triggers/': {
-      id: '/api/alerts/triggers/'
-      path: '/api/alerts/triggers'
-      fullPath: '/api/alerts/triggers/'
-      preLoaderRoute: typeof ApiAlertsTriggersIndexRouteImport
+    '/api/billing/contact': {
+      id: '/api/billing/contact'
+      path: '/api/billing/contact'
+      fullPath: '/api/billing/contact'
+      preLoaderRoute: typeof ApiBillingContactRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/users/': {
-      id: '/api/admin/users/'
-      path: '/api/admin/users'
-      fullPath: '/api/admin/users/'
-      preLoaderRoute: typeof ApiAdminUsersIndexRouteImport
+    '/api/billing/disputes': {
+      id: '/api/billing/disputes'
+      path: '/api/billing/disputes'
+      fullPath: '/api/billing/disputes'
+      preLoaderRoute: typeof ApiBillingDisputesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/seo/': {
-      id: '/api/admin/seo/'
-      path: '/api/admin/seo'
-      fullPath: '/api/admin/seo/'
-      preLoaderRoute: typeof ApiAdminSeoIndexRouteImport
+    '/api/billing/portal': {
+      id: '/api/billing/portal'
+      path: '/api/billing/portal'
+      fullPath: '/api/billing/portal'
+      preLoaderRoute: typeof ApiBillingPortalRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/roadmap/': {
-      id: '/api/admin/roadmap/'
-      path: '/api/admin/roadmap'
-      fullPath: '/api/admin/roadmap/'
-      preLoaderRoute: typeof ApiAdminRoadmapIndexRouteImport
+    '/api/billing/refunds': {
+      id: '/api/billing/refunds'
+      path: '/api/billing/refunds'
+      fullPath: '/api/billing/refunds'
+      preLoaderRoute: typeof ApiBillingRefundsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/operations/': {
-      id: '/api/admin/operations/'
-      path: '/api/admin/operations'
-      fullPath: '/api/admin/operations/'
-      preLoaderRoute: typeof ApiAdminOperationsIndexRouteImport
+    '/api/billing/summary': {
+      id: '/api/billing/summary'
+      path: '/api/billing/summary'
+      fullPath: '/api/billing/summary'
+      preLoaderRoute: typeof ApiBillingSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/metrics/': {
-      id: '/api/admin/metrics/'
-      path: '/api/admin/metrics'
-      fullPath: '/api/admin/metrics/'
-      preLoaderRoute: typeof ApiAdminMetricsIndexRouteImport
+    '/api/builders/$builderId': {
+      id: '/api/builders/$builderId'
+      path: '/api/builders/$builderId'
+      fullPath: '/api/builders/$builderId'
+      preLoaderRoute: typeof ApiBuildersBuilderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/integrations/': {
-      id: '/api/admin/integrations/'
-      path: '/api/admin/integrations'
-      fullPath: '/api/admin/integrations/'
-      preLoaderRoute: typeof ApiAdminIntegrationsIndexRouteImport
+    '/api/builders/track': {
+      id: '/api/builders/track'
+      path: '/api/builders/track'
+      fullPath: '/api/builders/track'
+      preLoaderRoute: typeof ApiBuildersTrackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/incidents/': {
-      id: '/api/admin/incidents/'
-      path: '/api/admin/incidents'
-      fullPath: '/api/admin/incidents/'
-      preLoaderRoute: typeof ApiAdminIncidentsIndexRouteImport
+    '/api/calendar/export.ics': {
+      id: '/api/calendar/export.ics'
+      path: '/api/calendar/export.ics'
+      fullPath: '/api/calendar/export.ics'
+      preLoaderRoute: typeof ApiCalendarExportDoticsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/human-links/': {
-      id: '/api/admin/human-links/'
-      path: '/api/admin/human-links'
-      fullPath: '/api/admin/human-links/'
-      preLoaderRoute: typeof ApiAdminHumanLinksIndexRouteImport
+    '/api/calendar/feed': {
+      id: '/api/calendar/feed'
+      path: '/api/calendar/feed'
+      fullPath: '/api/calendar/feed'
+      preLoaderRoute: typeof ApiCalendarFeedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/changelog/': {
-      id: '/api/admin/changelog/'
-      path: '/api/admin/changelog'
-      fullPath: '/api/admin/changelog/'
-      preLoaderRoute: typeof ApiAdminChangelogIndexRouteImport
+    '/api/calendar/notifications': {
+      id: '/api/calendar/notifications'
+      path: '/api/calendar/notifications'
+      fullPath: '/api/calendar/notifications'
+      preLoaderRoute: typeof ApiCalendarNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/builder-claims/': {
-      id: '/api/admin/builder-claims/'
-      path: '/api/admin/builder-claims'
-      fullPath: '/api/admin/builder-claims/'
-      preLoaderRoute: typeof ApiAdminBuilderClaimsIndexRouteImport
+    '/api/changelog/': {
+      id: '/api/changelog/'
+      path: '/api/changelog'
+      fullPath: '/api/changelog/'
+      preLoaderRoute: typeof ApiChangelogIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/access-requests/': {
-      id: '/api/admin/access-requests/'
-      path: '/api/admin/access-requests'
-      fullPath: '/api/admin/access-requests/'
-      preLoaderRoute: typeof ApiAdminAccessRequestsIndexRouteImport
+    '/api/changelog/$slug': {
+      id: '/api/changelog/$slug'
+      path: '/api/changelog/$slug'
+      fullPath: '/api/changelog/$slug'
+      preLoaderRoute: typeof ApiChangelogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/admin/abuse/': {
-      id: '/api/admin/abuse/'
-      path: '/api/admin/abuse'
-      fullPath: '/api/admin/abuse/'
-      preLoaderRoute: typeof ApiAdminAbuseIndexRouteImport
+    '/api/consent/': {
+      id: '/api/consent/'
+      path: '/api/consent'
+      fullPath: '/api/consent/'
+      preLoaderRoute: typeof ApiConsentIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_dashboard/sprints/$sprintId/': {
-      id: '/_dashboard/sprints/$sprintId/'
-      path: '/sprints/$sprintId'
-      fullPath: '/sprints/$sprintId/'
-      preLoaderRoute: typeof DashboardSprintsSprintIdIndexRouteImport
+    '/api/dashboard/context': {
+      id: '/api/dashboard/context'
+      path: '/api/dashboard/context'
+      fullPath: '/api/dashboard/context'
+      preLoaderRoute: typeof ApiDashboardContextRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/organization-admin': {
+      id: '/api/dashboard/organization-admin'
+      path: '/api/dashboard/organization-admin'
+      fullPath: '/api/dashboard/organization-admin'
+      preLoaderRoute: typeof ApiDashboardOrganizationAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/overview': {
+      id: '/api/dashboard/overview'
+      path: '/api/dashboard/overview'
+      fullPath: '/api/dashboard/overview'
+      preLoaderRoute: typeof ApiDashboardOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/preferences': {
+      id: '/api/dashboard/preferences'
+      path: '/api/dashboard/preferences'
+      fullPath: '/api/dashboard/preferences'
+      preLoaderRoute: typeof ApiDashboardPreferencesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/stats': {
+      id: '/api/dashboard/stats'
+      path: '/api/dashboard/stats'
+      fullPath: '/api/dashboard/stats'
+      preLoaderRoute: typeof ApiDashboardStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/e2e/billing-provider': {
+      id: '/api/e2e/billing-provider'
+      path: '/api/e2e/billing-provider'
+      fullPath: '/api/e2e/billing-provider'
+      preLoaderRoute: typeof ApiE2eBillingProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/e2e/outbox': {
+      id: '/api/e2e/outbox'
+      path: '/api/e2e/outbox'
+      fullPath: '/api/e2e/outbox'
+      preLoaderRoute: typeof ApiE2eOutboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/export/builders': {
+      id: '/api/export/builders'
+      path: '/api/export/builders'
+      fullPath: '/api/export/builders'
+      preLoaderRoute: typeof ApiExportBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/feeds/$searchId': {
+      id: '/api/feeds/$searchId'
+      path: '/api/feeds/$searchId'
+      fullPath: '/api/feeds/$searchId'
+      preLoaderRoute: typeof ApiFeedsSearchIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/fingerprint/match': {
+      id: '/api/fingerprint/match'
+      path: '/api/fingerprint/match'
+      fullPath: '/api/fingerprint/match'
+      preLoaderRoute: typeof ApiFingerprintMatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/incidents/': {
+      id: '/api/incidents/'
+      path: '/api/incidents'
+      fullPath: '/api/incidents/'
+      preLoaderRoute: typeof ApiIncidentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/': {
+      id: '/api/interviews/'
+      path: '/api/interviews'
+      fullPath: '/api/interviews/'
+      preLoaderRoute: typeof ApiInterviewsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/shared': {
+      id: '/api/interviews/shared'
+      path: '/api/interviews/shared'
+      fullPath: '/api/interviews/shared'
+      preLoaderRoute: typeof ApiInterviewsSharedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lists/': {
+      id: '/api/lists/'
+      path: '/api/lists'
+      fullPath: '/api/lists/'
+      preLoaderRoute: typeof ApiListsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lists/$listId': {
+      id: '/api/lists/$listId'
+      path: '/api/lists/$listId'
+      fullPath: '/api/lists/$listId'
+      preLoaderRoute: typeof ApiListsListIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/og/blog': {
+      id: '/api/og/blog'
+      path: '/api/og/blog'
+      fullPath: '/api/og/blog'
+      preLoaderRoute: typeof ApiOgBlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/og/explore': {
+      id: '/api/og/explore'
+      path: '/api/og/explore'
+      fullPath: '/api/og/explore'
+      preLoaderRoute: typeof ApiOgExploreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/complete': {
+      id: '/api/onboarding/complete'
+      path: '/api/onboarding/complete'
+      fullPath: '/api/onboarding/complete'
+      preLoaderRoute: typeof ApiOnboardingCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/skip': {
+      id: '/api/onboarding/skip'
+      path: '/api/onboarding/skip'
+      fullPath: '/api/onboarding/skip'
+      preLoaderRoute: typeof ApiOnboardingSkipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/status': {
+      id: '/api/onboarding/status'
+      path: '/api/onboarding/status'
+      fullPath: '/api/onboarding/status'
+      preLoaderRoute: typeof ApiOnboardingStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/': {
+      id: '/api/organizations/'
+      path: '/api/organizations'
+      fullPath: '/api/organizations/'
+      preLoaderRoute: typeof ApiOrganizationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/activity': {
+      id: '/api/organizations/activity'
+      path: '/api/organizations/activity'
+      fullPath: '/api/organizations/activity'
+      preLoaderRoute: typeof ApiOrganizationsActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/deletion': {
+      id: '/api/organizations/deletion'
+      path: '/api/organizations/deletion'
+      fullPath: '/api/organizations/deletion'
+      preLoaderRoute: typeof ApiOrganizationsDeletionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/switch': {
+      id: '/api/organizations/switch'
+      path: '/api/organizations/switch'
+      fullPath: '/api/organizations/switch'
+      preLoaderRoute: typeof ApiOrganizationsSwitchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/team': {
+      id: '/api/organizations/team'
+      path: '/api/organizations/team'
+      fullPath: '/api/organizations/team'
+      preLoaderRoute: typeof ApiOrganizationsTeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/transfer-ownership': {
+      id: '/api/organizations/transfer-ownership'
+      path: '/api/organizations/transfer-ownership'
+      fullPath: '/api/organizations/transfer-ownership'
+      preLoaderRoute: typeof ApiOrganizationsTransferOwnershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/transfer-ownership-preview': {
+      id: '/api/organizations/transfer-ownership-preview'
+      path: '/api/organizations/transfer-ownership-preview'
+      fullPath: '/api/organizations/transfer-ownership-preview'
+      preLoaderRoute: typeof ApiOrganizationsTransferOwnershipPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plans/me': {
+      id: '/api/plans/me'
+      path: '/api/plans/me'
+      fullPath: '/api/plans/me'
+      preLoaderRoute: typeof ApiPlansMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/portfolio/$claimId': {
+      id: '/api/portfolio/$claimId'
+      path: '/api/portfolio/$claimId'
+      fullPath: '/api/portfolio/$claimId'
+      preLoaderRoute: typeof ApiPortfolioClaimIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/privacy/profile-removal': {
+      id: '/api/privacy/profile-removal'
+      path: '/api/privacy/profile-removal'
+      fullPath: '/api/privacy/profile-removal'
+      preLoaderRoute: typeof ApiPrivacyProfileRemovalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/queries/': {
+      id: '/api/queries/'
+      path: '/api/queries'
+      fullPath: '/api/queries/'
+      preLoaderRoute: typeof ApiQueriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/recommendations/': {
+      id: '/api/recommendations/'
+      path: '/api/recommendations'
+      fullPath: '/api/recommendations/'
+      preLoaderRoute: typeof ApiRecommendationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/roadmap/': {
+      id: '/api/roadmap/'
+      path: '/api/roadmap'
+      fullPath: '/api/roadmap/'
+      preLoaderRoute: typeof ApiRoadmapIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/search/builders': {
+      id: '/api/search/builders'
+      path: '/api/search/builders'
+      fullPath: '/api/search/builders'
+      preLoaderRoute: typeof ApiSearchBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/search/semantic': {
+      id: '/api/search/semantic'
+      path: '/api/search/semantic'
+      fullPath: '/api/search/semantic'
+      preLoaderRoute: typeof ApiSearchSemanticRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/billing-state': {
+      id: '/api/solutions/billing-state'
+      path: '/api/solutions/billing-state'
+      fullPath: '/api/solutions/billing-state'
+      preLoaderRoute: typeof ApiSolutionsBillingStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/briefs': {
+      id: '/api/solutions/briefs'
+      path: '/api/solutions/briefs'
+      fullPath: '/api/solutions/briefs'
+      preLoaderRoute: typeof ApiSolutionsBriefsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/config': {
+      id: '/api/solutions/config'
+      path: '/api/solutions/config'
+      fullPath: '/api/solutions/config'
+      preLoaderRoute: typeof ApiSolutionsConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/generate': {
+      id: '/api/solutions/generate'
+      path: '/api/solutions/generate'
+      fullPath: '/api/solutions/generate'
+      preLoaderRoute: typeof ApiSolutionsGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/runs': {
+      id: '/api/solutions/runs'
+      path: '/api/solutions/runs'
+      fullPath: '/api/solutions/runs'
+      preLoaderRoute: typeof ApiSolutionsRunsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sprints/': {
+      id: '/api/sprints/'
+      path: '/api/sprints'
+      fullPath: '/api/sprints/'
+      preLoaderRoute: typeof ApiSprintsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sprints/$sprintId': {
+      id: '/api/sprints/$sprintId'
+      path: '/api/sprints/$sprintId'
+      fullPath: '/api/sprints/$sprintId'
+      preLoaderRoute: typeof ApiSprintsSprintIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sprints/preview': {
+      id: '/api/sprints/preview'
+      path: '/api/sprints/preview'
+      fullPath: '/api/sprints/preview'
+      preLoaderRoute: typeof ApiSprintsPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/status/': {
+      id: '/api/status/'
+      path: '/api/status'
+      fullPath: '/api/status/'
+      preLoaderRoute: typeof ApiStatusIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/status/subscribe': {
+      id: '/api/status/subscribe'
+      path: '/api/status/subscribe'
+      fullPath: '/api/status/subscribe'
+      preLoaderRoute: typeof ApiStatusSubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/status/summary': {
+      id: '/api/status/summary'
+      path: '/api/status/summary'
+      fullPath: '/api/status/summary'
+      preLoaderRoute: typeof ApiStatusSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/stripe': {
+      id: '/api/webhooks/stripe'
+      path: '/api/webhooks/stripe'
+      fullPath: '/api/webhooks/stripe'
+      preLoaderRoute: typeof ApiWebhooksStripeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-samples/': {
+      id: '/api/work-samples/'
+      path: '/api/work-samples'
+      fullPath: '/api/work-samples/'
+      preLoaderRoute: typeof ApiWorkSamplesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-samples/$id': {
+      id: '/api/work-samples/$id'
+      path: '/api/work-samples/$id'
+      fullPath: '/api/work-samples/$id'
+      preLoaderRoute: typeof ApiWorkSamplesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-samples/analyze': {
+      id: '/api/work-samples/analyze'
+      path: '/api/work-samples/analyze'
+      fullPath: '/api/work-samples/analyze'
+      preLoaderRoute: typeof ApiWorkSamplesAnalyzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/team/invite/$invitationId': {
+      id: '/team/invite/$invitationId'
+      path: '/team/invite/$invitationId'
+      fullPath: '/team/invite/$invitationId'
+      preLoaderRoute: typeof TeamInviteInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_dashboard/builder/$builderId/': {
+      id: '/_dashboard/builder/$builderId/'
+      path: '/builder/$builderId'
+      fullPath: '/builder/$builderId/'
+      preLoaderRoute: typeof DashboardBuilderBuilderIdIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/interviews/$interviewId/': {
+      id: '/_dashboard/interviews/$interviewId/'
+      path: '/interviews/$interviewId'
+      fullPath: '/interviews/$interviewId/'
+      preLoaderRoute: typeof DashboardInterviewsInterviewIdIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/interviews/$interviewId/live': {
+      id: '/_dashboard/interviews/$interviewId/live'
+      path: '/interviews/$interviewId/live'
+      fullPath: '/interviews/$interviewId/live'
+      preLoaderRoute: typeof DashboardInterviewsInterviewIdLiveRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/settings/billing/': {
@@ -5101,585 +5121,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsBillingIndexRouteImport
       parentRoute: typeof DashboardSettingsBillingRoute
     }
-    '/_dashboard/interviews/$interviewId/': {
-      id: '/_dashboard/interviews/$interviewId/'
-      path: '/interviews/$interviewId'
-      fullPath: '/interviews/$interviewId/'
-      preLoaderRoute: typeof DashboardInterviewsInterviewIdIndexRouteImport
+    '/_dashboard/settings/billing/return': {
+      id: '/_dashboard/settings/billing/return'
+      path: '/return'
+      fullPath: '/settings/billing/return'
+      preLoaderRoute: typeof DashboardSettingsBillingReturnRouteImport
+      parentRoute: typeof DashboardSettingsBillingRoute
+    }
+    '/_dashboard/sprints/$sprintId/': {
+      id: '/_dashboard/sprints/$sprintId/'
+      path: '/sprints/$sprintId'
+      fullPath: '/sprints/$sprintId/'
+      preLoaderRoute: typeof DashboardSprintsSprintIdIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/builder/$builderId/': {
-      id: '/_dashboard/builder/$builderId/'
-      path: '/builder/$builderId'
-      fullPath: '/builder/$builderId/'
-      preLoaderRoute: typeof DashboardBuilderBuilderIdIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/api/sprints/$sprintId/results': {
-      id: '/api/sprints/$sprintId/results'
-      path: '/results'
-      fullPath: '/api/sprints/$sprintId/results'
-      preLoaderRoute: typeof ApiSprintsSprintIdResultsRouteImport
-      parentRoute: typeof ApiSprintsSprintIdRoute
-    }
-    '/api/solutions/runs/$runId': {
-      id: '/api/solutions/runs/$runId'
-      path: '/$runId'
-      fullPath: '/api/solutions/runs/$runId'
-      preLoaderRoute: typeof ApiSolutionsRunsRunIdRouteImport
-      parentRoute: typeof ApiSolutionsRunsRoute
-    }
-    '/api/solutions/briefs/$briefId': {
-      id: '/api/solutions/briefs/$briefId'
-      path: '/$briefId'
-      fullPath: '/api/solutions/briefs/$briefId'
-      preLoaderRoute: typeof ApiSolutionsBriefsBriefIdRouteImport
-      parentRoute: typeof ApiSolutionsBriefsRoute
-    }
-    '/api/scheduling/invitations/$invitationId': {
-      id: '/api/scheduling/invitations/$invitationId'
-      path: '/api/scheduling/invitations/$invitationId'
-      fullPath: '/api/scheduling/invitations/$invitationId'
-      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/queries/$id/visibility': {
-      id: '/api/queries/$id/visibility'
-      path: '/api/queries/$id/visibility'
-      fullPath: '/api/queries/$id/visibility'
-      preLoaderRoute: typeof ApiQueriesIdVisibilityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/queries/$id/share': {
-      id: '/api/queries/$id/share'
-      path: '/api/queries/$id/share'
-      fullPath: '/api/queries/$id/share'
-      preLoaderRoute: typeof ApiQueriesIdShareRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/queries/$id/feed-capability': {
-      id: '/api/queries/$id/feed-capability'
-      path: '/api/queries/$id/feed-capability'
-      fullPath: '/api/queries/$id/feed-capability'
-      preLoaderRoute: typeof ApiQueriesIdFeedCapabilityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/privacy/profile-removal/verify': {
-      id: '/api/privacy/profile-removal/verify'
-      path: '/verify'
-      fullPath: '/api/privacy/profile-removal/verify'
-      preLoaderRoute: typeof ApiPrivacyProfileRemovalVerifyRouteImport
-      parentRoute: typeof ApiPrivacyProfileRemovalRoute
-    }
-    '/api/organizations/team/members': {
-      id: '/api/organizations/team/members'
-      path: '/members'
-      fullPath: '/api/organizations/team/members'
-      preLoaderRoute: typeof ApiOrganizationsTeamMembersRouteImport
-      parentRoute: typeof ApiOrganizationsTeamRoute
-    }
-    '/api/organizations/team/invitations': {
-      id: '/api/organizations/team/invitations'
-      path: '/invitations'
-      fullPath: '/api/organizations/team/invitations'
-      preLoaderRoute: typeof ApiOrganizationsTeamInvitationsRouteImport
-      parentRoute: typeof ApiOrganizationsTeamRoute
-    }
-    '/api/organizations/members/$memberId': {
-      id: '/api/organizations/members/$memberId'
-      path: '/api/organizations/members/$memberId'
-      fullPath: '/api/organizations/members/$memberId'
-      preLoaderRoute: typeof ApiOrganizationsMembersMemberIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/invitations/mine': {
-      id: '/api/organizations/invitations/mine'
-      path: '/api/organizations/invitations/mine'
-      fullPath: '/api/organizations/invitations/mine'
-      preLoaderRoute: typeof ApiOrganizationsInvitationsMineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/invitations/$invitationId': {
-      id: '/api/organizations/invitations/$invitationId'
-      path: '/api/organizations/invitations/$invitationId'
-      fullPath: '/api/organizations/invitations/$invitationId'
-      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/deletion/immediate': {
-      id: '/api/organizations/deletion/immediate'
-      path: '/immediate'
-      fullPath: '/api/organizations/deletion/immediate'
-      preLoaderRoute: typeof ApiOrganizationsDeletionImmediateRouteImport
-      parentRoute: typeof ApiOrganizationsDeletionRoute
-    }
-    '/api/me/data-export/$id': {
-      id: '/api/me/data-export/$id'
-      path: '/api/me/data-export/$id'
-      fullPath: '/api/me/data-export/$id'
-      preLoaderRoute: typeof ApiMeDataExportIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/me/builder/$builderId': {
-      id: '/api/me/builder/$builderId'
-      path: '/api/me/builder/$builderId'
-      fullPath: '/api/me/builder/$builderId'
-      preLoaderRoute: typeof ApiMeBuilderBuilderIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/$interviewId/transcription-token': {
-      id: '/api/interviews/$interviewId/transcription-token'
-      path: '/api/interviews/$interviewId/transcription-token'
-      fullPath: '/api/interviews/$interviewId/transcription-token'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdTranscriptionTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/$interviewId/suggestions': {
-      id: '/api/interviews/$interviewId/suggestions'
-      path: '/api/interviews/$interviewId/suggestions'
-      fullPath: '/api/interviews/$interviewId/suggestions'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdSuggestionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/$interviewId/session': {
-      id: '/api/interviews/$interviewId/session'
-      path: '/api/interviews/$interviewId/session'
-      fullPath: '/api/interviews/$interviewId/session'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdSessionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/$interviewId/segments': {
-      id: '/api/interviews/$interviewId/segments'
-      path: '/api/interviews/$interviewId/segments'
-      fullPath: '/api/interviews/$interviewId/segments'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdSegmentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/$interviewId/report': {
-      id: '/api/interviews/$interviewId/report'
-      path: '/api/interviews/$interviewId/report'
-      fullPath: '/api/interviews/$interviewId/report'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdReportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/$interviewId/finalize': {
-      id: '/api/interviews/$interviewId/finalize'
-      path: '/api/interviews/$interviewId/finalize'
-      fullPath: '/api/interviews/$interviewId/finalize'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdFinalizeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/calendar/events/$eventId': {
-      id: '/api/calendar/events/$eventId'
-      path: '/api/calendar/events/$eventId'
-      fullPath: '/api/calendar/events/$eventId'
-      preLoaderRoute: typeof ApiCalendarEventsEventIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/calendar/availability/overrides': {
-      id: '/api/calendar/availability/overrides'
-      path: '/api/calendar/availability/overrides'
-      fullPath: '/api/calendar/availability/overrides'
-      preLoaderRoute: typeof ApiCalendarAvailabilityOverridesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/builders/claim/verify': {
-      id: '/api/builders/claim/verify'
-      path: '/api/builders/claim/verify'
-      fullPath: '/api/builders/claim/verify'
-      preLoaderRoute: typeof ApiBuildersClaimVerifyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/builders/$builderId/views': {
-      id: '/api/builders/$builderId/views'
-      path: '/views'
-      fullPath: '/api/builders/$builderId/views'
-      preLoaderRoute: typeof ApiBuildersBuilderIdViewsRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/timeline': {
-      id: '/api/builders/$builderId/timeline'
-      path: '/timeline'
-      fullPath: '/api/builders/$builderId/timeline'
-      preLoaderRoute: typeof ApiBuildersBuilderIdTimelineRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/synergy': {
-      id: '/api/builders/$builderId/synergy'
-      path: '/synergy'
-      fullPath: '/api/builders/$builderId/synergy'
-      preLoaderRoute: typeof ApiBuildersBuilderIdSynergyRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/notes': {
-      id: '/api/builders/$builderId/notes'
-      path: '/notes'
-      fullPath: '/api/builders/$builderId/notes'
-      preLoaderRoute: typeof ApiBuildersBuilderIdNotesRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/hygiene': {
-      id: '/api/builders/$builderId/hygiene'
-      path: '/hygiene'
-      fullPath: '/api/builders/$builderId/hygiene'
-      preLoaderRoute: typeof ApiBuildersBuilderIdHygieneRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/fingerprint': {
-      id: '/api/builders/$builderId/fingerprint'
-      path: '/fingerprint'
-      fullPath: '/api/builders/$builderId/fingerprint'
-      preLoaderRoute: typeof ApiBuildersBuilderIdFingerprintRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/evidence-refresh': {
-      id: '/api/builders/$builderId/evidence-refresh'
-      path: '/evidence-refresh'
-      fullPath: '/api/builders/$builderId/evidence-refresh'
-      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceRefreshRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/enrichment': {
-      id: '/api/builders/$builderId/enrichment'
-      path: '/enrichment'
-      fullPath: '/api/builders/$builderId/enrichment'
-      preLoaderRoute: typeof ApiBuildersBuilderIdEnrichmentRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/claim': {
-      id: '/api/builders/$builderId/claim'
-      path: '/claim'
-      fullPath: '/api/builders/$builderId/claim'
-      preLoaderRoute: typeof ApiBuildersBuilderIdClaimRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/billing/subscription/preview': {
-      id: '/api/billing/subscription/preview'
-      path: '/api/billing/subscription/preview'
-      fullPath: '/api/billing/subscription/preview'
-      preLoaderRoute: typeof ApiBillingSubscriptionPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/subscription/change': {
-      id: '/api/billing/subscription/change'
-      path: '/api/billing/subscription/change'
-      fullPath: '/api/billing/subscription/change'
-      preLoaderRoute: typeof ApiBillingSubscriptionChangeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/subscription/cancel': {
-      id: '/api/billing/subscription/cancel'
-      path: '/api/billing/subscription/cancel'
-      fullPath: '/api/billing/subscription/cancel'
-      preLoaderRoute: typeof ApiBillingSubscriptionCancelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/contact/verify': {
-      id: '/api/billing/contact/verify'
-      path: '/verify'
-      fullPath: '/api/billing/contact/verify'
-      preLoaderRoute: typeof ApiBillingContactVerifyRouteImport
-      parentRoute: typeof ApiBillingContactRoute
-    }
-    '/api/billing/checkout/subscription': {
-      id: '/api/billing/checkout/subscription'
-      path: '/api/billing/checkout/subscription'
-      fullPath: '/api/billing/checkout/subscription'
-      preLoaderRoute: typeof ApiBillingCheckoutSubscriptionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/checkout/status': {
-      id: '/api/billing/checkout/status'
-      path: '/api/billing/checkout/status'
-      fullPath: '/api/billing/checkout/status'
-      preLoaderRoute: typeof ApiBillingCheckoutStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/billing/checkout/credits': {
-      id: '/api/billing/checkout/credits'
-      path: '/api/billing/checkout/credits'
-      fullPath: '/api/billing/checkout/credits'
-      preLoaderRoute: typeof ApiBillingCheckoutCreditsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/alerts/triggers/unread-count': {
-      id: '/api/alerts/triggers/unread-count'
-      path: '/api/alerts/triggers/unread-count'
-      fullPath: '/api/alerts/triggers/unread-count'
-      preLoaderRoute: typeof ApiAlertsTriggersUnreadCountRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/alerts/triggers/$id': {
-      id: '/api/alerts/triggers/$id'
-      path: '/api/alerts/triggers/$id'
-      fullPath: '/api/alerts/triggers/$id'
-      preLoaderRoute: typeof ApiAlertsTriggersIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/alerts/$id/test-send': {
-      id: '/api/alerts/$id/test-send'
-      path: '/test-send'
-      fullPath: '/api/alerts/$id/test-send'
-      preLoaderRoute: typeof ApiAlertsIdTestSendRouteImport
-      parentRoute: typeof ApiAlertsIdRoute
-    }
-    '/api/admin/users/$userId': {
-      id: '/api/admin/users/$userId'
-      path: '/api/admin/users/$userId'
-      fullPath: '/api/admin/users/$userId'
-      preLoaderRoute: typeof ApiAdminUsersUserIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/status/snapshot': {
-      id: '/api/admin/status/snapshot'
-      path: '/api/admin/status/snapshot'
-      fullPath: '/api/admin/status/snapshot'
-      preLoaderRoute: typeof ApiAdminStatusSnapshotRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/sprints/run-worker': {
-      id: '/api/admin/sprints/run-worker'
-      path: '/api/admin/sprints/run-worker'
-      fullPath: '/api/admin/sprints/run-worker'
-      preLoaderRoute: typeof ApiAdminSprintsRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/solutions/sources': {
-      id: '/api/admin/solutions/sources'
-      path: '/api/admin/solutions/sources'
-      fullPath: '/api/admin/solutions/sources'
-      preLoaderRoute: typeof ApiAdminSolutionsSourcesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/solutions/gold-briefs': {
-      id: '/api/admin/solutions/gold-briefs'
-      path: '/api/admin/solutions/gold-briefs'
-      fullPath: '/api/admin/solutions/gold-briefs'
-      preLoaderRoute: typeof ApiAdminSolutionsGoldBriefsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/roadmap/$id': {
-      id: '/api/admin/roadmap/$id'
-      path: '/api/admin/roadmap/$id'
-      fullPath: '/api/admin/roadmap/$id'
-      preLoaderRoute: typeof ApiAdminRoadmapIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/operations/sync-schedules': {
-      id: '/api/admin/operations/sync-schedules'
-      path: '/api/admin/operations/sync-schedules'
-      fullPath: '/api/admin/operations/sync-schedules'
-      preLoaderRoute: typeof ApiAdminOperationsSyncSchedulesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/operations/$jobKey': {
-      id: '/api/admin/operations/$jobKey'
-      path: '/api/admin/operations/$jobKey'
-      fullPath: '/api/admin/operations/$jobKey'
-      preLoaderRoute: typeof ApiAdminOperationsJobKeyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/metrics/trust': {
-      id: '/api/admin/metrics/trust'
-      path: '/api/admin/metrics/trust'
-      fullPath: '/api/admin/metrics/trust'
-      preLoaderRoute: typeof ApiAdminMetricsTrustRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/metrics/sections': {
-      id: '/api/admin/metrics/sections'
-      path: '/api/admin/metrics/sections'
-      fullPath: '/api/admin/metrics/sections'
-      preLoaderRoute: typeof ApiAdminMetricsSectionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/metrics/run-retention': {
-      id: '/api/admin/metrics/run-retention'
-      path: '/api/admin/metrics/run-retention'
-      fullPath: '/api/admin/metrics/run-retention'
-      preLoaderRoute: typeof ApiAdminMetricsRunRetentionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/metrics/overview': {
-      id: '/api/admin/metrics/overview'
-      path: '/api/admin/metrics/overview'
-      fullPath: '/api/admin/metrics/overview'
-      preLoaderRoute: typeof ApiAdminMetricsOverviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/metrics/conversion': {
-      id: '/api/admin/metrics/conversion'
-      path: '/api/admin/metrics/conversion'
-      fullPath: '/api/admin/metrics/conversion'
-      preLoaderRoute: typeof ApiAdminMetricsConversionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/legal/run-worker': {
-      id: '/api/admin/legal/run-worker'
-      path: '/api/admin/legal/run-worker'
-      fullPath: '/api/admin/legal/run-worker'
-      preLoaderRoute: typeof ApiAdminLegalRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/interviews/run-retention': {
-      id: '/api/admin/interviews/run-retention'
-      path: '/api/admin/interviews/run-retention'
-      fullPath: '/api/admin/interviews/run-retention'
-      preLoaderRoute: typeof ApiAdminInterviewsRunRetentionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/incidents/$id': {
-      id: '/api/admin/incidents/$id'
-      path: '/api/admin/incidents/$id'
-      fullPath: '/api/admin/incidents/$id'
-      preLoaderRoute: typeof ApiAdminIncidentsIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/enrichment/run-worker': {
-      id: '/api/admin/enrichment/run-worker'
-      path: '/api/admin/enrichment/run-worker'
-      fullPath: '/api/admin/enrichment/run-worker'
-      preLoaderRoute: typeof ApiAdminEnrichmentRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/embeddings/run-worker': {
-      id: '/api/admin/embeddings/run-worker'
-      path: '/api/admin/embeddings/run-worker'
-      fullPath: '/api/admin/embeddings/run-worker'
-      preLoaderRoute: typeof ApiAdminEmbeddingsRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/documents/run-worker': {
-      id: '/api/admin/documents/run-worker'
-      path: '/api/admin/documents/run-worker'
-      fullPath: '/api/admin/documents/run-worker'
-      preLoaderRoute: typeof ApiAdminDocumentsRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/documents/run-web-imports': {
-      id: '/api/admin/documents/run-web-imports'
-      path: '/api/admin/documents/run-web-imports'
-      fullPath: '/api/admin/documents/run-web-imports'
-      preLoaderRoute: typeof ApiAdminDocumentsRunWebImportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/discovery/run-worker': {
-      id: '/api/admin/discovery/run-worker'
-      path: '/api/admin/discovery/run-worker'
-      fullPath: '/api/admin/discovery/run-worker'
-      preLoaderRoute: typeof ApiAdminDiscoveryRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/devpost/run-worker': {
-      id: '/api/admin/devpost/run-worker'
-      path: '/api/admin/devpost/run-worker'
-      fullPath: '/api/admin/devpost/run-worker'
-      preLoaderRoute: typeof ApiAdminDevpostRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/changelog/$id': {
-      id: '/api/admin/changelog/$id'
-      path: '/api/admin/changelog/$id'
-      fullPath: '/api/admin/changelog/$id'
-      preLoaderRoute: typeof ApiAdminChangelogIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/calendar/run-worker': {
-      id: '/api/admin/calendar/run-worker'
-      path: '/api/admin/calendar/run-worker'
-      fullPath: '/api/admin/calendar/run-worker'
-      preLoaderRoute: typeof ApiAdminCalendarRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/calendar/run-reminders': {
-      id: '/api/admin/calendar/run-reminders'
-      path: '/api/admin/calendar/run-reminders'
-      fullPath: '/api/admin/calendar/run-reminders'
-      preLoaderRoute: typeof ApiAdminCalendarRunRemindersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/run-worker': {
-      id: '/api/admin/billing/run-worker'
-      path: '/api/admin/billing/run-worker'
-      fullPath: '/api/admin/billing/run-worker'
-      preLoaderRoute: typeof ApiAdminBillingRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/risk-exceptions': {
-      id: '/api/admin/billing/risk-exceptions'
-      path: '/api/admin/billing/risk-exceptions'
-      fullPath: '/api/admin/billing/risk-exceptions'
-      preLoaderRoute: typeof ApiAdminBillingRiskExceptionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/refunds': {
-      id: '/api/admin/billing/refunds'
-      path: '/api/admin/billing/refunds'
-      fullPath: '/api/admin/billing/refunds'
-      preLoaderRoute: typeof ApiAdminBillingRefundsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/reconcile': {
-      id: '/api/admin/billing/reconcile'
-      path: '/api/admin/billing/reconcile'
-      fullPath: '/api/admin/billing/reconcile'
-      preLoaderRoute: typeof ApiAdminBillingReconcileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/metrics': {
-      id: '/api/admin/billing/metrics'
-      path: '/api/admin/billing/metrics'
-      fullPath: '/api/admin/billing/metrics'
-      preLoaderRoute: typeof ApiAdminBillingMetricsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/disputes': {
-      id: '/api/admin/billing/disputes'
-      path: '/api/admin/billing/disputes'
-      fullPath: '/api/admin/billing/disputes'
-      preLoaderRoute: typeof ApiAdminBillingDisputesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/configuration': {
-      id: '/api/admin/billing/configuration'
-      path: '/api/admin/billing/configuration'
-      fullPath: '/api/admin/billing/configuration'
-      preLoaderRoute: typeof ApiAdminBillingConfigurationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/beta-mode': {
-      id: '/api/admin/billing/beta-mode'
-      path: '/api/admin/billing/beta-mode'
-      fullPath: '/api/admin/billing/beta-mode'
-      preLoaderRoute: typeof ApiAdminBillingBetaModeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/billing/accounting-export': {
-      id: '/api/admin/billing/accounting-export'
-      path: '/api/admin/billing/accounting-export'
-      fullPath: '/api/admin/billing/accounting-export'
-      preLoaderRoute: typeof ApiAdminBillingAccountingExportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/analytics/run-retention': {
-      id: '/api/admin/analytics/run-retention'
-      path: '/api/admin/analytics/run-retention'
-      fullPath: '/api/admin/analytics/run-retention'
-      preLoaderRoute: typeof ApiAdminAnalyticsRunRetentionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/alerts/run-worker': {
-      id: '/api/admin/alerts/run-worker'
-      path: '/api/admin/alerts/run-worker'
-      fullPath: '/api/admin/alerts/run-worker'
-      preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/activity/run-retention': {
-      id: '/api/admin/activity/run-retention'
-      path: '/api/admin/activity/run-retention'
-      fullPath: '/api/admin/activity/run-retention'
-      preLoaderRoute: typeof ApiAdminActivityRunRetentionRouteImport
+    '/api/admin/abuse/': {
+      id: '/api/admin/abuse/'
+      path: '/api/admin/abuse'
+      fullPath: '/api/admin/abuse/'
+      preLoaderRoute: typeof ApiAdminAbuseIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/abuse/clusters': {
@@ -5689,228 +5149,760 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminAbuseClustersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_dashboard/settings/billing/return': {
-      id: '/_dashboard/settings/billing/return'
-      path: '/return'
-      fullPath: '/settings/billing/return'
-      preLoaderRoute: typeof DashboardSettingsBillingReturnRouteImport
-      parentRoute: typeof DashboardSettingsBillingRoute
-    }
-    '/_dashboard/interviews/$interviewId/live': {
-      id: '/_dashboard/interviews/$interviewId/live'
-      path: '/interviews/$interviewId/live'
-      fullPath: '/interviews/$interviewId/live'
-      preLoaderRoute: typeof DashboardInterviewsInterviewIdLiveRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/api/public/scheduling/$invitationId/': {
-      id: '/api/public/scheduling/$invitationId/'
-      path: '/api/public/scheduling/$invitationId'
-      fullPath: '/api/public/scheduling/$invitationId/'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdIndexRouteImport
+    '/api/admin/access-requests/': {
+      id: '/api/admin/access-requests/'
+      path: '/api/admin/access-requests'
+      fullPath: '/api/admin/access-requests/'
+      preLoaderRoute: typeof ApiAdminAccessRequestsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/lists/$listId/items/': {
-      id: '/api/lists/$listId/items/'
-      path: '/items'
-      fullPath: '/api/lists/$listId/items/'
-      preLoaderRoute: typeof ApiListsListIdItemsIndexRouteImport
-      parentRoute: typeof ApiListsListIdRoute
-    }
-    '/api/interviews/$interviewId/participants/': {
-      id: '/api/interviews/$interviewId/participants/'
-      path: '/api/interviews/$interviewId/participants'
-      fullPath: '/api/interviews/$interviewId/participants/'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdParticipantsIndexRouteImport
+    '/api/admin/activity/run-retention': {
+      id: '/api/admin/activity/run-retention'
+      path: '/api/admin/activity/run-retention'
+      fullPath: '/api/admin/activity/run-retention'
+      preLoaderRoute: typeof ApiAdminActivityRunRetentionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/interviews/$interviewId/brief/': {
-      id: '/api/interviews/$interviewId/brief/'
-      path: '/api/interviews/$interviewId/brief'
-      fullPath: '/api/interviews/$interviewId/brief/'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdBriefIndexRouteImport
+    '/api/admin/alerts/run-worker': {
+      id: '/api/admin/alerts/run-worker'
+      path: '/api/admin/alerts/run-worker'
+      fullPath: '/api/admin/alerts/run-worker'
+      preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/builders/$builderId/evidence/': {
-      id: '/api/builders/$builderId/evidence/'
-      path: '/evidence'
-      fullPath: '/api/builders/$builderId/evidence/'
-      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceIndexRouteImport
+    '/api/admin/analytics/run-retention': {
+      id: '/api/admin/analytics/run-retention'
+      path: '/api/admin/analytics/run-retention'
+      fullPath: '/api/admin/analytics/run-retention'
+      preLoaderRoute: typeof ApiAdminAnalyticsRunRetentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/accounting-export': {
+      id: '/api/admin/billing/accounting-export'
+      path: '/api/admin/billing/accounting-export'
+      fullPath: '/api/admin/billing/accounting-export'
+      preLoaderRoute: typeof ApiAdminBillingAccountingExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/beta-mode': {
+      id: '/api/admin/billing/beta-mode'
+      path: '/api/admin/billing/beta-mode'
+      fullPath: '/api/admin/billing/beta-mode'
+      preLoaderRoute: typeof ApiAdminBillingBetaModeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/configuration': {
+      id: '/api/admin/billing/configuration'
+      path: '/api/admin/billing/configuration'
+      fullPath: '/api/admin/billing/configuration'
+      preLoaderRoute: typeof ApiAdminBillingConfigurationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/disputes': {
+      id: '/api/admin/billing/disputes'
+      path: '/api/admin/billing/disputes'
+      fullPath: '/api/admin/billing/disputes'
+      preLoaderRoute: typeof ApiAdminBillingDisputesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/metrics': {
+      id: '/api/admin/billing/metrics'
+      path: '/api/admin/billing/metrics'
+      fullPath: '/api/admin/billing/metrics'
+      preLoaderRoute: typeof ApiAdminBillingMetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/reconcile': {
+      id: '/api/admin/billing/reconcile'
+      path: '/api/admin/billing/reconcile'
+      fullPath: '/api/admin/billing/reconcile'
+      preLoaderRoute: typeof ApiAdminBillingReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/refunds': {
+      id: '/api/admin/billing/refunds'
+      path: '/api/admin/billing/refunds'
+      fullPath: '/api/admin/billing/refunds'
+      preLoaderRoute: typeof ApiAdminBillingRefundsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/risk-exceptions': {
+      id: '/api/admin/billing/risk-exceptions'
+      path: '/api/admin/billing/risk-exceptions'
+      fullPath: '/api/admin/billing/risk-exceptions'
+      preLoaderRoute: typeof ApiAdminBillingRiskExceptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/run-worker': {
+      id: '/api/admin/billing/run-worker'
+      path: '/api/admin/billing/run-worker'
+      fullPath: '/api/admin/billing/run-worker'
+      preLoaderRoute: typeof ApiAdminBillingRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/builder-claims/': {
+      id: '/api/admin/builder-claims/'
+      path: '/api/admin/builder-claims'
+      fullPath: '/api/admin/builder-claims/'
+      preLoaderRoute: typeof ApiAdminBuilderClaimsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/calendar/run-reminders': {
+      id: '/api/admin/calendar/run-reminders'
+      path: '/api/admin/calendar/run-reminders'
+      fullPath: '/api/admin/calendar/run-reminders'
+      preLoaderRoute: typeof ApiAdminCalendarRunRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/calendar/run-worker': {
+      id: '/api/admin/calendar/run-worker'
+      path: '/api/admin/calendar/run-worker'
+      fullPath: '/api/admin/calendar/run-worker'
+      preLoaderRoute: typeof ApiAdminCalendarRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/changelog/': {
+      id: '/api/admin/changelog/'
+      path: '/api/admin/changelog'
+      fullPath: '/api/admin/changelog/'
+      preLoaderRoute: typeof ApiAdminChangelogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/changelog/$id': {
+      id: '/api/admin/changelog/$id'
+      path: '/api/admin/changelog/$id'
+      fullPath: '/api/admin/changelog/$id'
+      preLoaderRoute: typeof ApiAdminChangelogIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/devpost/run-worker': {
+      id: '/api/admin/devpost/run-worker'
+      path: '/api/admin/devpost/run-worker'
+      fullPath: '/api/admin/devpost/run-worker'
+      preLoaderRoute: typeof ApiAdminDevpostRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/discovery/run-worker': {
+      id: '/api/admin/discovery/run-worker'
+      path: '/api/admin/discovery/run-worker'
+      fullPath: '/api/admin/discovery/run-worker'
+      preLoaderRoute: typeof ApiAdminDiscoveryRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/documents/run-web-imports': {
+      id: '/api/admin/documents/run-web-imports'
+      path: '/api/admin/documents/run-web-imports'
+      fullPath: '/api/admin/documents/run-web-imports'
+      preLoaderRoute: typeof ApiAdminDocumentsRunWebImportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/documents/run-worker': {
+      id: '/api/admin/documents/run-worker'
+      path: '/api/admin/documents/run-worker'
+      fullPath: '/api/admin/documents/run-worker'
+      preLoaderRoute: typeof ApiAdminDocumentsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/embeddings/run-worker': {
+      id: '/api/admin/embeddings/run-worker'
+      path: '/api/admin/embeddings/run-worker'
+      fullPath: '/api/admin/embeddings/run-worker'
+      preLoaderRoute: typeof ApiAdminEmbeddingsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/enrichment/run-worker': {
+      id: '/api/admin/enrichment/run-worker'
+      path: '/api/admin/enrichment/run-worker'
+      fullPath: '/api/admin/enrichment/run-worker'
+      preLoaderRoute: typeof ApiAdminEnrichmentRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/human-links/': {
+      id: '/api/admin/human-links/'
+      path: '/api/admin/human-links'
+      fullPath: '/api/admin/human-links/'
+      preLoaderRoute: typeof ApiAdminHumanLinksIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/incidents/': {
+      id: '/api/admin/incidents/'
+      path: '/api/admin/incidents'
+      fullPath: '/api/admin/incidents/'
+      preLoaderRoute: typeof ApiAdminIncidentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/incidents/$id': {
+      id: '/api/admin/incidents/$id'
+      path: '/api/admin/incidents/$id'
+      fullPath: '/api/admin/incidents/$id'
+      preLoaderRoute: typeof ApiAdminIncidentsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/integrations/': {
+      id: '/api/admin/integrations/'
+      path: '/api/admin/integrations'
+      fullPath: '/api/admin/integrations/'
+      preLoaderRoute: typeof ApiAdminIntegrationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/interviews/run-retention': {
+      id: '/api/admin/interviews/run-retention'
+      path: '/api/admin/interviews/run-retention'
+      fullPath: '/api/admin/interviews/run-retention'
+      preLoaderRoute: typeof ApiAdminInterviewsRunRetentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/legal/run-worker': {
+      id: '/api/admin/legal/run-worker'
+      path: '/api/admin/legal/run-worker'
+      fullPath: '/api/admin/legal/run-worker'
+      preLoaderRoute: typeof ApiAdminLegalRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/': {
+      id: '/api/admin/metrics/'
+      path: '/api/admin/metrics'
+      fullPath: '/api/admin/metrics/'
+      preLoaderRoute: typeof ApiAdminMetricsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/conversion': {
+      id: '/api/admin/metrics/conversion'
+      path: '/api/admin/metrics/conversion'
+      fullPath: '/api/admin/metrics/conversion'
+      preLoaderRoute: typeof ApiAdminMetricsConversionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/overview': {
+      id: '/api/admin/metrics/overview'
+      path: '/api/admin/metrics/overview'
+      fullPath: '/api/admin/metrics/overview'
+      preLoaderRoute: typeof ApiAdminMetricsOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/run-retention': {
+      id: '/api/admin/metrics/run-retention'
+      path: '/api/admin/metrics/run-retention'
+      fullPath: '/api/admin/metrics/run-retention'
+      preLoaderRoute: typeof ApiAdminMetricsRunRetentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/sections': {
+      id: '/api/admin/metrics/sections'
+      path: '/api/admin/metrics/sections'
+      fullPath: '/api/admin/metrics/sections'
+      preLoaderRoute: typeof ApiAdminMetricsSectionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/metrics/trust': {
+      id: '/api/admin/metrics/trust'
+      path: '/api/admin/metrics/trust'
+      fullPath: '/api/admin/metrics/trust'
+      preLoaderRoute: typeof ApiAdminMetricsTrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/operations/': {
+      id: '/api/admin/operations/'
+      path: '/api/admin/operations'
+      fullPath: '/api/admin/operations/'
+      preLoaderRoute: typeof ApiAdminOperationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/operations/$jobKey': {
+      id: '/api/admin/operations/$jobKey'
+      path: '/api/admin/operations/$jobKey'
+      fullPath: '/api/admin/operations/$jobKey'
+      preLoaderRoute: typeof ApiAdminOperationsJobKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/operations/sync-schedules': {
+      id: '/api/admin/operations/sync-schedules'
+      path: '/api/admin/operations/sync-schedules'
+      fullPath: '/api/admin/operations/sync-schedules'
+      preLoaderRoute: typeof ApiAdminOperationsSyncSchedulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/roadmap/': {
+      id: '/api/admin/roadmap/'
+      path: '/api/admin/roadmap'
+      fullPath: '/api/admin/roadmap/'
+      preLoaderRoute: typeof ApiAdminRoadmapIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/roadmap/$id': {
+      id: '/api/admin/roadmap/$id'
+      path: '/api/admin/roadmap/$id'
+      fullPath: '/api/admin/roadmap/$id'
+      preLoaderRoute: typeof ApiAdminRoadmapIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/seo/': {
+      id: '/api/admin/seo/'
+      path: '/api/admin/seo'
+      fullPath: '/api/admin/seo/'
+      preLoaderRoute: typeof ApiAdminSeoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/solutions/gold-briefs': {
+      id: '/api/admin/solutions/gold-briefs'
+      path: '/api/admin/solutions/gold-briefs'
+      fullPath: '/api/admin/solutions/gold-briefs'
+      preLoaderRoute: typeof ApiAdminSolutionsGoldBriefsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/solutions/sources': {
+      id: '/api/admin/solutions/sources'
+      path: '/api/admin/solutions/sources'
+      fullPath: '/api/admin/solutions/sources'
+      preLoaderRoute: typeof ApiAdminSolutionsSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/sprints/run-worker': {
+      id: '/api/admin/sprints/run-worker'
+      path: '/api/admin/sprints/run-worker'
+      fullPath: '/api/admin/sprints/run-worker'
+      preLoaderRoute: typeof ApiAdminSprintsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/status/snapshot': {
+      id: '/api/admin/status/snapshot'
+      path: '/api/admin/status/snapshot'
+      fullPath: '/api/admin/status/snapshot'
+      preLoaderRoute: typeof ApiAdminStatusSnapshotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/users/': {
+      id: '/api/admin/users/'
+      path: '/api/admin/users'
+      fullPath: '/api/admin/users/'
+      preLoaderRoute: typeof ApiAdminUsersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/users/$userId': {
+      id: '/api/admin/users/$userId'
+      path: '/api/admin/users/$userId'
+      fullPath: '/api/admin/users/$userId'
+      preLoaderRoute: typeof ApiAdminUsersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts/$id/test-send': {
+      id: '/api/alerts/$id/test-send'
+      path: '/test-send'
+      fullPath: '/api/alerts/$id/test-send'
+      preLoaderRoute: typeof ApiAlertsIdTestSendRouteImport
+      parentRoute: typeof ApiAlertsIdRoute
+    }
+    '/api/alerts/triggers/': {
+      id: '/api/alerts/triggers/'
+      path: '/api/alerts/triggers'
+      fullPath: '/api/alerts/triggers/'
+      preLoaderRoute: typeof ApiAlertsTriggersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts/triggers/$id': {
+      id: '/api/alerts/triggers/$id'
+      path: '/api/alerts/triggers/$id'
+      fullPath: '/api/alerts/triggers/$id'
+      preLoaderRoute: typeof ApiAlertsTriggersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts/triggers/unread-count': {
+      id: '/api/alerts/triggers/unread-count'
+      path: '/api/alerts/triggers/unread-count'
+      fullPath: '/api/alerts/triggers/unread-count'
+      preLoaderRoute: typeof ApiAlertsTriggersUnreadCountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/checkout/credits': {
+      id: '/api/billing/checkout/credits'
+      path: '/api/billing/checkout/credits'
+      fullPath: '/api/billing/checkout/credits'
+      preLoaderRoute: typeof ApiBillingCheckoutCreditsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/checkout/status': {
+      id: '/api/billing/checkout/status'
+      path: '/api/billing/checkout/status'
+      fullPath: '/api/billing/checkout/status'
+      preLoaderRoute: typeof ApiBillingCheckoutStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/checkout/subscription': {
+      id: '/api/billing/checkout/subscription'
+      path: '/api/billing/checkout/subscription'
+      fullPath: '/api/billing/checkout/subscription'
+      preLoaderRoute: typeof ApiBillingCheckoutSubscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/contact/verify': {
+      id: '/api/billing/contact/verify'
+      path: '/verify'
+      fullPath: '/api/billing/contact/verify'
+      preLoaderRoute: typeof ApiBillingContactVerifyRouteImport
+      parentRoute: typeof ApiBillingContactRoute
+    }
+    '/api/billing/subscription/cancel': {
+      id: '/api/billing/subscription/cancel'
+      path: '/api/billing/subscription/cancel'
+      fullPath: '/api/billing/subscription/cancel'
+      preLoaderRoute: typeof ApiBillingSubscriptionCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/subscription/change': {
+      id: '/api/billing/subscription/change'
+      path: '/api/billing/subscription/change'
+      fullPath: '/api/billing/subscription/change'
+      preLoaderRoute: typeof ApiBillingSubscriptionChangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/subscription/preview': {
+      id: '/api/billing/subscription/preview'
+      path: '/api/billing/subscription/preview'
+      fullPath: '/api/billing/subscription/preview'
+      preLoaderRoute: typeof ApiBillingSubscriptionPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/builders/$builderId/claim': {
+      id: '/api/builders/$builderId/claim'
+      path: '/claim'
+      fullPath: '/api/builders/$builderId/claim'
+      preLoaderRoute: typeof ApiBuildersBuilderIdClaimRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/enrichment': {
+      id: '/api/builders/$builderId/enrichment'
+      path: '/enrichment'
+      fullPath: '/api/builders/$builderId/enrichment'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEnrichmentRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/evidence-refresh': {
+      id: '/api/builders/$builderId/evidence-refresh'
+      path: '/evidence-refresh'
+      fullPath: '/api/builders/$builderId/evidence-refresh'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceRefreshRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/fingerprint': {
+      id: '/api/builders/$builderId/fingerprint'
+      path: '/fingerprint'
+      fullPath: '/api/builders/$builderId/fingerprint'
+      preLoaderRoute: typeof ApiBuildersBuilderIdFingerprintRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/hygiene': {
+      id: '/api/builders/$builderId/hygiene'
+      path: '/hygiene'
+      fullPath: '/api/builders/$builderId/hygiene'
+      preLoaderRoute: typeof ApiBuildersBuilderIdHygieneRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/notes': {
+      id: '/api/builders/$builderId/notes'
+      path: '/notes'
+      fullPath: '/api/builders/$builderId/notes'
+      preLoaderRoute: typeof ApiBuildersBuilderIdNotesRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/synergy': {
+      id: '/api/builders/$builderId/synergy'
+      path: '/synergy'
+      fullPath: '/api/builders/$builderId/synergy'
+      preLoaderRoute: typeof ApiBuildersBuilderIdSynergyRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/timeline': {
+      id: '/api/builders/$builderId/timeline'
+      path: '/timeline'
+      fullPath: '/api/builders/$builderId/timeline'
+      preLoaderRoute: typeof ApiBuildersBuilderIdTimelineRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/views': {
+      id: '/api/builders/$builderId/views'
+      path: '/views'
+      fullPath: '/api/builders/$builderId/views'
+      preLoaderRoute: typeof ApiBuildersBuilderIdViewsRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/claim/candidates': {
+      id: '/api/builders/claim/candidates'
+      path: '/api/builders/claim/candidates'
+      fullPath: '/api/builders/claim/candidates'
+      preLoaderRoute: typeof ApiBuildersClaimCandidatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/builders/claim/verify': {
+      id: '/api/builders/claim/verify'
+      path: '/api/builders/claim/verify'
+      fullPath: '/api/builders/claim/verify'
+      preLoaderRoute: typeof ApiBuildersClaimVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/builders/recent/': {
+      id: '/api/builders/recent/'
+      path: '/api/builders/recent'
+      fullPath: '/api/builders/recent/'
+      preLoaderRoute: typeof ApiBuildersRecentIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/availability/': {
+      id: '/api/calendar/availability/'
+      path: '/api/calendar/availability'
+      fullPath: '/api/calendar/availability/'
+      preLoaderRoute: typeof ApiCalendarAvailabilityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/availability/overrides': {
+      id: '/api/calendar/availability/overrides'
+      path: '/api/calendar/availability/overrides'
+      fullPath: '/api/calendar/availability/overrides'
+      preLoaderRoute: typeof ApiCalendarAvailabilityOverridesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/events/': {
+      id: '/api/calendar/events/'
+      path: '/api/calendar/events'
+      fullPath: '/api/calendar/events/'
+      preLoaderRoute: typeof ApiCalendarEventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/events/$eventId': {
+      id: '/api/calendar/events/$eventId'
+      path: '/api/calendar/events/$eventId'
+      fullPath: '/api/calendar/events/$eventId'
+      preLoaderRoute: typeof ApiCalendarEventsEventIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/finalize': {
+      id: '/api/interviews/$interviewId/finalize'
+      path: '/api/interviews/$interviewId/finalize'
+      fullPath: '/api/interviews/$interviewId/finalize'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdFinalizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/report': {
+      id: '/api/interviews/$interviewId/report'
+      path: '/api/interviews/$interviewId/report'
+      fullPath: '/api/interviews/$interviewId/report'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/segments': {
+      id: '/api/interviews/$interviewId/segments'
+      path: '/api/interviews/$interviewId/segments'
+      fullPath: '/api/interviews/$interviewId/segments'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdSegmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/session': {
+      id: '/api/interviews/$interviewId/session'
+      path: '/api/interviews/$interviewId/session'
+      fullPath: '/api/interviews/$interviewId/session'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/suggestions': {
+      id: '/api/interviews/$interviewId/suggestions'
+      path: '/api/interviews/$interviewId/suggestions'
+      fullPath: '/api/interviews/$interviewId/suggestions'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdSuggestionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/transcription-token': {
+      id: '/api/interviews/$interviewId/transcription-token'
+      path: '/api/interviews/$interviewId/transcription-token'
+      fullPath: '/api/interviews/$interviewId/transcription-token'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdTranscriptionTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/builder/': {
+      id: '/api/me/builder/'
+      path: '/api/me/builder'
+      fullPath: '/api/me/builder/'
+      preLoaderRoute: typeof ApiMeBuilderIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/builder/$builderId': {
+      id: '/api/me/builder/$builderId'
+      path: '/api/me/builder/$builderId'
+      fullPath: '/api/me/builder/$builderId'
+      preLoaderRoute: typeof ApiMeBuilderBuilderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/builders/': {
+      id: '/api/me/builders/'
+      path: '/api/me/builders'
+      fullPath: '/api/me/builders/'
+      preLoaderRoute: typeof ApiMeBuildersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/data-export/': {
+      id: '/api/me/data-export/'
+      path: '/api/me/data-export'
+      fullPath: '/api/me/data-export/'
+      preLoaderRoute: typeof ApiMeDataExportIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/data-export/$id': {
+      id: '/api/me/data-export/$id'
+      path: '/api/me/data-export/$id'
+      fullPath: '/api/me/data-export/$id'
+      preLoaderRoute: typeof ApiMeDataExportIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/delete-account/': {
+      id: '/api/me/delete-account/'
+      path: '/api/me/delete-account'
+      fullPath: '/api/me/delete-account/'
+      preLoaderRoute: typeof ApiMeDeleteAccountIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/preferences/': {
+      id: '/api/me/preferences/'
+      path: '/api/me/preferences'
+      fullPath: '/api/me/preferences/'
+      preLoaderRoute: typeof ApiMePreferencesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/sessions/': {
+      id: '/api/me/sessions/'
+      path: '/api/me/sessions'
+      fullPath: '/api/me/sessions/'
+      preLoaderRoute: typeof ApiMeSessionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/stepup/': {
+      id: '/api/me/stepup/'
+      path: '/api/me/stepup'
+      fullPath: '/api/me/stepup/'
+      preLoaderRoute: typeof ApiMeStepupIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/v2/': {
+      id: '/api/onboarding/v2/'
+      path: '/api/onboarding/v2'
+      fullPath: '/api/onboarding/v2/'
+      preLoaderRoute: typeof ApiOnboardingV2IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/deletion/immediate': {
+      id: '/api/organizations/deletion/immediate'
+      path: '/immediate'
+      fullPath: '/api/organizations/deletion/immediate'
+      preLoaderRoute: typeof ApiOrganizationsDeletionImmediateRouteImport
+      parentRoute: typeof ApiOrganizationsDeletionRoute
+    }
+    '/api/organizations/invitations/': {
+      id: '/api/organizations/invitations/'
+      path: '/api/organizations/invitations'
+      fullPath: '/api/organizations/invitations/'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/invitations/$invitationId': {
+      id: '/api/organizations/invitations/$invitationId'
+      path: '/api/organizations/invitations/$invitationId'
+      fullPath: '/api/organizations/invitations/$invitationId'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/invitations/mine': {
+      id: '/api/organizations/invitations/mine'
+      path: '/api/organizations/invitations/mine'
+      fullPath: '/api/organizations/invitations/mine'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsMineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/members/$memberId': {
+      id: '/api/organizations/members/$memberId'
+      path: '/api/organizations/members/$memberId'
+      fullPath: '/api/organizations/members/$memberId'
+      preLoaderRoute: typeof ApiOrganizationsMembersMemberIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/team/invitations': {
+      id: '/api/organizations/team/invitations'
+      path: '/invitations'
+      fullPath: '/api/organizations/team/invitations'
+      preLoaderRoute: typeof ApiOrganizationsTeamInvitationsRouteImport
+      parentRoute: typeof ApiOrganizationsTeamRoute
+    }
+    '/api/organizations/team/members': {
+      id: '/api/organizations/team/members'
+      path: '/members'
+      fullPath: '/api/organizations/team/members'
+      preLoaderRoute: typeof ApiOrganizationsTeamMembersRouteImport
+      parentRoute: typeof ApiOrganizationsTeamRoute
+    }
+    '/api/privacy/profile-removal/verify': {
+      id: '/api/privacy/profile-removal/verify'
+      path: '/verify'
+      fullPath: '/api/privacy/profile-removal/verify'
+      preLoaderRoute: typeof ApiPrivacyProfileRemovalVerifyRouteImport
+      parentRoute: typeof ApiPrivacyProfileRemovalRoute
+    }
+    '/api/queries/$id/feed-capability': {
+      id: '/api/queries/$id/feed-capability'
+      path: '/api/queries/$id/feed-capability'
+      fullPath: '/api/queries/$id/feed-capability'
+      preLoaderRoute: typeof ApiQueriesIdFeedCapabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/queries/$id/share': {
+      id: '/api/queries/$id/share'
+      path: '/api/queries/$id/share'
+      fullPath: '/api/queries/$id/share'
+      preLoaderRoute: typeof ApiQueriesIdShareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/queries/$id/visibility': {
+      id: '/api/queries/$id/visibility'
+      path: '/api/queries/$id/visibility'
+      fullPath: '/api/queries/$id/visibility'
+      preLoaderRoute: typeof ApiQueriesIdVisibilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/scheduling/invitations/': {
+      id: '/api/scheduling/invitations/'
+      path: '/api/scheduling/invitations'
+      fullPath: '/api/scheduling/invitations/'
+      preLoaderRoute: typeof ApiSchedulingInvitationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/scheduling/invitations/$invitationId': {
+      id: '/api/scheduling/invitations/$invitationId'
+      path: '/api/scheduling/invitations/$invitationId'
+      fullPath: '/api/scheduling/invitations/$invitationId'
+      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/briefs/$briefId': {
+      id: '/api/solutions/briefs/$briefId'
+      path: '/$briefId'
+      fullPath: '/api/solutions/briefs/$briefId'
+      preLoaderRoute: typeof ApiSolutionsBriefsBriefIdRouteImport
+      parentRoute: typeof ApiSolutionsBriefsRoute
+    }
+    '/api/solutions/runs/$runId': {
+      id: '/api/solutions/runs/$runId'
+      path: '/$runId'
+      fullPath: '/api/solutions/runs/$runId'
+      preLoaderRoute: typeof ApiSolutionsRunsRunIdRouteImport
+      parentRoute: typeof ApiSolutionsRunsRoute
+    }
+    '/api/sprints/$sprintId/results': {
+      id: '/api/sprints/$sprintId/results'
+      path: '/results'
+      fullPath: '/api/sprints/$sprintId/results'
+      preLoaderRoute: typeof ApiSprintsSprintIdResultsRouteImport
+      parentRoute: typeof ApiSprintsSprintIdRoute
     }
     '/api/admin/billing/events/': {
       id: '/api/admin/billing/events/'
       path: '/api/admin/billing/events'
       fullPath: '/api/admin/billing/events/'
       preLoaderRoute: typeof ApiAdminBillingEventsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/scheduling/invitations/$invitationId/send': {
-      id: '/api/scheduling/invitations/$invitationId/send'
-      path: '/send'
-      fullPath: '/api/scheduling/invitations/$invitationId/send'
-      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdSendRouteImport
-      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
-    }
-    '/api/scheduling/invitations/$invitationId/revoke': {
-      id: '/api/scheduling/invitations/$invitationId/revoke'
-      path: '/revoke'
-      fullPath: '/api/scheduling/invitations/$invitationId/revoke'
-      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRevokeRouteImport
-      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
-    }
-    '/api/public/scheduling/$invitationId/withdraw': {
-      id: '/api/public/scheduling/$invitationId/withdraw'
-      path: '/api/public/scheduling/$invitationId/withdraw'
-      fullPath: '/api/public/scheduling/$invitationId/withdraw'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/uploads': {
-      id: '/api/public/scheduling/$invitationId/uploads'
-      path: '/api/public/scheduling/$invitationId/uploads'
-      fullPath: '/api/public/scheduling/$invitationId/uploads'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdUploadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/submission': {
-      id: '/api/public/scheduling/$invitationId/submission'
-      path: '/api/public/scheduling/$invitationId/submission'
-      fullPath: '/api/public/scheduling/$invitationId/submission'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSubmissionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/slots': {
-      id: '/api/public/scheduling/$invitationId/slots'
-      path: '/api/public/scheduling/$invitationId/slots'
-      fullPath: '/api/public/scheduling/$invitationId/slots'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSlotsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/session': {
-      id: '/api/public/scheduling/$invitationId/session'
-      path: '/api/public/scheduling/$invitationId/session'
-      fullPath: '/api/public/scheduling/$invitationId/session'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSessionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/reschedule': {
-      id: '/api/public/scheduling/$invitationId/reschedule'
-      path: '/api/public/scheduling/$invitationId/reschedule'
-      fullPath: '/api/public/scheduling/$invitationId/reschedule'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdRescheduleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/decline': {
-      id: '/api/public/scheduling/$invitationId/decline'
-      path: '/api/public/scheduling/$invitationId/decline'
-      fullPath: '/api/public/scheduling/$invitationId/decline'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdDeclineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/cancel': {
-      id: '/api/public/scheduling/$invitationId/cancel'
-      path: '/api/public/scheduling/$invitationId/cancel'
-      fullPath: '/api/public/scheduling/$invitationId/cancel'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdCancelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/scheduling/$invitationId/book': {
-      id: '/api/public/scheduling/$invitationId/book'
-      path: '/api/public/scheduling/$invitationId/book'
-      fullPath: '/api/public/scheduling/$invitationId/book'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdBookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/invitations/$invitationId/review': {
-      id: '/api/organizations/invitations/$invitationId/review'
-      path: '/review'
-      fullPath: '/api/organizations/invitations/$invitationId/review'
-      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdReviewRouteImport
-      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
-    }
-    '/api/organizations/invitations/$invitationId/reject': {
-      id: '/api/organizations/invitations/$invitationId/reject'
-      path: '/reject'
-      fullPath: '/api/organizations/invitations/$invitationId/reject'
-      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRejectRouteImport
-      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
-    }
-    '/api/organizations/invitations/$invitationId/accept': {
-      id: '/api/organizations/invitations/$invitationId/accept'
-      path: '/accept'
-      fullPath: '/api/organizations/invitations/$invitationId/accept'
-      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRouteImport
-      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
-    }
-    '/api/me/builder/$builderId/restrict-processing': {
-      id: '/api/me/builder/$builderId/restrict-processing'
-      path: '/restrict-processing'
-      fullPath: '/api/me/builder/$builderId/restrict-processing'
-      preLoaderRoute: typeof ApiMeBuilderBuilderIdRestrictProcessingRouteImport
-      parentRoute: typeof ApiMeBuilderBuilderIdRoute
-    }
-    '/api/me/builder/$builderId/evidence-provenance': {
-      id: '/api/me/builder/$builderId/evidence-provenance'
-      path: '/evidence-provenance'
-      fullPath: '/api/me/builder/$builderId/evidence-provenance'
-      preLoaderRoute: typeof ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport
-      parentRoute: typeof ApiMeBuilderBuilderIdRoute
-    }
-    '/api/me/builder-claims/$claimId/portfolio': {
-      id: '/api/me/builder-claims/$claimId/portfolio'
-      path: '/api/me/builder-claims/$claimId/portfolio'
-      fullPath: '/api/me/builder-claims/$claimId/portfolio'
-      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/lists/$listId/items/$itemId': {
-      id: '/api/lists/$listId/items/$itemId'
-      path: '/items/$itemId'
-      fullPath: '/api/lists/$listId/items/$itemId'
-      preLoaderRoute: typeof ApiListsListIdItemsItemIdRouteImport
-      parentRoute: typeof ApiListsListIdRoute
-    }
-    '/api/interviews/$interviewId/participants/$participantId': {
-      id: '/api/interviews/$interviewId/participants/$participantId'
-      path: '/api/interviews/$interviewId/participants/$participantId'
-      fullPath: '/api/interviews/$interviewId/participants/$participantId'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/interviews/$interviewId/brief/$version': {
-      id: '/api/interviews/$interviewId/brief/$version'
-      path: '/api/interviews/$interviewId/brief/$version'
-      fullPath: '/api/interviews/$interviewId/brief/$version'
-      preLoaderRoute: typeof ApiInterviewsInterviewIdBriefVersionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/builders/$builderId/evidence/$evidenceId': {
-      id: '/api/builders/$builderId/evidence/$evidenceId'
-      path: '/evidence/$evidenceId'
-      fullPath: '/api/builders/$builderId/evidence/$evidenceId'
-      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdRoute
-    }
-    '/api/builders/$builderId/claim/verify': {
-      id: '/api/builders/$builderId/claim/verify'
-      path: '/verify'
-      fullPath: '/api/builders/$builderId/claim/verify'
-      preLoaderRoute: typeof ApiBuildersBuilderIdClaimVerifyRouteImport
-      parentRoute: typeof ApiBuildersBuilderIdClaimRoute
-    }
-    '/api/admin/operations/$jobKey/run': {
-      id: '/api/admin/operations/$jobKey/run'
-      path: '/run'
-      fullPath: '/api/admin/operations/$jobKey/run'
-      preLoaderRoute: typeof ApiAdminOperationsJobKeyRunRouteImport
-      parentRoute: typeof ApiAdminOperationsJobKeyRoute
-    }
-    '/api/admin/builder-claims/$claimId/revoke': {
-      id: '/api/admin/builder-claims/$claimId/revoke'
-      path: '/api/admin/builder-claims/$claimId/revoke'
-      fullPath: '/api/admin/builder-claims/$claimId/revoke'
-      preLoaderRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/billing/events/$eventId': {
@@ -5920,19 +5912,208 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBillingEventsEventIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/builder-claims/$claimId/portfolio/unpublish': {
-      id: '/api/me/builder-claims/$claimId/portfolio/unpublish'
-      path: '/unpublish'
-      fullPath: '/api/me/builder-claims/$claimId/portfolio/unpublish'
-      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport
-      parentRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRoute
+    '/api/admin/builder-claims/$claimId/revoke': {
+      id: '/api/admin/builder-claims/$claimId/revoke'
+      path: '/api/admin/builder-claims/$claimId/revoke'
+      fullPath: '/api/admin/builder-claims/$claimId/revoke'
+      preLoaderRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/me/builder-claims/$claimId/portfolio/publish': {
-      id: '/api/me/builder-claims/$claimId/portfolio/publish'
-      path: '/publish'
-      fullPath: '/api/me/builder-claims/$claimId/portfolio/publish'
-      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport
-      parentRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRoute
+    '/api/admin/operations/$jobKey/run': {
+      id: '/api/admin/operations/$jobKey/run'
+      path: '/run'
+      fullPath: '/api/admin/operations/$jobKey/run'
+      preLoaderRoute: typeof ApiAdminOperationsJobKeyRunRouteImport
+      parentRoute: typeof ApiAdminOperationsJobKeyRoute
+    }
+    '/api/builders/$builderId/claim/verify': {
+      id: '/api/builders/$builderId/claim/verify'
+      path: '/verify'
+      fullPath: '/api/builders/$builderId/claim/verify'
+      preLoaderRoute: typeof ApiBuildersBuilderIdClaimVerifyRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdClaimRoute
+    }
+    '/api/builders/$builderId/evidence/': {
+      id: '/api/builders/$builderId/evidence/'
+      path: '/evidence'
+      fullPath: '/api/builders/$builderId/evidence/'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceIndexRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/builders/$builderId/evidence/$evidenceId': {
+      id: '/api/builders/$builderId/evidence/$evidenceId'
+      path: '/evidence/$evidenceId'
+      fullPath: '/api/builders/$builderId/evidence/$evidenceId'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/interviews/$interviewId/brief/': {
+      id: '/api/interviews/$interviewId/brief/'
+      path: '/api/interviews/$interviewId/brief'
+      fullPath: '/api/interviews/$interviewId/brief/'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdBriefIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/brief/$version': {
+      id: '/api/interviews/$interviewId/brief/$version'
+      path: '/api/interviews/$interviewId/brief/$version'
+      fullPath: '/api/interviews/$interviewId/brief/$version'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdBriefVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/participants/': {
+      id: '/api/interviews/$interviewId/participants/'
+      path: '/api/interviews/$interviewId/participants'
+      fullPath: '/api/interviews/$interviewId/participants/'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdParticipantsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/participants/$participantId': {
+      id: '/api/interviews/$interviewId/participants/$participantId'
+      path: '/api/interviews/$interviewId/participants/$participantId'
+      fullPath: '/api/interviews/$interviewId/participants/$participantId'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lists/$listId/items/': {
+      id: '/api/lists/$listId/items/'
+      path: '/items'
+      fullPath: '/api/lists/$listId/items/'
+      preLoaderRoute: typeof ApiListsListIdItemsIndexRouteImport
+      parentRoute: typeof ApiListsListIdRoute
+    }
+    '/api/lists/$listId/items/$itemId': {
+      id: '/api/lists/$listId/items/$itemId'
+      path: '/items/$itemId'
+      fullPath: '/api/lists/$listId/items/$itemId'
+      preLoaderRoute: typeof ApiListsListIdItemsItemIdRouteImport
+      parentRoute: typeof ApiListsListIdRoute
+    }
+    '/api/me/builder-claims/$claimId/portfolio': {
+      id: '/api/me/builder-claims/$claimId/portfolio'
+      path: '/api/me/builder-claims/$claimId/portfolio'
+      fullPath: '/api/me/builder-claims/$claimId/portfolio'
+      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/builder/$builderId/evidence-provenance': {
+      id: '/api/me/builder/$builderId/evidence-provenance'
+      path: '/evidence-provenance'
+      fullPath: '/api/me/builder/$builderId/evidence-provenance'
+      preLoaderRoute: typeof ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport
+      parentRoute: typeof ApiMeBuilderBuilderIdRoute
+    }
+    '/api/me/builder/$builderId/restrict-processing': {
+      id: '/api/me/builder/$builderId/restrict-processing'
+      path: '/restrict-processing'
+      fullPath: '/api/me/builder/$builderId/restrict-processing'
+      preLoaderRoute: typeof ApiMeBuilderBuilderIdRestrictProcessingRouteImport
+      parentRoute: typeof ApiMeBuilderBuilderIdRoute
+    }
+    '/api/organizations/invitations/$invitationId/accept': {
+      id: '/api/organizations/invitations/$invitationId/accept'
+      path: '/accept'
+      fullPath: '/api/organizations/invitations/$invitationId/accept'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
+    }
+    '/api/organizations/invitations/$invitationId/reject': {
+      id: '/api/organizations/invitations/$invitationId/reject'
+      path: '/reject'
+      fullPath: '/api/organizations/invitations/$invitationId/reject'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRejectRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
+    }
+    '/api/organizations/invitations/$invitationId/review': {
+      id: '/api/organizations/invitations/$invitationId/review'
+      path: '/review'
+      fullPath: '/api/organizations/invitations/$invitationId/review'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdReviewRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
+    }
+    '/api/public/scheduling/$invitationId/': {
+      id: '/api/public/scheduling/$invitationId/'
+      path: '/api/public/scheduling/$invitationId'
+      fullPath: '/api/public/scheduling/$invitationId/'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/book': {
+      id: '/api/public/scheduling/$invitationId/book'
+      path: '/api/public/scheduling/$invitationId/book'
+      fullPath: '/api/public/scheduling/$invitationId/book'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdBookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/cancel': {
+      id: '/api/public/scheduling/$invitationId/cancel'
+      path: '/api/public/scheduling/$invitationId/cancel'
+      fullPath: '/api/public/scheduling/$invitationId/cancel'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/decline': {
+      id: '/api/public/scheduling/$invitationId/decline'
+      path: '/api/public/scheduling/$invitationId/decline'
+      fullPath: '/api/public/scheduling/$invitationId/decline'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdDeclineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/reschedule': {
+      id: '/api/public/scheduling/$invitationId/reschedule'
+      path: '/api/public/scheduling/$invitationId/reschedule'
+      fullPath: '/api/public/scheduling/$invitationId/reschedule'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdRescheduleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/session': {
+      id: '/api/public/scheduling/$invitationId/session'
+      path: '/api/public/scheduling/$invitationId/session'
+      fullPath: '/api/public/scheduling/$invitationId/session'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/slots': {
+      id: '/api/public/scheduling/$invitationId/slots'
+      path: '/api/public/scheduling/$invitationId/slots'
+      fullPath: '/api/public/scheduling/$invitationId/slots'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSlotsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/submission': {
+      id: '/api/public/scheduling/$invitationId/submission'
+      path: '/api/public/scheduling/$invitationId/submission'
+      fullPath: '/api/public/scheduling/$invitationId/submission'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSubmissionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/uploads': {
+      id: '/api/public/scheduling/$invitationId/uploads'
+      path: '/api/public/scheduling/$invitationId/uploads'
+      fullPath: '/api/public/scheduling/$invitationId/uploads'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdUploadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/withdraw': {
+      id: '/api/public/scheduling/$invitationId/withdraw'
+      path: '/api/public/scheduling/$invitationId/withdraw'
+      fullPath: '/api/public/scheduling/$invitationId/withdraw'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/scheduling/invitations/$invitationId/revoke': {
+      id: '/api/scheduling/invitations/$invitationId/revoke'
+      path: '/revoke'
+      fullPath: '/api/scheduling/invitations/$invitationId/revoke'
+      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRevokeRouteImport
+      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
+    }
+    '/api/scheduling/invitations/$invitationId/send': {
+      id: '/api/scheduling/invitations/$invitationId/send'
+      path: '/send'
+      fullPath: '/api/scheduling/invitations/$invitationId/send'
+      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdSendRouteImport
+      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
     }
     '/api/admin/billing/events/$eventId/replay': {
       id: '/api/admin/billing/events/$eventId/replay'
@@ -5941,12 +6122,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBillingEventsEventIdReplayRouteImport
       parentRoute: typeof ApiAdminBillingEventsEventIdRoute
     }
-    '/api/scheduling/invitations/$invitationId/documents/$documentId/download': {
-      id: '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
-      path: '/documents/$documentId/download'
-      fullPath: '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
-      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRouteImport
-      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
+    '/api/me/builder-claims/$claimId/portfolio/publish': {
+      id: '/api/me/builder-claims/$claimId/portfolio/publish'
+      path: '/publish'
+      fullPath: '/api/me/builder-claims/$claimId/portfolio/publish'
+      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport
+      parentRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRoute
+    }
+    '/api/me/builder-claims/$claimId/portfolio/unpublish': {
+      id: '/api/me/builder-claims/$claimId/portfolio/unpublish'
+      path: '/unpublish'
+      fullPath: '/api/me/builder-claims/$claimId/portfolio/unpublish'
+      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport
+      parentRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRoute
+    }
+    '/api/public/scheduling/$invitationId/links/$linkId/import': {
+      id: '/api/public/scheduling/$invitationId/links/$linkId/import'
+      path: '/api/public/scheduling/$invitationId/links/$linkId/import'
+      fullPath: '/api/public/scheduling/$invitationId/links/$linkId/import'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/scheduling/$invitationId/uploads/$documentId/complete': {
       id: '/api/public/scheduling/$invitationId/uploads/$documentId/complete'
@@ -5955,12 +6150,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRouteImport
       parentRoute: typeof ApiPublicSchedulingInvitationIdUploadsRoute
     }
-    '/api/public/scheduling/$invitationId/links/$linkId/import': {
-      id: '/api/public/scheduling/$invitationId/links/$linkId/import'
-      path: '/api/public/scheduling/$invitationId/links/$linkId/import'
-      fullPath: '/api/public/scheduling/$invitationId/links/$linkId/import'
-      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport
-      parentRoute: typeof rootRouteImport
+    '/api/scheduling/invitations/$invitationId/documents/$documentId/download': {
+      id: '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
+      path: '/documents/$documentId/download'
+      fullPath: '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
+      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRouteImport
+      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
     }
   }
 }
@@ -6093,6 +6288,9 @@ interface LandingRouteRouteChildren {
   LandingStatusRoute: typeof LandingStatusRoute
   LandingIndexRoute: typeof LandingIndexRoute
   LandingBlogSlugRoute: typeof LandingBlogSlugRoute
+  LandingForBuildersRoute: typeof LandingForBuildersRoute
+  LandingForHiringTeamsRoute: typeof LandingForHiringTeamsRoute
+  LandingForInvestorsRoute: typeof LandingForInvestorsRoute
   LandingLegalCookiesRoute: typeof LandingLegalCookiesRoute
   LandingLegalImprintRoute: typeof LandingLegalImprintRoute
   LandingLegalPrivacyRoute: typeof LandingLegalPrivacyRoute
@@ -6111,6 +6309,9 @@ const LandingRouteRouteChildren: LandingRouteRouteChildren = {
   LandingStatusRoute: LandingStatusRoute,
   LandingIndexRoute: LandingIndexRoute,
   LandingBlogSlugRoute: LandingBlogSlugRoute,
+  LandingForBuildersRoute: LandingForBuildersRoute,
+  LandingForHiringTeamsRoute: LandingForHiringTeamsRoute,
+  LandingForInvestorsRoute: LandingForInvestorsRoute,
   LandingLegalCookiesRoute: LandingLegalCookiesRoute,
   LandingLegalImprintRoute: LandingLegalImprintRoute,
   LandingLegalPrivacyRoute: LandingLegalPrivacyRoute,
@@ -6143,6 +6344,9 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 )
 
 interface OnboardingRouteRouteChildren {
+  OnboardingBuildingRoute: typeof OnboardingBuildingRoute
+  OnboardingGoalRoute: typeof OnboardingGoalRoute
+  OnboardingInvestingRoute: typeof OnboardingInvestingRoute
   OnboardingSaveRoute: typeof OnboardingSaveRoute
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
@@ -6150,6 +6354,9 @@ interface OnboardingRouteRouteChildren {
 }
 
 const OnboardingRouteRouteChildren: OnboardingRouteRouteChildren = {
+  OnboardingBuildingRoute: OnboardingBuildingRoute,
+  OnboardingGoalRoute: OnboardingGoalRoute,
+  OnboardingInvestingRoute: OnboardingInvestingRoute,
   OnboardingSaveRoute: OnboardingSaveRoute,
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,
@@ -6476,6 +6683,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCalendarFeedRoute: ApiCalendarFeedRoute,
   ApiCalendarNotificationsRoute: ApiCalendarNotificationsRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
+  ApiDashboardContextRoute: ApiDashboardContextRoute,
   ApiDashboardOrganizationAdminRoute: ApiDashboardOrganizationAdminRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,
   ApiDashboardPreferencesRoute: ApiDashboardPreferencesRoute,
@@ -6577,6 +6785,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingSubscriptionCancelRoute: ApiBillingSubscriptionCancelRoute,
   ApiBillingSubscriptionChangeRoute: ApiBillingSubscriptionChangeRoute,
   ApiBillingSubscriptionPreviewRoute: ApiBillingSubscriptionPreviewRoute,
+  ApiBuildersClaimCandidatesRoute: ApiBuildersClaimCandidatesRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiCalendarAvailabilityOverridesRoute: ApiCalendarAvailabilityOverridesRoute,
   ApiCalendarEventsEventIdRoute: ApiCalendarEventsEventIdRoute,
@@ -6619,8 +6828,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeBuildersIndexRoute: ApiMeBuildersIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
+  ApiMePreferencesIndexRoute: ApiMePreferencesIndexRoute,
   ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
   ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
+  ApiOnboardingV2IndexRoute: ApiOnboardingV2IndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
   ApiSchedulingInvitationsIndexRoute: ApiSchedulingInvitationsIndexRoute,
   ApiAdminBillingEventsEventIdRoute:

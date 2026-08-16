@@ -123,3 +123,239 @@ describe('computeConversionRate', () => {
     expect(smallWidth).toBeGreaterThan(largeWidth)
   })
 })
+
+/**
+ * Segmentation events (plan: phase-2/02-segmentacion-usuarios).
+ *
+ * The stream already refused free text and identity; what these events add is *which* choice
+ * somebody made, which is an enum on both ends. The rules worth pinning are the two the schema
+ * cannot express on its own: context is required on exactly the events that describe a choice, and
+ * forbidden on the ones that do not — a landing event carrying segment context would mean a surface
+ * is sending data it has no business holding.
+ */
+describe('segment events', () => {
+  const base = {
+    sessionId: '11111111-2222-4333-8444-555555555555',
+    variant: 'baseline' as const,
+    occurredAt: '2026-08-14T10:00:00.000Z',
+  }
+  const context = { previous: null, next: 'hiring' as const, source: 'settings' as const }
+
+  it('accepts a selection carrying its context', () => {
+    const result = parseConversionEvent({
+      ...base, name: 'segment_selected', surface: 'settings', segment: context,
+    })
+    expect(result.ok).toBe(true)
+    expect(result.event?.segment).toEqual(context)
+  })
+
+  it('accepts a change from one segment to another, and a clear', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'segment_changed', surface: 'settings',
+      segment: { previous: 'hiring', next: 'investing', source: 'settings' },
+    }).ok).toBe(true)
+
+    // Clearing is a real event; `next: null` is the whole point of the field being nullable.
+    expect(parseConversionEvent({
+      ...base, name: 'segment_changed', surface: 'settings',
+      segment: { previous: 'hiring', next: null, source: 'settings' },
+    }).ok).toBe(true)
+  })
+
+  it('refuses a segment event with no context, because it would be uncountable', () => {
+    const result = parseConversionEvent({ ...base, name: 'segment_selected', surface: 'settings' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/requires segment context/)
+  })
+
+  it('refuses segment context on an event that is not about a segment', () => {
+    const result = parseConversionEvent({ ...base, name: 'landing_view', surface: 'hero', segment: context })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/must not carry segment context/)
+  })
+
+  it('refuses anything in the context that is not one of the three allowed fields', () => {
+    for (const extra of ['email', 'name', 'query', 'builderId', 'userId']) {
+      const result = parseConversionEvent({
+        ...base, name: 'segment_selected', surface: 'settings',
+        segment: { ...context, [extra]: 'anything' },
+      })
+      expect(result.ok, `${extra} must be rejected`).toBe(false)
+    }
+  })
+
+  it('keeps each event on the surfaces it can actually happen on', () => {
+    // A skip only exists in a flow that can be skipped.
+    expect(parseConversionEvent({
+      ...base, name: 'segment_skipped', surface: 'onboarding',
+      segment: { previous: null, next: null, source: 'onboarding' },
+    }).ok).toBe(true)
+    expect(parseConversionEvent({
+      ...base, name: 'segment_skipped', surface: 'settings',
+      segment: { previous: null, next: null, source: 'settings' },
+    }).ok).toBe(false)
+    // And no segment event belongs on the landing hero.
+    expect(parseConversionEvent({
+      ...base, name: 'segment_selected', surface: 'hero', segment: context,
+    }).ok).toBe(false)
+  })
+})
+
+describe('activation', () => {
+  const base = {
+    sessionId: '11111111-2222-4333-8444-555555555555',
+    variant: 'baseline' as const,
+    occurredAt: '2026-08-14T10:00:00.000Z',
+  }
+
+  it('requires a coarse activation type', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'activation_reached', surface: 'explore', activationType: 'first_search',
+    }).ok).toBe(true)
+
+    const missing = parseConversionEvent({ ...base, name: 'activation_reached', surface: 'explore' })
+    expect(missing.ok).toBe(false)
+    expect(missing.error).toMatch(/requires activationType/)
+  })
+
+  /** An enum, so "which search" can never be what gets recorded. */
+  it('refuses an activation type outside the list', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'activation_reached', surface: 'explore', activationType: 'searched for rust',
+    }).ok).toBe(false)
+  })
+
+  it('refuses activationType on any other event', () => {
+    const result = parseConversionEvent({
+      ...base, name: 'landing_view', surface: 'hero', activationType: 'first_search',
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/must not carry activationType/)
+  })
+})
+
+/**
+ * The onboarding funnel's context (plan: phase-2/03-onboarding-segmentado).
+ *
+ * The step is a **key**, never v1's step number: `2` is a different screen on each route, so a funnel
+ * keyed on it would add four unrelated things together. And `flowVersion` is what makes the cohort
+ * rollout measurable at all — without it, a fall in completion cannot be told apart from a change in
+ * who was being onboarded that week.
+ */
+describe('the onboarding context', () => {
+  const base = {
+    sessionId: '11111111-2222-4333-8444-555555555555',
+    variant: 'baseline' as const,
+    occurredAt: '2026-08-14T10:00:00.000Z',
+  }
+  const onboarding = { flowVersion: 2 as const, preset: 'investing' as const, stepKey: 'investing_thesis' as const }
+
+  it('accepts a step event carrying version, route and step', () => {
+    for (const name of ['onboarding_step_viewed', 'onboarding_step_completed', 'onboarding_flow_exited']) {
+      const result = parseConversionEvent({ ...base, name, surface: 'onboarding', onboarding })
+      expect(result.ok, name).toBe(true)
+    }
+  })
+
+  it('refuses a step event with no context — it would be uncountable', () => {
+    const result = parseConversionEvent({ ...base, name: 'onboarding_step_viewed', surface: 'onboarding' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/requires onboarding context/)
+  })
+
+  it('refuses onboarding context on an event that has no business carrying it', () => {
+    const result = parseConversionEvent({ ...base, name: 'landing_view', surface: 'hero', onboarding })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/must not carry onboarding context/)
+  })
+
+  /** Closed enums, so a step name or a route cannot arrive as free text. */
+  it('refuses a step key or a preset outside the machine', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'onboarding',
+      onboarding: { ...onboarding, stepKey: 'thinking_about_it' },
+    }).ok).toBe(false)
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'onboarding',
+      onboarding: { ...onboarding, preset: 'recruiter' },
+    }).ok).toBe(false)
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'onboarding',
+      onboarding: { ...onboarding, flowVersion: 3 },
+    }).ok).toBe(false)
+  })
+
+  it('keeps the funnel events off every surface but onboarding', () => {
+    expect(parseConversionEvent({
+      ...base, name: 'onboarding_step_viewed', surface: 'hero', onboarding,
+    }).ok).toBe(false)
+  })
+})
+
+/**
+ * The segmented landing funnel (plan: phase-2/06-landing-segmentada).
+ *
+ * Three events, because the question the funnel has to answer is which of three steps a visitor
+ * stops at: reaching a segment page, choosing a different one, or pressing that page's CTA. They
+ * carry the same segment context as the choice events and mean something else — `next` is which page
+ * this was about, never a stored preference — which is why the contract keeps the two lists apart.
+ */
+describe('the segmented landing funnel', () => {
+  const base = {
+    sessionId: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+    variant: 'baseline' as const,
+    occurredAt: '2026-07-26T10:00:00.000Z',
+    segment: { previous: null, next: 'hiring' as const, source: 'landing' as const },
+  }
+
+  it('accepts each landing event on the surface it belongs to', () => {
+    expect(parseConversionEvent({ ...base, name: 'segment_page_viewed', surface: 'segment_page' }).ok).toBe(true)
+    expect(parseConversionEvent({ ...base, name: 'segment_page_cta_click', surface: 'segment_page' }).ok).toBe(true)
+    // The selector is on the home page and on every segment page, and which one was used is the
+    // difference between arriving undecided and landing on the wrong page.
+    expect(parseConversionEvent({ ...base, name: 'segment_selector_click', surface: 'hero' }).ok).toBe(true)
+    expect(parseConversionEvent({ ...base, name: 'segment_selector_click', surface: 'segment_page' }).ok).toBe(true)
+  })
+
+  it('refuses a landing event from a surface that cannot produce it', () => {
+    for (const surface of ['onboarding', 'settings', 'explore', 'signup']) {
+      const result = parseConversionEvent({ ...base, name: 'segment_page_viewed', surface })
+      expect(result.ok, surface).toBe(false)
+      expect(result.error).toContain('cannot occur on surface')
+    }
+    // A page view is not a hero event either, even though the selector on the hero is.
+    expect(parseConversionEvent({ ...base, name: 'segment_page_viewed', surface: 'hero' }).ok).toBe(false)
+  })
+
+  /** Without the context the event is uncountable: three pages would collapse into one number. */
+  it('requires segment context', () => {
+    for (const name of ['segment_page_viewed', 'segment_selector_click', 'segment_page_cta_click']) {
+      const { segment: _dropped, ...withoutContext } = base
+      const result = parseConversionEvent({ ...withoutContext, name, surface: 'segment_page' })
+      expect(result.ok, name).toBe(false)
+      expect(result.error).toContain('requires segment context')
+    }
+  })
+
+  /** The new surface must not become a way for older events to arrive from somewhere new. */
+  it('does not open the segment_page surface to unrelated events', () => {
+    for (const name of ['landing_view', 'signup_submit', 'onboarding_step_viewed', 'activation_reached']) {
+      const { segment: _dropped, ...withoutContext } = base
+      expect(parseConversionEvent({ ...withoutContext, name, surface: 'segment_page' }).ok, name).toBe(false)
+    }
+  })
+
+  /**
+   * Same rule as everywhere else in this contract: two enums and a source, and nowhere to put a
+   * name, an email or a query. The reliable way to keep PII out is to give it no field to sit in.
+   */
+  it('has nowhere to put free text', () => {
+    const result = parseConversionEvent({
+      ...base,
+      name: 'segment_page_viewed',
+      surface: 'segment_page',
+      referrer: 'https://example.test/?who=someone@example.test',
+    })
+    expect(result.ok).toBe(false)
+  })
+})

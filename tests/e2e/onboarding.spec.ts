@@ -80,6 +80,8 @@ interface Harness {
 
 let harness: Harness
 let toreDown = false
+/** The ambient rollout percentage, put back on teardown — see the note in `beforeAll`. */
+let previousRolloutPercent: string | undefined
 const minted: Principal[] = []
 const seededCacheKeys: string[] = []
 
@@ -102,6 +104,22 @@ test.beforeAll(async () => {
   const workerIndex = Number(process.env.TEST_PARALLEL_INDEX ?? '0')
   const database = await acquireWorkerDatabase(workerIndex)
   const cache = await acquireWorkerRedis(workerIndex)
+
+  /**
+   * This file is about **v1**, so it states the value that makes it v1 instead of inheriting one.
+   *
+   * It used to rely on `ONBOARDING_V2_ROLLOUT_PERCENT` being absent and falling back to `env.ts`'s
+   * default of `0` — which held right up until `.env` started setting it, and then this file would
+   * have failed on the welcome step going to `/onboarding/goal` instead of `/onboarding/search`.
+   * The failure reads as a broken onboarding flow rather than as a spec that assumed its
+   * environment. `onboarding-rollout.spec.ts` owns the other side of the fork and pins its own
+   * percentage the same way.
+   *
+   * Written into `process.env` because that is the only channel to the child server, which inherits
+   * it at spawn; restored in `afterAll` because at `--workers=1` every spec shares this process.
+   */
+  previousRolloutPercent = process.env.ONBOARDING_V2_ROLLOUT_PERCENT
+  process.env.ONBOARDING_V2_ROLLOUT_PERCENT = '0'
 
   let sql: Sql | undefined
   try {
@@ -128,6 +146,10 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (toreDown) return
   toreDown = true
+  // Undone first, so an early failure below still leaves the environment clean for the next spec
+  // in this worker.
+  if (previousRolloutPercent === undefined) delete process.env.ONBOARDING_V2_ROLLOUT_PERCENT
+  else process.env.ONBOARDING_V2_ROLLOUT_PERCENT = previousRolloutPercent
   const h = harness
   if (!h) return
   for (const principal of minted) {
@@ -364,6 +386,14 @@ test('full onboarding journey: welcome → starter query → three saves → suc
       (r) => r.url().includes('/api/onboarding/complete') && r.ok(),
     )
     await page.getByTestId('onboarding-start').click()
+
+    /**
+     * Straight to the search step, with no goal step in between — this is v1, and v1 is what an
+     * account gets while `ONBOARDING_V2_ROLLOUT_PERCENT` is 0, which is the default and what this
+     * harness runs with. The detour through the goal step that used to be here was needed while
+     * `welcome` linked to it unconditionally; the cohort ramp is what removed it.
+     * `onboarding-rollout.spec.ts` owns the other side of that fork.
+     */
     await page.waitForURL(/\/onboarding\/search/)
     await step2Done
     await expect(page.getByRole('heading', { name: 'What are you looking for?' })).toBeVisible()
@@ -399,7 +429,11 @@ test('full onboarding journey: welcome → starter query → three saves → suc
     await finish.click()
     await page.waitForURL(/\/onboarding\/success/)
     await expect(page.getByTestId('onboarding-success')).toBeVisible()
-    await expect(page.getByText('Your radar is live!')).toBeVisible()
+    // The general route's heading. The step is per-route since phase-2/03, so this asserts the
+    // preset it resolved to as well as the words — a segmented account reaching the general copy
+    // would be the failure worth catching here.
+    await expect(page.getByTestId('onboarding-success')).toHaveAttribute('data-preset', 'general')
+    await expect(page.getByTestId('onboarding-success-heading')).toHaveText('Your radar is live')
 
     // Server-side truth: completed + ineligible, the search was saved, and
     // exactly the three builders were tracked in the personal workspace.

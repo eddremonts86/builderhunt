@@ -60,7 +60,17 @@ export async function runDevpostWorker(): Promise<DevpostWorkerResult> {
 
   const browser = await chromium.launch({ headless: true })
   try {
-    const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (compatible; BuilderHuntBot/1.0; +https://builderhunt.eduardoinerarte.dk/about)' })
+    // The `+URL` is the only way a site owner who sees this bot in their logs can find out who we
+    // are and how to stop us, so it has to resolve — see the docstring on
+    // src/routes/_landing/crawler.tsx. This one cited `/about` on the retired
+    // `builderhunt.eduardoinerarte.dk` host: wrong host *and* a path that has never existed, so it
+    // was a dead link on both counts. `ENRICHMENT_DEFAULT_USER_AGENT` (src/lib/enrichment/network.ts)
+    // and `env.ENRICHMENT_USER_AGENT` already name the same page; this is the third copy, and the
+    // one that drifted. `tests/unit/lib/bot-user-agent.test.ts` now compares all three. It keeps the
+    // `Mozilla/5.0 (compatible; …)` shape rather than importing that constant because Devpost
+    // bot-challenges anything that does not look like a browser, which is the whole reason this
+    // connector drives Chromium instead of calling fetch.
+    const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (compatible; BuilderHuntBot/1.0; +https://builderhunt.dev/crawler)' })
     try {
       // A single flaky navigation on the search page (observed live: Devpost
       // occasionally serves an extra client-side redirect that destroys the

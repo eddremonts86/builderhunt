@@ -225,12 +225,39 @@ for glass panels, `24px` for cards. Pills (`9999px`) for badges and eyebrows. Bo
 Nineteen hand-built lists became one shell: `src/shared/components/table/DataTable.tsx`. What it
 looks like is decided here so it is not re-litigated per surface.
 
-**Row height is a table concept, not the dashboard's.** `comfortable` is 40px, `compact` 34px
-(`useTableVirtual.ts`'s `ROW_HEIGHT`). Deliberately *not* bound to the dashboard's `bento`/`sections`
-preference: switching the dashboard's layout must not silently change the row height of every table.
-A surface whose row is a card rather than a line of text declares `rowHeight` instead — search
-results do, at 176px — because the virtualizer measures nothing and a mixed-height list would jump at
-the hundredth row.
+**Every table draws from `--tbl-*` and nothing else.** The complete contract — colours, anatomy,
+densities, fixed column widths, the four deliberate deviations from the supplied reference and why
+each one moved — is in [`docs/visual-system.md`](docs/visual-system.md#tables--the---tbl--visual-contract-plan-phase-314).
+A surface that names a colour, a height or a width of its own is what `pnpm check:table-surfaces`
+rejects. What follows are the decisions a reader of a *column definition* needs.
+
+**Row height is the container's concept, never a cell's.** `sm` 44px, `md` 52px, `lg` 64px
+(`useTableVirtual.ts`'s `ROW_HEIGHT`), inherited through `data-density`. A cell may not choose its
+own: the virtualizer computes every offset as `index * rowHeight`, so one tall cell puts every row
+below it at the wrong position — which looks like the list sliding out from under its own hover
+state. Deliberately *not* bound to the dashboard's `bento`/`sections` preference: switching the
+dashboard's layout must not silently change the row height of every table. A surface whose row is a
+card rather than a line of text declares `rowHeight` instead — search results do, at
+`SEARCH_CARD_ROW_HEIGHT` — because the virtualizer measures nothing and a mixed-height list would
+jump at the hundredth row.
+
+**Every column declares one of nine kinds.** `primary`, `status`, `category`, `date`, `number`,
+`ratio`, `identity`, `empty`, `actions`. The kind decides three things at once: which presentation
+primitive renders the value, how wide the grid track is, and whether the cell may truncate. **Only
+the primary column is flexible** — a date sharing the free width with everything else truncates on a
+narrow screen, and a half-shown date is a wrong date, so status/category/date/number/ratio/actions
+take fixed tracks. Only free text may ellipsize, and it hands over the complete string through
+`title`.
+
+**Colour is for status, never for category.** A `status` cell is a semantic chip in one of five
+tones; a `category` cell is plain text. A grey chip around every category is decoration wearing a
+status chip's clothes, and once every cell is a chip none of them signals anything. Five tones is a
+ceiling, not a palette limit: a reader holds five meanings at once and not nine, and the exact word
+is in the chip's label either way.
+
+**An absence is a fact, so it is rendered.** `EmptyCell` draws a muted em dash and says what the
+absence *is* to a screen reader — "Never run", "No credential required". A blank cell reads as "the
+table failed to render this"; a `'—'` string reads as nothing at all.
 
 **Numbers are `tabular-nums`, never `font-mono`.** `font-variant-numeric: tabular-nums` on an
 `align: 'end'` column, which is what makes a column of amounts line up without changing typeface.

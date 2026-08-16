@@ -127,6 +127,53 @@ const zodEnv = z.object({
   CLAIMABLE_PROFILES_ENABLED: z.enum(['true', 'false']).default('true'),
   // Kill switch for the verified-owner portfolio feature (public /portfolio/$claimId pages).
   PORTFOLIOS_ENABLED: z.enum(['true', 'false']).default('true'),
+  // Plan: phase-2/02-segmentacion-usuarios — the user's primary goal (`hiring | investing |
+  // building | other`). Off by default because the phase README requires this to roll out behind a
+  // flag: the taxonomy is an explicit hypothesis awaiting the phase-5 research, and shipping it
+  // dark lets the contract, the table and the API land without changing what anybody sees.
+  //
+  // Off means *absent*, not hidden: the settings section does not render and
+  // `/api/me/preferences` answers 404. Rows already written survive a flip back to `false` — the
+  // flag governs the interface, never the data.
+  USER_SEGMENTATION_ENABLED: z.enum(['true', 'false']).default('false'),
+  /**
+   * The three public segment pages and the selector that points at them
+   * (plan: phase-2/06-landing-segmentada).
+   *
+   * Off means the pages **do not exist** — `/for/*` answers 404, the selector does not render, and
+   * the sitemap does not list them. Not hidden and not redirected: a public URL that is switched off
+   * but still answers 200 gets indexed, and a redirect to `/` tells a crawler the page moved
+   * permanently to somewhere it did not move to. 404 is the only answer that is true.
+   *
+   * Read on the server and passed down, never read in a component: the sitemap, the routes and the
+   * home page have to agree, and three surfaces each consulting the flag is three chances to
+   * disagree about whether a page exists.
+   */
+  SEGMENTED_LANDING_ENABLED: z.enum(['true', 'false']).default('false'),
+  /**
+   * Percentage of accounts on onboarding v2 (plan: phase-2/03-onboarding-segmentado).
+   *
+   * A percentage rather than a boolean because the spec asks for a cohort ramp with a stop
+   * condition. `0` is the default and means every account keeps the v1 flow — the two live side by
+   * side, so this is a client-side choice of route, not a deploy. The bucket is stable per user
+   * (`onboarding-rollout.ts`), so raising this only ever adds people.
+   *
+   * A string here, like every other flag, and parsed with `parseRolloutPercent` so anything
+   * unreadable clamps to 0. An unreadable percentage must mean "off", never "everybody".
+   */
+  ONBOARDING_V2_ROLLOUT_PERCENT: z.string().default('0'),
+  /**
+   * Whether the dashboard composes from a segment preset (plan: phase-2/04-dashboard-personalizado).
+   *
+   * Off by default, and off means `general` for everybody — the layout every account already has.
+   * Enforced in `/api/dashboard/context`, which answers `presetId: 'general'` regardless of the
+   * stored segment, so there is exactly one place the decision lives and the client needs no branch
+   * that could drift out of step with it.
+   *
+   * A boolean rather than a percentage: unlike onboarding, nobody is ever mid-flow on a dashboard.
+   * Turning this off is a page that reorders on the next load, not somebody stranded.
+   */
+  DASHBOARD_PRESETS_ENABLED: z.enum(['true', 'false']).default('false'),
   // Plan: audit-trust — profile-removal/global-suppression subsystem. Off by default: a new
   // security-critical flow that hashes requester email/challenge with a dedicated key distinct
   // from BETTER_AUTH_SECRET (spec.md: "must not reuse BETTER_AUTH_SECRET").

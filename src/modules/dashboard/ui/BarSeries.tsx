@@ -1,4 +1,6 @@
-// table-surface-ok: the sr-only accessible equivalent of a chart — the same series the bars draw, never a queried collection.
+// table-surface-sr-only: the accessible equivalent of a chart — the same series the bars draw. It
+// carries semantics and no visible chrome on purpose: styling a `.sr-only` table would be styling
+// something nobody can see, and the visual system deliberately has nothing to say about it.
 import * as React from 'react'
 
 /**

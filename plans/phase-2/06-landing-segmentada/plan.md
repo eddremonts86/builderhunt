@@ -1,7 +1,7 @@
 # Plan de entrega — landing segmentada
 
 > **Status**: `pending`
-> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Se extiende el sistema público actual y sus componentes; no se crea una app de
 > marketing separada.

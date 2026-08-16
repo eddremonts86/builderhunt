@@ -21,7 +21,7 @@ import {
   type InvitationIntent,
 } from '~/shared/lib/organizations/invitation-personalization'
 import { Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, IdentityCell, PrimaryCell } from '~/shared/components/table'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery, TableSearch } from '~/shared/lib/table/types'
 import { OrganizationDangerZone } from './OrganizationDangerZone'
@@ -175,21 +175,25 @@ export function TeamSettingsPage({
     {
       id: 'name',
       header: 'Member',
+      // A person: 26px avatar slot, name, and the email on the *second line* rather than in a
+      // column of its own — nobody sorts or filters by it, and it was the first column squeezed
+      // to nothing on a laptop.
+      kind: 'identity',
       priority: 'primary',
       value: (member) => member.name,
       cell: (member) => (
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">
-            {member.name}
-            {member.userId === viewerUserId && <span className="text-bh-text-dim font-normal"> (you)</span>}
-          </span>
-          <span className="block truncate text-xs text-bh-text-muted">{member.email}</span>
-        </span>
+        <IdentityCell
+          name={member.userId === viewerUserId ? `${member.name} (you)` : member.name}
+          meta={member.email}
+        />
       ),
     },
     {
       id: 'role',
       header: 'Role',
+      // Not a status chip: a role is a classification every row has, and the cell is frequently an
+      // editable Select rather than a value at all.
+      kind: 'category',
       value: (member) => member.role,
       cell: (member) => canChangeMemberRole(snapshot.viewerRole, member.role)
         ? (
@@ -223,16 +227,16 @@ export function TeamSettingsPage({
     {
       id: 'joinedAt',
       header: 'Joined',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (member) => member.joinedAt,
-      cell: (member) => new Date(member.joinedAt).toLocaleDateString(),
+      cell: (member) => <DateCell value={member.joinedAt} />,
     },
     {
       id: 'remove',
       header: 'Remove',
-      align: 'end',
+      kind: 'actions',
       value: () => null,
       cell: (member) => canRemoveMember(snapshot.viewerRole, viewerUserId, member)
         ? (
@@ -257,37 +261,37 @@ export function TeamSettingsPage({
     {
       id: 'email',
       header: 'Invitee',
+      kind: 'primary',
       priority: 'primary',
       value: (invitation) => invitation.email,
       cell: (invitation) => (
-        <span className="min-w-0">
-          <span className="block truncate text-sm">{invitation.email}</span>
-          {devLinkByInvitationId?.[invitation.id] && (
-            <span className="block text-xs text-bh-warning">
-              Couldn't send the email — copy the link to share it manually.
-            </span>
-          )}
-        </span>
+        <PrimaryCell
+          title={invitation.email}
+          meta={devLinkByInvitationId?.[invitation.id]
+            ? "Couldn't send the email — copy the link to share it manually."
+            : undefined}
+        />
       ),
     },
     {
       id: 'role',
       header: 'Role',
+      kind: 'category',
       value: (invitation) => invitation.role,
       cell: (invitation) => ROLE_LABEL[invitation.role],
     },
     {
       id: 'expiresAt',
       header: 'Expires',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       value: (invitation) => invitation.expiresAt,
-      cell: (invitation) => new Date(invitation.expiresAt).toLocaleDateString(),
+      cell: (invitation) => <DateCell value={invitation.expiresAt} />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       value: () => null,
       cell: (invitation) => (
         <span className="flex items-center justify-end gap-1">
@@ -361,6 +365,7 @@ export function TeamSettingsPage({
         <div data-testid="members-list">
           <DataTable
             label="Team members"
+            density="lg"
             columns={memberColumns}
             page={membersPage}
             query={membersSearch.query}

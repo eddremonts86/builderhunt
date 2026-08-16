@@ -2,7 +2,7 @@
 import * as React from 'react'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui'
 import { ErrorState } from '~/shared/components/ErrorState'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, EmptyCell, PrimaryCell, StatusCell, type StatusTone } from '~/shared/components/table'
 import { ABUSE_SIGNAL_FILTER_LABELS } from '~/shared/lib/table/capabilities/abuse-signals'
 import {
   emptyTableSearch,
@@ -51,6 +51,19 @@ const ACTION_OPTIONS = [
  * `abuse_signals` feed (with each signal's current enforcement stage) and the linked-account
  * cluster read model (its own pre-existing route from Phase 3) into one review surface, with
  * inline manual actions per account — same expand-a-row-no-modal pattern as `RefundQueue`. */
+/**
+ * Abuse severity is already a three-value scale, so it maps straight onto the shared tones.
+ *
+ * The chip's label still carries the exact word — colour narrows the search, the word is what an
+ * operator quotes in the audit note.
+ */
+const ABUSE_SEVERITY_TONES: Record<string, StatusTone> = {
+  critical: 'danger',
+  high: 'danger',
+  medium: 'warning',
+  low: 'neutral',
+}
+
 export function AbuseConsole() {
   const [page, setPage] = React.useState<PageResult<AbuseSignalRow>>(EMPTY_PAGE)
   const [loaded, setLoaded] = React.useState(false)
@@ -163,36 +176,38 @@ export function AbuseConsole() {
     {
       id: 'type',
       header: 'Type',
+      kind: 'primary',
       sortable: true,
       groupable: true,
       priority: 'primary',
       value: (row) => row.type,
-      cell: (row) => row.type,
+      // The signal's type is what the row *is*; the account it fired for is its metadata, and
+      // giving the id a second line rather than a column of its own is what let the type stop
+      // being squeezed by an opaque uuid nobody sorts by.
+      cell: (row) => <PrimaryCell title={row.type} meta={row.userId ?? undefined} monoMeta />,
     },
-    { id: 'severity', header: 'Severity', value: (row) => row.severity, cell: (row) => row.severity },
     {
-      id: 'user',
-      header: 'User',
-      priority: 'secondary',
-      value: (row) => row.userId,
-      // Deliberately not a monospace face: DESIGN.md:221 reserves it for literal code and keys, and
-      // an opaque id rendered in a table column is neither. `truncate` does the alignment work.
-      cell: (row) => <span className="truncate text-xs">{row.userId ?? '—'}</span>,
+      id: 'severity',
+      header: 'Severity',
+      kind: 'status',
+      value: (row) => row.severity,
+      cell: (row) => <StatusCell label={row.severity} tone={ABUSE_SEVERITY_TONES[row.severity] ?? 'neutral'} />,
     },
     {
       id: 'stage',
       header: 'Stage',
+      kind: 'category',
       priority: 'secondary',
       value: (row) => row.stage?.stage ?? null,
-      cell: (row) => row.stage?.stage ?? '—',
+      cell: (row) => row.stage?.stage ?? <EmptyCell label="No enforcement stage" />,
     },
     {
       id: 'createdAt',
       header: 'Created',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       value: (row) => row.createdAt,
-      cell: (row) => new Date(row.createdAt).toLocaleString(),
+      cell: (row) => <DateCell value={row.createdAt} withTime />,
     },
   ], [])
 

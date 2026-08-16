@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { DataTable } from '~/shared/components/table'
+import { SEARCH_CARD_ROW_HEIGHT } from '~/shared/components/table/useTableVirtual'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import { TABLE_PAGE_SIZE } from '~/shared/lib/table/constants'
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
@@ -265,6 +266,180 @@ describe('the toolbar', () => {
     const headers = [...dom.querySelectorAll('[role="columnheader"]')].map((header) => header.textContent)
     expect(headers.some((text) => text?.includes('Score'))).toBe(false)
     expect(headers.some((text) => text?.includes('Source'))).toBe(true)
+  })
+})
+
+describe('the canonical anatomy', () => {
+  it('is the table container, not a generic card', () => {
+    const dom = render()
+    const shell = dom.querySelector('[data-testid="table-container"]')
+    expect(shell?.className).toContain('tbl-container')
+    // `.card` is 24px-radius with 1.5rem of padding; the reference's table is a 14px-radius clipped
+    // surface whose toolbar sits flush against its own edge. Sharing the class is how the toolbar
+    // ended up inset from the header rule below it.
+    expect(shell?.className).not.toContain('card')
+  })
+
+  it.each([['sm', 44], ['md', 52], ['lg', 64]] as const)('inherits %s density as %spx from the container', (density, height) => {
+    const shell = render({ density }).querySelector('[data-testid="table-container"]') as HTMLElement
+    expect(shell.getAttribute('data-density')).toBe(density)
+    // The one place row height crosses from TypeScript into CSS: `ROW_HEIGHT` is what the
+    // virtualizer offsets by, so writing it back is what stops painted and computed from drifting.
+    expect(shell.style.getPropertyValue('--tbl-row-height')).toBe(`${height}px`)
+  })
+
+  it('defaults to md, the reference\'s default density', () => {
+    expect(render().querySelector('[data-testid="table-container"]')?.getAttribute('data-density')).toBe('md')
+  })
+
+  /** A cell may not choose its own height — see `useTableVirtual.ts`. Density is the container's. */
+  it('lets a specialized renderer name its row height without inventing a fourth density', () => {
+    const shell = render({ rowHeight: SEARCH_CARD_ROW_HEIGHT }).querySelector('[data-testid="table-container"]') as HTMLElement
+    expect(shell.style.getPropertyValue('--tbl-row-height')).toBe('176px')
+  })
+
+  it('gives the toolbar, header and rows their token classes and nothing else', () => {
+    const dom = render()
+    expect(dom.querySelector('[data-testid="table-toolbar"]')?.className).toBe('tbl-toolbar')
+    expect(dom.querySelector('[role="row"][aria-rowindex="1"]')?.className).toContain('tbl-header-row')
+    expect(dom.querySelector('[data-testid="result-r1"]')?.className).toContain('tbl-row')
+  })
+})
+
+describe('column kinds and geometry', () => {
+  const classified: ColumnDef<Result>[] = [
+    { id: 'id', header: 'ID', kind: 'primary', cell: (row) => row.id, priority: 'primary' },
+    { id: 'source', header: 'Source', kind: 'status', cell: (row) => row.source, sortable: true },
+    { id: 'score', header: 'Score', kind: 'number', cell: (row) => row.score, sortable: true },
+  ]
+
+  /**
+   * A date, a status or a number sharing the free width with everything else truncates on a narrow
+   * screen. Only the primary column flexes; the rest take the reference's fixed tracks.
+   */
+  it('lays the row out from the column kinds', () => {
+    const row = render({ columns: classified }).querySelector('[data-testid="result-r1"]') as HTMLElement
+    expect(row.style.gridTemplateColumns)
+      .toBe('var(--tbl-col-primary) var(--tbl-col-status) var(--tbl-col-number)')
+    expect(row.style.columnGap).toBe('var(--tbl-column-gap)')
+  })
+
+  /**
+   * Fixed tracks can want more width than a phone has. Every row carries the same floor so they
+   * stay in column with each other, and the overflow belongs to `.tbl-scroll`, never the document.
+   */
+  it('gives every row and the header the same minimum width', () => {
+    const dom = render({ columns: classified })
+    const header = dom.querySelector('[role="row"][aria-rowindex="1"]') as HTMLElement
+    const row = dom.querySelector('[data-testid="result-r1"]') as HTMLElement
+    expect(row.style.minWidth).toBe('516px') // 240 + 116 + 88 + 2 gaps x 20 + 2 x 16 padding
+    expect(header.style.minWidth).toBe(row.style.minWidth)
+  })
+
+  /**
+   * The header would still render a clickable control announcing `aria-sort`. Ordering a status
+   * column sorts by the internal enum's spelling, which is an order nobody means.
+   */
+  it('refuses a sort affordance on a status column even when the author asked for one', () => {
+    const dom = render({ columns: classified })
+    expect(dom.querySelector('[data-testid="table-sort-source"]')).toBeNull()
+    const header = [...dom.querySelectorAll('[role="columnheader"]')].find((element) => element.textContent?.includes('Source'))
+    expect(header?.getAttribute('aria-sort')).toBeNull()
+    // And still offers it where there is a real order.
+    expect(dom.querySelector('[data-testid="table-sort-score"]')).not.toBeNull()
+  })
+
+  it('leaves unclassified columns on the pre-adoption proportional sizing', () => {
+    const row = render().querySelector('[data-testid="result-r1"]') as HTMLElement
+    expect(row.style.gridTemplateColumns).toContain('minmax(0,')
+    expect(row.style.minWidth).toBe('')
+  })
+})
+
+describe('row variants', () => {
+  /**
+   * The reference's danger/degraded and muted/paused rows. Before this the surfaces tinted one cell
+   * red, which produced a red *status chip* in a row that otherwise looked healthy.
+   */
+  it('paints the whole row from the surface\'s tone', () => {
+    const dom = render({ rowTone: (row) => (row.id === 'r2' ? 'danger' : row.id === 'r3' ? 'muted' : undefined) })
+    expect(dom.querySelector('[data-testid="result-r1"]')?.getAttribute('data-tone')).toBeNull()
+    expect(dom.querySelector('[data-testid="result-r2"]')?.getAttribute('data-tone')).toBe('danger')
+    expect(dom.querySelector('[data-testid="result-r3"]')?.getAttribute('data-tone')).toBe('muted')
+  })
+
+  /** Dimming a row is not a way to disable it: it stays selectable and keyboard-reachable. */
+  it('is presentation only', () => {
+    const dom = render({ rowTone: () => 'muted', selectable: true })
+    const row = dom.querySelector('[data-testid="result-r1"]')
+    expect(row?.getAttribute('aria-disabled')).toBeNull()
+    expect(dom.querySelector('[data-testid="result-r1-select"]')).not.toBeNull()
+  })
+
+  it('marks a selected row as selected, distinctly from a tone', () => {
+    const dom = render({ selectable: true })
+    act(() => { (dom.querySelector('[data-testid="result-r1-select"]') as HTMLElement).click() })
+    expect(dom.querySelector('[data-testid="result-r1"]')?.getAttribute('data-state')).toBe('selected')
+  })
+})
+
+describe('the footer', () => {
+  /**
+   * `X of Y`, and never page numbers. Phase 3 replaced offsets with keyset cursors because an
+   * offset repeats and drops rows when the set changes between two requests — drawing "1 2 3 … 64"
+   * over a cursor API would mean either lying about the buttons or bringing that bug back.
+   */
+  it('says how much of the set is loaded', () => {
+    const dom = render()
+    expect(dom.querySelector('[data-testid="table-footer-count"]')?.textContent).toBe('3 of 214')
+  })
+
+  it('offers the cursor rather than a page number when there is more', () => {
+    const onLoadMore = vi.fn()
+    const dom = render({ onLoadMore })
+    act(() => { (dom.querySelector('[data-testid="table-footer-more"]') as HTMLButtonElement).click() })
+    expect(onLoadMore).toHaveBeenCalled()
+    expect(dom.querySelector('[data-testid="table-footer"]')?.textContent).not.toMatch(/\bPage\b|\b1\s+2\s+3\b/)
+  })
+
+  it('says what it knows when the total is unknowable', () => {
+    const dom = render({ page: { ...page, total: null } })
+    expect(dom.querySelector('[data-testid="table-footer-count"]')?.textContent).toBe('3 loaded')
+  })
+
+  /** A footer reading "10 of 10" under every settings table is furniture. */
+  it('is absent for a small bounded table with no cursor', () => {
+    const rows = Array.from({ length: 6 }, (_, index) => ({ id: `s${index}`, source: 'github', score: index }))
+    const dom = render({ page: { rows, nextCursor: null, total: 6, facets: {} } })
+    expect(dom.querySelector('[data-testid="table-footer"]')).toBeNull()
+  })
+
+  it('is present once the set is bigger than the page', () => {
+    const rows = Array.from({ length: 6 }, (_, index) => ({ id: `s${index}`, source: 'github', score: index }))
+    const dom = render({ page: { rows, nextCursor: null, total: 40, facets: {} } })
+    expect(dom.querySelector('[data-testid="table-footer-count"]')?.textContent).toBe('6 of 40')
+  })
+})
+
+describe('the selection bar', () => {
+  /**
+   * It used to be an inline strip between the toolbar and the header, which pushed every row down
+   * 40px the moment a checkbox was ticked — the list moved under the cursor selecting it.
+   */
+  it('floats in a zero-height dock rather than displacing the rows', () => {
+    const dom = render({ selectable: true })
+    act(() => { (dom.querySelector('[data-testid="table-select-loaded"]') as HTMLElement).click() })
+    const bar = dom.querySelector('[data-testid="table-selection-bar"]')
+    expect(bar?.parentElement?.className).toBe('tbl-selection-dock')
+  })
+
+  it('sits after the grid, so its sticky dock resolves against the bottom of the table', () => {
+    const dom = render({ selectable: true })
+    act(() => { (dom.querySelector('[data-testid="table-select-loaded"]') as HTMLElement).click() })
+    const children = [...(dom.querySelector('[data-testid="table-container"]')?.children ?? [])]
+    const grid = children.findIndex((child) => child.getAttribute('role') === 'grid')
+    const dock = children.findIndex((child) => child.className === 'tbl-selection-dock')
+    expect(dock).toBeGreaterThan(grid)
   })
 })
 

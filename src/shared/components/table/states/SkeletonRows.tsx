@@ -1,7 +1,7 @@
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import { cn } from '~/shared/lib/utils'
 
-import { ariaColIndex, gridTemplateColumns } from '../grid-roles'
+import { ariaColIndex, gridMinWidth, gridTemplateColumns } from '../grid-roles'
 
 interface SkeletonRowsProps<Row> {
   columns: ColumnDef<Row>[]
@@ -20,19 +20,27 @@ interface SkeletonRowsProps<Row> {
  * The grid's `aria-busy` is what carries the state.
  */
 export function SkeletonRows<Row>({ columns, count = 8, selectable }: SkeletonRowsProps<Row>) {
+  // The same floor every real row carries, so the skeleton occupies the final geometry rather than
+  // a narrower one the rows then jump out of.
+  const minWidth = gridMinWidth(columns, { selectable })
+
   return (
     <div aria-hidden="true" data-testid="table-skeleton">
       {Array.from({ length: count }, (_, rowIndex) => (
         <div
           key={rowIndex}
-          className="grid items-center gap-3 border-b border-bh-border px-4 py-3 last:border-b-0"
-          style={{ gridTemplateColumns: gridTemplateColumns(columns, { selectable }) }}
+          className="tbl-row grid items-center"
+          style={{
+            gridTemplateColumns: gridTemplateColumns(columns, { selectable }),
+            columnGap: 'var(--tbl-column-gap)',
+            minWidth: minWidth > 0 ? minWidth : undefined,
+          }}
         >
-          {selectable && <div className="h-4 w-4 rounded bg-bh-surface-2" />}
+          {selectable && <div className="tbl-skeleton h-4 w-4" />}
           {columns.map((column, columnIndex) => (
             <div
               key={column.id}
-              className={cn('h-4 rounded bg-bh-surface-2', columnIndex % 3 === 0 ? 'w-3/4' : 'w-1/2')}
+              className={cn('tbl-skeleton h-4', columnIndex % 3 === 0 ? 'w-3/4' : 'w-1/2')}
               style={{ animationDelay: `${(rowIndex * columns.length + ariaColIndex(columnIndex)) * 30}ms` }}
             />
           ))}

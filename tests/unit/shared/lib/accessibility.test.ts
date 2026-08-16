@@ -78,6 +78,126 @@ describe('semantic text-contrast pairs (WCAG 1.4.3, normal text >= 4.5:1)', () =
   })
 })
 
+/**
+ * The `--tbl-*` table contract (plan phase-3/14).
+ *
+ * The reference these literals came from is a warm stone ramp tuned for a white
+ * page, and four of its roles do not clear the contrast the same specification
+ * demands. Those four moved one step down the reference's own ramp; these
+ * assertions are what pins that, and what would catch a future edit putting the
+ * original values back because they "look closer to the design".
+ *
+ * Values are copied from the `--tbl-*` block in src/shared/styles/globals.css.
+ */
+const TBL_LIGHT = {
+  surface: '#ffffff',
+  surfaceSubtle: '#fafaf9',
+  textPrimary: '#1b1917',
+  textSecondary: '#44403c',
+  textMuted: '#57534e', // reference #a8a29e measured 2.52:1 on white; #78716c only 4.48:1 on the selected row
+  headerIdle: '#78716c',
+  headerActive: '#44403c',
+  focusRing: '#ca5d25', // reference accent #e8703a measured 2.93:1 on the selected row
+  rowSelected: '#fdf6f1',
+  rowDanger: '#fef9f8',
+  chips: {
+    success: ['#166534', '#eaf7ee'],
+    warning: ['#9a5b0b', '#fef3e7'],
+    danger: ['#9f2d20', '#fdecea'],
+    neutral: ['#57534e', '#f5f4f2'], // reference #78716c measured 4.36:1 on #f5f4f2
+    accent: ['#9a4318', '#fdf0e9'],
+  },
+} as const
+
+const TBL_DARK = {
+  surface: '#16161c', // --color-bh-surface
+  surfaceSubtle: '#1c1c24', // --color-bh-surface-2
+  textPrimary: '#f4f4f5',
+  textSecondary: '#a1a1aa',
+  textMuted: '#a4a4ab',
+  headerIdle: '#a4a4ab',
+  headerActive: '#f4f4f5',
+  focusRing: '#e07338',
+  rowSelected: '#241a15',
+  rowDanger: '#241416',
+  chips: {
+    success: ['#4ade80', '#152a1e'],
+    warning: ['#fbbf24', '#2a1e0c'],
+    danger: ['#f26464', '#2c1616'],
+    neutral: ['#a4a4ab', '#232329'],
+    accent: ['#f5a878', '#2e1c11'],
+  },
+} as const
+
+describe('table tokens: cell and header text (WCAG 1.4.3, >= 4.5:1)', () => {
+  for (const [mode, tokens] of [['light', TBL_LIGHT], ['dark', TBL_DARK]] as const) {
+    /** Every row background a cell can sit on. Ink has to clear AA on all of them, not just the resting one. */
+    const backgrounds = [tokens.surface, tokens.surfaceSubtle, tokens.rowSelected, tokens.rowDanger]
+
+    it(`${mode} mode: primary and secondary ink on every row state`, () => {
+      for (const background of backgrounds) {
+        expect(contrastRatio(tokens.textPrimary, background)).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.normalText)
+        expect(contrastRatio(tokens.textSecondary, background)).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.normalText)
+      }
+    })
+
+    /**
+     * The em dash in an empty cell and every cell's second line are this colour.
+     * The reference's own value fails here; that is why the token is not it.
+     */
+    it(`${mode} mode: muted ink on every row state`, () => {
+      for (const background of backgrounds) {
+        expect(contrastRatio(tokens.textMuted, background)).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.normalText)
+      }
+    })
+
+    /** 11px bold is not "large text" (that starts at 18.66px bold), so the header is held to 4.5:1 too. */
+    it(`${mode} mode: idle and active header ink on the header's own surface`, () => {
+      expect(contrastRatio(tokens.headerIdle, tokens.surfaceSubtle)).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.normalText)
+      expect(contrastRatio(tokens.headerActive, tokens.surfaceSubtle)).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.normalText)
+    })
+
+    /** The reference's whole point about the active column: it reads stronger than the idle ones. */
+    it(`${mode} mode: the active header is stronger than an idle one`, () => {
+      expect(contrastRatio(tokens.headerActive, tokens.surfaceSubtle))
+        .toBeGreaterThan(contrastRatio(tokens.headerIdle, tokens.surfaceSubtle))
+    })
+  }
+})
+
+describe('table tokens: status chips (WCAG 1.4.3, >= 4.5:1 on their own fill)', () => {
+  for (const [mode, tokens] of [['light', TBL_LIGHT], ['dark', TBL_DARK]] as const) {
+    it(`${mode} mode: every tone`, () => {
+      for (const [tone, [foreground, background]] of Object.entries(tokens.chips)) {
+        expect(
+          contrastRatio(foreground, background),
+          `${mode} ${tone} chip`,
+        ).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.normalText)
+      }
+    })
+  }
+})
+
+describe('table tokens: focus and interactive boundaries (WCAG 1.4.11, >= 3:1)', () => {
+  it('the 2px focus ring is visible against every row state it is drawn on', () => {
+    for (const tokens of [TBL_LIGHT, TBL_DARK]) {
+      for (const background of [tokens.surface, tokens.surfaceSubtle, tokens.rowSelected, tokens.rowDanger]) {
+        expect(contrastRatio(tokens.focusRing, background)).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.nonText)
+      }
+    }
+  })
+
+  /**
+   * Why the ring is not simply `--tbl-accent`. The reference's terracotta clears
+   * 3:1 on white and fails it on the selected-row tint — which is the row you
+   * are most likely to be operating on with a keyboard.
+   */
+  it('records why the ring is a darker token than the decorative accent', () => {
+    expect(contrastRatio('#e8703a', TBL_LIGHT.rowSelected)).toBeLessThan(CONTRAST_MINIMUMS.nonText)
+    expect(contrastRatio(TBL_LIGHT.focusRing, TBL_LIGHT.rowSelected)).toBeGreaterThanOrEqual(CONTRAST_MINIMUMS.nonText)
+  })
+})
+
 describe('accent-contrast (fixed 2026-07-25 — was a pinned known-failing exception)', () => {
   it('dark-ink accent-contrast text on the solid accent fill clears 4.5:1', () => {
     // Was white (#ffffff), 3.14:1 — below the 4.5:1 text minimum. Rather than

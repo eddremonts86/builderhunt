@@ -8,7 +8,7 @@
 import * as React from 'react'
 import { BookOpen, ExternalLink, Plus, Save, Trash2, X } from 'lucide-react'
 import { Button, Input, Textarea } from '~/components/ui'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, DateCell, EmptyCell, PrimaryCell } from '~/shared/components/table'
 import { emptyTableSearch } from '~/shared/lib/table/query-url'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
@@ -223,55 +223,61 @@ export function ChangelogManager() {
     {
       id: 'title',
       header: 'Entry',
+      kind: 'primary',
       sortable: true,
       priority: 'primary',
       value: (entry) => entry.title,
       cell: (entry) => (
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-medium">{entry.title}</span>
-            {entry.id.startsWith(FILE_MANAGED_PREFIX) && (
-              // Editing this row here works, and the next `pnpm content:sync` overwrites it from the
-              // file. Saying so is cheaper than letting someone discover it after a deploy.
+        <PrimaryCell
+          title={entry.title}
+          meta={entry.content.slice(0, 120)}
+          leading={entry.id.startsWith(FILE_MANAGED_PREFIX)
+            ? (
+              // Editing this row here works, and the next `pnpm content:sync` overwrites it from
+              // the file. Saying so is cheaper than letting someone discover it after a deploy.
               <span
-                className="rounded border border-bh-cyan/30 bg-bh-cyan/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bh-cyan-text"
+                className="tbl-chip"
+                data-tone="accent"
                 title={`Defined by content/changelog/${entry.slug}.md — edits here are overwritten by the next content:sync`}
               >
                 in git
               </span>
-            )}
-          </span>
-          <span className="block truncate text-xs text-bh-text-muted">{entry.content.slice(0, 120)}</span>
-        </span>
+              )
+            : undefined}
+        />
       ),
     },
     {
       id: 'slug',
       header: 'Slug',
+      kind: 'category',
       priority: 'secondary',
       value: (entry) => entry.slug,
-      cell: (entry) => `/${entry.slug}`,
+      cell: (entry) => <span className="truncate font-mono text-xs" title={`/${entry.slug}`}>/{entry.slug}</span>,
     },
     {
       id: 'tags',
       header: 'Tags',
+      kind: 'category',
       priority: 'detail',
       value: (entry) => entry.tags.join(', '),
-      cell: (entry) => entry.tags.length > 0 ? entry.tags.join(', ') : '—',
+      cell: (entry) => entry.tags.length > 0
+        ? <span className="truncate" title={entry.tags.join(', ')}>{entry.tags.join(', ')}</span>
+        : <EmptyCell label="No tags" />,
     },
     {
       id: 'publishedAt',
       header: 'Published',
+      kind: 'date',
       sortable: true,
-      align: 'end',
       priority: 'secondary',
       value: (entry) => entry.publishedAt,
-      cell: (entry) => new Date(entry.publishedAt).toLocaleString(),
+      cell: (entry) => <DateCell value={entry.publishedAt} withTime />,
     },
     {
       id: 'actions',
       header: 'Actions',
-      align: 'end',
+      kind: 'actions',
       cell: (entry) => (
         <span className="flex items-center gap-2">
           <a
@@ -287,7 +293,16 @@ export function ChangelogManager() {
           <Button type="button" onClick={() => startEdit(entry)} variant="secondary" size="sm" data-testid="admin-changelog-edit">
             Edit
           </Button>
-          <Button type="button" onClick={() => void remove(entry.id)} variant="secondary" size="sm" data-testid="admin-changelog-delete">
+          <Button
+            type="button"
+            onClick={() => void remove(entry.id)}
+            variant="secondary"
+            size="sm"
+            // Same as the roadmap's: an icon-only button announces as "button" without this, and
+            // this one deletes a published changelog entry.
+            aria-label={`Delete ${entry.title}`}
+            data-testid="admin-changelog-delete"
+          >
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
         </span>

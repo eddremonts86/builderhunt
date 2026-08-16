@@ -1,8 +1,8 @@
 # Plan de implementación — perfiles auto-gestionados
 
 > **Status**: `pending`
-> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md),
-> [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md),
+> **Depends on**: [`02-segmentacion-usuarios`](../../implemented/phase-2/02-segmentacion-usuarios/spec.md),
+> [`03-onboarding-segmentado`](../../implemented/phase-2/03-onboarding-segmentado/spec.md),
 > [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md),
 > [`06-landing-segmentada`](../06-landing-segmentada/spec.md),
 > [`phase-1/36-claimable-profiles`](../../implemented/phase-1/36-claimable-profiles/spec.md),

@@ -46,8 +46,8 @@ anteriores son usuarios.
 | Orden | Plan | Resultado |
 |---|---|---|
 | 1 | [`01-investigacion-icp`](./01-investigacion-icp/spec.md) | Paquete de investigación y baseline listos para post-launch |
-| 2 | [`02-segmentacion-usuarios`](./02-segmentacion-usuarios/spec.md) | Contrato, persistencia, settings y analítica |
-| 3 | [`03-onboarding-segmentado`](./03-onboarding-segmentado/spec.md) | Activación diferente por objetivo |
+| 2 | [`02-segmentacion-usuarios`](../implemented/phase-2/02-segmentacion-usuarios/spec.md) | Contrato, persistencia, settings y analítica |
+| 3 | [`03-onboarding-segmentado`](../implemented/phase-2/03-onboarding-segmentado/spec.md) | Activación diferente por objetivo |
 | 4 | [`04-dashboard-personalizado`](./04-dashboard-personalizado/spec.md) | Presets de widgets y acciones por segmento |
 | 5 | [`05-roles-internos-plataforma`](./05-roles-internos-plataforma/spec.md) | RBAC interno auditable y de mínimo privilegio |
 | 6 | [`06-landing-segmentada`](./06-landing-segmentada/spec.md) | Mensajes y páginas de conversión por ICP |

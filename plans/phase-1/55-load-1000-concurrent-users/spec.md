@@ -20,9 +20,27 @@ Protect PostgreSQL with three independent controls:
    pooling;
 3. PgBouncer 1.25.2 in transaction mode, with a hard database-wide backend cap.
 
-Capacity is certified by a 1,000-session, two-hour soak on an isolated production-sized host.
-The 10-minute run is a calibration gate, not evidence for the two-hour claim. Rate limiting is
-not part of the capacity fix: legitimate traffic must pass without being converted to `429`.
+Capacity is certified by a 1,000-session, two-hour soak on **the production host, pooler and
+PostgreSQL instance, with the fixture in a disposable `builderhunt_load_test_*` database on that
+instance**, during beta, with an approved window. The 10-minute run is a calibration gate, not
+evidence for the two-hour claim. Rate limiting is not part of the capacity fix: legitimate traffic
+must pass without being converted to `429`.
+
+> **Changed 2026-08-14.** This spec said "on an isolated production-sized host", and
+> [`docs/operations/load-testing.md`](../../../docs/operations/load-testing.md) had said the
+> opposite since 2026-08-11: certify against production, because the real Coolify private network,
+> the real pooler and the real host only exist there, and a 4-vCPU box somewhere else measures a
+> different system. That reasoning stands and the isolated host is gone.
+>
+> What the doc did not say, and this spec now does, is **where the fixture lives**. It goes in a
+> throwaway database on the same PostgreSQL instance, not in `builderhunt`. Everything the
+> certification actually measures is unchanged — same host, same CPU and disk, same pooler, same
+> instance-wide `max_connections`, and `pgbouncer.ini`'s `* = host=…` wildcard already forwards
+> whatever database a client asks for ("so one line serves the app, the disposable load databases
+> and the admin console"). What changes is the failure mode: cleanup becomes `DROP DATABASE`
+> instead of deleting a thousand rows from the live one, so an aborted run cannot leave a thousand
+> accounts sharing one password on a public site. That hazard stops being something an operator has
+> to remember and becomes impossible by construction.
 
 ## Problem
 
@@ -65,8 +83,10 @@ database-wide connection failure.
 
 1. **Baseline** — 10 minutes, direct app-to-PostgreSQL, same build, data, host, and workload.
 2. **Calibration** — 10 minutes through PgBouncer. Tune only within the connection budget below.
-3. **Soak** — two hours through PgBouncer on an isolated 4-vCPU/8-GB ARM64 host, matching the
-   production CAX21 class documented in `docs/operations/host-maintenance.md`.
+3. **Soak** — two hours through PgBouncer on the production host documented in
+   `docs/operations/host-maintenance.md`, its own Coolify private network, and the pooler that
+   will actually serve traffic, with the app pointed at the disposable load database for the
+   duration. Approved window, named owner, fresh backup first.
 4. **Smoke** — 25 users for 30 seconds in a dedicated CI workflow. This detects broken wiring;
    it does not certify 1,000 users.
 

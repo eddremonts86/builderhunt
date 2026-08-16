@@ -1,7 +1,7 @@
 import { Checkbox } from '~/components/ui/checkbox'
 import { cn } from '~/shared/lib/utils'
 
-import { ariaColIndex, ariaRowIndex, columnsForPriority } from '../grid-roles'
+import { ariaColIndex, ariaRowIndex, columnsForPriority, isEndAligned } from '../grid-roles'
 import type { RendererContext } from './types'
 
 /**
@@ -16,7 +16,7 @@ import type { RendererContext } from './types'
  * accessibility tree should not change shape with the viewport.
  */
 export function StackedRenderer<Row>({ context }: { context: RendererContext<Row> }) {
-  const { rows, columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction } = context
+  const { rows, columns, rowId, rowTestId, rowOffset, selectable, selection, keyboard, onPrimaryAction, rowTone } = context
 
   const primary = columnsForPriority(columns, ['primary'])
   const secondary = columnsForPriority(columns, ['secondary'])
@@ -37,10 +37,12 @@ export function StackedRenderer<Row>({ context }: { context: RendererContext<Row
             aria-rowindex={ariaRowIndex(index, rowOffset)}
             aria-selected={selectable ? selected : undefined}
             data-testid={rowTestId(row)}
-            className={cn(
-              'flex gap-3 border-b border-bh-border px-4 py-3 last:border-b-0',
-              selected && 'bg-bh-accent-soft',
-            )}
+            data-state={selected ? 'selected' : undefined}
+            data-tone={rowTone?.(row)}
+            // The same row tokens as the grid renderer, laid out as a card. The reference's point
+            // about density and colour is that they do not change with the viewport — only the
+            // arrangement does.
+            className="tbl-row tbl-stacked-row"
             onDoubleClick={onPrimaryAction ? () => onPrimaryAction(row) : undefined}
           >
             {selectable && (
@@ -62,25 +64,36 @@ export function StackedRenderer<Row>({ context }: { context: RendererContext<Row
                   tabIndex={keyboard.isFocused(index, columnIndex) ? 0 : -1}
                   ref={(element) => keyboard.registerCell(index, columnIndex, element)}
                   onFocus={() => keyboard.setPosition({ row: index, column: columnIndex })}
-                  className="truncate text-sm font-medium text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+                  className="tbl-cell tbl-cell-primary"
                 >
                   {column.cell(row)}
                 </div>
               ))}
-              <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {/*
+                * Divs, not a `<dl>`. A `role="row"` may only contain `gridcell`, `columnheader` or
+                * `rowheader`, and a definition list puts `dl`, `dt` and `dd` inside it — axe reports
+                * both `aria-required-children` (critical) and `definition-list` against the same
+                * markup, and a screen reader navigating the grid finds children it cannot place.
+                *
+                * The label moves *inside* the cell instead of standing beside it as a `<dt>`, which
+                * is also what makes the cell announce as "Last run, 3d ago" rather than as a bare
+                * value whose column header is off-screen at this width.
+                */}
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                 {rest.map((column, columnIndex) => (
-                  <div key={column.id} className="flex min-w-0 items-baseline gap-1.5">
-                    <dt className="text-xs text-bh-text-muted">{column.header}</dt>
-                    <dd
-                      role="gridcell"
-                      aria-colindex={ariaColIndex(identity.length + columnIndex + (selectable ? 1 : 0))}
-                      className={cn('truncate text-xs text-bh-text', column.align === 'end' && 'tabular-nums')}
-                    >
+                  <div
+                    key={column.id}
+                    role="gridcell"
+                    aria-colindex={ariaColIndex(identity.length + columnIndex + (selectable ? 1 : 0))}
+                    className="flex min-w-0 items-baseline gap-1.5"
+                  >
+                    <span className="tbl-cell-meta">{column.header}</span>
+                    <span className={cn('tbl-stacked-value', isEndAligned(column) && 'tabular-nums')}>
                       {column.cell(row)}
-                    </dd>
+                    </span>
                   </div>
                 ))}
-              </dl>
+              </div>
             </div>
           </div>
         )

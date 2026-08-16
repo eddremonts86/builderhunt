@@ -13,7 +13,13 @@ import * as React from 'react'
  */
 
 /**
- * Table row density.
+ * Table row density, inherited from the table container.
+ *
+ * The reference's three: `sm` for large lists, `md` as the default, `lg` for rows carrying an
+ * avatar. A *cell* may not choose its own height — the virtualizer measures nothing and computes
+ * every offset as `index * rowHeight`, so one tall cell would put every row below it at the wrong
+ * `translateY`. That is why density lives on the container as `data-density` and the cells simply
+ * fill it.
  *
  * Deliberately **not** the dashboard's `BentoDensity`, which plan 06's checklist points at.
  * That preference is `'bento' | 'sections'` — a layout mode for the dashboard's widget grid — and
@@ -21,12 +27,36 @@ import * as React from 'react'
  * height to it would mean switching the dashboard from bento to sections silently changed the row
  * height of every table, which nobody asked for. Row height is the table's own concept.
  */
-export type TableDensity = 'comfortable' | 'compact'
+export type TableDensity = 'sm' | 'md' | 'lg'
 
+/**
+ * **The** source of row-height truth.
+ *
+ * `globals.css` carries the same three numbers as `--tbl-row-height-{sm,md,lg}`, but only as the
+ * fallback a table that sets no density resolves against: `DataTable` writes the value from this
+ * record back onto the container as an inline `--tbl-row-height`, so the pixels CSS paints and the
+ * pixels the virtualizer offsets by cannot drift apart. A mismatch there does not look broken — it
+ * looks like rows slowly sliding out from under their own hover state as you scroll.
+ *
+ * Unwindowed, this is the row's *floor*: a cell whose actions or identity need a few more pixels
+ * grows the row rather than being clipped. Windowed, `[data-virtualized]` pins it exactly, because
+ * there a taller row overlaps the one below it. See the `.tbl-row` rules in `globals.css`.
+ */
 export const ROW_HEIGHT: Record<TableDensity, number> = {
-  comfortable: 40,
-  compact: 34,
+  sm: 44,
+  md: 52,
+  lg: 64,
 }
+
+/**
+ * Search's result-card row height.
+ *
+ * Not a fourth density. A search row *is* a `PersonResultCard`, so it is a specialized renderer's
+ * fixed height — but it is named here rather than left as a literal in `SearchPage.tsx`, because a
+ * magic `176` in a surface file is exactly the local dimension this plan removes everywhere else.
+ * Mirrored by `--tbl-row-height-search-card`.
+ */
+export const SEARCH_CARD_ROW_HEIGHT = 176
 
 /** Rows kept mounted beyond the visible window, so a fast scroll does not show blank space. */
 const DEFAULT_OVERSCAN = 8

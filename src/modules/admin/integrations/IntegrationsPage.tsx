@@ -4,9 +4,9 @@
 // and no cursor to page. `registry-page.ts` explains why sorting a complete set in the browser is
 // correct here and wrong on any surface backed by a growing table.
 import * as React from 'react'
-import { AlertTriangle, BookOpen, CheckCircle2, ExternalLink, MinusCircle, XCircle } from 'lucide-react'
+import { BookOpen, ExternalLink } from 'lucide-react'
 import { Button } from '~/components/ui'
-import { DataTable } from '~/shared/components/table'
+import { DataTable, EmptyCell, PrimaryCell, StatusCell } from '~/shared/components/table'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import { registryPage, type RegistryTableSpec } from '~/shared/lib/table/registry-page'
 import type { TableQuery } from '~/shared/lib/table/types'
@@ -96,46 +96,37 @@ const AI_TASK_FILTER_LABELS = { tier: 'Tier', state: 'State' }
 const SOURCES_QUERY: TableQuery = { search: '', filters: {}, sort: [{ id: 'label', dir: 'asc' }] } as TableQuery
 const AI_TASKS_QUERY: TableQuery = { search: '', filters: {}, sort: [{ id: 'taskId', dir: 'asc' }] } as TableQuery
 
+/**
+ * Why a source is or is not running, as one chip in the shared tones.
+ *
+ * Four locally-hand-rolled pills with four different tints became one `StatusCell`. The per-row
+ * `data-testid` survives verbatim — `admin-integrations.spec.ts` drives these by it, and a shell
+ * that renamed them would turn a green suite red for reasons that have nothing to do with tables.
+ */
 function SourceBadge({ row }: { row: SourceRow }) {
-  if (!row.trackable) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-surface text-bh-text-muted" data-testid={`integration-badge-${row.source}`}>
-        Dormant
-      </span>
-    )
-  }
-  if (row.killSwitchEnabled === false) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-surface text-bh-text-muted" data-testid={`integration-badge-${row.source}`}>
-        Disabled
-      </span>
-    )
-  }
-  if (row.credentialRequired && !row.credentialPresent) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-warning/15 text-bh-warning" data-testid={`integration-badge-${row.source}`}>
-        <AlertTriangle className="size-3" aria-hidden />
-        No credential
-      </span>
-    )
-  }
+  const state = !row.trackable ? { label: 'Dormant', tone: 'neutral' as const }
+    : row.killSwitchEnabled === false ? { label: 'Disabled', tone: 'neutral' as const }
+      : row.credentialRequired && !row.credentialPresent ? { label: 'No credential', tone: 'warning' as const }
+        : { label: 'Ready', tone: 'success' as const }
+
   return (
-    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-success/15 text-bh-success" data-testid={`integration-badge-${row.source}`}>
-      <CheckCircle2 className="size-3" aria-hidden />
-      Active
+    <span data-testid={`integration-badge-${row.source}`}>
+      <StatusCell label={state.label} tone={state.tone} />
     </span>
   )
 }
 
+/**
+ * "Not required" is an absence, not a third state of the credential.
+ *
+ * It used to be dim text beside a green tick and a red cross, which read as a *worse* version of
+ * present. The empty cell says the same thing without competing for the same colour vocabulary.
+ */
 function CredentialCell({ row }: { row: SourceRow }) {
-  if (!row.credentialRequired) {
-    return <span className="text-bh-text-dim">Not required</span>
-  }
-  return row.credentialPresent ? (
-    <span className="inline-flex items-center gap-1 text-bh-success"><CheckCircle2 className="size-3.5" aria-hidden />Present</span>
-  ) : (
-    <span className="inline-flex items-center gap-1 text-bh-danger"><XCircle className="size-3.5" aria-hidden />Missing</span>
-  )
+  if (!row.credentialRequired) return <EmptyCell label="No credential required" />
+  return row.credentialPresent
+    ? <StatusCell label="Present" tone="success" />
+    : <StatusCell label="Missing" tone="danger" />
 }
 
 export function IntegrationsPage() {
@@ -176,22 +167,29 @@ export function IntegrationsPage() {
   const status = loading && !data ? 'loading' : error ? 'error' : 'ready'
 
   const sourceColumns = React.useMemo<ColumnDef<SourceRow>[]>(() => [
-    { id: 'label', header: 'Source', sortable: true, weight: 2, value: (row) => row.label, cell: (row) => <span className="font-medium text-bh-text">{row.label}</span> },
+    {
+      id: 'label',
+      header: 'Source',
+      kind: 'primary',
+      sortable: true,
+      value: (row) => row.label,
+      // The dormant reason moved here from under the status chip. It is prose explaining *this
+      // source*, which is metadata about the row's identity rather than a second status — and in
+      // a 116px status column it wrapped to three lines.
+      cell: (row) => <PrimaryCell title={row.label} meta={row.dormantReason ?? undefined} />,
+    },
     {
       id: 'state',
       header: 'Status',
+      kind: 'status',
       sortable: true,
       value: (row) => sourceState(row),
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <SourceBadge row={row} />
-          {row.dormantReason && <span className="text-xs text-bh-text-dim">{row.dormantReason}</span>}
-        </div>
-      ),
+      cell: (row) => <SourceBadge row={row} />,
     },
     {
       id: 'credential',
       header: 'Credential',
+      kind: 'status',
       sortable: true,
       value: (row) => (!row.credentialRequired ? null : row.credentialPresent ? 'present' : 'missing'),
       cell: (row) => <CredentialCell row={row} />,
@@ -199,7 +197,7 @@ export function IntegrationsPage() {
     {
       id: 'search',
       header: 'Search',
-      align: 'end',
+      kind: 'actions',
       cell: (row) => (
         <a href={`/search?sources=${encodeURIComponent(row.source)}`} className="inline-flex items-center gap-1 text-bh-accent hover:underline text-xs" data-testid={`integration-search-link-${row.source}`}>
           View <ExternalLink className="size-3" aria-hidden />
@@ -209,23 +207,33 @@ export function IntegrationsPage() {
   ], [])
 
   const aiTaskColumns = React.useMemo<ColumnDef<AITaskRow>[]>(() => [
-    { id: 'taskId', header: 'Task', sortable: true, weight: 2, value: (row) => row.taskId, cell: (row) => <span className="font-medium text-bh-text font-mono text-xs">{row.taskId}</span> },
-    { id: 'tier', header: 'Tier', sortable: true, value: (row) => row.tier, cell: (row) => <span className="text-bh-text-muted">{row.tier}</span> },
-    { id: 'version', header: 'Version', sortable: true, value: (row) => row.version, cell: (row) => <span className="text-bh-text-dim">v{row.version}</span> },
+    {
+      id: 'taskId',
+      header: 'Task',
+      kind: 'primary',
+      sortable: true,
+      value: (row) => row.taskId,
+      // A task id is a literal key an operator copies into a config file — one of the two things
+      // DESIGN.md:221 keeps the monospace face for, and the reference's own use for this line.
+      cell: (row) => <PrimaryCell title={row.taskId} meta={`v${row.version}`} monoMeta />,
+    },
+    {
+      id: 'tier',
+      header: 'Tier',
+      kind: 'category',
+      sortable: true,
+      value: (row) => row.tier,
+      cell: (row) => row.tier,
+    },
     {
       id: 'state',
       header: 'State',
+      kind: 'status',
       sortable: true,
       value: (row) => (row.disabled ? 'disabled' : 'enabled'),
-      cell: (row) => row.disabled ? (
-        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-surface text-bh-text-muted">
-          <MinusCircle className="size-3" aria-hidden />Disabled
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider bg-bh-success/15 text-bh-success">
-          <CheckCircle2 className="size-3" aria-hidden />Enabled
-        </span>
-      ),
+      cell: (row) => row.disabled
+        ? <StatusCell label="Disabled" tone="neutral" />
+        : <StatusCell label="Enabled" tone="success" />,
     },
   ], [])
 
@@ -310,7 +318,7 @@ export function IntegrationsPage() {
                   aria-pressed={selected}
                   data-testid={`integrations-filter-${f}`}
                   className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${
-                    selected ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
+                    selected ? 'bg-bh-accent text-bh-accent-contrast' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'
                   }`}
                 >
                   {f}

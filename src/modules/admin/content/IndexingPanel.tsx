@@ -84,9 +84,9 @@ export function IndexingPanel() {
         Each surface can be hidden from search engines independently, and changed back at any time —
         no deploy. A change takes effect on the next request: it drives the page&apos;s{' '}
         <code className="text-bh-accent">robots</code> meta tag, the surface&apos;s line in{' '}
-        <a href="/robots.txt" className="text-bh-accent hover:underline" target="_blank" rel="noreferrer">robots.txt</a>,
+        <a href="/robots.txt" className="text-bh-accent underline" target="_blank" rel="noreferrer">robots.txt</a>,
         and whether its URLs appear in{' '}
-        <a href="/sitemap.xml" className="text-bh-accent hover:underline" target="_blank" rel="noreferrer">sitemap.xml</a>.
+        <a href="/sitemap.xml" className="text-bh-accent underline" target="_blank" rel="noreferrer">sitemap.xml</a>.
       </p>
 
       {error && (

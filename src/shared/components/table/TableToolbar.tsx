@@ -5,7 +5,6 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import type { ColumnDef } from '~/shared/lib/table/columns'
 import type { PageResult, TableQuery } from '~/shared/lib/table/types'
-import { cn } from '~/shared/lib/utils'
 
 export interface TableToolbarProps<Row> {
   columns: ColumnDef<Row>[]
@@ -59,11 +58,11 @@ export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-bh-border px-4 py-3">
+    <div className="tbl-toolbar" data-testid="table-toolbar">
       {searchable
         ? (
           <div className="relative min-w-[12rem] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bh-text-muted" aria-hidden="true" />
+            <Search className="tbl-toolbar-search-icon" aria-hidden="true" />
             <Input
               ref={searchRef}
               type="search"
@@ -91,16 +90,11 @@ export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
                 aria-pressed={active}
                 onClick={() => toggleFilterValue(id, facet.value)}
                 data-testid={`table-facet-${id}-${facet.value}`}
-                className={cn(
-                  'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2',
-                  active
-                    ? 'border-bh-accent bg-bh-accent-soft text-bh-text'
-                    : 'border-bh-border bg-bh-surface text-bh-text-muted hover:border-bh-border-strong',
-                )}
+                className="tbl-facet-chip"
+                data-active={active ? 'true' : undefined}
               >
                 <span className="truncate">{valueLabel?.(id, facet.value) ?? facet.value}</span>
-                <span className="tabular-nums opacity-70">{facet.count.toLocaleString()}</span>
+                <span className="tbl-facet-count">{facet.count.toLocaleString()}</span>
               </button>
             )
           })}
@@ -108,13 +102,13 @@ export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
       ))}
 
       {groupable.length > 0 && (
-        <label className="flex items-center gap-2 text-xs text-bh-text-muted">
+        <label className="tbl-toolbar-group-label">
           <span>Group</span>
           <select
             value={query.groupBy ?? ''}
             onChange={(event) => onQueryChange({ ...query, groupBy: event.target.value === '' ? null : event.target.value })}
             data-testid="table-group-select"
-            className="h-8 rounded-lg border border-bh-border bg-bh-surface px-2 text-xs text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+            className="tbl-toolbar-select"
           >
             <option value="">None</option>
             {groupable.map((column) => (
@@ -137,12 +131,12 @@ export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
         </Button>
         {columnsOpen && (
           <div
-            className="absolute right-0 z-20 mt-1 w-52 rounded-xl border border-bh-border bg-bh-surface p-2 shadow-lg"
+            className="tbl-column-menu"
             role="group"
             aria-label="Column visibility"
           >
             {columns.map((column) => (
-              <label key={column.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-bh-surface-2">
+              <label key={column.id} className="tbl-column-menu-item">
                 <input
                   type="checkbox"
                   checked={!hiddenColumns.has(column.id)}
@@ -158,7 +152,7 @@ export function TableToolbar<Row>(props: TableToolbarProps<Row>) {
 
       {onOpenCommandSheet && (
         <Button variant="ghost" size="sm" onClick={onOpenCommandSheet} data-testid="table-command-open">
-          <kbd className="rounded border border-bh-border px-1 text-[10px]">⌘K</kbd>
+          <kbd className="kbd">⌘K</kbd>
         </Button>
       )}
     </div>
