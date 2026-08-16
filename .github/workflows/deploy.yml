@@ -21,25 +21,99 @@ jobs:
     # difference between a bad run and a bad month.
     timeout-minutes: 15
     steps:
+      # Which of the three secrets is wrong, said out loud, before anything is deployed.
+      #
+      # The trigger step below used to be a bare `curl -fsS`, and on 2026-08-16 it failed with
+      # `curl: (22) The requested URL returned error: 401` — a number and nothing else. Production
+      # kept serving the previous build, and working out which of `COOLIFY_API_TOKEN`,
+      # `COOLIFY_API_URL` and `COOLIFY_APP_UUID` was at fault meant reading the API by hand from a
+      # laptop. `-f` is what hides the response body, so this reads the status code itself.
+      #
+      # The identity assertion is the more important half. A uuid that is merely *stale* still names
+      # a real application, so a deploy against it succeeds — against somebody else's production.
+      # The Coolify runbook says never to trust a stored uuid for exactly this reason, and this repo
+      # already knows which host is its own.
+      - name: Check the Coolify credentials, and that they point at this app
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          set -uo pipefail
+
+          # Not fatal, because turning it off would block every deploy until the instance has TLS —
+          # that is the owner's call, not this job's. Loud, because a bearer token that can read the
+          # server's private keys should not be crossing the internet in cleartext.
+          case "$COOLIFY_API_URL" in
+            https://*) ;;
+            *) echo "::warning::COOLIFY_API_URL is not https. The bearer token travels in cleartext from this runner, and a Coolify token can read the host's private keys. Give the instance a TLS domain and update the secret." ;;
+          esac
+
+          body=$(mktemp)
+          # `|| code=000` rather than `|| echo 000`: on a connection failure curl *already* prints
+          # `000` via -w, so appending another one produced `000000` and fell through to the generic
+          # branch — the one case with the most specific advice got the least.
+          code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 20 \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+            -H "Accept: application/json" \
+            "$COOLIFY_API_URL/api/v1/applications/$COOLIFY_APP_UUID") || code=000
+
+          case "$code" in
+            200) ;;
+            000) echo "::error::Could not reach $COOLIFY_API_URL at all. Either COOLIFY_API_URL is wrong or the Coolify instance is down."; exit 1 ;;
+            401) echo "::error::Coolify answered 401. COOLIFY_API_TOKEN is stale or revoked — reissue it in Coolify (Keys & Tokens) and run: gh secret set COOLIFY_API_TOKEN --repo ${{ github.repository }}"; exit 1 ;;
+            404) echo "::error::Coolify answered 404 for application $COOLIFY_APP_UUID. That uuid does not exist on this instance — resolve the real one by name from GET /api/v1/applications and update COOLIFY_APP_UUID."; exit 1 ;;
+            *)   echo "::error::Coolify answered $code:"; cat "$body"; exit 1 ;;
+          esac
+
+          read_field() {
+            node -e 'const fs=require("fs");try{const a=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(a[process.argv[2]]??""))}catch{process.stdout.write("")}' "$body" "$1"
+          }
+          name=$(read_field name)
+          fqdn=$(read_field fqdn)
+
+          case "$fqdn" in
+            *builderhunt.dev*) echo "target: $name — $fqdn" ;;
+            *) echo "::error::COOLIFY_APP_UUID points at \"$name\" ($fqdn), which is not builderhunt.dev. Refusing to deploy this repository onto another application."; exit 1 ;;
+          esac
+
       - name: Trigger deployment
         id: trigger
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
         run: |
-          resp=$(curl -fsS -X POST \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+          set -uo pipefail
+          resp=$(curl -sS -X POST \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
             -H "Accept: application/json" \
-            "${{ secrets.COOLIFY_API_URL }}/api/v1/applications/${{ secrets.COOLIFY_APP_UUID }}/start")
+            "$COOLIFY_API_URL/api/v1/applications/$COOLIFY_APP_UUID/start")
           echo "$resp"
           uuid=$(printf '%s' "$resp" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{process.stdout.write(JSON.parse(d).deployment_uuid||"")}catch{process.stdout.write("")}})')
+
+          # A 200 carrying no deployment_uuid used to be silently survivable: the wait step was
+          # conditional on this output, so it skipped, and "Verify production actually answers" then
+          # passed against the build that was already running. A green deploy job, no deploy. Nothing
+          # downstream would ever have said so.
+          if [ -z "$uuid" ]; then
+            echo "::error::Coolify accepted the request but returned no deployment_uuid, so nothing can be waited on or verified. Response above."
+            exit 1
+          fi
           echo "deployment_uuid=$uuid" >> "$GITHUB_OUTPUT"
 
+      # No `if:` guard any more. It used to skip when the trigger produced no uuid, which is the one
+      # case where skipping is worst — see the note in the trigger step.
       - name: Wait for deployment to finish
-        if: steps.trigger.outputs.deployment_uuid != ''
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
         run: |
           uuid="${{ steps.trigger.outputs.deployment_uuid }}"
           for i in $(seq 1 40); do
             sleep 10
-            resp=$(curl -fsS -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
-              "${{ secrets.COOLIFY_API_URL }}/api/v1/deployments/$uuid")
+            resp=$(curl -fsS -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+              "$COOLIFY_API_URL/api/v1/deployments/$uuid")
             dstatus=$(printf '%s' "$resp" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{process.stdout.write(JSON.parse(d).status||"?")}catch{process.stdout.write("?")}})')
             echo "poll $i: $dstatus"
             case "$dstatus" in
@@ -80,7 +154,7 @@ jobs:
           set -uo pipefail
           BASE="https://builderhunt.dev"
           for i in $(seq 1 30); do
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$BASE/api/health" || echo 000)
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$BASE/api/health") || code=000
             [ "$code" = "200" ] && break
             echo "poll $i: /api/health -> $code"
             [ "$i" = 30 ] && { echo "::error::$BASE/api/health never returned 200 after the deploy"; exit 1; }
@@ -96,7 +170,7 @@ jobs:
             *) echo "::error::$BASE/api/health answered 200 but the body was not the health payload: $body"; exit 1 ;;
           esac
 
-          page=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/" || echo 000)
+          page=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$BASE/") || page=000
           if [ "$page" != "200" ]; then
             echo "::error::$BASE/ returned $page — the process is up but not serving the app"
             exit 1
