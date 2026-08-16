@@ -196,6 +196,13 @@
     del job de calidad, así que "local está verde" no habría significado que CI lo estuviera. Añadido
     a los tres bloques `env` de `quality.yml` y a `advisory.yml` y `visual-baselines.yml`, que
     `check-step-parity` exige idénticos.
+  - **Pendiente (2026-08-16, decisión de Edd)**: `CONVERSION_EVENTS_ENABLED` se queda **apagada en
+    producción** hasta actualizar la copy de cookies. `legal/cookies.tsx` afirma hoy que no se usan
+    analytics, y encender la bandera vuelve esa frase falsa — es una afirmación legal en la página que
+    alguien lee para decidir si acepta. El mecanismo ya respeta el consentimiento (`conversion-client.ts`
+    lee `bh_cookie_consent`); lo que falta es solo la copy. Consecuencia mientras tanto: **las tres
+    páginas funcionan y su embudo no mide nada.** Desbloqueo escrito en
+    [`segmented-landing-rollout.md`](../../../docs/operations/segmented-landing-rollout.md).
   - **Pendiente**: pase real con lector de pantalla sobre las tres páginas. Lo automático comprueba
     estructura, nombre accesible y orden de foco; no puede decir si "I'm investing" seguido de un
     cambio de encabezado se anuncia como una navegación que funcionó. Es la razón de que esta tarea

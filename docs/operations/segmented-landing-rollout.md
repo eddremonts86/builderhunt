@@ -79,6 +79,26 @@ Derivarlas en la consulta en vez de guardarlas es lo que impide que se contradig
 `firstTouch` / `lastTouch` escritos por el cliente serían dos afirmaciones sobre el pasado hechas por
 la única parte que no puede verlo entero, y la primera visita las escribiría iguales para siempre.
 
+### Pendiente: en producción el embudo está apagado, y por qué
+
+`CONVERSION_EVENTS_ENABLED` sigue en `false` en producción a fecha de **2026-08-16**, y la razón no
+es técnica. `src/routes/_landing/legal/cookies.tsx` afirma hoy:
+
+> **Analytics**: we currently do not use any analytics cookies. If we add them in the future, this
+> policy will be updated, and you will be re-prompted for consent.
+
+Encender la bandera vuelve esa frase falsa. No es un tecnicismo: es una afirmación legal en la página
+que alguien lee para decidir si acepta.
+
+El mecanismo ya está bien construido — `conversion-client.ts` lee `bh_cookie_consent` y no envía nada
+salvo que la persona haya marcado analytics, y no hay terceros ni PII en el contrato de eventos. Lo
+que falta es solo la copy.
+
+**Para desbloquearlo**: reescribir esa sección para describir el embudo first-party real (qué se
+recoge, que es opt-in, que no hay terceros), y entonces poner la bandera a `true` en Coolify. Hasta
+que eso pase, las tres páginas funcionan y **no se mide nada de su embudo** — los eventos se emiten
+en el cliente y la ruta de ingesta los descarta con `{ok:true, recorded:false}`.
+
 ### Lo que el embudo todavía no dice
 
 **Nada conecta una `sessionId` anónima con la cuenta que crea.** `signup_complete` cierra la sesión
