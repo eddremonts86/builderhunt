@@ -57,9 +57,10 @@ const CI_RUNS_WITHOUT = {
   // at --workers=1 every spec shares the process it puts it back into. The workflow's own comment
   // on SCHEDULING_ENABLED says so.
   INTERVIEW_TRANSCRIPTION_ENABLED: 'set per-spec; needs DEEPGRAM_API_KEY, which CI does not have',
-  PROFILE_REMOVAL_ENABLED: 'set per-spec',
-  PROFILE_REMOVAL_HMAC_KEY: 'only read when PROFILE_REMOVAL_ENABLED is true, which is per-spec',
-  ENRICHMENT_ENABLED: 'set per-spec',
+  // PROFILE_REMOVAL_* and ENRICHMENT_ENABLED used to live here as "set per-spec". They are now in
+  // the workflow instead, because `.env.example` turns every flag on (CLAUDE.md) and an exemption
+  // only silences the first arm of this check — the second still caught that CI was running the
+  // `env.ts` default while a developer ran the opposite.
 
   // ── Supplied by other means in CI ───────────────────────────────────────────────────────────
   REDIS_URL: 'playwright.config.ts defaults it to the redis service on 6379',
@@ -145,12 +146,37 @@ function flagsSpecsEnable() {
   return enabled
 }
 
+/**
+ * `env.ts`'s conditional requirements: flag → keys it genuinely makes mandatory.
+ *
+ * The naive read — every `path: ['X']` inside an `if (data.FLAG === 'true')` block — conflates two
+ * different rules, and only one of them is about the workflow. `if (!data.X)` fires when X is
+ * **absent**, so the flag requires it. `if (data.X && !/^[0-9a-f]{64}$/.test(data.X))` and
+ * `if (data.X > 90)` fire on a **bad value** that is already there; absence is legal and the workflow
+ * needs nothing.
+ *
+ * The discriminator has to be the guard, not the schema declaration. Every one of these keys is
+ * `.optional()` or `.default(…)` in the schema *precisely because* the refinement is what makes it
+ * mandatory — reading the declaration instead reports nothing as required and quietly retires the
+ * check.
+ *
+ * Turning every flag on (CLAUDE.md) is what surfaced this: the old inference demanded
+ * `PROFILE_REMOVAL_HMAC_KEY_PREVIOUS`, which exists only to be shape-checked *while rotating*, and
+ * `ENRICHMENT_RAW_RETENTION_DAYS`, which defaults to 30 — and the second contradicted this file's own
+ * "defaulted" exemption for the same key.
+ */
 function conditionalRequirements() {
   const source = readFileSync(join(root, 'src/shared/lib/env.ts'), 'utf8')
   const required = new Map()
   for (const m of source.matchAll(/if \(data\.([A-Z_][A-Z0-9_]*) === 'true'\) \{([\s\S]*?)\n {2}\}/g)) {
-    const keys = [...m[2].matchAll(/path: \['([A-Z_][A-Z0-9_]*)'\]/g)].map((p) => p[1])
-    if (keys.length > 0) required.set(m[1], new Set(keys))
+    const block = m[2]
+    // Keys the block tests for absence — `if (!data.X)`, including inside a longer condition.
+    const keys = [...block.matchAll(/!data\.([A-Z_][A-Z0-9_]*)\b/g)].map((p) => p[1])
+    // ...but only those the block also raises an issue about, so an incidental negation is not a
+    // requirement on its own.
+    const reported = new Set([...block.matchAll(/path: \['([A-Z_][A-Z0-9_]*)'\]/g)].map((p) => p[1]))
+    const genuine = keys.filter((key) => reported.has(key))
+    if (genuine.length > 0) required.set(m[1], new Set(genuine))
   }
   return required
 }
