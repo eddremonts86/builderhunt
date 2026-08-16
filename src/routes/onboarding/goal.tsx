@@ -3,7 +3,7 @@ import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button } from '~/components/ui'
-import { parseSegmentHint } from '~/shared/lib/landing-segment-hint'
+import { consumeSegmentHint, parseSegmentHint } from '~/shared/lib/landing-segment-hint'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
 import { entryRouteFor } from '~/shared/lib/onboarding-shared'
 import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
@@ -11,6 +11,7 @@ import {
   SEGMENT_SCOPE_NOTICE,
   USER_SEGMENT_COPY,
   USER_SEGMENTS,
+  parseUserSegment,
   resolveSegmentPreset,
   type UserSegment,
 } from '~/shared/lib/user-segments'
@@ -28,6 +29,20 @@ import {
  *
  * A manipulated hint is indistinguishable from no hint: `parseSegmentHint` returns `null` for both,
  * so the URL cannot be used to probe which values the enum accepts.
+ *
+ * ## What wins, when two things suggest different answers
+ *
+ * A choice already stored beats every hint (plan: phase-2/06-landing-segmentada). A stored segment
+ * is something this person said; a hint of any kind is a guess read off a URL, and the URL is the
+ * half an attacker controls. Preselecting *their* answer over a link's means the worst a crafted
+ * link can do is offer a change somebody has to press Continue to accept.
+ *
+ * Below that, the URL beats the stash: the URL is the link they just followed, and the stash is one
+ * they followed before filling in a sign-up form.
+ *
+ * The stored preference arrives from a fetch, so it lands after the first paint. It only overrides
+ * an untouched form — once somebody has picked an option themselves, nothing arriving late may move
+ * it under them.
  *
  * ## Skipping is a first-class answer
  *
@@ -51,15 +66,47 @@ function GoalStep() {
   const [selected, setSelected] = React.useState<UserSegment | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  // Whether this person has answered the question themselves. Nothing asynchronous may move a
+  // selection after they have made one.
+  const answered = React.useRef(false)
 
   // Read once, on mount: a hint is about arrival, and re-reading it would let a history change
   // silently move a choice somebody had already made on this screen.
   React.useEffect(() => {
-    const hinted = parseSegmentHint(typeof window === 'undefined' ? null : window.location.search)
+    const fromUrl = parseSegmentHint(typeof window === 'undefined' ? null : window.location.search)
+    // Consumed either way, and before it is needed: the stash is one-shot, so a hint that loses to
+    // the URL here is still spent rather than left to decide a later screen.
+    const fromStash = consumeSegmentHint()
+    const hinted = fromUrl ?? fromStash
     if (hinted) setSelected(hinted)
     trackConversionEvent('segment_prompt_viewed', 'onboarding', {
       segment: { previous: null, next: hinted, source: 'onboarding' },
     })
+  }, [])
+
+  /**
+   * A stored choice outranks every hint.
+   *
+   * A 404 is the segmentation feature being off, and anything else is a read that failed — neither
+   * is worth a message, because the only thing lost is which radio starts checked. The question is
+   * still on screen and still answerable.
+   */
+  React.useEffect(() => {
+    let abandoned = false
+    void (async () => {
+      try {
+        const response = await fetch('/api/me/preferences', { credentials: 'include' })
+        if (!response.ok) return
+        const body = (await response.json()) as { primarySegment?: unknown }
+        const stored = parseUserSegment(body.primarySegment)
+        if (stored && !abandoned && !answered.current) setSelected(stored)
+      } catch {
+        // Preselecting is a nicety. Failing at it changes nothing anybody needs to be told.
+      }
+    })()
+    return () => {
+      abandoned = true
+    }
   }, [])
 
   const persist = React.useCallback(
@@ -128,7 +175,10 @@ function GoalStep() {
                   className="mt-1"
                   checked={selected === segment}
                   aria-describedby={describedBy}
-                  onChange={() => setSelected(segment)}
+                  onChange={() => {
+                    answered.current = true
+                    setSelected(segment)
+                  }}
                 />
                 <span>
                   <span className="block font-medium">{copy.label}</span>

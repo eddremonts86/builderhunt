@@ -291,3 +291,71 @@ describe('the onboarding context', () => {
     }).ok).toBe(false)
   })
 })
+
+/**
+ * The segmented landing funnel (plan: phase-2/06-landing-segmentada).
+ *
+ * Three events, because the question the funnel has to answer is which of three steps a visitor
+ * stops at: reaching a segment page, choosing a different one, or pressing that page's CTA. They
+ * carry the same segment context as the choice events and mean something else — `next` is which page
+ * this was about, never a stored preference — which is why the contract keeps the two lists apart.
+ */
+describe('the segmented landing funnel', () => {
+  const base = {
+    sessionId: '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+    variant: 'baseline' as const,
+    occurredAt: '2026-07-26T10:00:00.000Z',
+    segment: { previous: null, next: 'hiring' as const, source: 'landing' as const },
+  }
+
+  it('accepts each landing event on the surface it belongs to', () => {
+    expect(parseConversionEvent({ ...base, name: 'segment_page_viewed', surface: 'segment_page' }).ok).toBe(true)
+    expect(parseConversionEvent({ ...base, name: 'segment_page_cta_click', surface: 'segment_page' }).ok).toBe(true)
+    // The selector is on the home page and on every segment page, and which one was used is the
+    // difference between arriving undecided and landing on the wrong page.
+    expect(parseConversionEvent({ ...base, name: 'segment_selector_click', surface: 'hero' }).ok).toBe(true)
+    expect(parseConversionEvent({ ...base, name: 'segment_selector_click', surface: 'segment_page' }).ok).toBe(true)
+  })
+
+  it('refuses a landing event from a surface that cannot produce it', () => {
+    for (const surface of ['onboarding', 'settings', 'explore', 'signup']) {
+      const result = parseConversionEvent({ ...base, name: 'segment_page_viewed', surface })
+      expect(result.ok, surface).toBe(false)
+      expect(result.error).toContain('cannot occur on surface')
+    }
+    // A page view is not a hero event either, even though the selector on the hero is.
+    expect(parseConversionEvent({ ...base, name: 'segment_page_viewed', surface: 'hero' }).ok).toBe(false)
+  })
+
+  /** Without the context the event is uncountable: three pages would collapse into one number. */
+  it('requires segment context', () => {
+    for (const name of ['segment_page_viewed', 'segment_selector_click', 'segment_page_cta_click']) {
+      const { segment: _dropped, ...withoutContext } = base
+      const result = parseConversionEvent({ ...withoutContext, name, surface: 'segment_page' })
+      expect(result.ok, name).toBe(false)
+      expect(result.error).toContain('requires segment context')
+    }
+  })
+
+  /** The new surface must not become a way for older events to arrive from somewhere new. */
+  it('does not open the segment_page surface to unrelated events', () => {
+    for (const name of ['landing_view', 'signup_submit', 'onboarding_step_viewed', 'activation_reached']) {
+      const { segment: _dropped, ...withoutContext } = base
+      expect(parseConversionEvent({ ...withoutContext, name, surface: 'segment_page' }).ok, name).toBe(false)
+    }
+  })
+
+  /**
+   * Same rule as everywhere else in this contract: two enums and a source, and nowhere to put a
+   * name, an email or a query. The reliable way to keep PII out is to give it no field to sit in.
+   */
+  it('has nowhere to put free text', () => {
+    const result = parseConversionEvent({
+      ...base,
+      name: 'segment_page_viewed',
+      surface: 'segment_page',
+      referrer: 'https://example.test/?who=someone@example.test',
+    })
+    expect(result.ok).toBe(false)
+  })
+})

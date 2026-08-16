@@ -8,6 +8,7 @@ import { ThemeToggle } from '~/shared/components/ThemeToggle'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
 import { parseSafeNext } from '~/shared/lib/safe-next'
 import { POST_ONBOARDING_NEXT_KEY } from '~/shared/lib/post-onboarding-next'
+import { stashSegmentHint } from '~/shared/lib/landing-segment-hint'
 
 export function SignUpPage() {
   const navigate = useNavigate()
@@ -27,6 +28,12 @@ export function SignUpPage() {
       const result = await signUpEmail({ email, password, name })
       if (result.data?.user) {
         trackConversionEvent('signup_complete', 'signup')
+        // Carry the landing hint across the form (plan: phase-2/06-landing-segmentada). It only
+        // decides which radio starts checked on the goal step; `stashSegmentHint` narrows it to the
+        // segment enum and stores nothing at all for anything else, so a hand-edited `?goal=` is
+        // indistinguishable from arriving with none. Stashed on success only — an abandoned form is
+        // not a visit worth remembering.
+        stashSegmentHint(search.goal)
         // Preserve guest-search intent (plan: audit-conversion) — stashed for
         // the onboarding flow to restore once its own tour finishes, rather
         // than skipping onboarding entirely for a new account.

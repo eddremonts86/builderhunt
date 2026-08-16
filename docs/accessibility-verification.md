@@ -30,6 +30,34 @@ note) is announced without an unexpected focus jump.
 
 ## Entries
 
+### 2026-08-15 — Segmented landing pages: structural pass, no screen-reader run
+
+- **Commit**: this branch (`feat/phase2-segmented-landing`), plan `phase-2/06-landing-segmentada`
+- **Tester**: Claude (automated + browser inspection), unverified by a human
+- **Environment**: macOS, Chromium via the in-app browser at 375×812 and desktop, light and dark
+- **Scope**: `/for/hiring-teams`, `/for/investors`, `/for/builders` and the selector band on `/`.
+  Deliberately narrow — this is a new public surface, not a change to the shell, so the two standing
+  journeys below were not re-walked.
+- **Structure**: one `<h1>` per page, headings in order (`h1` → three `h2`), and the selector is a
+  `<nav>` with an accessible name ("Choose what brings you here") rather than a list of links under
+  a heading. A screen-reader user landing here needs to know this is a way *out* of the page, not a
+  table of contents for it.
+- **Keyboard**: focus order matches reading order — three selector options, then the two CTAs. Every
+  selector option carries a `focus-visible:ring`; the page you are on is marked `aria-current="page"`
+  rather than offered. Focus + Enter navigating between pages is asserted in
+  `tests/e2e/segmented-landing.spec.ts`, not just checked by hand.
+- **No JavaScript**: every claim, every limit and every selector `href` is in the served HTML,
+  asserted with `request.get` rather than a browser visit. The selector is anchors, which is what
+  makes that true.
+- **320px reflow**: `scrollWidth` equals the viewport at 375px on all three pages, covered by an
+  `@mobile-only` spec and by `responsive-device-matrix.spec.ts`'s five widths.
+- **200% zoom**: **not checked.**
+- **VoiceOver / manual AT pass**: **not done.** Same gap as every entry below it — automated
+  structure checks cannot tell you whether "I'm investing" followed by a heading change announces as
+  a navigation that worked.
+- **Owner**: unassigned. The screen-reader pass on these three pages is a launch-QA item that stays
+  open (plan task 9).
+
 ### 2026-07-25 (2) — Final quality-gate smoke run
 
 - **Commit**: work-in-progress on branch `ui-modernization-and-audits` (uncommitted at time of

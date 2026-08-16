@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getAllPosts } from '~/shared/lib/blog'
 import { SITE_URL as SITE } from '~/shared/lib/site-url'
+import { SEGMENT_PAGES } from '~/modules/landing/content/segment-pages'
+// Read directly rather than through the server function the routes use: this handler only ever runs
+// on the server, so there is no browser stub to worry about here.
+import { env } from '~/shared/lib/env'
 // `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
 // opens a real `postgres()` client at module scope — importing it dynamically
 // inside the handler (not statically here) keeps that chain out of the
@@ -97,6 +101,21 @@ export const Route = createFileRoute('/sitemap.xml')({
           { loc: `${SITE}/`, lastmod: today, changefreq: 'weekly', priority: 1.0 },
           { loc: `${SITE}/explore`, lastmod: today, changefreq: 'weekly', priority: 0.9 },
           { loc: `${SITE}/pricing`, lastmod: today, changefreq: 'weekly', priority: 0.8 },
+          /*
+           * The three segment pages (plan: phase-2/06-landing-segmentada).
+           *
+           * Generated from `SEGMENT_PAGES` rather than written out, so a page added or renamed there
+           * cannot leave the sitemap describing a URL that 404s — or, worse, omitting one that exists
+           * and is the only place a whole segment's copy lives.
+           */
+          ...(env.SEGMENTED_LANDING_ENABLED === 'true'
+            ? Object.values(SEGMENT_PAGES).map((page) => ({
+                loc: `${SITE}/for/${page.slug}`,
+                lastmod: today,
+                changefreq: 'monthly' as const,
+                priority: 0.8,
+              }))
+            : []),
           { loc: `${SITE}/status`, lastmod: today, changefreq: 'daily', priority: 0.6 },
           { loc: `${SITE}/legal/terms`, lastmod: today, changefreq: 'monthly', priority: 0.3 },
           { loc: `${SITE}/legal/privacy`, lastmod: today, changefreq: 'monthly', priority: 0.3 },

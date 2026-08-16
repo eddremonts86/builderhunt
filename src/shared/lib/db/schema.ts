@@ -2428,12 +2428,13 @@ export const conversionEvents = pgTable(
         'explore_search_complete', 'explore_signup_click', 'signup_submit', 'signup_complete',
         'segment_prompt_viewed', 'segment_selected', 'segment_changed', 'segment_skipped',
         'activation_reached', 'onboarding_step_viewed', 'onboarding_step_completed',
-        'onboarding_flow_exited'
+        'onboarding_flow_exited',
+        'segment_page_viewed', 'segment_selector_click', 'segment_page_cta_click'
       )`,
     ),
     check(
       'conversion_events_surface_check',
-      sql`${table.surface} in ('hero', 'final_cta', 'explore', 'signup', 'onboarding', 'settings')`,
+      sql`${table.surface} in ('hero', 'final_cta', 'explore', 'signup', 'onboarding', 'settings', 'segment_page')`,
     ),
     check('conversion_events_variant_check', sql`${table.variant} in ('baseline', 'treatment')`),
     check(

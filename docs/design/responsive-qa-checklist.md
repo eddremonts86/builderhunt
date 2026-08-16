@@ -47,8 +47,16 @@ markup that renders user-generated free text.
   billing-ops (`/admin/*`)
 - Builder profile (`/builder/$builderId`) — **the highest-risk page**: it renders arbitrary
   external bio text that can contain long unbroken tokens (raw URLs). See the gotcha below.
-- Onboarding (`/onboarding/welcome`, `/search`, `/save`, `/success`)
+- Onboarding (`/onboarding/welcome`, `/goal`, `/search`, `/save`, `/investing`, `/building`,
+  `/success`)
 - Public content: `/pricing`, `/explore`, `/legal/*`, `/changelog`, `/roadmap`
+- Segment pages (`/for/hiring-teams`, `/for/investors`, `/for/builders`) — **only exist with
+  `SEGMENTED_LANDING_ENABLED=true`**; with the flag off they 404 by design, which is not a
+  responsive failure. Their selector band also appears on `/` under the same flag. Checked
+  2026-08-15 at 375px in light and dark: `scrollWidth` equals the viewport on all three, the three
+  selector pills wrap onto two rows rather than overflowing, and the CTA pair stacks. Automated at
+  all five widths by `responsive-device-matrix.spec.ts` and at 375px by an `@mobile-only` case in
+  `segmented-landing.spec.ts`.
 
 ## Pass criteria
 
