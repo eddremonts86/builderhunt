@@ -1,63 +1,82 @@
 # Features bento copy refresh
 
-The existing six bento cards stay. Each gets a one-line copy refresh grounded in the inventory.
+The existing six bento cards stay. Each gets a one-line refresh grounded in the inventory.
+
+> **Verified 2026-08-18.** Every claim below was resolved against the code. Three in the previous
+> draft were wrong and are recorded at the bottom rather than quietly replaced.
 
 ## 1. Multi-source discovery
 
 **Headline**: Multi-source discovery
-**Subhead**: Federated across 12 communities, with semantic search on top.
-**Number**: 12 SOURCES
+**Subhead**: One federated search across every public source we index, with semantic search on top.
+**Number**: **interpolated, never typed** — `SEARCH_SOURCE_COUNT` from
+`src/shared/lib/search-connectors.ts` (13 today).
 
-(Replaces the current copy that says "13 sources". The actual live count is 12:
-`src/lib/sources/index.ts`. Semantic search is a search method, not a source. The
-"+1" framing is misleading.)
+The count is the one number on this page that has already gone stale across nine surfaces at once.
+It is a constant precisely so copy reads the registry that decides it; a card that renders
+`{SEARCH_SOURCE_COUNT} sources` cannot drift, and one that renders `13 SOURCES` will.
 
 ## 2. Recency-weighted scoring
 
 **Headline**: Recency-weighted scoring
-**Subhead**: A 7-day decay window. A builder who shipped last week outranks one who shipped last month. We surface people, not history.
+**Subhead**: Somebody who shipped today outranks somebody who shipped last month. We surface people,
+not history.
+
+Deliberately no number. `src/lib/score.ts` is a five-step ladder — under a day scores 30, under a
+week 22, under a month 12, under 90 days 5, under a year 1 — not the "7-day decay window" the earlier
+draft claimed. Describing the shape in prose survives a retune of the steps; quoting one step does not.
 
 ## 3. Keyword alerts
 
 **Headline**: Keyword alerts
-**Subhead**: Set the filter once. We send an email or RSS ping the moment a new builder matches. No daily digest, just the hits that matter.
+**Subhead**: Set the filter once. We tell you the moment a new builder matches.
 
-(Plan `phase-1/34-smart-alerts` is `partially-implemented` — v1 ships, v2 deferred. This
-copy describes v1 honestly.)
+Email alerts are a paid action (`402` without `paidActionsAllowed`); the free plan gets the feed link.
+The card must not promise email without that qualifier — the segmented investing page states it
+explicitly and this card should not contradict it.
 
 ## 4. Private notes
 
 **Headline**: Private notes
-**Subhead**: Stash private context on any builder. Outreach status, where you met them, why they matter. Only you and your team see them.
+**Subhead**: Stash private context on any builder — outreach status, where you met, why they matter.
+Only your workspace sees them.
 
 ## 5. CSV / JSON export
 
 **Headline**: CSV / JSON export
-**Subhead**: Export any shortlist to CSV or JSON. Pipe it into Notion, Airtable, your ATS, or a spreadsheet. No lock-in.
+**Subhead**: Export any shortlist to CSV or JSON. Pipe it into Notion, Airtable, your ATS, or a
+spreadsheet. No lock-in.
 
 ## 6. No tracking, no spam
 
 **Headline**: No tracking, no spam
-**Subhead**: We don't message builders on your behalf and we don't sell profile data. You find them, you reach out. That is the whole model.
+**Subhead**: We do not message builders on your behalf and we do not sell profile data. You find them,
+you reach out.
 
 ## Sources strip
 
 **Eyebrow**: AGGREGATING ACTIVITY FROM THE PLATFORMS BUILDERS ALREADY USE
-**Copy**: GitHub, Reddit, Hacker News, DEV.to, GitLab, Codeberg, Stack Overflow, npm, Hugging Face, Lobsters, Hashnode, SourceHut.
-**Footnote**: Plus semantic search across the same 12 communities. We index what people
-shipped, not just what they say they did.
+**Copy**: rendered from `IMPLEMENTED_SEARCH_CONNECTORS`, not typed. Today that is GitHub, Hacker News,
+DEV.to, Reddit, Lobsters, Stack Overflow, npm, Hugging Face, GitLab, Codeberg, Devpost, Product Hunt
+and Bluesky.
+**Footnote**: Semantic search runs across the same sources. We index what people shipped, not just
+what they say they did.
 
-## Footer paragraph (small refresh)
+A hand-written list is the same defect as a hand-written count, one row lower: the previous draft
+still listed **Hashnode** and **SourceHut**, retired on 2026-08-04 by `drizzle/0143` and `drizzle/0144`,
+and omitted Devpost, Product Hunt and Bluesky.
 
-> Find active open-source builders across the open web. Track GitHub stars, Hacker News
-> comments, and Reddit velocity from one clean dashboard. Plus alerts, notes, and team
-> shortlists.
+## What the earlier draft got wrong
 
-(Adds the three shipped surfaces the current copy leaves out.)
+- **"Federated across 12 communities" / "12 SOURCES"** — it is 13, and it must not be a literal at all.
+  The draft even argued *for* the wrong number, reasoning that "semantic search is a search method,
+  not a source" against a "13" it assumed was `12 + 1`. The 13 is thirteen connectors.
+- **"`src/lib/sources/index.ts`"** — no such file. The registry is `src/shared/lib/search-connectors.ts`.
+- **"A 7-day decay window"** — `score.ts` is a five-step ladder, not a decay window.
 
 ## Acceptance
 
-- "13 sources" appears nowhere in the home page copy.
+- No source count appears as a literal anywhere in the rendered copy.
 - Every numeric claim resolves to a `src/` path via `grep -r`.
 - Persona variants do not change any line in this section.
-- The footer paragraph does not exceed one line on mobile 320.
+- The sources strip renders from the registry, so retiring a connector updates the page.

@@ -2,51 +2,58 @@
 
 The three shipped surfaces that turn "search and look" into recurring work.
 
+> **Verified 2026-08-18.** All three plans resolve, and all three are in
+> `plans/implemented/phase-1/` — so all three are shipped. The earlier draft badged one of them
+> "COMING SOON", which is the error this section can least afford.
+
 ## Section header
 
 **Eyebrow**: PIPELINE
 **Headline**: Three surfaces that turn a search into a system.
-**Subhead**: Discovery is the entry point. Alerts, sprints, and team shortlists are what keep your sourcing running without you clicking refresh.
+**Subhead**: Discovery is the entry point. Alerts, sprints and shared shortlists are what keep it
+running without you clicking refresh.
 
 ## Three cards
 
-### Card 1: Keyword alerts
+### Card 1 — Keyword alerts
 
-**Eyebrow**: SHIPPED · PLAN PHASE-1/34-SMART-ALERTS
-**Headline**: Keyword alerts
-**Copy**: Set the filter once. We ping the moment a new builder matches your criteria. Email, RSS, or webhook. No daily digest, just the hits that matter.
-**Link**: Browse the docs
+**Eyebrow**: SHIPPED
+**Plan**: [`phase-1/34-smart-alerts`](../../../implemented/phase-1/34-smart-alerts/spec.md)
+**Copy**: Set the filter once. We tell you the moment a new builder matches.
 
-(Plan `phase-1/34-smart-alerts` is `partially-implemented`. v1 ships today: keyword
-match + email + RSS. v2 (semantic match, score thresholds) is deferred.)
+Email delivery is a paid action; a free workspace gets the private feed link, which runs the same
+query. The card says "we tell you" rather than naming a channel, so it stays true on both plans.
 
-### Card 2: AI sourcing sprints
+### Card 2 — AI sourcing sprints
 
-**Eyebrow**: SHIPPED · PLAN PHASE-1/41-AI-SOURCING-SPRINTS
-**Headline**: AI sourcing sprints
-**Copy**: Pick keywords. We re-run them in the background until a result quota. Free: 0 concurrent. Pro: 3. Team: 10.
-**Link**: See sprint example
+**Eyebrow**: SHIPPED
+**Plan**: [`phase-1/41-ai-sourcing-sprints`](../../../implemented/phase-1/41-ai-sourcing-sprints/spec.md)
+**Copy**: Give a role a deadline and let a sprint work the sources for you.
 
-(Plan `phase-1/41-ai-sourcing-sprints` is `implemented`. Tier gates come from
-`organization_entitlements` + `repositories/entitlements.ts`.)
+Concurrency is tier-gated by `SOURCING_SPRINT_LIMITS` in `src/shared/lib/billing-shared.ts` —
+free 0, pro 3, pro_max 10, team 10. **Rendered from the constant if shown at all.** The earlier draft
+typed "Free: 0. Pro: 3. Team: 10", which is right today, omits `pro_max`, and is the same
+hand-written-number defect as the source count.
 
-### Card 3: Team shortlists
+### Card 3 — Team shortlists
 
-**Eyebrow**: COMING SOON · PLAN PHASE-1/28-SHARED-RESOURCES
-**Headline**: Team shortlists
-**Copy**: Share saved searches and shortlists with your workspace. Owner-only visibility on private lists. Admins see org-visible lists. Free workspaces get one shared list. Team workspaces get unlimited.
-**Link**: Read the plan
+**Eyebrow**: SHIPPED
+**Plan**: [`phase-1/28-shared-resources`](../../../implemented/phase-1/28-shared-resources/spec.md)
+**Copy**: Share saved searches and shortlists with your workspace, with private lists staying private.
 
-(Plan `phase-1/28-shared-resources` is `pending — unblocked 2026-07-29`. The preconditions
-are met; the remaining work is the UI layer for shared lists. Honest "Coming soon"
-because the precondition is met but the feature is not shipped.)
+## What the earlier draft got wrong
+
+- **Card 3 was badged `COMING SOON`** and described as `pending — unblocked 2026-07-29`, with a link
+  "to the plan, not to the feature". `28-shared-resources` is in `plans/implemented/phase-1/`. The
+  page would have advertised a shipped feature as unavailable — the rare failure that costs sign-ups
+  by being *too* modest, and the one no reviewer catches because nobody audits copy for underselling.
+- Every card's eyebrow carried the plan path in shouting caps. Plan numbers are internal navigation;
+  a visitor reading `PLAN PHASE-1/34-SMART-ALERTS` learns nothing and sees the seams.
+- The acceptance block referred to "12 concurrent" sprint caps, a number matching nothing.
 
 ## Acceptance
 
-- Every card cites a real plan path.
-- Status badges match the plan's `Status` header (`implemented` or `pending`).
-- Numeric claims match the live code:
-  - "12 concurrent" sprint caps come from `repositories/entitlements.ts` (free: 0, pro: 3,
-    team: 10).
-- No "Coming soon" appears in card 1 or 2.
-- Card 3 has a "Coming soon" badge and a link to the plan, not to the feature.
+- Every card cites a real plan path, and the path's location under `implemented/` or a phase
+  directory is what decides the badge — not a hand-written status.
+- No tier number appears as a literal; the sprint caps render from `SOURCING_SPRINT_LIMITS`.
+- No card promises email alerts without the paid-plan qualifier.

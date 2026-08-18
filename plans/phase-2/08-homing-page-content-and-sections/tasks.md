@@ -80,33 +80,68 @@
   - The default column remains `HomePage.tsx` string for string, so a visitor with no `?persona=`
     sees no change at all.
 
-- [ ] **Draft `landing-copy/02-features-refresh.md`**
+- [x] **Draft `landing-copy/02-features-refresh.md`**
   - Files: `landing-copy/02-features-refresh.md`
   - Do: Refresh copy for the six existing bento feature cards plus the "13 sources" claim
     in the Sources strip.
   - Verify: "13 sources" becomes "12 sources + semantic search" with a link to
     `src/lib/sources/index.ts` for the live count.
+  - **This Verify clause was itself wrong** and is superseded. The live count is **13**, not 12; the
+    file it names has never existed (the registry is `src/shared/lib/search-connectors.ts`); and the
+    "+ semantic search" framing came from reading 13 as `12 + 1`. It is thirteen connectors.
+  - Result: the count is **never a literal**. The card interpolates `SEARCH_SOURCE_COUNT` and the
+    sources strip renders from `IMPLEMENTED_SEARCH_CONNECTORS`, so retiring a connector updates the
+    page. The old strip still listed Hashnode and SourceHut, retired 2026-08-04 by drizzle/0143 and
+    0144, and omitted Devpost, Product Hunt and Bluesky.
+  - Also removed: "a 7-day decay window". `src/lib/score.ts` is a five-step ladder (30/22/12/5/1 by
+    age), so the copy describes the shape and survives a retune instead of quoting one step.
 
-- [ ] **Draft `landing-copy/03-pipeline.md`**
+- [x] **Draft `landing-copy/03-pipeline.md`**
   - Files: `landing-copy/03-pipeline.md`
   - Do: Section header + three cards (Keyword alerts, AI sourcing sprints, Team shortlists)
     with one-line copy each.
   - Verify: every cited plan path exists; every status claim matches the plan's
     `Status` header.
+  - Result: all three plans resolve and **all three are in `plans/implemented/phase-1/`**. The draft
+    badged Team shortlists `COMING SOON` and linked "to the plan, not to the feature" — the page would
+    have advertised a shipped feature as unavailable. That is the failure nobody catches, because no
+    reviewer audits a landing page for underselling.
+  - The badge now derives from where the plan directory lives rather than from a hand-written status,
+    and the sprint caps render from `SOURCING_SPRINT_LIMITS` instead of the draft's typed
+    "Free: 0. Pro: 3. Team: 10" — right today, silent about `pro_max`, stale on the next change.
 
-- [ ] **Draft `landing-copy/04-ai-helpers.md`**
+- [x] **Draft `landing-copy/04-ai-helpers.md`**
   - Files: `landing-copy/04-ai-helpers.md`
   - Do: Section header + five tiles (Semantic search, AI sourcing sprints, AI outreach
     copilot, AI profile enrichment, AI CV generation) with status badge, plan path, credit
     cost, and one-line copy.
   - Verify: status badge matches the plan's `Status`; credit cost matches the plan's
     billing section or is `included in plan`.
+  - Result: four tiles link into `plans/implemented/phase-1/`, the fifth into `plans/phase-4/`, and
+    every target resolves.
+  - **The credit allowances were removed rather than corrected.** "Pro: 140 credits/month, Pro Max:
+    700, Team: 2100" appears nowhere `grep -rn` reaches. They may well be right and written down
+    somewhere else — they are not verifiable from this repository, which is the bar for a landing
+    page. The header now says so and asks whoever restores them to cite the file. The section
+    headline lost "Three cost credits, two do not" with them: that is arithmetic over numbers nobody
+    can check.
 
-- [ ] **Draft `landing-copy/05-roadmap.md`**
+- [x] **Draft `landing-copy/05-roadmap.md`**
   - Files: `landing-copy/05-roadmap.md`
   - Do: 8 items, each with `plan name — one-line why — Coming soon`. The plan-name link
     points to the matching `plans/phase-1/<dir>/spec.md` or `plans/phase-4/<dir>/spec.md`.
   - Verify: every link target exists; order matches the priority list in `spec.md`.
+  - Result: all seven `phase-4/…/spec.md` targets resolve, and every item is now a real link rather
+    than a bare path in parentheses.
+  - **It was seven items, not eight.** Solutions Intelligence is
+    `plans/implemented/phase-1/43-solutions-intelligence` — shipped, not upcoming. It ships behind
+    seven `SOLUTIONS_*` flags that were `false` in `env.ts` and absent from `.env.example` entirely
+    until 2026-08-16: built, switched off, invisible. "Coming soon" is the wrong badge either way, so
+    the item is struck with the two honest options written beside it.
+  - A methodology note worth keeping: my first check reported all seven phase-4 paths missing. The
+    check was broken — zsh aborts the whole glob when the first pattern matches nothing — not the
+    paths. A verification script that fails open is worse than none, because it produces confident
+    wrong answers.
 
 ## Phase 2 — New sections
 
