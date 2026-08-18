@@ -5,6 +5,15 @@ on:
     workflows: [Quality]
     types: [completed]
     branches: [master]
+  # Manual re-run, for the two cases a merge cannot serve.
+  #
+  # Verifying the Coolify credentials after rotating one, and re-deploying a commit whose deploy
+  # failed for a reason outside the build. Without this the only way to exercise this workflow is to
+  # merge something to master, which makes "did the fix work?" cost a release.
+  #
+  # It runs the same steps against the same secrets — the preflight still refuses an app that is not
+  # builderhunt.dev, so a dispatch cannot reach somewhere a push could not.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +24,13 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success'
+    # Both triggers, or the manual one silently skips.
+    #
+    # On a `workflow_dispatch` there is no `github.event.workflow_run`, so the original condition is
+    # false and the job is *skipped* — which GitHub renders as a grey tick, not a failure. A manual
+    # run that appears to succeed while doing nothing is the same class of lie as the missing
+    # `deployment_uuid` this workflow already guards against.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     # A hung job bills the runner default of six hours. On a metered account that is the
     # difference between a bad run and a bad month.
