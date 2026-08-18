@@ -18,7 +18,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
 
 ## Phase 0 — canonical model and ownership
 
-- [ ] **Add the account-subject profile and attachment schema**
+- [x] **Add the account-subject profile and attachment schema**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/*.sql` (new migration allocated by
     `pnpm db:generate`), `drizzle/migration-hashes.json`,
     `docs/architecture/data-classification.md`
@@ -30,6 +30,26 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     forward-only migration. Let `pnpm db:generate` allocate the migration number.
   - Verify: `pnpm test:migrations:local`, `pnpm test:migration-integrity`, and a negative DB test
     proving user A cannot select or mutate user B's draft/unlisted profile or attachments.
+  - Result: `drizzle/0175_self_managed_profiles.sql` — three tables, applied, `migration-integrity`
+    green at 176.
+  - **The RLS shape deliberately departs from its own precedent.** `0171_user_preferences` is the
+    account-subject template and its policies are owner-only, keyed on `app.user_id`. Copying that
+    here would be wrong in a way that looks right: these profiles are read by strangers at
+    `/u/<handle>`, so owner-only makes every public profile invisible and the failure reads as "no
+    profiles exist" rather than as a policy. Each table therefore pairs an owner policy with a
+    public-read policy scoped to `visibility in ('public','unlisted') and deleted_at is null`.
+  - `unlisted` **is** publicly readable at the row level, on purpose: it means reachable by anyone
+    holding the link. Keeping it out of *search* is the route's job, because a policy cannot tell a
+    direct visit from a listing.
+  - An attachment's exposure is a subquery against its profile rather than a denormalised column, so a
+    profile returning to `draft` hides its attachments in the same statement. Two columns to keep in
+    step is how an attachment outlives the decision to hide it.
+  - The handle and owner unique indexes are **partial on live rows**. A plain `unique` would let a
+    soft-deleted profile hold its handle forever and stop anybody from making a second profile after
+    deleting their first — and the error would read "handle taken" for a handle nobody holds.
+  - Negative test run against the real database as `builderhunt_app` with `app.user_id` set: B cannot
+    select A's draft (0 rows), cannot update it (0 rows), A can read their own (1), B can read it once
+    published (1), and B loses it the moment it is soft-deleted (0). Five for five.
 
 - [ ] **Implement schemas, service taxonomy, and repositories**
   - Files: `src/shared/lib/self-managed/contracts.ts`,
