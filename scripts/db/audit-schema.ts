@@ -342,6 +342,55 @@ const classifications: Classification[] = [
   // key on. Its RLS is enabled and forced, keyed on `app.user_id`, the same shape as `user_devices`
   // above rather than `dashboard_preferences`.
   account('user_preferences', 'user_id', ['phase-2/02-segmentacion-usuarios']),
+
+  /**
+   * Self-managed profiles (plan: phase-2/07-perfiles-autogestionados).
+   *
+   * `account-subject` like `user_preferences` — keyed on the person, not the workspace, because a
+   * profile describes who somebody is and does not change when they switch organisation. But unlike
+   * every other account-subject table here, **strangers read it**: `/u/<handle>` serves the public
+   * projection, so `publicDtoFields` is populated rather than empty and the RLS pairs an owner policy
+   * with a public-read policy scoped to `visibility in ('public','unlisted') and deleted_at is null`.
+   *
+   * Listing the public fields is the point of the entry. It is the difference between "this table is
+   * private" and "these eleven columns are the ones a stranger may see", and a column added later that
+   * is not on this list is a column the projection must keep leaving out.
+   */
+  {
+    table: 'self_managed_profiles',
+    class: 'account-subject',
+    ownerKey: 'owner_user_id',
+    publicDtoFields: [
+      'handle', 'display_name', 'headline', 'bio', 'location_city', 'location_country_code',
+      'languages', 'services', 'topics', 'updated_at', 'visibility',
+    ],
+    // Soft-deleted rows hold their handle for thirty days so nobody can grab it the moment somebody
+    // leaves, then the worker removes them. The row outliving the account is not a case: the FK
+    // cascades from `auth_users`.
+    retention: 'account lifetime; a soft-deleted profile is purged after the 30-day handle hold',
+    plans: ['phase-2/07-perfiles-autogestionados'],
+  },
+  {
+    table: 'self_managed_attachments',
+    class: 'account-subject',
+    ownerKey: 'profile_id -> self_managed_profiles.owner_user_id',
+    // Title and description are the owner's words about their own work and are shown with it. The
+    // storage key never is: it is a path into object storage and publishing it would make the
+    // bucket's layout guessable.
+    publicDtoFields: ['kind', 'title', 'description', 'mime_type', 'size_bytes', 'duration_seconds', 'uploaded_at'],
+    retention: 'profile lifetime; the stored object must be deleted with the row — enforcement pending the retention worker',
+    plans: ['phase-2/07-perfiles-autogestionados'],
+  },
+  /**
+   * Never public. The whole purpose is that a handle is *held*, and publishing who holds what is a
+   * list of names worth squatting against.
+   */
+  account(
+    'self_managed_handle_reservations',
+    'reserved_by_user_id',
+    ['phase-2/07-perfiles-autogestionados'],
+    'seven days from reservation; expired rows are swept rather than trusted',
+  ),
   tenant('seat_usage_daily', 'organization_id + user_id + day', ['abuse-and-usage-integrity'], { organizationColumn: true }),
 
   // Onboarding (plan 8). `onboarding_selected_builders` is keyed by organization AND user, with a
