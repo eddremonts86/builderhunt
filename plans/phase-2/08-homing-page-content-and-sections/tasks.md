@@ -37,12 +37,26 @@
     document whose job is to be the ground truth for twenty-two other tasks had a broken first row,
     and reading it carefully is exactly what had already failed to catch that.
 
-- [ ] **Write the persona copy variants table**
+- [x] **Write the persona copy variants table**
   - Files: `landing-copy/01-hero.md` (top section)
   - Do: Four persona variants (`hiring`, `investing`, `building`, `other`) × three text
     blocks (hero sub-paragraph, persona-tabs headline, CTA strip).
   - Verify: every persona has a value for every block; default `hiring` matches the current
     home copy exactly so the persona switch is invisible-by-default.
+  - Result: the 4 × 3 table at the top of `landing-copy/01-hero.md`. The `hiring` column was copied
+    out of `HomePage.tsx` string by string rather than written from memory — that column *is* the
+    shipped page, which is what makes the switch invisible to anyone arriving without `?persona=`.
+  - The four are `USER_SEGMENTS` from `user-segments.ts`, not categories invented for this page. A
+    fifth would be a taxonomy the goal step and the dashboard presets do not honour. `other` repeats
+    `hiring` on purpose: `resolveSegmentPreset` maps it to the general experience, and a variant
+    written for somebody who declined to say is copy addressed to nobody.
+  - **The CTA paragraph is deliberately not persona-varied.** `HomePage.tsx` carries the reason beside
+    it: `ACCESS_ALLOWLIST_ENABLED` gates sign-up behind an approval queue, so any wording promising
+    immediate access is false whenever that flag is on — and it is on, in production and in
+    `.env.example`. `trust-claims.test.ts` matches the raw component source, so the phrasing is a
+    build-time constraint rather than a preference. Its nine forbidden patterns are listed in the file
+    so the next person writing a variant does not have to rediscover them; the guard reads only
+    `HomePage.tsx`, so listing them in a plan document is safe, and its 30 tests stay green.
 
 ## Phase 1 — Copy draft
 
