@@ -145,7 +145,25 @@
 
 ## Phase 2 — New sections
 
-- [ ] **Build `PipelineSection` component**
+- [x] **Build `PipelineSection` component**
+  - Result: **one `LandingSection` component, three thin wrappers**, plus
+    `content/landing-sections.ts` holding all three sections as data. Three hand-built sections would
+    drift into three different answers to what this product does — the same reasoning as
+    `SegmentLandingPage`, and the reason the copy drafts contradicted each other in the first place.
+  - **The "Coming soon" badge is derived from the plan path, never passed.** `isShipped` returns true
+    for anything under `plans/implemented/`, so a card cannot claim a state its plan contradicts. The
+    draft this replaces badged Team shortlists "Coming soon" while `28-shared-resources` sat in
+    `implemented/`; nothing here can express that, and a test asserts the roadmap contains no
+    implemented plan.
+  - **No number appears in any copy string, and the test enforces it against the resolved value.** The
+    weaker "no hand-written number" rule is unenforceable — a test sees `3` in the output but not
+    whether a constant or a keyboard produced it, so it lets both through or blocks both. My first
+    version interpolated `SOURCING_SPRINT_LIMITS.pro` and the test caught it. Tier limits belong on
+    the pricing page next to what they cost; a landing card saying "up to 3 at once" is a number
+    without a price.
+  - 40 unit tests: every `planPath` resolves to a real `spec.md`, the roadmap holds nothing
+    implemented, the shipped sections hold nothing unimplemented, no copy string carries a number, and
+    the forbidden-promise patterns from the segmented landing apply here too.
   - Files: `src/modules/landing/components/PipelineSection.tsx`,
     `src/modules/landing/components/PipelineSection.test.tsx`
   - Do: Read copy from `landing-copy/03-pipeline.md`. Three cards in a
@@ -154,7 +172,7 @@
   - Verify: `pnpm vitest run tests/unit/modules/landing/components/PipelineSection.test.tsx`
     passes; rendered copy matches the draft.
 
-- [ ] **Build `AiHelpersSection` component**
+- [x] **Build `AiHelpersSection` component**
   - Files: `src/modules/landing/components/AiHelpersSection.tsx`,
     `src/modules/landing/components/AiHelpersSection.test.tsx`
   - Do: Read copy from `landing-copy/04-ai-helpers.md`. Five tiles in a 2/3-column grid
@@ -162,7 +180,7 @@
     badge, plan path as `data-testid`, credit cost, and one-line copy.
   - Verify: test pins the rendered copy and the status badge of each tile.
 
-- [ ] **Build `RoadmapSection` component**
+- [x] **Build `RoadmapSection` component**
   - Files: `src/modules/landing/components/RoadmapSection.tsx`,
     `src/modules/landing/components/RoadmapSection.test.tsx`
   - Do: Read copy from `landing-copy/05-roadmap.md`. Eight items in a single column. Each
@@ -171,7 +189,7 @@
   - Verify: every link's `href` matches a real plan path; render test snapshots the eight
     items in order.
 
-- [ ] **Wire the new sections into `HomePage.tsx`**
+- [x] **Wire the new sections into `HomePage.tsx`**
   - Files: `src/modules/landing/components/HomePage.tsx`
   - Do: Insert `<PipelineSection />`, `<AiHelpersSection />`, `<RoadmapSection />` in the
     order established in `spec.md`. No other change to `HomePage.tsx` in this commit.

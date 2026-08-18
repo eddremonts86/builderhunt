@@ -7,6 +7,9 @@ import {
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
+import { AiHelpersSection } from '~/modules/landing/components/AiHelpersSection'
+import { PipelineSection } from '~/modules/landing/components/PipelineSection'
+import { RoadmapSection } from '~/modules/landing/components/RoadmapSection'
 import { SegmentSelector } from '~/modules/landing/components/SegmentSelector'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
@@ -428,6 +431,18 @@ export function HomePage({ isAuthed, showSegmentSelector }: HomePageProps) {
             </div>
           </div>
         </section>
+
+        {/*
+          The three data-driven sections (plan: phase-2/08-homing-page-content-and-sections).
+
+          Placed after the feature grid and before the use cases: the grid says what the product is,
+          these say what it keeps doing for you, and the use cases say who that is for. Their copy
+          lives in `content/landing-sections.ts` and their "Coming soon" badges are derived from each
+          item's plan path, so no card here can claim a state its plan contradicts.
+        */}
+        <PipelineSection />
+        <AiHelpersSection />
+        <RoadmapSection />
 
         {/* ───────────────────── USE CASES ─────────────────────── */}
         <section id="use-cases" className="section bg-bh-surface">
