@@ -113,6 +113,31 @@ application: fast numbers answering a question nobody asked.
 The cookie *name* is equally not assumed. It is better-auth's default only because no `cookiePrefix`
 or `useSecureCookies` is configured; both would move it, and so would an upgrade.
 
+### 3b. Two ways the runner cannot reach an app that is running fine
+
+Both were found on 2026-08-18 setting up the first smoke through the minting path, and both read as
+"the app will not start" while the app is serving perfectly.
+
+**The dev server binds IPv6 only.** `vite dev` listens on `[::1]`, and the runner's default base URL
+is `http://127.0.0.1:3000` — IPv4. `lsof -nP -iTCP:<port> -sTCP:LISTEN` shows the listener, `curl`
+against `127.0.0.1` gets nothing, and the run dies with `fetch failed` after the minting log line.
+Use `http://localhost:<port>`, which resolves to `::1` first on macOS.
+
+```
+localhost:3013   -> 200
+[::1]:3013       -> 200
+127.0.0.1:3013   -> refused
+```
+
+**`LOAD_BASE_URL` must equal the app's own `APP_URL`.** The probe sign-in sends `Origin`, because a
+browser does and better-auth validates it — so a mismatched port or host answers
+`403 INVALID_ORIGIN`, which is the application behaving correctly and looks like a credential problem.
+Against production the two match naturally (`https://builderhunt.dev`); they diverge the moment
+somebody points the runner at loopback "to go faster".
+
+With both aligned, a 25-user smoke through the minting path passes end to end: 25 minted, preflight
+green on all five routes, p50 35 ms / p95 225 ms, zero 5xx.
+
 ### 4. The connection budget
 
 One app process caps its five pools at 12/4/4/3/3 — **26 connections** — see
