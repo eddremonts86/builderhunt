@@ -21,7 +21,7 @@ The earlier headline said "Three cost credits, two do not", which is a claim abo
 ### Tile 1: Semantic search
 
 **Status**: SHIPPED
-**Plan**: [`phase-1/22-semantic-search`](../../../implemented/phase-1/22-semantic-search/spec.md) — implemented
+**Plan**: [`phase-1/22-semantic-search`](../../../../implemented/phase-1/22-semantic-search/spec.md) — implemented
 **Cost**: Free for everyone
 **Headline**: Semantic search
 **Copy**: Find builders by what they shipped, not just what they say they did. Embeddings, not a scraper.
@@ -29,7 +29,7 @@ The earlier headline said "Three cost credits, two do not", which is a claim abo
 ### Tile 2: AI sourcing sprints
 
 **Status**: SHIPPED
-**Plan**: [`phase-1/41-ai-sourcing-sprints`](../../../implemented/phase-1/41-ai-sourcing-sprints/spec.md) — implemented
+**Plan**: [`phase-1/41-ai-sourcing-sprints`](../../../../implemented/phase-1/41-ai-sourcing-sprints/spec.md) — implemented
 **Cost**: Included in plan; concurrency rendered from `SOURCING_SPRINT_LIMITS` (free 0, pro 3, pro_max 10, team 10) rather than typed
 **Headline**: AI sourcing sprints
 **Copy**: Background re-runs of saved searches until a result quota. Workers run on the same credit ledger.
@@ -37,7 +37,7 @@ The earlier headline said "Three cost credits, two do not", which is a claim abo
 ### Tile 3: AI outreach copilot
 
 **Status**: SHIPPED
-**Plan**: [`phase-1/26-outreach-generator`](../../../implemented/phase-1/26-outreach-generator/spec.md) — implemented
+**Plan**: [`phase-1/26-outreach-generator`](../../../../implemented/phase-1/26-outreach-generator/spec.md) — implemented
 **Cost**: Included in plan — allowance not stated until its source is named (see the header)
 **Headline**: AI outreach copilot
 **Copy**: Draft the first note in your voice. Three tones, a frozen fallback rung if the model is busy. You edit before sending.
@@ -45,7 +45,7 @@ The earlier headline said "Three cost credits, two do not", which is a claim abo
 ### Tile 4: AI profile enrichment
 
 **Status**: SHIPPED (claim-gated)
-**Plan**: [`phase-1/24-ai-profile-enrichment`](../../../implemented/phase-1/24-ai-profile-enrichment/spec.md) — implemented
+**Plan**: [`phase-1/24-ai-profile-enrichment`](../../../../implemented/phase-1/24-ai-profile-enrichment/spec.md) — implemented
 **Cost**: Per-request credit (cost printed before you run it)
 **Headline**: AI profile enrichment
 **Copy**: Verified claim holders get an evidence-backed persona card. We do not sell it, we do not share it, we do not include it in search ranking.
@@ -53,7 +53,7 @@ The earlier headline said "Three cost credits, two do not", which is a claim abo
 ### Tile 5: AI CV generation and tailoring
 
 **Status**: COMING SOON
-**Plan**: [`phase-4/ai-cv-generation-and-tailoring`](../../../phase-4/ai-cv-generation-and-tailoring/spec.md) — not started
+**Plan**: [`phase-4/ai-cv-generation-and-tailoring`](../../../../phase-4/ai-cv-generation-and-tailoring/spec.md) — not started
 **Cost**: Per-request credit (cost printed before you run it)
 **Headline**: AI CV generation and tailoring
 **Copy**: Generate a CV from confirmed facts. Tailor it to a job description without inventing experience. The first batch ships to builders; recruiters see only verified builders who opted in.

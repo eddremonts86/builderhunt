@@ -18,7 +18,7 @@ running without you clicking refresh.
 ### Card 1 — Keyword alerts
 
 **Eyebrow**: SHIPPED
-**Plan**: [`phase-1/34-smart-alerts`](../../../implemented/phase-1/34-smart-alerts/spec.md)
+**Plan**: [`phase-1/34-smart-alerts`](../../../../implemented/phase-1/34-smart-alerts/spec.md)
 **Copy**: Set the filter once. We tell you the moment a new builder matches.
 
 Email delivery is a paid action; a free workspace gets the private feed link, which runs the same
@@ -27,7 +27,7 @@ query. The card says "we tell you" rather than naming a channel, so it stays tru
 ### Card 2 — AI sourcing sprints
 
 **Eyebrow**: SHIPPED
-**Plan**: [`phase-1/41-ai-sourcing-sprints`](../../../implemented/phase-1/41-ai-sourcing-sprints/spec.md)
+**Plan**: [`phase-1/41-ai-sourcing-sprints`](../../../../implemented/phase-1/41-ai-sourcing-sprints/spec.md)
 **Copy**: Give a role a deadline and let a sprint work the sources for you.
 
 Concurrency is tier-gated by `SOURCING_SPRINT_LIMITS` in `src/shared/lib/billing-shared.ts` —
@@ -38,7 +38,7 @@ hand-written-number defect as the source count.
 ### Card 3 — Team shortlists
 
 **Eyebrow**: SHIPPED
-**Plan**: [`phase-1/28-shared-resources`](../../../implemented/phase-1/28-shared-resources/spec.md)
+**Plan**: [`phase-1/28-shared-resources`](../../../../implemented/phase-1/28-shared-resources/spec.md)
 **Copy**: Share saved searches and shortlists with your workspace, with private lists staying private.
 
 ## What the earlier draft got wrong

@@ -115,6 +115,14 @@ pnpm audit:landing:walk   # records docs/ui-audit/evidence/landing-baseline/metr
 pnpm audit:landing        # enforces the budgets against the newest metrics file
 ```
 
+Both live in `scripts/audit/`: `landing-walk.ts` records, `check-landing-budget.ts` enforces. Only the
+second is in `ci:local` and `.github/workflows/quality.yml` — the walker needs a browser and a running
+app, and it *records* rather than checks.
+
+**So the gate catches a committed baseline going over budget, and cannot catch a page that grew
+without the walker being re-run.** Re-running it belongs with the change that moves the page, the same
+way `pnpm test:visual --update-snapshots` belongs with a deliberate visual change.
+
 The walker measures every persona at every viewport and keeps the **tallest**: the budget is a
 ceiling, so the worst render is the honest one. It writes a full-page screenshot per persona per
 viewport alongside the metrics, so a review can see what the number describes.

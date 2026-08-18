@@ -1,7 +1,7 @@
 # Homing-page content and sections — Delivery Plan
 
-> **Status**: `pending`
-> **Depends on**: nothing in the same phase. Reads [`app-reality`](../../_meta/app-reality.md)
+> **Status**: `implemented` — 2026-08-18
+> **Depends on**: nothing in the same phase. Reads [`app-reality`](../../../_meta/app-reality.md)
 > for the ground truth on what is shipped today and what the home page is allowed to claim. Reads
 > every plan under `plans/` to know what is coming so the home page can advertise it honestly.
 > **Blocks**: nothing. Pure landing-page rewrite — no schema, no API, no migration.

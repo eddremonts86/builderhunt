@@ -1,11 +1,11 @@
 # Homing-page content and sections — Tasks
 
-> **Status**: `pending`
+> **Status**: `implemented` — 2026-08-18
 > **Spec**: [`spec.md`](./spec.md)
 > **Plan**: [`plan.md`](./plan.md)
 > **Rule**: a task is complete only after its runtime verification passes AND the page-size
 > gate (`scripts/audit/check-landing-budget.ts`) stays green.
-> **Depends on**: nothing in the same phase. Reads [`app-reality`](../../_meta/app-reality.md)
+> **Depends on**: nothing in the same phase. Reads [`app-reality`](../../../_meta/app-reality.md)
 > for the ground truth on what is shipped today and what the home page is allowed to claim. Reads
 > every plan under `plans/` to know what is coming so the home page can advertise it honestly.
 > **Blocks**: nothing. Pure landing-page rewrite — no schema, no API, no migration.
@@ -307,21 +307,30 @@
     workflow. Both gates are required.
   - Verify: `pnpm ci:local` runs end-to-end with all gates green.
 
-- [ ] **Document the gates**
+- [x] **Document the gates**
   - Files: `docs/operations/development.md`
   - Do: Append the new entries next to the existing dashboard-budget gates entry.
   - Verify: the gates section references both files by path.
 
 ## Final cross-plan reconciliation
 
-- [ ] **Verify the plan against `app-reality.md`**
+- [x] **Verify the plan against `app-reality.md`**
+  - Result: every `src/`, `scripts/` and `plans/` path the spec cites resolves. **One did not:**
+    `src/lib/sources/index.ts`, which has never existed — the registry is
+    `src/shared/lib/search-connectors.ts`.
+  - That same phantom path appeared in `landing-copy/00-inventory.md` **and in this task list's own
+    Verify clause**, which is what a wrong path does once written down: it gets copied rather than
+    checked. Three documents cited a file nobody had opened.
+  - The "13 sources" framing went with it. The count is thirteen connectors, it moves, and it renders
+    from the registry — the defect that put "12 sources" on nine surfaces at once, all of which went
+    stale the day `sourcehut` and `hashnode` were retired.
   - Files: `plans/phase-2/08-homing-page-content-and-sections/spec.md`
   - Do: Re-read every claim in the spec against the latest `app-reality.md`. A claim with no
     ground-truth backing is removed.
   - Verify: every claim in `spec.md` resolves to either a `src/` feature, a `plans/` plan
     path, or the `Coming soon` label with a plan path.
 
-- [ ] **Close the plan**
+- [x] **Close the plan**
   - Files: `plans/phase-2/08-homing-page-content-and-sections/`
   - Do: Update the `Status:` header in each of `spec.md`, `plan.md`, `tasks.md` to
     `implemented` or `closed` with a dated implementation note.
