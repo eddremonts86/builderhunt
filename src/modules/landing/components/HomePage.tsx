@@ -1,4 +1,5 @@
 import * as React from 'react'
+import type { UserSegment } from '~/shared/lib/user-segments'
 import { LinkButton } from '~/components/ui'
 import {
   Sparkles, Target, ArrowRight, Check, Search,
@@ -10,7 +11,9 @@ import { trackConversionEvent } from '~/shared/lib/conversion-client'
 import { AiHelpersSection } from '~/modules/landing/components/AiHelpersSection'
 import { PipelineSection } from '~/modules/landing/components/PipelineSection'
 import { RoadmapSection } from '~/modules/landing/components/RoadmapSection'
+import { PersonaSwitcher } from '~/modules/landing/components/PersonaSwitcher'
 import { SegmentSelector } from '~/modules/landing/components/SegmentSelector'
+import { PERSONA_COPY, DEFAULT_PERSONA } from '~/modules/landing/content/persona-copy'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 
 export interface HomePageProps {
@@ -28,9 +31,17 @@ export interface HomePageProps {
    * however the server is configured. Resolved once in `_landing/index.tsx`.
    */
   showSegmentSelector: boolean
+  /**
+   * Which of three text blocks to render (plan: phase-2/08).
+   *
+   * Defaulted rather than required so every other caller — tests, the screenshot script — keeps
+   * rendering the shipped page without opting in to a variant.
+   */
+  persona?: UserSegment
 }
 
-export function HomePage({ isAuthed, showSegmentSelector }: HomePageProps) {
+export function HomePage({ isAuthed, showSegmentSelector, persona = DEFAULT_PERSONA }: HomePageProps) {
+  const copy = PERSONA_COPY[persona]
   const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
 
   React.useEffect(() => {
@@ -57,9 +68,12 @@ export function HomePage({ isAuthed, showSegmentSelector }: HomePageProps) {
                     within the pre-flight cap of 4 text elements + 1+1 CTAs (§4.7).
                     The full product pitch used to live below in a second paragraph;
                     it is now part of the closing CTA copy on the page. */}
-                <p className="text-base md:text-lg text-bh-text max-w-xl mb-8 font-medium animate-fade-in-up">
-                  Activity scored for recency, so the top of your results are the people shipping right now.
+                <p className="text-base md:text-lg text-bh-text max-w-xl mb-8 font-medium animate-fade-in-up" data-testid="hero-subheading">
+                  {copy.heroSubheading}
                 </p>
+                <div className="mb-8 animate-fade-in-up">
+                  <PersonaSwitcher current={persona} />
+                </div>
                 <div className="flex flex-wrap items-center gap-3 mb-8 animate-fade-in-up">
                   {isAuthed ? (
                     <LinkButton to="/dashboard" variant="primary" className="btn-lg">
@@ -448,8 +462,8 @@ export function HomePage({ isAuthed, showSegmentSelector }: HomePageProps) {
         <section id="use-cases" className="section bg-bh-surface">
           <div className="container">
             <div className="max-w-2xl mb-12">
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-bh-text">
-                Whoever you need to find, we surface them first.
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-bh-text" data-testid="use-cases-heading">
+                {copy.useCasesHeading}
               </h2>
             </div>
 
@@ -640,8 +654,8 @@ export function HomePage({ isAuthed, showSegmentSelector }: HomePageProps) {
         {/* ───────────────────── FINAL CTA ─────────────────────── */}
         <section className="section border-t border-bh-border bg-gradient-to-b from-bh-bg-alt/40 to-bh-bg">
           <div className="container-narrow text-center">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-              Start hunting the right builders.
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4" data-testid="closing-heading">
+              {copy.closingHeading}
             </h2>
             <p className="text-lg text-bh-text-muted max-w-xl mx-auto mb-8">
               {/* This CTA used to promise that sign-up had no queue to wait in. Dropped rather

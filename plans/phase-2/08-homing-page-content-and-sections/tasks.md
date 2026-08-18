@@ -198,7 +198,22 @@
 
 ## Phase 3 — Persona switch
 
-- [ ] **Add `?persona=` query parameter to the home route**
+- [x] **Add `?persona=` query parameter to the home route**
+  - Result: `validateSearch` keeps `persona` as a raw string and `personaFromSearch` narrows it at the
+    point of use, so an unrecognised value is **indistinguishable from an absent one**. A validator
+    that rejected loudly would turn the parameter into a way to enumerate the segment enum — the same
+    rule `parseSegmentHint` follows for `?goal=`.
+  - Verified against the served HTML, not a browser: no query and `?persona=hiring` are byte-identical,
+    the three variants each swap, `other` repeats the default, and `?persona=platform_admin` renders
+    the default with no trace that it was rejected.
+  - The switch is `PersonaSwitcher`, a `<details>` of four anchors. A disclosure widget the browser
+    already ships gets the keyboard behaviour, the focus handling and `aria-expanded` right; a
+    `useState` toggle would be three of those re-implemented and one forgotten. Anchors rather than
+    buttons so it survives JavaScript being off and a middle-click does the obvious thing.
+  - **The closing paragraph is deliberately not persona-varied**, and a test asserts the persona data
+    never contains its phrasing. `ACCESS_ALLOWLIST_ENABLED` gates sign-up behind an approval queue, so
+    any wording promising immediate access is false whenever the flag is on — and it is on in
+    production. `trust-claims.test.ts` matches raw component source, making it a build-time constraint.
   - Files: `src/routes/_landing/index.tsx` (or wherever the home route is defined)
   - Do: Read `persona` via `useSearch({ from: '/' })`. Default `hiring`. Pass to the
     hero, persona-tabs, and closing-CTA components as a prop. SSR-safe default: the
@@ -206,14 +221,14 @@
   - Verify: server-rendered HTML matches the default `hiring` variant. Client-side swap
     on navigation does not flash.
 
-- [ ] **Add the persona-switch UI**
+- [x] **Add the persona-switch UI**
   - Files: `src/modules/landing/components/PersonaSwitcher.tsx`
   - Do: A small radio group below the hero sub-paragraph, four options, hidden by default
     behind a "Different goal?" text link. Picking one navigates to `?persona=X`.
   - Verify: keyboard accessible; ARIA roles correct; default `hiring` is the
     `aria-pressed` choice.
 
-- [ ] **Render persona variants**
+- [x] **Render persona variants**
   - Files: `src/modules/landing/components/HomePage.tsx`,
     `src/modules/landing/components/HeroGlass.tsx`,
     `src/modules/landing/components/ClosingCta.tsx`
