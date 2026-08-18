@@ -88,7 +88,7 @@
 
 ## Phase 1 — Direct baseline
 
-- [ ] **Mint fixture sessions in the database instead of signing 1,000 users in**
+- [x] **Mint fixture sessions in the database instead of signing 1,000 users in**
   - Files: `scripts/load/auth.ts`, `scripts/load/seed.ts`, `scripts/load/runner.ts`,
     `tests/unit/scripts/load/auth.test.ts`, `docs/operations/load-testing.md`
   - Do: Add `mintSessions()` beside `signInAll`. For each fixture user: a token from
@@ -111,6 +111,27 @@
   - Needs `BETTER_AUTH_SECRET` (already optional in `env.ts`) and the load database URL, both of
     which the harness has. Refuse with a clear message rather than minting unsigned cookies if the
     secret is absent.
+  - Result: `mintSessions` and `resolveSessionCookieFormat` in `scripts/load/auth.ts`, with the runner
+    minting whenever the profile exceeds the 20/min sign-in ceiling and a `fixtureDatabaseUrl` is
+    supplied. Below the ceiling the real sign-in stays: it exercises a path the run would otherwise
+    never touch, and at that size it costs seconds.
+  - **Split into two functions, against the task's own shape.** The probe needs a server and the
+    minting needs a database, and folding them together made the thousand-session case impossible to
+    test without standing an app up — which is exactly the half that does not need one. The unit test
+    now mints 1,000 sessions against a disposable database (1,000 rows, 1,000 distinct tokens) with no
+    server, and `tests/e2e/load-minted-session.spec.ts` proves the real server accepts a minted cookie
+    and resolves it to the right user and organization.
+  - **The byte-for-byte check paid for itself on its first real run.** `better-call`'s
+    `signCookieValue` applies `encodeURIComponent` **inside the signing helper**, not in `_serialize`,
+    so base64 `+` and `=` arrive as `%2B` and `%3D`. Reading `_serialize` alone says the value is not
+    encoded — true, and misleading enough that I discarded the right hypothesis mid-way. Without the
+    check this would have passed every test and then made 400,000 requests anonymous, and the report
+    would have described the latency of the signed-out application.
+  - The e2e also asserts the negative: a cookie signed with the wrong secret is not a session. Without
+    it the positive proves nothing, because an endpoint that answered 200 for anything would satisfy it.
+  - `user_id` is resolved by querying `auth_users` on the email rather than parsing it out of the
+    address, which happens to be `${userId}@load.local` today and is not a contract. A missing fixture
+    is named and counted instead of surfacing as a foreign-key violation five hundred rows into a batch.
   - **Records a real trade-off**: the run no longer exercises `/sign-in/email`. That is acceptable
     and deliberate — `spec.md` says "Rate limiting is not part of the capacity fix", and sign-in is
     startup, not the workload being measured. It is a decision, not a detail, and it belongs in the
