@@ -4545,3 +4545,135 @@ export const userPreferences = pgTable('user_preferences', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
+
+/**
+ * Self-managed profiles (plan: phase-2/07-perfiles-autogestionados).
+ *
+ * `builder_claims` keys on `(source, sourceId)` — the external account somebody proved they control.
+ * A self-managed profile has neither: what it has is a handle and an owner. Forcing it into
+ * `builder_claims` would make every such row a malformed claim, and "verified" would stop meaning
+ * anything, which is the one property this product's profiles are for.
+ *
+ * So it is its own table, and `promoted_to_builder_claim_id` is the bridge: if the owner later proves
+ * an external account, the profile keeps rendering from *this* row — preserving their attachments and
+ * the words they chose — while the verified badge hydrates from the claim.
+ *
+ * ## Account-subject, with public reads
+ *
+ * Keyed on `owner_user_id` like `user_preferences`, so a person keeps their profile across every
+ * organisation they belong to. Unlike `user_preferences`, strangers read it: the RLS policies in the
+ * migration therefore pair an owner policy with a public-read policy scoped to
+ * `visibility in ('public','unlisted') and deleted_at is null`, rather than the owner-only shape
+ * `0171` uses. A policy keyed on `app.user_id` alone would make every public profile invisible.
+ */
+export const selfManagedProfiles = pgTable(
+  'self_managed_profiles',
+  {
+    id: text('id').primaryKey(),
+    /** Lowercase, hyphenated, 3–32. Becomes `/u/<handle>`, so it is narrower than a username. */
+    handle: text('handle').notNull(),
+    ownerUserId: text('owner_user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    displayName: text('display_name').notNull(),
+    headline: text('headline'),
+    bio: text('bio'),
+    locationCity: text('location_city'),
+    /** ISO 3166-1 alpha-2, upper case. */
+    locationCountryCode: text('location_country_code'),
+    /** BCP-47 tags. Free text: the world has more languages than any list this product would keep current. */
+    languages: jsonb('languages').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    /** Ids from `SERVICE_TAXONOMY`. Closed, because an open field is a filter that matches nothing. */
+    services: jsonb('services').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    topics: jsonb('topics').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    visibility: text('visibility').notNull().default('draft'),
+    /** Set when the owner later proves an external account. The profile still renders from this row. */
+    promotedToBuilderClaimId: text('promoted_to_builder_claim_id').references(() => builderClaims.id, {
+      onDelete: 'set null',
+    }),
+    declaredAt: timestamp('declared_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    /** Soft delete. The handle stays reserved for thirty days afterwards — see the migration. */
+    deletedAt: timestamp('deleted_at'),
+  },
+  (table) => [
+    /**
+     * One live profile per handle and one per person, enforced on *live* rows only.
+     *
+     * Partial, because a soft-deleted row must not block the handle forever, and a person who deleted
+     * one profile must be able to make another. A plain `unique` would make both impossible and the
+     * failure would read as "handle taken" for a handle nobody holds.
+     */
+    uniqueIndex('self_managed_profiles_handle_live_unique')
+      .on(table.handle)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex('self_managed_profiles_owner_live_unique')
+      .on(table.ownerUserId)
+      .where(sql`${table.deletedAt} is null`),
+    index('self_managed_profiles_visibility_idx').on(table.visibility),
+    check(
+      'self_managed_profiles_visibility_check',
+      sql`${table.visibility} in ('public', 'unlisted', 'draft')`,
+    ),
+    check('self_managed_profiles_handle_check', sql`${table.handle} ~ '^[a-z0-9-]{3,32}$'`),
+    check(
+      'self_managed_profiles_country_check',
+      sql`${table.locationCountryCode} is null or ${table.locationCountryCode} ~ '^[A-Z]{2}$'`,
+    ),
+  ],
+)
+
+/** Up to twelve live work samples per profile. The bound is enforced in the repository, not here. */
+export const selfManagedAttachments = pgTable(
+  'self_managed_attachments',
+  {
+    id: text('id').primaryKey(),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => selfManagedProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    /** Set by the server after the upload completes. Never accepted from a request body. */
+    storageKey: text('storage_key').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    durationSeconds: integer('duration_seconds'),
+    checksumSha256: text('checksum_sha256').notNull(),
+    uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+  },
+  (table) => [
+    // Unique across every row, deleted included: a storage key is a real object, and reusing one
+    // would let a deleted attachment's bytes resurface under a new title.
+    uniqueIndex('self_managed_attachments_storage_key_unique').on(table.storageKey),
+    index('self_managed_attachments_profile_idx').on(table.profileId),
+    check('self_managed_attachments_kind_check', sql`${table.kind} in ('cv', 'work-sample', 'certificate', 'other')`),
+    // 25 MB, from the spec. A negative or zero size is a bug upstream, not a small file.
+    check('self_managed_attachments_size_check', sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= 26214400`),
+    check('self_managed_attachments_checksum_check', sql`${table.checksumSha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+)
+
+/**
+ * Handles held before their owner exists, so a popular one cannot be squatted at launch.
+ *
+ * Keyed by handle rather than by user: the scarce thing is the handle, and a reservation that let one
+ * person hold several would recreate the squatting it exists to prevent.
+ */
+export const selfManagedHandleReservations = pgTable(
+  'self_managed_handle_reservations',
+  {
+    handle: text('handle').primaryKey(),
+    reservedByUserId: text('reserved_by_user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    reservedAt: timestamp('reserved_at').defaultNow().notNull(),
+    /** Seven days. An expired row is swept rather than trusted, so the index is on the expiry. */
+    expiresAt: timestamp('expires_at').notNull(),
+  },
+  (table) => [
+    index('self_managed_handle_reservations_expires_idx').on(table.expiresAt),
+    check('self_managed_handle_reservations_handle_check', sql`${table.handle} ~ '^[a-z0-9-]{3,32}$'`),
+  ],
+)
