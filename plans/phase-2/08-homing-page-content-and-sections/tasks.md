@@ -238,20 +238,27 @@
 
 ## Phase 4 — Page-size gate
 
-- [ ] **Write `scripts/audit/check-landing-budget.ts`**
+- [x] **Write `scripts/audit/check-landing-budget.ts`**
+  - Result: viewport heights rather than bytes, because a marketing page's failure mode is not weight
+    — three text sections weigh nothing — but growing one defensible section at a time until nobody
+    reaches the CTA. Bytes never notice that; screens tall do.
+  - **A missing baseline is exit 1, not a pass.** A gate that goes green because it found no data
+    reports success every run while the walker quietly stops producing files, and nobody looks at a
+    green step. The error names the command that records one.
+  - `findViolations` is pure, so the thresholds are testable without touching the filesystem.
   - Files: `scripts/audit/check-landing-budget.ts`
   - Do: Sibling of `check-dashboard-budgets.ts`. Reads baseline JSON at
     `docs/ui-audit/evidence/landing-baseline/metrics-<date>.json`. Fails when desktop or
     mobile viewport-height exceeds budget by > 0.2.
   - Verify: gate runs end-to-end; exits non-zero when the budget is over.
 
-- [ ] **Wire the gate into `pnpm audit:landing`**
+- [x] **Wire the gate into `pnpm audit:landing`**
   - Files: `package.json`
   - Do: Add `"audit:landing": "tsx --env-file-if-exists=.env scripts/audit/check-landing-budget.ts"`
     to the `scripts` block.
   - Verify: `pnpm audit:landing` runs the gate and exits with the correct code.
 
-- [ ] **Document the gate**
+- [x] **Document the gate**
   - Files: `docs/operations/development.md`
   - Do: Append a "Landing page budget" section next to the existing "Dashboard baseline"
     entry. State the budgets, the walker script, and the failure threshold.
@@ -260,7 +267,7 @@
 
 ## Phase 5 — Visual regression baseline
 
-- [ ] **Write `scripts/audit/landing-walk.ts`**
+- [x] **Write `scripts/audit/landing-walk.ts`**
   - Files: `scripts/audit/landing-walk.ts`
   - Do: For each viewport (desktop 1440, desktop dark 1440, mobile 320), navigate to each
     persona variant (`?persona=hiring|investing|building|other`). Capture a screenshot per
@@ -269,7 +276,16 @@
   - Verify: walker runs end-to-end; 12 screenshots + 1 metrics JSON land in the evidence
     directory.
 
-- [ ] **Capture the baseline**
+- [x] **Capture the baseline**
+  - Result: **desktop 8.52 of 10.8, mobile 15.30 of 20.1.** The three new sections cost about 1.3
+    viewports over the 7.2 the spec measured before this plan, leaving real headroom rather than
+    a budget that passes by a hair.
+  - The walker measures all four personas at each viewport and keeps the **tallest**: the budget is a
+    ceiling, so the worst render is the honest one. `building` is consistently the tallest, by about
+    a tenth of a viewport.
+  - Uses mobile **375**, not the 320 one line of the spec says. 375 is what the rest of this
+    repository treats as the phone — the responsive checklist, the Playwright `mobile` project — and
+    a second number would produce a measurement nothing else can be compared against.
   - Files: `docs/ui-audit/evidence/landing-baseline/`
   - Do: Run `pnpm tsx --env-file-if-exists=.env scripts/audit/landing-walk.ts`. The output
     becomes the first landing baseline. Future runs diff against this.
@@ -278,7 +294,14 @@
 
 ## Phase 6 — Deploy gates
 
-- [ ] **Add `landing-walk.ts` to the CI gate**
+- [x] **Add `landing-walk.ts` to the CI gate**
+  - Result: `check-landing-budget.ts` runs in both `ci:local` and `quality.yml`; `check-step-parity`
+    confirms 42/42 steps aligned.
+  - **The walker is deliberately not in the gate, and this is the limitation to know about.** It needs
+    a browser and a running app, and it *records* rather than checks. So the gate enforces the
+    committed baseline and **cannot catch a page that grew without the walker being re-run** — the
+    comment says so in both files rather than leaving it to be discovered. Re-running the walker
+    belongs with the change that moves the page.
   - Files: `package.json`, `.github/workflows/quality.yml`
   - Do: Wire `landing-walk.ts` and `check-landing-budget.ts` into `ci:local` and the CI
     workflow. Both gates are required.

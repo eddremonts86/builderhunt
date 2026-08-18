@@ -245,6 +245,13 @@ step plans-implemented pnpm plans:check-implemented
 # expected 1`. A correct number measured against a corpus missing thirteen entries.
 step plans-readiness pnpm plans:check-readiness
 
+# The landing's viewport-height budget (plan: phase-2/08).
+#
+# Enforces the *recorded* baseline; it does not measure the page. Measuring needs a browser and a
+# running app, which is `pnpm audit:landing:walk` and belongs with the change that moves the page —
+# see docs/operations/development.md. The honest limit: this step catches a committed baseline going
+# over budget, and it cannot catch a page that grew without the walker being re-run.
+step landing-budget pnpm audit:landing
 step migration-integrity pnpm test:migration-integrity
 step deploy-imports pnpm test:deploy-imports
 step drizzle-check pnpm exec drizzle-kit check

@@ -465,6 +465,13 @@ jobs:
       # It was wired into nothing until 2026-08-07, which is how it stayed broken for weeks: it
       # crashed at `page.selectOption` against a Radix `Select` and nobody saw it. A regression
       # script no job runs is a file, not a gate.
+      # Enforces the recorded landing baseline (plan: phase-2/08). It does not measure the page —
+      # that is `pnpm audit:landing:walk`, which needs a browser and belongs with the change that
+      # moves the page. So this catches a committed baseline going over budget, and cannot catch a
+      # page that grew without the walker being re-run.
+      - name: Landing page budget
+        run: pnpm audit:landing
+
       - name: Status and trust regression (public status/changelog/roadmap + admin management)
         run: pnpm test:status-trust
       - name: Conversion funnel instrumentation
