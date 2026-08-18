@@ -57,17 +57,32 @@ shipping right now.
 The "Public beta · Free plan, no credit card" eyebrow stays; it mirrors
 `src/routes/_landing/index.tsx`.
 
-## Persona variants
+## Closing CTA, per persona
 
-The persona switch swaps three text blocks per persona. The headline, the bento features
-that follow, and the rest of the page stay identical.
+Separate from the table above because it is the block with the most ways to become false. The
+paragraph beneath it does not vary at all — see the constraint section.
 
-| Persona | Sub-paragraph | Persona-tab headline | Closing CTA |
-|---|---|---|---|
-| `hiring` (default) | Activity scored for recency, so the top of your results are the people shipping right now. | Whoever you need to find, we surface them first. | Create a free workspace. Search 12 sources in under a minute. |
-| `investing` | Track who is shipping what. Across code, conversation, and publishing. | Map a market without scraping it. | Sign up free. Track 50 founders per workspace. Upgrade for unlimited. |
-| `building` | Claim your profile. Show the work. Skip the spam. | Your public work, indexed by people who care. | Claim your builder profile in under 3 minutes. |
-| `other` | We don't know your job yet. Tell us. We will show you where BuilderHunt fits. | If you read code, you can use this. | Browse public builders without signing up. |
+| Persona | Closing CTA headline | Grounded in |
+|---|---|---|
+| `hiring` (default) | Start hunting the right builders. | current `HomePage.tsx` |
+| `investing` | Start watching the right builders. | same verb the investing segment page uses |
+| `building` | Start with the profile we already built. | `builder_claims`, `/onboarding/building` |
+| `other` | Start hunting the right builders. | repeats the default, as everywhere else |
+
+### What an earlier draft of this file claimed, and why it is gone
+
+The table these replace carried three claims that could not survive their own verification, and they
+are recorded rather than quietly deleted because each is a different way to get this wrong:
+
+- **"Search 12 sources in under a minute."** Wrong number — it is 13 — and, more importantly, a
+  *literal*. `SEARCH_SOURCE_COUNT` exists because nine surfaces hardcoded 12 and all nine went stale
+  the day two connectors were retired. Copy interpolates the constant or omits the count.
+- **"Claim your builder profile in under 3 minutes."** No evidence anywhere for the duration. It is
+  the kind of number that sounds measured and was not, and nothing in the product times a claim.
+- **"Track 50 founders per workspace."** This one is *true* — `PLAN_LIMITS.free.savedBuilders` is 50
+  — which makes it the instructive case: it still should not be typed here, for the same reason the
+  source count should not. A number that is right today and written by hand is a number that goes
+  stale silently.
 
 ## Persona switcher UI
 

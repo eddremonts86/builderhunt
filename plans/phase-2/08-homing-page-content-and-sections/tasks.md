@@ -60,10 +60,25 @@
 
 ## Phase 1 — Copy draft
 
-- [ ] **Draft `landing-copy/01-hero.md`**
+- [x] **Draft `landing-copy/01-hero.md`**
   - Files: `landing-copy/01-hero.md`
   - Do: Hero eyebrow, headline, sub-paragraph (with persona variants), CTA microcopy.
   - Verify: every line grounded in the inventory; no invented numbers.
+  - Result: the file had **two contradicting persona tables** — the one this plan's task 2 added and
+    an earlier draft below it. Reconciled into one, with the closing CTA split out because it is the
+    block with the most ways to become false.
+  - Three claims failed "no invented numbers", and each fails differently, so all three are recorded
+    in the file rather than quietly deleted:
+    - *"Search 12 sources in under a minute"* — wrong (13) **and** a literal. `SEARCH_SOURCE_COUNT`
+      exists because nine surfaces hardcoded 12 and all nine went stale the day two connectors were
+      retired.
+    - *"Claim your builder profile in under 3 minutes"* — nothing in the product times a claim. A
+      number that sounds measured and was not.
+    - *"Track 50 founders per workspace"* — **true**, `PLAN_LIMITS.free.savedBuilders` is 50, and
+      still wrong to type by hand. That is the instructive one: a number that is right today and
+      written by hand is a number that goes stale silently.
+  - The default column remains `HomePage.tsx` string for string, so a visitor with no `?persona=`
+    sees no change at all.
 
 - [ ] **Draft `landing-copy/02-features-refresh.md`**
   - Files: `landing-copy/02-features-refresh.md`
