@@ -17,12 +17,25 @@
 
 ## Phase 0 — Read and inventory
 
-- [ ] **Write `landing-copy/00-inventory.md`** with one row per home-page claim.
+- [x] **Write `landing-copy/00-inventory.md`** with one row per home-page claim.
   - Files: `landing-copy/00-inventory.md`
   - Do: For every claim on the current home (`src/modules/landing/components/HomePage.tsx`)
     plus every claim this plan proposes adding, write a row: `claim | evidence (file:line) |
     plan path | shipped | coming soon |`.
   - Verify: every row's `evidence` resolves to a real file or plan path via `ls` / `grep -r`.
+  - Result: the file already existed; running its own verification is what the task was worth. Two of
+    seventeen `src/…` paths did not resolve — `src/lib/sources/index.ts`, which has never existed at
+    that path, and `src/routes/api/feeds/$searchId.xml`, where `.xml` is the URL and `.ts` is the
+    module. Both corrected, and all seventeen now resolve on disk.
+  - **The source-count row was wrong in four ways at once**: it said 12, listed `sourcehut` and
+    `hashnode` — retired 2026-08-04 by drizzle/0143 and 0144 — omitted `devpost`, `producthunt` and
+    `bluesky`, and cited a file that does not exist. The real count is 13, and the row now says the
+    count is **never a literal**: copy derived from it must interpolate `SEARCH_SOURCE_COUNT`, the way
+    `segment-pages.ts` already does. Nine surfaces once hardcoded "12 sources" and all nine went stale
+    on the same day, which is the whole reason that constant exists.
+  - The verification is a ten-line script over the table's backticked paths, not a read-through. A
+    document whose job is to be the ground truth for twenty-two other tasks had a broken first row,
+    and reading it carefully is exactly what had already failed to catch that.
 
 - [ ] **Write the persona copy variants table**
   - Files: `landing-copy/01-hero.md` (top section)
