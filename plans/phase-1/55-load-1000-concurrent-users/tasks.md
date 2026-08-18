@@ -143,7 +143,7 @@
     parameter, and the cap is a literal, not configuration). Pacing would have worked and cost ~53
     minutes of every run. Minting is less code, costs seconds, and touches no protection at all.
 
-- [ ] **Let the soak set its duration without silently dropping its own thresholds**
+- [x] **Let the soak set its duration without silently dropping its own thresholds**
   - Files: `scripts/load/runner.ts`, `scripts/load/config.ts`,
     `tests/unit/scripts/load/runner-config.test.ts`
   - Do: Separate duration from profile. `--seconds` is the only way to ask for anything other than
@@ -163,6 +163,16 @@
     `steadySeconds`; nothing else about the contract changes between stages". The only mechanism
     that overrides it changes two other things. Found 2026-08-14 while writing the certification
     runbook, before any run had been attempted.
+  - Result: `resolveRunConfig` in `scripts/load/runner.ts`. `--seconds` now moves `steadySeconds` and
+    nothing else; the widening stays keyed on `--users`, where the arithmetic actually justifies it;
+    and `--ramp` exists for the cases that genuinely want a shorter ramp, so shortening it is a request
+    rather than a side effect.
+  - **The logic had to be extracted before it could be asserted.** It lived inside the
+    `import.meta.url === process.argv[1]` guard, unreachable from any test — which is the other half of
+    why this survived to be found by reading rather than by failing. Seven unit tests in
+    `tests/unit/scripts/load/runner-config.test.ts` now pin each flag to what it may and may not touch.
+  - `LOAD_FIXTURE_DATABASE_URL` is wired through at the same time, which is what lets the runner mint
+    sessions for the thousand-user profile instead of aborting on the sign-in ceiling.
 
 - [ ] **Run and record the direct 10-minute baseline**
   - Files: `docs/operations/load-baseline-<date>.md`

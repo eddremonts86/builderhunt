@@ -353,10 +353,31 @@ sharing one password on the live site.
 |---|---|---|---|
 | 1 | Baseline | `LOAD_MANIFEST=… pnpm load:test:baseline` | `pool_mode=direct`, 10 min |
 | 2 | Deploy the pooler, then calibrate | rollout steps 1–2 above, then `pnpm load:pooler:preflight`, then the runner with `--pooled` | `pool_mode=transaction`, 10 min |
-| 3 | Soak | the runner with `--pooled` and the two-hour duration | 120 complete steady minutes |
+| 3 | Soak | the runner with `--pooled --seconds=7200` | 120 complete steady minutes |
 
 Between 1 and 2, follow *The order, and the one URL that must not move* above. `DATABASE_MIGRATION_URL`
 stays direct on 5432 through all of it.
+
+**The runner's flags, and what each is allowed to change**
+
+| Flag | Changes | Deliberately does *not* change |
+|---|---|---|
+| `--seconds=N` | `steadySeconds` | the ramp, the offered-rate window, the user count |
+| `--users=N` | `users`, and widens `offeredRatePerSecond` to `{0, ∞}` | the ramp, the steady window |
+| `--ramp=N` | `rampSeconds` | everything else |
+| `--smoke` | the whole profile, to `SMOKE_LOAD_CONFIG` | — |
+| `--pooled` | the topology the runner reports | the contract |
+
+`--users` widens the offered-rate window because the rate is derived as
+`users / (thinkTime + averageJitter)` — 25 users cannot offer 400 req/s, and asserting they do is
+arithmetic rather than capacity. `--seconds` does not, because a thousand users offer the same rate for
+two hours as for ten minutes.
+
+Until 2026-08-16 `--seconds` did both: it collapsed the ramp to two seconds *and* widened the window.
+A `--seconds=7200` certification would therefore have reported a two-second ramp and **no offered-rate
+check at all**, and 400–500 req/s is one of the spec's own success criteria — the report would have
+read `pass` without evaluating it. Asserted now in
+`tests/unit/scripts/load/runner-config.test.ts`.
 
 **Watch these, and stop if any trips**
 

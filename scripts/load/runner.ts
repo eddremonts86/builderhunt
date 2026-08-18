@@ -422,23 +422,50 @@ function flag(argv: readonly string[], name: string): string | undefined {
   return argv.find((entry) => entry.startsWith(prefix))?.slice(prefix.length)
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  const argv = process.argv.slice(2)
+/**
+ * The configuration a command line asks for — duration separate from profile.
+ *
+ * `config.ts` states the contract as "the two-hour soak overrides `steadySeconds`; nothing else about
+ * the contract changes between stages", and until 2026-08-16 the only mechanism that overrode it
+ * changed two other things: `--seconds` also collapsed the ramp to two seconds and widened
+ * `offeredRatePerSecond` to `{0, ∞}`. `--seconds=7200` therefore reported a two-second ramp and **no
+ * offered-rate check at all**, and 400–500 req/s is one of the spec's success criteria — so the
+ * certification would have read `pass` without having evaluated it.
+ *
+ * The widening is right for `--users` and wrong for `--seconds`. The offered rate is derived as
+ * `users / (thinkTime + averageJitter)`: changing the user count genuinely invalidates the window,
+ * while changing the duration does not — a thousand users offer the same rate for two hours as for
+ * ten minutes.
+ *
+ * Extracted from the CLI guard so it can be asserted at all. Inline under
+ * `import.meta.url === process.argv[1]`, none of this was reachable from a test, which is the other
+ * half of why the bug survived to be found by reading rather than by failing.
+ */
+export function resolveRunConfig(argv: readonly string[]): LoadConfig {
   const base = configFromArgv(argv)
   const users = flag(argv, 'users')
   const seconds = flag(argv, 'seconds')
-  const config: LoadConfig = {
+  const ramp = flag(argv, 'ramp')
+
+  return {
     ...base,
     users: users ? Number(users) : base.users,
-    stages: seconds
-      ? { rampSeconds: Math.min(base.stages.rampSeconds, 2), steadySeconds: Number(seconds) }
-      : base.stages,
-    // An explicit `--users`/`--seconds` makes the offered-rate window meaningless: it is derived from the
-    // thousand-user profile. Widened rather than dropped, so the check still appears and still reports.
-    thresholds: users || seconds
+    stages: {
+      // Kept unless something explicitly asks otherwise. A ramp is how the run avoids measuring a
+      // thundering herd, and shortening it silently is how a report describes one.
+      rampSeconds: ramp ? Number(ramp) : base.stages.rampSeconds,
+      steadySeconds: seconds ? Number(seconds) : base.stages.steadySeconds,
+    },
+    // Widened rather than dropped, so the check still appears in the report and still says something.
+    thresholds: users
       ? { ...base.thresholds, offeredRatePerSecond: { min: 0, max: Number.POSITIVE_INFINITY } }
       : base.thresholds,
   }
+}
+
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  const argv = process.argv.slice(2)
+  const config = resolveRunConfig(argv)
 
   const manifestFile = flag(argv, 'manifest') ?? process.env.LOAD_MANIFEST
   if (!manifestFile) {
@@ -452,6 +479,7 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
     config,
     poolMode: argv.includes('--pooled') ? 'transaction' : 'direct',
     monitorDatabaseUrl: process.env.LOAD_MONITOR_DATABASE_URL,
+    fixtureDatabaseUrl: process.env.LOAD_FIXTURE_DATABASE_URL,
     poolerAdminUrl: process.env.LOAD_PGBOUNCER_ADMIN_URL,
   })
     .then((result) => process.exit(result.exitCode))
