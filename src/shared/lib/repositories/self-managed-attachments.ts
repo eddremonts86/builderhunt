@@ -112,6 +112,9 @@ export async function listOwnAttachments(
     .from(selfManagedAttachments)
     .where(and(eq(selfManagedAttachments.profileId, profileId), isNull(selfManagedAttachments.deletedAt)))
     .orderBy(desc(selfManagedAttachments.uploadedAt))
+    // The ceiling is the model's, not a page size: `addAttachment` counts live rows in the same
+    // transaction as the insert and refuses the thirteenth, so twelve is every row there can be.
+    .limit(MAX_ACTIVE_ATTACHMENTS)
 
   return rows.map(rowToAttachment)
 }
@@ -140,6 +143,9 @@ export async function listPublicAttachments(
       ),
     )
     .orderBy(desc(selfManagedAttachments.uploadedAt))
+    // Same ceiling, same reason. A public page is exactly where an unbounded read would be worst:
+    // the caller is a stranger, the handle is guessable, and nobody is logged in to notice the cost.
+    .limit(MAX_ACTIVE_ATTACHMENTS)
 
   return rows.map(rowToAttachment)
 }
