@@ -700,6 +700,10 @@
     "0174_segmented_landing_funnel": {
       "sql": "fa4d1ea422c862c12ed60bd5f145e97a17ba1e633719c7c25840de6ccf0e6f58",
       "snapshot": "f3ea68673808b030949e16f17cefee2fce14dfedaf7873d5fbfb4ec21703bac6"
+    },
+    "0175_self_managed_profiles": {
+      "sql": "cada5aca728a8052e1192cd400f2caaef520d9f972e0254e84e13d89cf1d4035",
+      "snapshot": "cd85238ef208de074598bb7d47cbb3769ff643280dbe1da6d341f64c0dba0596"
     }
   }
 }

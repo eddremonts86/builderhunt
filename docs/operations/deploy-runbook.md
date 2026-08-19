@@ -252,6 +252,56 @@ Full procedure, inputs, metrics and stop conditions: [`load-testing.md`](./load-
 | `migration-hashes.json` mismatch in CI/preflight | new migration added without regenerating manifest | `node scripts/db/verify-migration-integrity.mjs --write`, bump the count in `migration-integrity.test.ts`, commit |
 | Semantic search returns 503 / keyword fallback | pgvector extension missing | switch the DB resource to `pgvector/pgvector:0.8.5-pg18`, re-run `pnpm deploy:db` (this row said `pg16` until 2026-08-05 — on a pg18 data volume that image cannot start) |
 | Scrapers do nothing | `ENRICHMENT_ENABLED=false` or worker role can't log in | set enrichment env; confirm orchestrator step 6 green |
+| Quality is green on `master` but **Deploy to Coolify** failed | one of the three Coolify secrets | the job now names which one — see below |
+
+### When the deploy job fails on credentials
+
+Since 2026-08-16 the workflow checks the three secrets *before* deploying and says which is wrong:
+`000` means `COOLIFY_API_URL` is unreachable, `401` means `COOLIFY_API_TOKEN` is stale or revoked,
+`404` means `COOLIFY_APP_UUID` does not exist on that instance. It also refuses to continue if the
+uuid resolves to an application whose domain is not `builderhunt.dev` — a stale uuid still names a
+*real* app, so without that check a deploy succeeds against somebody else's production.
+
+Reissue a token in Coolify under **Keys & Tokens**, then:
+
+```bash
+gh secret set COOLIFY_API_TOKEN --repo eddremonts86/builderhunt
+```
+
+### Deploying by hand when the pipeline cannot
+
+The pipeline is the normal path; this is what to do when it is broken and a release has to go out —
+it is how the 2026-08-16 phase-2 release shipped, with the token secret a month stale.
+
+```bash
+ENVF=/Users/edd/Projects/ai-os/dev-env/env-config/.env
+T=$(awk -F= '/^COOLIFY_API_TOKEN=/{sub(/^[^=]*=/,""); print; exit}' "$ENVF" | tr -d '"\r')
+U=$(awk -F= '/^COOLIFY_API_URL=/{sub(/^[^=]*=/,""); print; exit}' "$ENVF" | tr -d '"\r')
+```
+
+`awk`, never `source`: the token is Laravel-Sanctum shaped (`<id>|<hash>`) and the `|` makes a shell
+read it as a pipe, leaving a token of `5` and a 401 that looks exactly like a revoked credential.
+
+Resolve the uuid by name rather than trusting a stored one, trigger, then poll:
+
+```bash
+curl -sS -H "Authorization: Bearer $T" "$U/api/v1/applications" \
+  | python3 -c "import json,sys;[print(a['uuid'],a['name'],a.get('fqdn')) for a in json.load(sys.stdin)]"
+curl -sS -X POST -H "Authorization: Bearer $T" "$U/api/v1/applications/<uuid>/start"
+curl -sS -H "Authorization: Bearer $T" "$U/api/v1/deployments/<deployment_uuid>"
+```
+
+**`finished` is not `working`.** Three things to check afterwards, each of which has silently failed
+here before:
+
+1. **The right build is running.** Ask for a route only the new release has — after the phase-2
+   release that was `/for/investors`. A 200 proves the new code *and* its flag; `/api/health` cannot,
+   because the old build answers it happily.
+2. **Migrations ran.** Read the deployment log for `✓ migrations applied`. Coolify does not treat a
+   failing `post_deployment_command` as a fatal deploy error, and this repo has shipped deploys that
+   reported success having skipped migrations entirely.
+3. **A real browser.** A 200 from `curl` cannot tell a working app from one whose client bundle is
+   broken.
 
 ## PG18 observability — `pg_stat_io` and `pg_aios`
 

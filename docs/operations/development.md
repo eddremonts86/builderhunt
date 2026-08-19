@@ -95,6 +95,41 @@ registration, real credential-account insert via the harness's privileged
 connection, and a real sign-in through the app's own API. It never touches
 the app role's own grants either.
 
+## Landing page budget
+
+The landing is measured in **viewport heights**, not bytes. A marketing page's failure mode is not
+weight — three text sections weigh nothing — it is growing one defensible section at a time until
+nobody scrolls to the call to action. Bytes never notice that; screens tall do.
+
+| Viewport | Budget | Measured 2026-08-18 |
+|---|---|---|
+| desktop 1440 | ≤ 10.8 viewports | 8.52 |
+| mobile 375 | ≤ 20.1 viewports | 15.30 |
+
+The budgets are the pre-plan measurement × 1.5 (7.2 desktop, 13.4 mobile — `spec.md` §Page-size
+budget). A run fails only past a **0.2 tolerance**, because a heading wrapping onto a second line
+moves the number by a hundredth and that is not a regression worth failing a build over.
+
+```bash
+pnpm audit:landing:walk   # records docs/ui-audit/evidence/landing-baseline/metrics-<date>.json
+pnpm audit:landing        # enforces the budgets against the newest metrics file
+```
+
+Both live in `scripts/audit/`: `landing-walk.ts` records, `check-landing-budget.ts` enforces. Only the
+second is in `ci:local` and `.github/workflows/quality.yml` — the walker needs a browser and a running
+app, and it *records* rather than checks.
+
+**So the gate catches a committed baseline going over budget, and cannot catch a page that grew
+without the walker being re-run.** Re-running it belongs with the change that moves the page, the same
+way `pnpm test:visual --update-snapshots` belongs with a deliberate visual change.
+
+The walker measures every persona at every viewport and keeps the **tallest**: the budget is a
+ceiling, so the worst render is the honest one. It writes a full-page screenshot per persona per
+viewport alongside the metrics, so a review can see what the number describes.
+
+**A missing baseline is exit 1, not a pass.** A gate that goes green because it found no data reports
+success every run while the walker quietly stops producing files, and nobody looks at a green step.
+
 ## Dashboard baseline — 2026-08-07
 
 Recorded by `scripts/audit/dashboard-baseline.ts` against the

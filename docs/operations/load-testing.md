@@ -84,9 +84,59 @@ from one host. A 1,000-user startup therefore hits that wall by design, and the 
 `aborted` report quoting the limit rather than a `fail` — `aborted` says the run proved nothing, while
 `fail` would say the product cannot do this, which is untrue.
 
-A run at that size needs the limit raised **on the disposable load host, by whoever owns it**. That is
-an operator decision about a throwaway environment. Do not raise it to make a test pass: the CI smoke
-runs 15 users for exactly this reason.
+**Above that ceiling the runner mints sessions instead of earning them.** Give it
+`fixtureDatabaseUrl` and any profile over 20 users skips `/sign-in/email` entirely: one
+`auth_sessions` row per fixture user, and a cookie built with better-auth's own `generateRandomString`
+and `makeSignature`. Below the ceiling the real sign-in stays, because it exercises a path the run
+would otherwise never touch and it costs seconds at that size.
+
+Nothing about the limit changes. It is not raised, not bypassed on the request path, and a run without
+a fixture database URL still aborts against it exactly as before.
+
+The trade is that a large run no longer exercises `/sign-in/email`. That is a decision, not an
+oversight, and it belongs in the certification report: this plan's spec already says rate limiting is
+not part of the capacity fix, and sign-in is startup rather than the measured workload.
+
+### 3a. The cookie format is re-proved on every run, and here is why
+
+`mintSessions` does not assume the cookie's name or its signature format. `resolveSessionCookieFormat`
+performs **one** real sign-in — far under 20/min — reads the name off the `set-cookie`, and re-signs
+that same token to check it produces better-auth's signature byte for byte. It refuses the run if not.
+
+That check earned its place the first time it ran. `better-call`'s `signCookieValue` applies
+`encodeURIComponent` **inside the signing helper**, not in the serializer, so base64 `+` and `=` reach
+the header as `%2B` and `%3D`. Reading `_serialize` alone says the value is not encoded — true, and
+misleading. Without the byte-for-byte check the harness would have passed its own tests and then sent
+400,000 anonymous requests, and the report would have described the latency of the signed-out
+application: fast numbers answering a question nobody asked.
+
+The cookie *name* is equally not assumed. It is better-auth's default only because no `cookiePrefix`
+or `useSecureCookies` is configured; both would move it, and so would an upgrade.
+
+### 3b. Two ways the runner cannot reach an app that is running fine
+
+Both were found on 2026-08-18 setting up the first smoke through the minting path, and both read as
+"the app will not start" while the app is serving perfectly.
+
+**The dev server binds IPv6 only.** `vite dev` listens on `[::1]`, and the runner's default base URL
+is `http://127.0.0.1:3000` — IPv4. `lsof -nP -iTCP:<port> -sTCP:LISTEN` shows the listener, `curl`
+against `127.0.0.1` gets nothing, and the run dies with `fetch failed` after the minting log line.
+Use `http://localhost:<port>`, which resolves to `::1` first on macOS.
+
+```
+localhost:3013   -> 200
+[::1]:3013       -> 200
+127.0.0.1:3013   -> refused
+```
+
+**`LOAD_BASE_URL` must equal the app's own `APP_URL`.** The probe sign-in sends `Origin`, because a
+browser does and better-auth validates it — so a mismatched port or host answers
+`403 INVALID_ORIGIN`, which is the application behaving correctly and looks like a credential problem.
+Against production the two match naturally (`https://builderhunt.dev`); they diverge the moment
+somebody points the runner at loopback "to go faster".
+
+With both aligned, a 25-user smoke through the minting path passes end to end: 25 minted, preflight
+green on all five routes, p50 35 ms / p95 225 ms, zero 5xx.
 
 ### 4. The connection budget
 
@@ -269,9 +319,11 @@ two-hour soak can afford an hour of ramp-in.
 > already says rate limiting is not part of the capacity fix and sign-in is startup, not the measured
 > workload. It is a decision, and it belongs in the certification report.
 >
-> The first open task in Phase 1 of
-> [`plans/phase-1/55-load-1000-concurrent-users/tasks.md`](../../plans/phase-1/55-load-1000-concurrent-users/tasks.md)
-> implements it. Until it lands, the runbook below stops at its first command.
+> **Landed 2026-08-16** as `mintSessions` / `resolveSessionCookieFormat` in `scripts/load/auth.ts`,
+> with `tests/unit/scripts/load/auth-mint.test.ts` minting a thousand sessions against a disposable
+> database and `tests/e2e/load-minted-session.spec.ts` proving the real server accepts one and refuses
+> a cookie signed with the wrong secret. See §3a above for the encoding the byte-for-byte check
+> caught.
 
 ### Production load runs still require explicit approval
 
@@ -326,10 +378,31 @@ sharing one password on the live site.
 |---|---|---|---|
 | 1 | Baseline | `LOAD_MANIFEST=… pnpm load:test:baseline` | `pool_mode=direct`, 10 min |
 | 2 | Deploy the pooler, then calibrate | rollout steps 1–2 above, then `pnpm load:pooler:preflight`, then the runner with `--pooled` | `pool_mode=transaction`, 10 min |
-| 3 | Soak | the runner with `--pooled` and the two-hour duration | 120 complete steady minutes |
+| 3 | Soak | the runner with `--pooled --seconds=7200` | 120 complete steady minutes |
 
 Between 1 and 2, follow *The order, and the one URL that must not move* above. `DATABASE_MIGRATION_URL`
 stays direct on 5432 through all of it.
+
+**The runner's flags, and what each is allowed to change**
+
+| Flag | Changes | Deliberately does *not* change |
+|---|---|---|
+| `--seconds=N` | `steadySeconds` | the ramp, the offered-rate window, the user count |
+| `--users=N` | `users`, and widens `offeredRatePerSecond` to `{0, ∞}` | the ramp, the steady window |
+| `--ramp=N` | `rampSeconds` | everything else |
+| `--smoke` | the whole profile, to `SMOKE_LOAD_CONFIG` | — |
+| `--pooled` | the topology the runner reports | the contract |
+
+`--users` widens the offered-rate window because the rate is derived as
+`users / (thinkTime + averageJitter)` — 25 users cannot offer 400 req/s, and asserting they do is
+arithmetic rather than capacity. `--seconds` does not, because a thousand users offer the same rate for
+two hours as for ten minutes.
+
+Until 2026-08-16 `--seconds` did both: it collapsed the ramp to two seconds *and* widened the window.
+A `--seconds=7200` certification would therefore have reported a two-second ramp and **no offered-rate
+check at all**, and 400–500 req/s is one of the spec's own success criteria — the report would have
+read `pass` without evaluating it. Asserted now in
+`tests/unit/scripts/load/runner-config.test.ts`.
 
 **Watch these, and stop if any trips**
 

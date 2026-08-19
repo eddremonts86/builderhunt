@@ -206,6 +206,23 @@ jobs:
       DASHBOARD_PRESETS_ENABLED: 'true'
       ONBOARDING_V2_ROLLOUT_PERCENT: '100'
       CONVERSION_EVENTS_ENABLED: 'true'
+      # The rest of the fleet, so this job runs the configuration a developer runs. `.env.example`
+      # turns on every flag in `env.ts` (see CLAUDE.md, "Every feature flag is on in local"), and a
+      # key set locally but absent here does not run "off" on CI — it runs whatever `env.ts` defaults
+      # to, which is exactly the divergence `check-env-fidelity` exists to refuse.
+      #
+      # The seven SOLUTIONS_* flags had never appeared in any environment file at all.
+      PROFILE_REMOVAL_ENABLED: 'true'
+      PROFILE_REMOVAL_HMAC_KEY: '0000000000000000000000000000000000000000000000000000000000000001'
+      ENRICHMENT_ENABLED: 'true'
+      INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: 'true'
+      SOLUTIONS_CATALOG_INGESTION_ENABLED: 'true'
+      SOLUTIONS_PUBLIC_SCRAPE_ENABLED: 'true'
+      SOLUTIONS_LIVE_ENRICHMENT_ENABLED: 'true'
+      SOLUTIONS_INTERPRETATION_ENABLED: 'true'
+      SOLUTIONS_EXPLANATION_ENABLED: 'true'
+      SOLUTIONS_EXTERNAL_HUMAN_ENABLED: 'true'
+      SOLUTIONS_PAID_GENERATION_ENABLED: 'true'
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       # The billing suite drives the fake provider, but the page still renders its unavailable state
@@ -268,8 +285,38 @@ jobs:
             -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-18
+          # Bounded, because an unbounded `apt-get update` once ate the entire job.
+          #
+          # On 2026-08-19 `azure.archive.ubuntu.com` answered `Ign:` for every index and the fallback
+          # to `archive.ubuntu.com` stalled mid-transfer on `noble-security InRelease`. apt sat there
+          # for twenty-four minutes and the job hit its 25-minute timeout, which GitHub reports as a
+          # cancelled job — indistinguishable, from the pull request page, from a test this commit
+          # broke. Two E2E shards died the same way in the same minute.
+          #
+          # `Acquire::*::Timeout` alone does not cover it: the stall was a slow drip, not a dead
+          # socket, so the per-connection timeout never fired. `timeout` around the whole command is
+          # what actually bounds it, and three attempts turn a mirror having a bad morning into a
+          # four-minute delay with a warning that names the real culprit.
+          apt_retry() {
+            for attempt in 1 2 3; do
+              if sudo timeout -k 15 240 apt-get "$@" \
+                   -o Acquire::Retries=3 \
+                   -o Acquire::http::Timeout=20 \
+                   -o Acquire::https::Timeout=20; then
+                return 0
+              fi
+              echo "::warning::apt-get $1 stalled or failed (attempt $attempt/3) — retrying"
+              # The half-downloaded index is the stall's residue; left in place, apt resumes the
+              # same broken transfer and the retry replays the failure. `sudo timeout` can reach
+              # this apt-get, so unlike scripts/ci/install-chromium.sh there is no orphan to kill.
+              sudo rm -rf /var/lib/apt/lists/partial
+              sleep 10
+            done
+            echo "::error::apt-get $1 did not finish in three bounded attempts. The Ubuntu package mirrors are unreachable from this runner; this is not a problem with the commit under test."
+            return 1
+          }
+          apt_retry update
+          apt_retry install -y postgresql-client-18
           # Installing the package is not enough. `/usr/bin/pg_dump` is Debian's
           # pg_wrapper, which dispatches to the *default cluster's* version, and the
           # runner image ships a PostgreSQL 16 server — so `pg_dump --version` still
@@ -361,7 +408,9 @@ jobs:
       # Includes the ABUSE_ENFORCEMENT_MODE=observe kill-switch smoke
       # (tests/unit/shared/lib/abuse/enforcement-kill-switch.test.ts) — no separate step needed,
       # `pnpm test` picks up every tests/unit/**/*.test.ts file already.
-      - run: pnpm exec playwright install --with-deps chromium
+      # Bounded and retried — a stalled Ubuntu mirror once cost three required checks a full
+      # timeout each. The reasoning is in the script.
+      - run: ./scripts/ci/install-chromium.sh
 
       - run: pnpm security:dependencies
       - run: pnpm build
@@ -448,6 +497,13 @@ jobs:
       # It was wired into nothing until 2026-08-07, which is how it stayed broken for weeks: it
       # crashed at `page.selectOption` against a Radix `Select` and nobody saw it. A regression
       # script no job runs is a file, not a gate.
+      # Enforces the recorded landing baseline (plan: phase-2/08). It does not measure the page —
+      # that is `pnpm audit:landing:walk`, which needs a browser and belongs with the change that
+      # moves the page. So this catches a committed baseline going over budget, and cannot catch a
+      # page that grew without the walker being re-run.
+      - name: Landing page budget
+        run: pnpm audit:landing
+
       - name: Status and trust regression (public status/changelog/roadmap + admin management)
         run: pnpm test:status-trust
       - name: Conversion funnel instrumentation
@@ -632,6 +688,23 @@ jobs:
       DASHBOARD_PRESETS_ENABLED: 'true'
       ONBOARDING_V2_ROLLOUT_PERCENT: '100'
       CONVERSION_EVENTS_ENABLED: 'true'
+      # The rest of the fleet, so this job runs the configuration a developer runs. `.env.example`
+      # turns on every flag in `env.ts` (see CLAUDE.md, "Every feature flag is on in local"), and a
+      # key set locally but absent here does not run "off" on CI — it runs whatever `env.ts` defaults
+      # to, which is exactly the divergence `check-env-fidelity` exists to refuse.
+      #
+      # The seven SOLUTIONS_* flags had never appeared in any environment file at all.
+      PROFILE_REMOVAL_ENABLED: 'true'
+      PROFILE_REMOVAL_HMAC_KEY: '0000000000000000000000000000000000000000000000000000000000000001'
+      ENRICHMENT_ENABLED: 'true'
+      INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: 'true'
+      SOLUTIONS_CATALOG_INGESTION_ENABLED: 'true'
+      SOLUTIONS_PUBLIC_SCRAPE_ENABLED: 'true'
+      SOLUTIONS_LIVE_ENRICHMENT_ENABLED: 'true'
+      SOLUTIONS_INTERPRETATION_ENABLED: 'true'
+      SOLUTIONS_EXPLANATION_ENABLED: 'true'
+      SOLUTIONS_EXTERNAL_HUMAN_ENABLED: 'true'
+      SOLUTIONS_PAID_GENERATION_ENABLED: 'true'
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       # The billing suite drives the fake provider, but the page still renders its unavailable state
@@ -921,6 +994,23 @@ jobs:
       DASHBOARD_PRESETS_ENABLED: 'true'
       ONBOARDING_V2_ROLLOUT_PERCENT: '100'
       CONVERSION_EVENTS_ENABLED: 'true'
+      # The rest of the fleet, so this job runs the configuration a developer runs. `.env.example`
+      # turns on every flag in `env.ts` (see CLAUDE.md, "Every feature flag is on in local"), and a
+      # key set locally but absent here does not run "off" on CI — it runs whatever `env.ts` defaults
+      # to, which is exactly the divergence `check-env-fidelity` exists to refuse.
+      #
+      # The seven SOLUTIONS_* flags had never appeared in any environment file at all.
+      PROFILE_REMOVAL_ENABLED: 'true'
+      PROFILE_REMOVAL_HMAC_KEY: '0000000000000000000000000000000000000000000000000000000000000001'
+      ENRICHMENT_ENABLED: 'true'
+      INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: 'true'
+      SOLUTIONS_CATALOG_INGESTION_ENABLED: 'true'
+      SOLUTIONS_PUBLIC_SCRAPE_ENABLED: 'true'
+      SOLUTIONS_LIVE_ENRICHMENT_ENABLED: 'true'
+      SOLUTIONS_INTERPRETATION_ENABLED: 'true'
+      SOLUTIONS_EXPLANATION_ENABLED: 'true'
+      SOLUTIONS_EXTERNAL_HUMAN_ENABLED: 'true'
+      SOLUTIONS_PAID_GENERATION_ENABLED: 'true'
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       # The billing suite drives the fake provider, but the page still renders its unavailable state
@@ -1020,7 +1110,9 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       # The harness serves the build, so it has to exist before the suite starts.
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      # Bounded and retried — a stalled Ubuntu mirror once cost three required checks a full
+      # timeout each. The reasoning is in the script.
+      - run: ./scripts/ci/install-chromium.sh
       - name: End-to-end suite
         # Was `tests/e2e/team-accounts.spec.ts` — one file, ten tests, out of
         # nineteen files and 191. The other eighteen were written, passing

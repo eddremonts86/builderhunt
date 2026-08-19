@@ -112,6 +112,23 @@ jobs:
       DASHBOARD_PRESETS_ENABLED: 'true'
       ONBOARDING_V2_ROLLOUT_PERCENT: '100'
       CONVERSION_EVENTS_ENABLED: 'true'
+      # The rest of the fleet, so this job runs the configuration a developer runs. `.env.example`
+      # turns on every flag in `env.ts` (see CLAUDE.md, "Every feature flag is on in local"), and a
+      # key set locally but absent here does not run "off" on CI — it runs whatever `env.ts` defaults
+      # to, which is exactly the divergence `check-env-fidelity` exists to refuse.
+      #
+      # The seven SOLUTIONS_* flags had never appeared in any environment file at all.
+      PROFILE_REMOVAL_ENABLED: 'true'
+      PROFILE_REMOVAL_HMAC_KEY: '0000000000000000000000000000000000000000000000000000000000000001'
+      ENRICHMENT_ENABLED: 'true'
+      INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: 'true'
+      SOLUTIONS_CATALOG_INGESTION_ENABLED: 'true'
+      SOLUTIONS_PUBLIC_SCRAPE_ENABLED: 'true'
+      SOLUTIONS_LIVE_ENRICHMENT_ENABLED: 'true'
+      SOLUTIONS_INTERPRETATION_ENABLED: 'true'
+      SOLUTIONS_EXPLANATION_ENABLED: 'true'
+      SOLUTIONS_EXTERNAL_HUMAN_ENABLED: 'true'
+      SOLUTIONS_PAID_GENERATION_ENABLED: 'true'
       ABUSE_ENFORCEMENT_MODE: warn
       ENRICHMENT_ALLOWED_CONNECTORS: github
       STRIPE_BILLING_ENABLED: 'true'
@@ -147,7 +164,9 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       # `empty-states.spec.ts` drives the worker harness, which serves `dist/`.
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      # Bounded and retried — a stalled Ubuntu mirror once cost three required checks a full
+      # timeout each. The reasoning is in the script.
+      - run: ./scripts/ci/install-chromium.sh
 
       # ── The database this job judges against ────────────────────────────────────────────────────
       #

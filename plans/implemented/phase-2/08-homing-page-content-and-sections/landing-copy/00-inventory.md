@@ -1,12 +1,27 @@
 # Inventory — Home page claims and evidence
 
+> **Verified 2026-08-18.** Every `src/…` path below was resolved on disk. Two did not exist and are
+> corrected above their old values:
+>
+> - `src/lib/sources/index.ts` — never existed at that path. The registry is
+>   `src/shared/lib/search-connectors.ts`.
+> - `src/routes/api/feeds/$searchId.xml` — the route file is `$searchId.ts`; `.xml` is the URL, not
+>   the module.
+>
+> **The source count is not a number this document may carry.** It said 12, listing `sourcehut` and
+> `hashnode`, both retired on 2026-08-04 (drizzle/0143, drizzle/0144), and omitting `devpost`,
+> `producthunt` and `bluesky`. The real count is 13 and it moves. Nine surfaces once hardcoded "12
+> sources" and every one went stale the same day — `SEARCH_SOURCE_COUNT` exists so copy reads the
+> registry that decides it. Any home-page copy derived from this row must interpolate the constant,
+> the way `src/modules/landing/content/segment-pages.ts` already does.
+
 Every claim the home page is allowed to make, mapped to ground truth.
 
 ## Currently shipping (no "Coming soon" badge)
 
 | Claim | Evidence | Plan |
 |---|---|---|
-| 12 sources indexed live | `src/lib/sources/index.ts` (12 adapters: github, hn, devto, reddit, lobsters, stackoverflow, npm, huggingface, gitlab, codeberg, hashnode, sourcehut) | `phase-1/22-semantic-search` complete |
+| N sources indexed live — **never a literal** | `src/shared/lib/search-connectors.ts` → `SEARCH_SOURCE_COUNT` (13 today: github, hn, devto, reddit, lobsters, stackoverflow, npm, huggingface, gitlab, codeberg, devpost, producthunt, bluesky) | `phase-1/22-semantic-search` complete |
 | Semantic search | `src/routes/api/search/semantic.ts`, `src/lib/semantic/` | `phase-1/22-semantic-search` complete |
 | Recency-weighted scoring | `src/lib/score.ts` | `phase-1/21-ai-expansion` complete |
 | Keyword alerts | `src/routes/api/alerts/*`, `src/lib/alerts/worker.ts` | `phase-1/34-smart-alerts` partially-implemented (v1 ships; v2 deferred) |
@@ -18,7 +33,7 @@ Every claim the home page is allowed to make, mapped to ground truth.
 | Outreach copilot | `src/modules/builder-profile/components/OutreachCopilot.tsx` | `phase-1/26-outreach-generator` complete |
 | AI profile enrichment | `src/routes/api/builders/$builderId/enrichment.ts` (claim-gated) | `phase-1/24-ai-profile-enrichment` partially-implemented |
 | Public profile pages | `published_builder_profiles`, `builder_claims` | `phase-1/36-claimable-profiles` partially-implemented |
-| RSS feeds per saved search | `src/routes/api/feeds/$searchId.xml` | `phase-1/35-rss-feeds` partially-implemented |
+| RSS feeds per saved search | `src/routes/api/feeds/$searchId.ts` | `phase-1/35-rss-feeds` partially-implemented |
 | Stripe billing (code ships, off by default) | `src/shared/lib/billing/` (~60 modules), `STRIPE_BILLING_ENABLED=false` | `phase-1/30-stripe-billing-platform` partially-implemented (~29/40 sections) |
 | Status page | `src/routes/_landing/status.tsx` | `phase-1/47-status-and-trust` implemented |
 | Changelog | `/changelog` (file-based posts) | `phase-1/46-content-marketing` partially-implemented |
