@@ -51,7 +51,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     select A's draft (0 rows), cannot update it (0 rows), A can read their own (1), B can read it once
     published (1), and B loses it the moment it is soft-deleted (0). Five for five.
 
-- [ ] **Implement schemas, service taxonomy, and repositories**
+- [x] **Implement schemas, service taxonomy, and repositories**
   - Files: `src/shared/lib/self-managed/contracts.ts`,
     `src/shared/lib/self-managed/service-taxonomy.ts`,
     `src/shared/lib/repositories/self-managed-profiles.ts`,
@@ -65,6 +65,36 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: `pnpm test tests/unit/shared/lib/repositories/self-managed-profiles.test.ts
     tests/unit/shared/lib/repositories/self-managed-attachments.test.ts`; include create/update/delete,
     expired reservation, duplicate owner/handle, invalid transition, and cross-user negative cases.
+  - Result: two repositories and 39 tests, all green. `contracts.ts` and `service-taxonomy.ts` were
+    already written alongside the schema in task 1; what this task added is the data access over them.
+  - **A handle's availability is three questions, not one.** A live profile may hold it, a profile
+    soft-deleted inside the last thirty days may hold it, or somebody else's unexpired reservation
+    may. Answering only the first is the version that looks right and hands out a handle that comes
+    back a month later attached to a resurrected profile — with every inbound link, bookmark and
+    search result the previous owner built, which to a reader is indistinguishable from impersonation.
+  - The uniqueness checks before each write are advisory. `self_managed_profiles_owner_live_unique`
+    and `..._handle_live_unique` are what hold under two concurrent requests; checking first exists so
+    the common case gets a message naming the problem, and 23505 is translated back into
+    `handle-taken` or `already-exists` so a lost race is not a 500.
+  - **No function takes a `profileId`.** Attachments resolve the profile from `ownerUserId`, because
+    "add an attachment to profile X" is exactly the shape that lets one person publish a document on
+    another person's page. Every attachment query is scoped to the caller's own profile as well as the
+    id, and a stranger's attachment id reads as `not-found` rather than as an edit.
+  - `updateAttachment` cannot touch `storageKey`, `mimeType`, `sizeBytes` or `checksumSha256`: those
+    describe the object the scanner saw. Replacing a file is a delete and a new upload, which is the
+    same work and cannot lie.
+  - Deleting is two steps and the repository is only the first. The row is marked, the bytes go in the
+    sweep — `listPurgeableAttachments` hands out keys and `purgeDeletedAttachments` takes back the ids
+    whose objects are actually gone. Re-running the predicate instead of passing ids would delete rows
+    that became eligible between the two statements, leaving their bytes in the bucket forever.
+  - **The Date-binding trap bit again.** `createDisposableTestDatabase` runs `migrate()` on the client
+    it hands back, and after that every `sql\`col > ${date}\`` throws `ERR_INVALID_ARG_TYPE` — 22 of 23
+    tests failed at once on it. Typed operators (`gt`, `lt`, `ne`, `isNotNull`, `inArray`) go through
+    the column mapper and are unaffected, and are better drizzle regardless. The helper is still the
+    underlying defect and every disposable-DB test shares it.
+  - These tests connect as a superuser and prove nothing about RLS. The policy evidence is task 1's
+    five-case negative test against the real `builderhunt_app` role. What they do prove is the layer
+    RLS cannot: the two spec limits and the repository's own `WHERE` clauses.
 
 ## Phase 1 — uploads on the existing document pipeline
 
