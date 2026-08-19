@@ -306,6 +306,10 @@ jobs:
                 return 0
               fi
               echo "::warning::apt-get $1 stalled or failed (attempt $attempt/3) — retrying"
+              # The half-downloaded index is the stall's residue; left in place, apt resumes the
+              # same broken transfer and the retry replays the failure. `sudo timeout` can reach
+              # this apt-get, so unlike scripts/ci/install-chromium.sh there is no orphan to kill.
+              sudo rm -rf /var/lib/apt/lists/partial
               sleep 10
             done
             echo "::error::apt-get $1 did not finish in three bounded attempts. The Ubuntu package mirrors are unreachable from this runner; this is not a problem with the commit under test."
