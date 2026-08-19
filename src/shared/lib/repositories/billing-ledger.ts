@@ -131,7 +131,16 @@ function activeGrantConditions(organizationId: string, options: ActiveCreditGran
   ]
   if (options.notExpiredAt) conditions.push(gt(billingCreditGrants.expiresAt, options.notExpiredAt))
   if (options.after) {
-    conditions.push(sql`(${billingCreditGrants.expiresAt}, ${billingCreditGrants.id}) > (${options.after.expiresAt}, ${options.after.id})`)
+    // `.toISOString()` and an explicit cast, not the `Date`. `drizzle(client)` replaces postgres.js's
+    // serializers for the date and timestamp OIDs with a pass-through (`postgres-js/driver.js`), so a
+    // `Date` bound into a raw `sql` template reaches the wire encoder unconverted and Node throws
+    // `ERR_INVALID_ARG_TYPE`. Drizzle does that deliberately — it expects values to arrive through
+    // column mappers, and a raw template has no column to map through.
+    //
+    // Only the second batch binds a cursor, so this ran correctly for every organization with fewer
+    // than `CREDIT_GRANT_BATCH` active grants and threw for the first one that crossed it — on the
+    // credit-consumption path. `calendar.ts` already writes it this way.
+    conditions.push(sql`(${billingCreditGrants.expiresAt}, ${billingCreditGrants.id}) > (${options.after.expiresAt.toISOString()}::timestamptz, ${options.after.id})`)
   }
 
   /**
