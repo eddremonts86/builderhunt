@@ -29,6 +29,8 @@
 
 export const QUARANTINE_PREFIX = 'quarantine/'
 export const CLEAN_PREFIX = 'clean/'
+/** Separates profile attachments from candidate documents inside both prefixes. See below. */
+export const SELF_MANAGED_NAMESPACE = 'self-managed/'
 
 export class ObjectKeyError extends Error {
   constructor(message: string) {
@@ -76,6 +78,46 @@ export function cleanKeyFor(quarantineKey: string): string {
     throw new ObjectKeyError('only a quarantine key can be promoted to the clean prefix')
   }
   return `${CLEAN_PREFIX}${quarantineKey.slice(QUARANTINE_PREFIX.length)}`
+}
+
+/**
+ * Where a self-managed profile attachment is written (plan: phase-2/07-perfiles-autogestionados).
+ *
+ * The `self-managed/` infix is the point. A candidate key is
+ * `quarantine/<organization>/<submission>/<document>` and without an infix a profile key would be
+ * `quarantine/<owner>/<profile>/<attachment>` — same prefix, same arity, nothing in the string
+ * saying which space it belongs to. The two are authorized completely differently: one by
+ * organization membership, the other by account ownership. A download route that checked the wrong
+ * one would still find an object, which is the failure worth making impossible in the key itself
+ * rather than in every caller.
+ *
+ * Carries no filename, for the reason at the top of this file, and no handle either: a handle is
+ * public, changeable and chosen by its owner, so it is the one profile field with a real chance of
+ * turning up in somebody's access logs attached to a person's name.
+ */
+export function selfManagedQuarantineKeyFor(params: {
+  ownerUserId: string
+  profileId: string
+  attachmentId: string
+}): string {
+  assertSegment('ownerUserId', params.ownerUserId)
+  assertSegment('profileId', params.profileId)
+  assertSegment('attachmentId', params.attachmentId)
+  return `${QUARANTINE_PREFIX}${SELF_MANAGED_NAMESPACE}${params.ownerUserId}/${params.profileId}/${params.attachmentId}`
+}
+
+/**
+ * Whether this key belongs to the self-managed space, under either prefix.
+ *
+ * For a caller that has just authorized somebody as the *owner of a profile* and is about to sign a
+ * URL: asserting the space closes the gap between "this row is yours" and "this key is the kind of
+ * key that row should ever have held".
+ */
+export function isSelfManagedKey(key: string): boolean {
+  return (
+    key.startsWith(`${QUARANTINE_PREFIX}${SELF_MANAGED_NAMESPACE}`)
+    || key.startsWith(`${CLEAN_PREFIX}${SELF_MANAGED_NAMESPACE}`)
+  )
 }
 
 export function isQuarantineKey(key: string): boolean {

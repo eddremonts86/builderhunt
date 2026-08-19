@@ -98,7 +98,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
 
 ## Phase 1 — uploads on the existing document pipeline
 
-- [ ] **Extend the existing quarantine and scanning pipeline for profile attachments**
+- [~] **Extend the existing quarantine and scanning pipeline for profile attachments**
   - Files: `src/lib/storage/document-validation.ts`, `src/lib/storage/object-keys.ts`,
     `src/lib/storage/provider.ts`, `src/lib/storage/clamav.ts`,
     `src/lib/scheduling/document-worker.ts`,
@@ -111,6 +111,38 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     safety into a second storage tree.
   - Verify: unit tests reject MIME/magic-byte mismatch and EICAR, keep failed scans quarantined,
     promote a clean object, enforce both quotas, and prove object keys never contain user filenames.
+  - Partial. The validation contract and the key space are done and proved by 24 new tests; the scan
+    pipeline itself is blocked on a schema change, described below.
+  - **Done: a policy, not a second validator.** `UploadPolicy` names the only two things the
+    candidate path and this one actually differ on — the accepted formats and the byte cap — and
+    `validateDocument` takes one, defaulting to the candidate contract so every existing caller is
+    untouched (its 28 tests still pass unchanged). Everything expensive to get right stays shared:
+    magic bytes against the declaration, hash against the bytes, the zip walk, the PDF checks.
+  - Every `sniffedAs` entry was **measured against `file-type`**, not assumed, and two of the seven
+    would have been wrong if guessed: a PNG is not recognised until its IHDR length is well formed,
+    and an MP3 behind an ID3v2 tag needs the tag's synchsafe size to be right. Both are true of every
+    real file and false of the obvious hand-made fixture — a fixture the sniffer rejects would make
+    these tests pass for the wrong reason, as a mismatch rather than an acceptance.
+  - `text/plain` is deliberately **not** in the profile policy. Text is the one format with no magic
+    bytes, so its whole structural check is "decodes as UTF-8, holds no NUL" — worth it for a CV a
+    recruiter asked for, not worth it on a public page where it buys nothing a PDF does not.
+  - **Done: `self-managed/` is a separate key space**, not a shared one. A candidate key is
+    `quarantine/<org>/<submission>/<document>` and a profile key would otherwise be
+    `quarantine/<owner>/<profile>/<attachment>` — same prefix, same arity, nothing saying which is
+    which. The two are authorized completely differently, so a route checking the wrong one would
+    still find an object. The infix makes that impossible in the key rather than in every caller.
+  - **Blocked: `self_managed_attachments` has no scan state**, so there is nothing for the worker to
+    lease and nothing a download route could refuse. This is not an oversight in task 1 — `spec.md`
+    contradicts itself. Its §"Modelo canónico de datos" lists the table without a status field, and
+    its §"Adjuntos" requires that "adjuntos recién subidos quedan en estado `pending` y no se sirven
+    hasta que el scan devuelva `clean`". Task 1 built what the data model specified.
+  - What unblocking costs, and why it is a real migration rather than one column: `candidate_documents`
+    is the precedent, and it carries `scan_status`, `scan_attempts` and `rejection_code` with a CHECK
+    pairing a rejection to a reason. It also makes `sha256` nullable, because an `awaiting_upload` row
+    has no bytes yet — and `0175` made `size_bytes` and `checksum_sha256` `NOT NULL` with a
+    `size_bytes > 0` CHECK, all three of which have to be relaxed for the intent step task 4 specifies.
+    That belongs in one migration written deliberately, not appended to this task at the end of a
+    session. `0175` is applied in production, so it is `0176` and nothing edits `0175`.
 
 - [ ] **Expose upload intent, completion, download, and deletion routes**
   - Files: `src/routes/api/self-managed/attachments/index.ts`,
