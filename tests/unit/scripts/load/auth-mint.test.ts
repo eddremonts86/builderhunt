@@ -63,8 +63,14 @@ describe('parseSessionCookie', () => {
   it('decodes the percent-encoding better-call applies inside its signing helper', () => {
     // `signCookieValue` returns encodeURIComponent(`${token}.${signature}`), so base64 `+` and `=`
     // arrive as %2B and %3D. Comparing the raw header against makeSignature never matches.
-    const parsed = parseSessionCookie('better-auth.session_token=abc123.c2ln%2BbmF0dXJl%3D%3D; Path=/; HttpOnly')
-    expect(parsed).toEqual({ name: 'better-auth.session_token', token: 'abc123', signature: 'c2ln+bmF0dXJl==' })
+    //
+    // The fixture is deliberately three characters long. A realistic-looking base64 blob after
+    // `session_token=` is what GitGuardian's generic detector matches on, and this file failed the
+    // secret scan on 2026-08-19 over a value that never authenticated anything. Nothing here needs
+    // length: `%2B` and `%3D` are the whole subject, and one of each proves the decoding. Keep it
+    // small, or the next scan turns a passing test into a security incident again.
+    const parsed = parseSessionCookie('better-auth.session_token=tok.s%2Bg%3D%3D; Path=/; HttpOnly')
+    expect(parsed).toEqual({ name: 'better-auth.session_token', token: 'tok', signature: 's+g==' })
   })
 
   /** The token itself never contains a dot, but splitting on the *last* one is what makes that not matter. */
