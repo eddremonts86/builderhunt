@@ -37,13 +37,29 @@ import {
   type LoadRoute,
 } from './config'
 import { LatencyHistogram } from './histogram'
-import { LoadAuthRateLimitedError, signInAll, type LoadSession } from './auth'
+import postgres from 'postgres'
+
+import {
+  LoadAuthRateLimitedError,
+  mintSessions,
+  resolveSessionCookieFormat,
+  signInAll,
+  type LoadSession,
+} from './auth'
 import { startMonitor } from './monitor'
 import { buildLoadReport, renderLoadReportMarkdown, type ObservabilitySample, type RouteOutcome } from './report'
 import type { LoadFixtureManifest } from './seed'
 
 /** How many sign-ins run at once. Deliberately small — see `auth.ts`. */
 const SIGN_IN_CONCURRENCY = 8
+
+/**
+ * What `better-auth.ts` caps `/sign-in/email` at, per IP per minute.
+ *
+ * Mirrored rather than imported because the runner never loads the app's modules — it drives HTTP.
+ * If the cap moves there and not here, the worst case is minting when signing in would have worked.
+ */
+const SIGN_IN_RATE_LIMIT_PER_MINUTE = 20
 
 /** The spec's drain window: in-flight requests get this long to answer before an aborted report is written. */
 const DRAIN_MS = 30_000
@@ -121,6 +137,14 @@ export interface RunnerOptions {
   config: LoadConfig
   poolMode: 'direct' | 'transaction'
   monitorDatabaseUrl?: string
+  /**
+   * The fixture database, used only to mint sessions (plan 55 phase 2).
+   *
+   * Separate from `monitorDatabaseUrl`, which is a read-only observer: this one writes
+   * `auth_sessions` rows. Absent means fall back to signing users in, which is correct for the
+   * smoke profile and refused by the rate limiter for the thousand-user one.
+   */
+  fixtureDatabaseUrl?: string
   poolerAdminUrl?: string
   outputDirectory?: string
   log?: (message: string) => void
@@ -165,16 +189,43 @@ export async function runLoadTest(options: RunnerOptions): Promise<RunnerResult>
 
   let sessions: LoadSession[] = []
   try {
-    log(`signing in ${wanted.length} users, ${SIGN_IN_CONCURRENCY} at a time`)
-    sessions = await signInAll({
-      baseUrl: options.baseUrl,
-      users: wanted,
-      concurrency: SIGN_IN_CONCURRENCY,
-      timeoutMs: config.requestTimeoutMs,
-      onProgress: (signedIn, total) => {
-        if (signedIn % 100 === 0 || signedIn === total) log(`  ${signedIn}/${total}`)
-      },
-    })
+    /**
+     * Minting above the rate limiter's ceiling, signing in below it.
+     *
+     * `/sign-in/email` is capped at 20/min per IP and every virtual user comes from one host, so any
+     * profile larger than that aborts on a `429` — the product behaving correctly. Minting writes the
+     * sessions straight to the fixture database instead, with better-auth's own signing primitives.
+     *
+     * Below the ceiling the real sign-in stays, because it exercises a path the run would otherwise
+     * never touch, and it costs seconds at that size.
+     */
+    if (wanted.length > SIGN_IN_RATE_LIMIT_PER_MINUTE && options.fixtureDatabaseUrl) {
+      log(`minting ${wanted.length} sessions (over the ${SIGN_IN_RATE_LIMIT_PER_MINUTE}/min sign-in limit)`)
+      const sql = postgres(options.fixtureDatabaseUrl, { max: 4, prepare: false })
+      try {
+        const format = await resolveSessionCookieFormat({
+          baseUrl: options.baseUrl,
+          email: wanted[0]!.email,
+          timeoutMs: config.requestTimeoutMs,
+          secret: process.env.BETTER_AUTH_SECRET,
+        })
+        sessions = await mintSessions({ sql, users: wanted, format })
+        log(`  ${sessions.length} minted`)
+      } finally {
+        await sql.end({ timeout: 5 }).catch(() => undefined)
+      }
+    } else {
+      log(`signing in ${wanted.length} users, ${SIGN_IN_CONCURRENCY} at a time`)
+      sessions = await signInAll({
+        baseUrl: options.baseUrl,
+        users: wanted,
+        concurrency: SIGN_IN_CONCURRENCY,
+        timeoutMs: config.requestTimeoutMs,
+        onProgress: (signedIn, total) => {
+          if (signedIn % 100 === 0 || signedIn === total) log(`  ${signedIn}/${total}`)
+        },
+      })
+    }
   } catch (error) {
     if (error instanceof LoadAuthRateLimitedError) abortedReason = error.message
     else throw error
@@ -371,23 +422,50 @@ function flag(argv: readonly string[], name: string): string | undefined {
   return argv.find((entry) => entry.startsWith(prefix))?.slice(prefix.length)
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  const argv = process.argv.slice(2)
+/**
+ * The configuration a command line asks for — duration separate from profile.
+ *
+ * `config.ts` states the contract as "the two-hour soak overrides `steadySeconds`; nothing else about
+ * the contract changes between stages", and until 2026-08-16 the only mechanism that overrode it
+ * changed two other things: `--seconds` also collapsed the ramp to two seconds and widened
+ * `offeredRatePerSecond` to `{0, ∞}`. `--seconds=7200` therefore reported a two-second ramp and **no
+ * offered-rate check at all**, and 400–500 req/s is one of the spec's success criteria — so the
+ * certification would have read `pass` without having evaluated it.
+ *
+ * The widening is right for `--users` and wrong for `--seconds`. The offered rate is derived as
+ * `users / (thinkTime + averageJitter)`: changing the user count genuinely invalidates the window,
+ * while changing the duration does not — a thousand users offer the same rate for two hours as for
+ * ten minutes.
+ *
+ * Extracted from the CLI guard so it can be asserted at all. Inline under
+ * `import.meta.url === process.argv[1]`, none of this was reachable from a test, which is the other
+ * half of why the bug survived to be found by reading rather than by failing.
+ */
+export function resolveRunConfig(argv: readonly string[]): LoadConfig {
   const base = configFromArgv(argv)
   const users = flag(argv, 'users')
   const seconds = flag(argv, 'seconds')
-  const config: LoadConfig = {
+  const ramp = flag(argv, 'ramp')
+
+  return {
     ...base,
     users: users ? Number(users) : base.users,
-    stages: seconds
-      ? { rampSeconds: Math.min(base.stages.rampSeconds, 2), steadySeconds: Number(seconds) }
-      : base.stages,
-    // An explicit `--users`/`--seconds` makes the offered-rate window meaningless: it is derived from the
-    // thousand-user profile. Widened rather than dropped, so the check still appears and still reports.
-    thresholds: users || seconds
+    stages: {
+      // Kept unless something explicitly asks otherwise. A ramp is how the run avoids measuring a
+      // thundering herd, and shortening it silently is how a report describes one.
+      rampSeconds: ramp ? Number(ramp) : base.stages.rampSeconds,
+      steadySeconds: seconds ? Number(seconds) : base.stages.steadySeconds,
+    },
+    // Widened rather than dropped, so the check still appears in the report and still says something.
+    thresholds: users
       ? { ...base.thresholds, offeredRatePerSecond: { min: 0, max: Number.POSITIVE_INFINITY } }
       : base.thresholds,
   }
+}
+
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  const argv = process.argv.slice(2)
+  const config = resolveRunConfig(argv)
 
   const manifestFile = flag(argv, 'manifest') ?? process.env.LOAD_MANIFEST
   if (!manifestFile) {
@@ -401,6 +479,7 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
     config,
     poolMode: argv.includes('--pooled') ? 'transaction' : 'direct',
     monitorDatabaseUrl: process.env.LOAD_MONITOR_DATABASE_URL,
+    fixtureDatabaseUrl: process.env.LOAD_FIXTURE_DATABASE_URL,
     poolerAdminUrl: process.env.LOAD_PGBOUNCER_ADMIN_URL,
   })
     .then((result) => process.exit(result.exitCode))

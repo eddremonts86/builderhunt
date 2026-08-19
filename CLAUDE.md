@@ -19,6 +19,29 @@ gate on the strength of one green parallel run. The full reasoning, including th
 each mode catches that the other hides, is in
 [`docs/operations/development.md`](./docs/operations/development.md#running-the-test-suites--worker-count).
 
+## Every feature flag is on in local. All of them, always
+
+A feature you cannot see is a feature nobody can test. `.env.example` therefore turns on **every**
+flag in `env.ts`, and a local `.env` is expected to match — not the ones that seem relevant to
+today's task, all of them.
+
+The defaults in `env.ts` stay `false`, and that is not a contradiction: production inherits neither
+`.env` nor `.env.example`, so an off-by-default flag means turning a surface on for real users is a
+deliberate act in Coolify rather than a side effect of a merge. Local and production want opposite
+defaults, and each gets its own.
+
+Three flags are *available* locally but need a credential this machine does not hold to actually
+answer: `STRIPE_BILLING_ENABLED` (`sk_test_…`), `INTERVIEW_TRANSCRIPTION_ENABLED` (`DEEPGRAM_API_KEY`)
+and `SENSITIVE_AI_ENABLED` (a real EU Azure/Mistral deployment). Available and functional are
+different claims — the flag being on is what makes the difference visible instead of silent.
+`PROFILE_REMOVAL_ENABLED` needs `PROFILE_REMOVAL_HMAC_KEY`, which is one `openssl rand -hex 32` away
+and whose absence is a boot error naming the exact command.
+
+**When adding a flag, add it to `.env.example` in the same change, switched on.** The seven
+`SOLUTIONS_*` flags spent their whole life `false` in `env.ts` and absent from `.env.example`
+entirely — not switched off so much as never mentioned, which is how a whole pipeline becomes
+invisible to everyone who did not write it.
+
 ## Before reporting something as done
 
 - Capture exit codes to a file and check them directly. A pipeline's exit status is the *last*

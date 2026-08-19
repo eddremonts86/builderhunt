@@ -30,7 +30,6 @@ const root = process.cwd()
  */
 const RUNNER_PLUMBING = {
   install: 'installs dependencies; a developer already has node_modules',
-  'exec playwright': 'installs browsers into a fresh runner image',
   vitest: 'the Stripe sandbox certification job, which makes real test-mode API calls and is gated on a repository secret rather than run on every push',
 }
 

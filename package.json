@@ -11,6 +11,8 @@
     "bench:interviews": "pnpm bench:calendar && pnpm bench:booking && pnpm bench:segments",
     "bench:segments": "node scripts/bench/transcript-segments.mjs",
     "billing:check-readiness": "tsx --env-file=.env scripts/billing/check-live-readiness.ts",
+    "audit:landing:walk": "tsx --env-file-if-exists=.env scripts/audit/landing-walk.ts",
+    "audit:landing": "tsx --env-file-if-exists=.env scripts/audit/check-landing-budget.ts",
     "build": "vite build",
     "check:env-fidelity": "node scripts/ci/check-env-fidelity.mjs",
     "check:step-parity": "node scripts/ci/check-step-parity.mjs",

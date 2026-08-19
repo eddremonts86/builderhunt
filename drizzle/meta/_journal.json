@@ -1226,6 +1226,13 @@
       "when": 1786795382089,
       "tag": "0174_segmented_landing_funnel",
       "breakpoints": true
+    },
+    {
+      "idx": 175,
+      "version": "7",
+      "when": 1787083652408,
+      "tag": "0175_self_managed_profiles",
+      "breakpoints": true
     }
   ]
 }

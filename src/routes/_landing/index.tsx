@@ -1,8 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { HomePage } from '~/modules/landing/components/HomePage'
+import { personaFromSearch } from '~/modules/landing/content/persona-copy'
 import { getSegmentedLandingEnabled } from '~/shared/lib/segmented-landing-flag'
 
 export const Route = createFileRoute('/_landing/')({
+  /**
+   * `?persona=` chooses which of three text blocks the page renders
+   * (plan: phase-2/08-homing-page-content-and-sections).
+   *
+   * Kept as a raw string here and narrowed by `personaFromSearch` at the point of use, so an
+   * unrecognised value is indistinguishable from an absent one — the URL is attacker-controlled and a
+   * validator that rejected loudly would turn the parameter into a way to probe the enum.
+   */
+  validateSearch: (search: Record<string, unknown>): { persona?: string } =>
+    (typeof search.persona === 'string' ? { persona: search.persona } : {}),
   // Resolved here rather than read in the component: `env.ts` hands the browser a stub, so a
   // component asking it directly would hide the selector on every client render whatever the server
   // has configured. See `segmented-landing-flag.ts`.
@@ -20,5 +31,12 @@ export const Route = createFileRoute('/_landing/')({
  */
 function HomeRoute() {
   const { user, segmentedLanding } = Route.useRouteContext()
-  return <HomePage isAuthed={!!user.userId} showSegmentSelector={segmentedLanding} />
+  const { persona } = Route.useSearch()
+  return (
+    <HomePage
+      isAuthed={!!user.userId}
+      showSegmentSelector={segmentedLanding}
+      persona={personaFromSearch(persona)}
+    />
+  )
 }

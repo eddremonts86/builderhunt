@@ -119,7 +119,7 @@ function fixtureId(runId: string, kind: string, ordinal: number | string): strin
   return `ld_${runId}_${kind}${ordinal}`
 }
 
-async function insertBatched(sql: Sql, table: string, rows: Record<string, unknown>[]): Promise<number> {
+export async function insertBatched(sql: Sql, table: string, rows: Record<string, unknown>[]): Promise<number> {
   let written = 0
   for (let offset = 0; offset < rows.length; offset += INSERT_BATCH) {
     const batch = rows.slice(offset, offset + INSERT_BATCH)

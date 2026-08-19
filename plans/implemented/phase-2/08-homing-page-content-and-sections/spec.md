@@ -1,7 +1,18 @@
 # Homing-page content and sections (spec)
 
-> **Status**: `pending`
-> **Depends on**: nothing in the same phase. Reads [`app-reality`](../../_meta/app-reality.md)
+> **Reconciled against `plans/_meta/app-reality.md` on 2026-08-18.** Every `src/`, `scripts/` and
+> `plans/` path this spec cites now resolves. One did not: `src/lib/sources/index.ts`, which has never
+> existed — the registry is `src/shared/lib/search-connectors.ts`. The same phantom path appeared in
+> `landing-copy/00-inventory.md` and in the task list's own Verify clause, which is what a wrong path
+> does once it is written down: it gets copied rather than checked.
+>
+> The "13 sources" framing went with it. The count is thirteen connectors, it moves, and it is
+> rendered from the registry rather than written — the defect that put "12 sources" on nine surfaces
+> at once, all of which went stale the day `sourcehut` and `hashnode` were retired.
+
+
+> **Status**: `implemented` — 2026-08-18
+> **Depends on**: nothing in the same phase. Reads [`app-reality`](../../../_meta/app-reality.md)
 > for the ground truth on what is shipped today and what the home page is allowed to claim. Reads
 > every plan under `plans/` to know what is coming so the home page can advertise it honestly.
 > **Blocks**: nothing. Pure landing-page rewrite — no schema, no API, no migration.
@@ -210,11 +221,11 @@ Three existing sections get a copy refresh only:
   marked `implemented` or `complete` in `app-reality.md`). The "Multi-source discovery" card
   gets a one-line clarification: "Federated across 12 communities + semantic search on top,
   not a scraper."
-- **Sources strip**: the "13 sources" claim becomes "12 sources + semantic search". The
+- **Sources strip**: the count is rendered from `SEARCH_SOURCE_COUNT` and the list from `IMPLEMENTED_SEARCH_CONNECTORS`, never typed. The
   `app-reality.md` source list (github, hn, devto, reddit, lobsters, stackoverflow, npm,
   huggingface, gitlab, codeberg, hashnode, sourcehut) is 12 entries; phase-1 `17-bluesky`,
   `18-producthunt`, `19-devpost`, `20-indiehackers` are added but the headline count comes
-  from the live `src/lib/sources/index.ts` registry, not from a hard-coded number. The copy
+  from the live `src/shared/lib/search-connectors.ts` registry, not from a hard-coded number. The copy
   says "12+ sources live today, more on the way" rather than asserting a static count.
 
 ## Page-size budget
@@ -249,7 +260,7 @@ existing `/saas-review-walk` evidence: routes with the most console errors or no
 
 1. **Numeric-claim audit**: `grep -nE '[0-9]+' src/modules/landing/components/HomePage.tsx
    landing-copy/*.md` returns every number on the home. Each one resolves to:
-   - a real feature in `src/` (e.g. `13 sources` → `grep -l sources src/lib/sources/index.ts`),
+   - a real feature in `src/` (e.g. the source count → `SEARCH_SOURCE_COUNT` in `src/shared/lib/search-connectors.ts`),
    - or `Coming soon` with a plan name in the same line.
 2. **Page-size gate**: `scripts/audit/check-dashboard-budgets.ts` is repurposed for the
    landing: a sibling script `scripts/audit/check-landing-budget.ts` measures rendered

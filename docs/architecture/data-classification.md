@@ -12,6 +12,9 @@ an explicitly reviewed view or command is listed.
 | auth_sessions | account-subject | `user_id` | none | expiry + short operational window |
 | auth_accounts | account-subject | `user_id` | none | account lifetime; tokens secret |
 | auth_verifications | account-subject | identifier subject | none | expiry + short abuse window |
+| self_managed_profiles | account-subject | `owner_user_id` | handle, display_name, headline, bio, location, languages, services, topics, updated_at — **only when `visibility` is public or unlisted and `deleted_at` is null** | account lifetime; a soft-deleted profile is purged after the 30-day handle hold |
+| self_managed_attachments | account-subject | via `profile_id` → profile owner | kind, title, description, mime_type, size_bytes, duration_seconds, uploaded_at — never `storage_key` | profile lifetime; the stored object must be deleted with the row |
+| self_managed_handle_reservations | account-subject | `reserved_by_user_id` | none | seven days from reservation; expired rows swept |
 | organizations | tenant-private | organization `id` (tenant root) | name/slug/logo only to authorized contexts | organization lifetime |
 | organization_members | tenant-private | `organization_id` | none | membership + audit window |
 | organization_invitations | tenant-private | `organization_id` | none | expiry + abuse/audit window |
@@ -63,6 +66,27 @@ marked as transition findings until that lands.
 Authorization must never depend on `metadata`, `payload`, `topics`, `keywords`, selections, or other
 JSON fields. Future tables must be added here before their migration is accepted and must document
 owner key, DTO fields, retention, indexes, constraints, RLS policy, and introducing plan.
+
+
+
+### Account-subject tables that strangers read
+
+`self_managed_profiles` is the first table in this document that is keyed on a person **and** served
+to the public. Every other account-subject row here has `none` in the public-fields column, and the
+RLS shape that goes with it — owner-only, keyed on `app.user_id` — is what `0171_user_preferences`
+established.
+
+Copying that shape onto a profile table would be wrong in a way that looks right: these rows are read
+at `/u/<handle>`, so owner-only makes every public profile invisible and the failure reads as "no
+profiles exist" rather than as a policy. The migration therefore pairs an owner policy with a
+public-read policy scoped to `visibility in ('public','unlisted') and deleted_at is null`.
+
+`unlisted` is publicly readable at the row level on purpose — it means reachable by anyone holding
+the link. Excluding it from *search* is the route's job, because a policy cannot tell a direct visit
+from a listing.
+
+An attachment's `storage_key` is never public. It is a path into object storage, and publishing it
+makes the bucket's layout guessable from the outside.
 
 
 ## Table capabilities are an authorization surface
