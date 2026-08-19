@@ -101,6 +101,28 @@ jobs:
       INTERVIEW_R2_SECRET_ACCESS_KEY: builderhunt-local-dev
       INTERVIEW_CLAMAV_HOST: 127.0.0.1
       INTERVIEW_CLAMAV_PORT: '3310'
+      # Sixteen keys this block was missing until 2026-08-19, and the serial suite failed three
+      # nights running because of the first one: `/for/investors` renders no sign-up CTA with
+      # `SEGMENTED_LANDING_ENABLED` unset, so `onboarding-goal.spec.ts` looked for a link that was
+      # never going to be there. The sharded run in `quality.yml` had the flag and passed, which is
+      # the worst version of this — the only job that catches serial-order bugs was itself broken,
+      # and its red was three nights of noise nobody could act on.
+      SEGMENTED_LANDING_ENABLED: 'true'
+      USER_SEGMENTATION_ENABLED: 'true'
+      DASHBOARD_PRESETS_ENABLED: 'true'
+      ONBOARDING_V2_ROLLOUT_PERCENT: '100'
+      CONVERSION_EVENTS_ENABLED: 'true'
+      PROFILE_REMOVAL_ENABLED: 'true'
+      PROFILE_REMOVAL_HMAC_KEY: '0000000000000000000000000000000000000000000000000000000000000001'
+      ENRICHMENT_ENABLED: 'true'
+      INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: 'true'
+      SOLUTIONS_CATALOG_INGESTION_ENABLED: 'true'
+      SOLUTIONS_PUBLIC_SCRAPE_ENABLED: 'true'
+      SOLUTIONS_LIVE_ENRICHMENT_ENABLED: 'true'
+      SOLUTIONS_INTERPRETATION_ENABLED: 'true'
+      SOLUTIONS_EXPLANATION_ENABLED: 'true'
+      SOLUTIONS_EXTERNAL_HUMAN_ENABLED: 'true'
+      SOLUTIONS_PAID_GENERATION_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v7
       # Minted per run, never written down.
