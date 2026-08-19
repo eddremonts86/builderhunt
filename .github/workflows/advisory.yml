@@ -272,7 +272,9 @@ jobs:
       # two specs die on "no build exists" while the twelve public-surface ones, which use the
       # config's own webServer, pass around them.
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      # Bounded and retried — a stalled Ubuntu mirror once cost three required checks a full
+      # timeout each. The reasoning is in the script.
+      - run: ./scripts/ci/install-chromium.sh
 
       # Before the preview, not after it. Playwright starts its own dev server for these
       # projects and `reuseExistingServer` is false under CI by design, so running this while

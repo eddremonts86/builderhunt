@@ -165,7 +165,9 @@ jobs:
       # The harness serves `dist/`, so a build is a precondition of the suite, not a check that
       # follows it.
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      # Bounded and retried — a stalled Ubuntu mirror once cost three required checks a full
+      # timeout each. The reasoning is in the script.
+      - run: ./scripts/ci/install-chromium.sh
 
       # No `--shard`. That is the entire point of this workflow.
       - name: End-to-end suite, whole and serial
