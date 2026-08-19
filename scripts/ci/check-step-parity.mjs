@@ -91,6 +91,7 @@ function envBlocksAgree() {
     quality: source,
     advisory: readFileSync(join(root, '.github/workflows/advisory.yml'), 'utf8'),
     'visual-baselines': readFileSync(join(root, '.github/workflows/visual-baselines.yml'), 'utf8'),
+    'nightly-serial': readFileSync(join(root, '.github/workflows/nightly-serial.yml'), 'utf8'),
   }
   const envOf = (job, file) => {
     const block = new RegExp(`^ {2}${job}:$([\\s\\S]*?)^ {4}steps:$`, 'm').exec(sources[file])
@@ -112,6 +113,13 @@ function envBlocksAgree() {
     // runs when someone changes the UI, months apart, and a missing key there produces a rewritten
     // baseline of an error page rather than a failure.
     ['visual-baselines', 'baselines'],
+    // Absent from CHECKING_WORKFLOWS, present here, and the comment above SUITE_RUNNING_WORKFLOWS
+    // has always said so — but this loop did not read the file, so for months it was a claim rather
+    // than a check. The block had drifted sixteen keys behind, and the serial suite failed three
+    // nights in a row looking for a sign-up CTA that `SEGMENTED_LANDING_ENABLED` gates. Not running
+    // the same *checks* as quality is a deliberate exemption; not running them in the same
+    // *environment* was never one.
+    ['nightly-serial', 'serial'],
   ]) {
     const other = envOf(job, file)
     if (!other) continue
