@@ -346,8 +346,12 @@ export const listExpiredPendingDeletionRequests = (
     // `id` trails the timestamp because two requests can share a grace-period end — the flow sets it
     // from a fixed offset, so two accounts closed in the same minute do — and a batch boundary
     // inside that tie would skip one of them entirely.
+    // `.toISOString()` and a cast rather than the `Date` — see the note in `billing-ledger.ts`.
+    // `drizzle(client)` disables postgres.js's timestamp serializers, so a raw `Date` in a template
+    // throws `ERR_INVALID_ARG_TYPE`. Only the second batch binds a cursor, so this sweep worked
+    // until more than `DELETION_BATCH` requests came due at once and then stopped erasing accounts.
     ...(after
-      ? [sql`(${deletionRequests.gracePeriodEndsAt}, ${deletionRequests.id}) > (${after.gracePeriodEndsAt}, ${after.id})`]
+      ? [sql`(${deletionRequests.gracePeriodEndsAt}, ${deletionRequests.id}) > (${after.gracePeriodEndsAt.toISOString()}::timestamptz, ${after.id})`]
       : []),
   ))
   .orderBy(asc(deletionRequests.gracePeriodEndsAt), asc(deletionRequests.id))
