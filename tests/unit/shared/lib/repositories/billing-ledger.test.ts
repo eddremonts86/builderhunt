@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import { organizations } from '~/shared/lib/db/schema'
 import {
+  drainActiveCreditGrants,
   findCreditGrant,
   findCreditGrantByMonthlyWindowKey,
   findLedgerEntryByIdempotencyKey,
@@ -126,5 +127,49 @@ describe('billing ledger repository', () => {
 
     const expired = await db.transaction((tx) => listExpiredButStillActiveGrants(tx, 'ledger-org-a', new Date()))
     expect(expired.map((grant) => grant.id)).toContain('ledger-grant-past-expiry')
+  })
+})
+
+/**
+ * The second batch, which is the only place a Date cursor can fail.
+ *
+ * `activeGrantConditions` binds `after.expiresAt` — a JS `Date` — into a raw `sql` template. That
+ * cannot reach the wire: `drizzle(client)` replaces postgres.js's serializers for the date and
+ * timestamp OIDs with a pass-through (`postgres-js/driver.js`, the `transparentParser` loop), so the
+ * driver hands the `Date` object straight to its byte encoder and Node throws
+ * `ERR_INVALID_ARG_TYPE`. Drizzle does that on purpose — it expects values to arrive through column
+ * mappers, which stringify — so this is correct usage of the library rather than a bug in it.
+ *
+ * The first batch passes `after: null`, so nothing binds and everything works. Which is exactly why
+ * this went unnoticed: it needs more grants than `CREDIT_GRANT_BATCH` before it can fire, and then
+ * it fires on the credit-consumption path.
+ */
+describe('draining more grants than one batch holds', () => {
+  it('crosses the batch boundary instead of throwing on the cursor', async () => {
+    const now = Date.now()
+    await db.transaction(async (tx) => {
+      for (let index = 0; index < 5; index += 1) {
+        await insertCreditGrant(tx, {
+          id: `ledger-drain-${index}`,
+          organizationId: 'ledger-org-b',
+          source: 'promotional',
+          originalUnits: 10,
+          remainingUnits: 10,
+          // Distinct expiries, so the cursor is a moving Date rather than one repeated tie.
+          expiresAt: new Date(now + (index + 1) * 86_400_000),
+        })
+      }
+    })
+
+    const seen: string[] = []
+    // A limit of two over five grants forces three reads, so the cursor is bound twice.
+    await db.transaction((tx) => drainActiveCreditGrants(tx, 'ledger-org-b', { limit: 2 }, (batch) => {
+      seen.push(...batch.map((grant) => grant.id))
+      return true
+    }))
+
+    expect(seen).toEqual([
+      'ledger-drain-0', 'ledger-drain-1', 'ledger-drain-2', 'ledger-drain-3', 'ledger-drain-4',
+    ])
   })
 })
