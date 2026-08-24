@@ -39,6 +39,14 @@ import { fileTypeFromBuffer } from 'file-type'
 
 export type DocumentKind = 'pdf' | 'docx' | 'txt'
 
+/**
+ * What a self-managed profile may attach beyond the three document kinds: a still, a recording, a
+ * clip (plan: phase-2/07-perfiles-autogestionados). Separate from `DocumentKind` because the
+ * extraction pipeline is defined over documents and only over documents — an image has no text to
+ * parse, and widening `DocumentKind` would silently offer these to `document-extraction.ts`.
+ */
+export type MediaKind = DocumentKind | 'image' | 'audio' | 'video'
+
 export const PDF_MEDIA_TYPE = 'application/pdf'
 export const DOCX_MEDIA_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 export const TXT_MEDIA_TYPE = 'text/plain'
@@ -56,10 +64,73 @@ export const MAX_INVITATION_BYTES = 25 * 1024 * 1024
 const MAX_DOCX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
 const MAX_DOCX_COMPRESSION_RATIO = 150
 
-const KIND_BY_MEDIA_TYPE: Readonly<Record<string, { kind: DocumentKind; extensions: readonly string[] }>> = {
-  [PDF_MEDIA_TYPE]: { kind: 'pdf', extensions: ['.pdf'] },
-  [DOCX_MEDIA_TYPE]: { kind: 'docx', extensions: ['.docx'] },
-  [TXT_MEDIA_TYPE]: { kind: 'txt', extensions: ['.txt'] },
+/** One accepted format: what it is, what may name it, and what the sniffer is allowed to call it. */
+export interface AcceptedMedia {
+  kind: MediaKind
+  extensions: readonly string[]
+  /**
+   * Sniffed mime types that count as agreement with the declared one.
+   *
+   * Usually a single entry — measured against `file-type`, not guessed. DOCX is the exception and
+   * the reason this is a list: `file-type` reports an OOXML package as either the full type or a
+   * bare `application/zip`, and `assertSaneZip` is what then proves it is WordprocessingML rather
+   * than a renamed archive. `undefined` means "this format has no magic bytes", which is true of
+   * text and of nothing else here.
+   */
+  sniffedAs: readonly (string | undefined)[]
+}
+
+/**
+ * Who is uploading, and therefore what they may upload and how much of it.
+ *
+ * A policy rather than a second validator. The candidate document path and the self-managed profile
+ * path differ in exactly two things — the accepted formats and the byte cap — and everything
+ * expensive to get right (magic bytes against the declaration, hash against the bytes, the zip walk,
+ * the PDF sanity checks) is identical. Forking would mean two of each, and the second copy is the
+ * one that misses the next hardening.
+ */
+export interface UploadPolicy {
+  /** Named so a rejection can say which contract refused, not just that something did. */
+  name: string
+  maxBytes: number
+  accepts: Readonly<Record<string, AcceptedMedia>>
+}
+
+/** spec.md (scheduling): PDF, DOCX or TXT, 10 MB each. */
+export const CANDIDATE_DOCUMENT_POLICY: UploadPolicy = {
+  name: 'candidate-document',
+  maxBytes: MAX_DOCUMENT_BYTES,
+  accepts: {
+    [PDF_MEDIA_TYPE]: { kind: 'pdf', extensions: ['.pdf'], sniffedAs: [PDF_MEDIA_TYPE] },
+    [DOCX_MEDIA_TYPE]: { kind: 'docx', extensions: ['.docx'], sniffedAs: [DOCX_MEDIA_TYPE, 'application/zip'] },
+    [TXT_MEDIA_TYPE]: { kind: 'txt', extensions: ['.txt'], sniffedAs: [undefined] },
+  },
+}
+
+/**
+ * spec.md (phase-2/07, "Adjuntos"): the seven formats a profile may attach, 25 MB each.
+ *
+ * Deliberately no `text/plain`. Text is the one format with no magic bytes, so its only structural
+ * check is "decodes as UTF-8 and holds no NUL" — worth accepting for a CV a recruiter asked for, and
+ * not worth it on a public page where the format buys nothing an attached PDF does not.
+ *
+ * Every `sniffedAs` here was measured against `file-type` rather than assumed, including the two
+ * that surprised: a PNG needs a well-formed IHDR length before it is recognised at all, and an MP3
+ * behind an ID3v2 tag is only found once the tag's synchsafe size is well formed. Both are true of
+ * every real file and false of several plausible hand-made fixtures.
+ */
+export const SELF_MANAGED_ATTACHMENT_POLICY: UploadPolicy = {
+  name: 'self-managed-attachment',
+  maxBytes: 25 * 1024 * 1024,
+  accepts: {
+    [PDF_MEDIA_TYPE]: { kind: 'pdf', extensions: ['.pdf'], sniffedAs: [PDF_MEDIA_TYPE] },
+    'image/png': { kind: 'image', extensions: ['.png'], sniffedAs: ['image/png'] },
+    'image/jpeg': { kind: 'image', extensions: ['.jpg', '.jpeg'], sniffedAs: ['image/jpeg'] },
+    'image/webp': { kind: 'image', extensions: ['.webp'], sniffedAs: ['image/webp'] },
+    'audio/mpeg': { kind: 'audio', extensions: ['.mp3'], sniffedAs: ['audio/mpeg'] },
+    'audio/wav': { kind: 'audio', extensions: ['.wav'], sniffedAs: ['audio/wav'] },
+    'video/mp4': { kind: 'video', extensions: ['.mp4'], sniffedAs: ['video/mp4'] },
+  },
 }
 
 export type DocumentRejectionCode =
@@ -83,7 +154,7 @@ export class DocumentValidationError extends Error {
 }
 
 export interface ValidatedDocument {
-  kind: DocumentKind
+  kind: MediaKind
   mediaType: string
   sha256: string
   bytes: number
@@ -249,15 +320,18 @@ export async function validateDocument(params: {
   declaredBytes: number
   declaredSha256: string
   body: Uint8Array
+  /** Defaults to the candidate-document contract, so every existing caller keeps its old behaviour. */
+  policy?: UploadPolicy
 }): Promise<ValidatedDocument> {
   const { body } = params
+  const policy = params.policy ?? CANDIDATE_DOCUMENT_POLICY
 
   if (body.byteLength === 0) {
     throw new DocumentValidationError('file is empty', 'empty_file')
   }
-  if (body.byteLength > MAX_DOCUMENT_BYTES) {
+  if (body.byteLength > policy.maxBytes) {
     throw new DocumentValidationError(
-      `file is ${body.byteLength} bytes, above the ${MAX_DOCUMENT_BYTES}-byte limit`,
+      `file is ${body.byteLength} bytes, above the ${policy.maxBytes}-byte limit for ${policy.name}`,
       'too_large',
     )
   }
@@ -268,9 +342,12 @@ export async function validateDocument(params: {
     )
   }
 
-  const allowed = KIND_BY_MEDIA_TYPE[params.declaredMediaType]
+  const allowed = policy.accepts[params.declaredMediaType]
   if (!allowed) {
-    throw new DocumentValidationError(`${params.declaredMediaType} is not an accepted format`, 'unsupported_media_type')
+    throw new DocumentValidationError(
+      `${params.declaredMediaType} is not an accepted format for ${policy.name}`,
+      'unsupported_media_type',
+    )
   }
   if (!allowed.extensions.includes(extensionOf(params.originalName))) {
     throw new DocumentValidationError(
@@ -284,38 +361,24 @@ export async function validateDocument(params: {
     throw new DocumentValidationError('sha256 does not match the uploaded bytes', 'checksum_mismatch')
   }
 
-  // `file-type` reads magic bytes only; it returns undefined for text, which
-  // has none. Absent detection is therefore only acceptable for TXT.
+  // `file-type` reads magic bytes only, and returns undefined for a format that has none. The
+  // policy says which sniffed answers agree with the declaration, so "undefined is fine" is a
+  // property of text rather than a hole every format inherits.
   const detected = await fileTypeFromBuffer(body)
-  if (allowed.kind === 'txt') {
-    if (detected) {
-      throw new DocumentValidationError(
-        `declared text/plain but the bytes are ${detected.mime}`,
-        'media_type_mismatch',
-      )
-    }
-    assertSaneText(body)
-  } else if (allowed.kind === 'pdf') {
-    if (detected?.mime !== PDF_MEDIA_TYPE) {
-      throw new DocumentValidationError(
-        `declared a pdf but the bytes are ${detected?.mime ?? 'unrecognised'}`,
-        'media_type_mismatch',
-      )
-    }
-    assertSanePdf(body)
-  } else {
-    // `file-type` reports a DOCX as either the OOXML type or, for archives it
-    // cannot classify further, plain `application/zip`. Both are acceptable at
-    // this stage precisely because `assertSaneZip` then proves it is a
-    // WordprocessingML package rather than trusting the sniff.
-    if (detected?.mime !== DOCX_MEDIA_TYPE && detected?.mime !== 'application/zip') {
-      throw new DocumentValidationError(
-        `declared a docx but the bytes are ${detected?.mime ?? 'unrecognised'}`,
-        'media_type_mismatch',
-      )
-    }
-    assertSaneZip(body)
+  if (!allowed.sniffedAs.includes(detected?.mime)) {
+    throw new DocumentValidationError(
+      `declared ${params.declaredMediaType} but the bytes are ${detected?.mime ?? 'unrecognised'}`,
+      'media_type_mismatch',
+    )
   }
+
+  // Structural checks, where a format has one worth making. Images, audio and video have none here
+  // beyond the magic bytes: their containers are parsed by whatever renders them, and a validator
+  // that half-parsed an MP4 would be a second decoder with the bugs of a first. What stands behind
+  // them is the scanner, which is the same thing standing behind a PDF.
+  if (allowed.kind === 'txt') assertSaneText(body)
+  else if (allowed.kind === 'pdf') assertSanePdf(body)
+  else if (allowed.kind === 'docx') assertSaneZip(body)
 
   return { kind: allowed.kind, mediaType: params.declaredMediaType, sha256, bytes: body.byteLength }
 }

@@ -185,3 +185,75 @@ export function buildPdf(pages: readonly string[], options?: { encrypted?: boole
 
   return Buffer.from(pdf, 'latin1')
 }
+
+// ── Media fixtures for the self-managed attachment policy (plan: phase-2/07) ─────────────────
+//
+// Constructed rather than committed, for the same reason the document fixtures are: a binary in the
+// tree is a binary nobody reads in review. These are the smallest byte sequences `file-type`
+// actually recognises, and two of them are smaller than they look:
+//
+//   - a PNG needs a well-formed IHDR *length* before it is recognised at all; the signature alone
+//     sniffs as `undefined`,
+//   - an MP3 behind an ID3v2 tag is only found once the tag's synchsafe size is well formed.
+//
+// Both were measured, not assumed, and both are true of every real file and false of the obvious
+// hand-made version. A fixture the sniffer rejects would make the policy's tests pass for the wrong
+// reason — the file would be refused as a mismatch rather than accepted as valid.
+
+const latin1 = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0) & 0xff)
+
+function u32be(value: number): Uint8Array {
+  const bytes = new Uint8Array(4)
+  new DataView(bytes.buffer).setUint32(0, value)
+  return bytes
+}
+
+function concat(...parts: readonly Uint8Array[]): Uint8Array {
+  const total = parts.reduce((sum, part) => sum + part.byteLength, 0)
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const part of parts) {
+    out.set(part, offset)
+    offset += part.byteLength
+  }
+  return out
+}
+
+/** Signature plus one IHDR chunk. Anything less is not recognised as a PNG. */
+export function buildPng(): Uint8Array {
+  return concat(
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    u32be(13), latin1('IHDR'), u32be(1), u32be(1), new Uint8Array([8, 6, 0, 0, 0]), u32be(0),
+  )
+}
+
+export function buildJpeg(): Uint8Array {
+  return concat(
+    new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
+    latin1('JFIF'),
+    new Uint8Array(20),
+  )
+}
+
+export function buildWebp(): Uint8Array {
+  return concat(latin1('RIFF'), new Uint8Array([0x24, 0, 0, 0]), latin1('WEBPVP8 '), new Uint8Array(20))
+}
+
+export function buildWav(): Uint8Array {
+  return concat(
+    latin1('RIFF'), new Uint8Array([0x24, 0, 0, 0]),
+    latin1('WAVEfmt '), new Uint8Array([0x10, 0, 0, 0]), new Uint8Array(20),
+  )
+}
+
+/** An ID3v2 header with a well-formed synchsafe size, then one MPEG frame. */
+export function buildMp3(): Uint8Array {
+  return concat(
+    latin1('ID3'), new Uint8Array([3, 0, 0]), new Uint8Array([0, 0, 0, 10]), new Uint8Array(10),
+    new Uint8Array([0xff, 0xfb, 0x90, 0x64]), new Uint8Array(400),
+  )
+}
+
+export function buildMp4(): Uint8Array {
+  return concat(new Uint8Array(4), latin1('ftypisom'), new Uint8Array(4), latin1('isomiso2avc1mp41'), new Uint8Array(20))
+}
