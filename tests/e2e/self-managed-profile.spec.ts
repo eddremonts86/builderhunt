@@ -715,6 +715,60 @@ test('promotion needs a verified claim the caller owns, and is reversible', asyn
   await harness.sql`delete from builder_claims where id = 'claim-smprof'`
 })
 
+test('the building branch offers a page to somebody with nothing indexed, end to end', async ({ page }) => {
+  await resetUiBuilderProfile()
+  await signedInPage(page, uiBuilder)
+
+  // The landing page promises both paths now, and says which one is which.
+  const anonymous = await newApiContext(harness.baseURL)
+  try {
+    const served = await anonymous.get('/for/builders')
+    expect(served.status()).toBe(200)
+    const html = await served.text()
+    expect(html).toContain('no GitHub account required')
+    // The limit is rendered at the same size as the promise, not filed as a footnote.
+    expect(html).toContain('shown as Self-managed everywhere it appears')
+  } finally {
+    await anonymous.dispose()
+  }
+
+  // Onboarding: a handle nothing indexed used to end in "nothing to do in the meantime".
+  await openAsOwner(page, `${harness.baseURL}/onboarding/building`)
+  await page.getByTestId('building-handle').fill('nobody-indexed-under-this')
+  await page.getByTestId('building-find').click()
+  await expect(page.getByTestId('building-not-found')).toBeVisible()
+
+  // It now offers the honest alternative, and says what it is.
+  const create = page.getByTestId('building-create')
+  await expect(create).toBeVisible()
+  await expect(page.getByTestId('building-not-found')).toContainText('Self-managed')
+
+  // Following it lands in the editor, which is where the from-scratch profile gets written.
+  await create.click()
+  await expect(page.getByTestId('self-managed-editor')).toBeVisible()
+
+  await page.locator('#profile-handle').fill('smprof-journey')
+  await page.locator('#profile-name').fill('Journey Builder')
+  await page.getByTestId('profile-save').click()
+  await expect(page.getByTestId('profile-message')).toHaveText('Saved.')
+  await page.getByTestId('visibility-public').click()
+  // Waited on the rendered result, not on the click: publishing is its own request, and reading the
+  // public page before it lands is a 404 that says nothing about the product.
+  await expect(page.getByTestId('view-public-profile')).toBeVisible()
+
+  // And a stranger can read it.
+  const reader = await newApiContext(harness.baseURL)
+  try {
+    const publicPage = await reader.get('/u/smprof-journey')
+    expect(publicPage.status()).toBe(200)
+    const html = await publicPage.text()
+    expect(html).toContain('Journey Builder')
+    expect(html).toContain('Self-managed')
+  } finally {
+    await reader.dispose()
+  }
+})
+
 test('a pending attachment is the owner’s alone until the scanner clears it', async ({ page }) => {
   await resetUiBuilderProfile()
   await createProfileVia(uiBuilder.api!, 'smprof-pending')

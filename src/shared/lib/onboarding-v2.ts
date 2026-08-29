@@ -44,6 +44,14 @@ export const ONBOARDING_STEP_KEYS = [
   'investing_save',
   'building_locate',
   'building_claim',
+  /**
+   * The from-scratch branch (plan: phase-2/07-perfiles-autogestionados).
+   *
+   * Its own key rather than a reuse of `building_locate`: the funnel question this answers is "of
+   * the people with no indexed footprint, how many wrote a profile anyway", and folding it into the
+   * lookup step would make that number unrecoverable.
+   */
+  'building_create',
   'building_enrich',
   'general_search',
   'general_save',
