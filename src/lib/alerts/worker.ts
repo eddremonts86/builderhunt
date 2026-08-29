@@ -1,4 +1,6 @@
-import { searchBuilders } from '~/lib/search'
+import { searchBuilders, DEFAULT_SEARCH_SOURCES } from '~/lib/search'
+import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
+import { getUserPreferences } from '~/shared/lib/repositories/user-preferences'
 import { randomId } from '~/lib/utils'
 import { evaluateMatch, isDueForEvaluation, type AlertMatchPayload, type TriggerConditions } from '~/shared/lib/alerts'
 import { sendAlertDigestEmail, type AlertDigestItem } from '~/shared/lib/email'
@@ -120,8 +122,23 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
         }
         const keywords = rawKeywords ?? []
         if (keywords.length === 0) continue
+        /*
+         * The alert's own owner decides, not the organisation: an alert is delivered to a person's
+         * inbox, and the preference that governs what lands there is theirs. The base list is the
+         * default set this call has always used — appended to, never reordered, so an alert that
+         * fired yesterday fires on the same sources today.
+         */
+        const inclusion = decideSelfManagedInclusion({
+          accountPreference: (await withWorkerOrganization(organizationId, (tx) =>
+            getUserPreferences(tx as never, alert.userId))).searchIncludeSelfManaged,
+        })
+
         const [searchResults, alreadySeen] = await Promise.all([
-          searchBuilders({ keywords, perPage: 20 }),
+          searchBuilders({
+            keywords,
+            perPage: 20,
+            sources: withSelfManagedOrigin([...DEFAULT_SEARCH_SOURCES], inclusion),
+          }),
           withWorkerOrganization(organizationId, (tx) =>
             listWorkerSeenSourceIds(tx, organizationId, alert.id),
           ),

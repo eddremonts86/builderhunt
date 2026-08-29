@@ -16,6 +16,8 @@
 // the same load budget the spec computed for its own design.
 import { randomId } from '~/lib/utils'
 import { searchBuilders } from '~/lib/search'
+import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
+import { getUserPreferences } from '~/shared/lib/repositories/user-preferences'
 import { log } from '~/shared/lib/log'
 import {
   advanceWorkerSprintCursor,
@@ -73,9 +75,21 @@ export async function runSprintsWorker(): Promise<SprintsWorkerResult> {
         continue
       }
 
+      /*
+       * Two levels, and the sprint wins when it has spoken. An organiser narrowing one shortlist
+       * must not rewrite their own standing preference, and a standing preference must not override
+       * a decision somebody just made on the screen in front of them. The subject is the sprint's
+       * creator, because a sprint is theirs — an organisation has no preferences, people do.
+       */
+      const inclusion = decideSelfManagedInclusion({
+        surfacePreference: sprint.includeSelfManaged,
+        accountPreference: (await withWorkerOrganization(organizationId, (tx) =>
+          getUserPreferences(tx as never, sprint.creatorUserId))).searchIncludeSelfManaged,
+      })
+
       const searchResults = await searchBuilders({
         keywords: variant.keywords,
-        sources: variant.sources,
+        sources: withSelfManagedOrigin(variant.sources ?? [], inclusion),
         language: variant.language,
         country: variant.country,
         page: sprint.cursor.page,

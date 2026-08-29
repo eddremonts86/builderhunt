@@ -421,7 +421,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     renders the registry, so two new rows on that page is the change being visible rather than a
     regression — which is the whole reason that gate screenshots the operations page at all.
 
-- [ ] **Apply the shared inclusion policy to every current matching surface**
+- [~] **Apply the shared inclusion policy to every current matching surface**
   - Files: `src/shared/lib/self-managed/inclusion-policy.ts`,
     `src/routes/api/recommendations/index.ts`, `src/lib/sprints/results.ts`,
     `src/lib/alerts/worker.ts`, `src/lib/solutions/`,
@@ -435,6 +435,50 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     sprint.
   - Verify: unit matrix covers default-on, explicit-off, deleted, suppressed, draft, unlisted and
     rank preservation; e2e asserts the chip on search, recommendations and sprint results.
+  - Partial. The policy, the opt-out and three of the four surfaces are done and proved by 53 unit
+    tests plus an e2e; **Solutions is not, and the reason is structural rather than a shortfall of
+    effort** — described below so the next reader does not start from the symptom.
+  - **Done: `inclusion-policy.ts`** — one module deciding included-by-default, filterable, never
+    hidden without asking. Precedence is the spec's: the surface first, then the account, then the
+    default (`el toggle global solo se aplica si el toggle por superficie no está definido`). At
+    both levels `null` means "never chosen" and resolves to *included*, never to `false`: collapsing
+    them would make a later change of default overwrite the choice of everyone who had answered.
+  - **Done: the opt-out is real, and typed.** `user_preferences.search_include_self_managed`
+    (`0180`) and `sourcing_sprints.include_self_managed` (`0181`) — columns, not keys in a jsonb
+    blob, which the task forbids by name and for the reason both tables demonstrate: a preference
+    nobody can read in a `select` is one nobody can count, migrate or constrain.
+  - **Its own route, `PATCH /api/me/preferences/self-managed`, not a field on the existing
+    preferences PATCH.** That route refuses the whole request when `USER_SEGMENTATION_ENABLED` is
+    off, and an opt-out that disappears with an unrelated feature flag is not an opt-out.
+  - **Done: recommendations, sprints, alerts.** All three reach people through `searchBuilders`, so
+    the policy's job is to decide whether the origin joins their source list —
+    `withSelfManagedOrigin` *appends*, never inserts, so the sources a person actually chose keep
+    their order and nothing re-ranks for people who never asked for this feature. Subjects are the
+    people who own the surface: the searcher for recommendations, the sprint's creator for a sprint,
+    the alert's owner for an alert. An organisation has no preferences; people do.
+  - Recommendations needed one extra line and it is worth naming: a self-managed row matches a saved
+    query without that query naming the origin — no saved search can name it — so without an
+    explicit reason it arrived with none and read as an unexplained recommendation, which is the one
+    thing that list must never be.
+  - **Not done: Solutions, and it is not a wiring job.** The people lane
+    (`src/lib/solutions/retrieval/lanes.ts`) selects `from builder_embeddings e join
+    builder_identities i on i.source = e.source and i.source_id = e.source_id` — self-managed
+    profiles have no `builder_identities` row, so widening the entity-kind filter alone returns
+    nothing. Closing it means a parallel CTE against `self_managed_profiles`, a `HumanCandidate`
+    that can carry no identity id, a third `componentId` prefix beside `human:` and `account:`, and
+    `human_profile` branches in `composer/coverage.ts`, `composer/estimate.ts` and
+    `composer/compose.ts` that would each have to learn the new kind or silently stop counting these
+    people toward human coverage. That is the plan's own 4b.6 (1.5 days, the largest subfase) and it
+    belongs in its own task with its own tests — wiring a policy call there now would have made the
+    surface *look* covered while returning nothing, which is worse than the gap being visible.
+  - Deliberately no eligibility logic in the policy: public, undeleted and unsuppressed are decided
+    where the rows come from — the origin's query and `filterSuppressed`, which already runs before
+    ranking on every path. A second copy would be a second thing to keep in step with the row
+    policies, and the one that lags is the one that shows a withdrawn profile. The unit matrix says
+    this out loud rather than leaving it implied.
+  - Provenance is attached to **every** row, not only the self-managed ones: a field present on some
+    rows and absent on others is one a renderer reads as `undefined` and treats as "no chip", which
+    is exactly how the spec's "el chip nunca se omite por error visual" gets violated.
 
 - [ ] **Guard future matching surfaces mechanically**
   - Files: `scripts/check-self-managed-coverage.mjs`, `package.json`,

@@ -1178,7 +1178,14 @@
     "/api/me/preferences": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/me-preferences.spec.ts"
+        "tests/e2e/api/me-preferences.spec.ts",
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/me/preferences/self-managed": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/me/sessions": {
@@ -1534,7 +1541,8 @@
     "/api/recommendations": {
       "status": "covered",
       "specs": [
-        "tests/e2e/dashboard-api.spec.ts"
+        "tests/e2e/dashboard-api.spec.ts",
+        "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/roadmap": {
@@ -1592,7 +1600,8 @@
       "status": "covered",
       "specs": [
         "tests/e2e/onboarding.spec.ts",
-        "tests/e2e/search.spec.ts"
+        "tests/e2e/search.spec.ts",
+        "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/search/semantic": {

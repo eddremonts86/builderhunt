@@ -38,6 +38,8 @@ export interface UserPreferences {
   segmentSource: SegmentSource | null
   segmentSchemaVersion: number | null
   segmentSelectedAt: Date | null
+  /** `null` means never chosen — the inclusion policy resolves that to included, never to excluded. */
+  searchIncludeSelfManaged: boolean | null
 }
 
 /** What a person who has never answered looks like. Never persisted; returned in place of a row. */
@@ -48,6 +50,7 @@ export function emptyUserPreferences(userId: string): UserPreferences {
     segmentSource: null,
     segmentSchemaVersion: null,
     segmentSelectedAt: null,
+    searchIncludeSelfManaged: null,
   }
 }
 
@@ -62,6 +65,7 @@ function rowToPreferences(row: {
   segmentSource: string | null
   segmentSchemaVersion: number | null
   segmentSelectedAt: Date | null
+  searchIncludeSelfManaged: boolean | null
 }): UserPreferences {
   const source = segmentSourceSchema.safeParse(row.segmentSource)
   return {
@@ -70,6 +74,7 @@ function rowToPreferences(row: {
     segmentSource: source.success ? source.data : null,
     segmentSchemaVersion: row.segmentSchemaVersion,
     segmentSelectedAt: row.segmentSelectedAt,
+    searchIncludeSelfManaged: row.searchIncludeSelfManaged,
   }
 }
 
@@ -84,6 +89,7 @@ export async function getUserPreferences(
       segmentSource: userPreferences.segmentSource,
       segmentSchemaVersion: userPreferences.segmentSchemaVersion,
       segmentSelectedAt: userPreferences.segmentSelectedAt,
+      searchIncludeSelfManaged: userPreferences.searchIncludeSelfManaged,
     })
     .from(userPreferences)
     .where(eq(userPreferences.userId, subjectUserId))
@@ -151,6 +157,7 @@ export async function setPrimarySegment(
       segmentSource: userPreferences.segmentSource,
       segmentSchemaVersion: userPreferences.segmentSchemaVersion,
       segmentSelectedAt: userPreferences.segmentSelectedAt,
+      searchIncludeSelfManaged: userPreferences.searchIncludeSelfManaged,
     })
 
   // Unreachable while the row is the caller's own: the policy permits the write, so RETURNING has a
@@ -186,4 +193,27 @@ export async function countUsersBySegment(
     counts[key] = (counts[key] ?? 0) + Number(row.total)
   }
   return counts
+}
+
+/**
+ * Record whether this person wants self-managed profiles in their matching surfaces.
+ *
+ * Upserts the row rather than requiring one to exist: a preference is the first thing many people
+ * ever set, and "you must have answered the segment question first" is a coupling neither question
+ * asks for. `null` is not writable here — clearing a choice back to "never asked" is not something
+ * the product offers, and a nullable setter would make the difference between the two states
+ * depend on which caller happened to run.
+ */
+export async function setSearchIncludeSelfManaged(
+  transaction: TenantTransaction,
+  input: { userId: string; include: boolean; now?: Date },
+): Promise<void> {
+  const now = input.now ?? new Date()
+  await transaction
+    .insert(userPreferences)
+    .values({ userId: input.userId, searchIncludeSelfManaged: input.include, createdAt: now, updatedAt: now })
+    .onConflictDoUpdate({
+      target: userPreferences.userId,
+      set: { searchIncludeSelfManaged: input.include, updatedAt: now },
+    })
 }

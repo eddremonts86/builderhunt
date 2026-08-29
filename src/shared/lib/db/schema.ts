@@ -1396,6 +1396,16 @@ export const sourcingSprints = pgTable(
     variants: jsonb('variants').$type<QueryVariant[]>().notNull(),
     status: text('status').notNull().default('active'),
     quota: integer('quota').notNull().default(200),
+    /**
+     * Whether this shortlist includes self-managed profiles (plan:
+     * phase-2/07-perfiles-autogestionados).
+     *
+     * A column of its own rather than a key inside `variants`, even though that jsonb was right
+     * there: the choice belongs to the sprint, not to one query variant, and a value hidden in a
+     * blob is one nobody can filter a report by. `null` means the sprint is silent and the
+     * organiser's own standing preference decides.
+     */
+    includeSelfManaged: boolean('include_self_managed'),
     cursor: jsonb('cursor').$type<SprintCursor>().notNull().default({ variantIndex: 0, page: 1 }),
     lastRunAt: timestamp('last_run_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -4543,6 +4553,19 @@ export const userPreferences = pgTable('user_preferences', {
   segmentSource: text('segment_source'),
   segmentSchemaVersion: integer('segment_schema_version'),
   segmentSelectedAt: timestamp('segment_selected_at', { withTimezone: true }),
+  /**
+   * Whether matching surfaces include self-managed profiles (plan:
+   * phase-2/07-perfiles-autogestionados).
+   *
+   * A typed column, not a key in a JSON blob — the plan forbids the blob by name, and for the
+   * reason this table already demonstrates: a preference nobody can read in a `select` is a
+   * preference nobody can count, migrate or constrain.
+   *
+   * Nullable, and `null` is not `false`: it means never chosen, which resolves to *included*. The
+   * distinction is what lets a later default change reach people who never expressed a preference
+   * without overwriting the choice of those who did.
+   */
+  searchIncludeSelfManaged: boolean('search_include_self_managed'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

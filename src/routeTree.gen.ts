@@ -263,6 +263,7 @@ import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-e
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMePreferencesIndexRouteImport } from './routes/api/me/preferences/index'
+import { Route as ApiMePreferencesSelfManagedRouteImport } from './routes/api/me/preferences/self-managed'
 import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
 import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
 import { Route as ApiOnboardingV2IndexRouteImport } from './routes/api/onboarding/v2/index'
@@ -1673,6 +1674,12 @@ const ApiMePreferencesIndexRoute = ApiMePreferencesIndexRouteImport.update({
   path: '/api/me/preferences/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMePreferencesSelfManagedRoute =
+  ApiMePreferencesSelfManagedRouteImport.update({
+    id: '/api/me/preferences/self-managed',
+    path: '/api/me/preferences/self-managed',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
   id: '/api/me/sessions/',
   path: '/api/me/sessions/',
@@ -2282,6 +2289,7 @@ export interface FileRoutesByFullPath {
   '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/me/preferences/self-managed': typeof ApiMePreferencesSelfManagedRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
@@ -2598,6 +2606,7 @@ export interface FileRoutesByTo {
   '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/me/preferences/self-managed': typeof ApiMePreferencesSelfManagedRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
@@ -2919,6 +2928,7 @@ export interface FileRoutesById {
   '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/me/preferences/self-managed': typeof ApiMePreferencesSelfManagedRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
@@ -3239,6 +3249,7 @@ export interface FileRouteTypes {
     | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/me/preferences/self-managed'
     | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
@@ -3555,6 +3566,7 @@ export interface FileRouteTypes {
     | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/me/preferences/self-managed'
     | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
@@ -3875,6 +3887,7 @@ export interface FileRouteTypes {
     | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/me/preferences/self-managed'
     | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
@@ -4116,6 +4129,7 @@ export interface RootRouteChildren {
   ApiInterviewsInterviewIdTranscriptionTokenRoute: typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
+  ApiMePreferencesSelfManagedRoute: typeof ApiMePreferencesSelfManagedRoute
   ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   ApiOrganizationsInvitationsMineRoute: typeof ApiOrganizationsInvitationsMineRoute
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
@@ -5958,6 +5972,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMePreferencesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/me/preferences/self-managed': {
+      id: '/api/me/preferences/self-managed'
+      path: '/api/me/preferences/self-managed'
+      fullPath: '/api/me/preferences/self-managed'
+      preLoaderRoute: typeof ApiMePreferencesSelfManagedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/sessions/': {
       id: '/api/me/sessions/'
       path: '/api/me/sessions'
@@ -7053,6 +7074,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiInterviewsInterviewIdTranscriptionTokenRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
+  ApiMePreferencesSelfManagedRoute: ApiMePreferencesSelfManagedRoute,
   ApiOrganizationsInvitationsInvitationIdRoute:
     ApiOrganizationsInvitationsInvitationIdRouteWithChildren,
   ApiOrganizationsInvitationsMineRoute: ApiOrganizationsInvitationsMineRoute,
