@@ -311,7 +311,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
 
 ## Phase 3 — unified discovery without duplicated source logic
 
-- [ ] **Add self-managed as a typed internal search origin**
+- [x] **Add self-managed as a typed internal search origin**
   - Files: `src/lib/sources/types.ts`, `src/lib/sources/self-managed.ts`,
     `src/lib/search.ts`, `src/lib/dedup.ts`, `src/shared/lib/profile-suppression.ts`,
     `tests/unit/lib/search/self-managed.test.ts`
@@ -324,6 +324,44 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: `pnpm type-check` catches every exhaustive registry; unit tests prove inclusion,
     exclusion, dedup, suppression, timeout/error reporting, and unchanged relative order for
     pre-existing results.
+  - Result: the separate typed union, which is the branch the task offers second and the honest one.
+    `INTERNAL_ORIGIN_NAMES` / `BuilderOrigin` in `sources/types.ts`, `sources/self-managed.ts` as
+    the origin, a bounded `searchPublicProfiles` in the profile repository, and the fan-out split in
+    `resolveContactableSources`. 21 new tests across two files, the full unit suite at 7,403, and
+    `search.spec.ts` green — the ranking fixture did not move.
+  - **Why not `SourceName`.** Every registry keyed on that union describes a *network connector*:
+    the operator register decides whether a host may be contacted, `CREDENTIAL_ENV_VARS` says which
+    token it needs, the discovery matrix schedules crawls, and the acquisition policy records what
+    its terms permit. A self-managed profile is a row this product owns — no host, no token, no
+    terms — and its honest answers to those questions ("always enabled", "no credential", "never
+    crawled") are **indistinguishable from a connector somebody forgot to configure**. Adding it
+    there would have bought a `disabled` status for a missing register row and an `unconfigured` for
+    an absent credential, both of which read as operator decisions nobody made. Asserted directly:
+    the origin is absent from `SOURCE_NAMES`, from `CREDENTIAL_ENV_VARS`, and never reaches
+    `partitionRequestedSources` — which is called with the network sources alone.
+  - Widening `RawBuilder.source` to `BuilderOrigin` produced **zero type errors**, which is worth
+    recording rather than celebrating: nothing indexes a `Record<SourceName, …>` by a builder's own
+    source today, so the compiler had nothing to catch. The guard that does hold is the split in
+    `resolveContactableSources` plus its test.
+  - **`dedup.ts` and `profile-suppression.ts` needed no change, and that is the finding.** Dedup has
+    keyed on `(source, sourceId)` since plan 43 — never the username — so a self-managed profile and
+    a GitHub account sharing a handle are already two identities; the test pins it so a future
+    "merge by display name" cannot quietly absorb one person's page into another's. Suppression is
+    generic over `{source, sourceId}` strings, so `self-managed:<id>` works the day somebody files
+    one, and it already runs before `scoreBuilders` on both the live and the cached path.
+  - **`unlisted` is not searchable, and the predicate is where that lives.** The row policy permits
+    reading an unlisted profile because a policy cannot tell a direct visit from a listing; the
+    query filters `visibility = 'public'`. Soft-deleted rows are gone from search immediately rather
+    than at purge time.
+  - **Nothing invents a signal.** `followersCount` is left undefined rather than zeroed, and
+    `lastSeen` is deliberately unset: deriving it from `updatedAt` would let editing a bio outrank a
+    builder who shipped this morning, which is the dilution the plan's risk table names. The scoring
+    branch adds only a small capped services term, and a test asserts the existing builders' scores
+    are byte-identical with a self-managed row in the list.
+  - **Deliberately not default-on.** `DEFAULT_SEARCH_SOURCES` is unchanged and a test pins that,
+    because the shared inclusion policy and its opt-out are the next task's — turning the origin on
+    for every search before a user can say no is the anti-pattern the spec's own coverage section
+    forbids in the other direction. The origin is available the moment it is requested.
 
 - [ ] **Index public self-managed profiles for semantic search**
   - Files: `src/lib/semantic/index-writer.ts`,
