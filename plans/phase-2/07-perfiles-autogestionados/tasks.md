@@ -222,7 +222,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
 
 ## Phase 2 — profile API and public/editor UI
 
-- [ ] **Expose strict owner and public profile APIs**
+- [x] **Expose strict owner and public profile APIs**
   - Files: `src/routes/api/self-managed/profile/index.ts`,
     `src/routes/api/self-managed/profile/$profileId.ts`,
     `src/routes/api/self-managed/handle/$handle/reserve.ts`,
@@ -234,6 +234,33 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     logging profile content.
   - Verify: route tests cover 200/400/401/404/409/429, unknown fields, handle expiry, idempotent
     retries, draft/unlisted/public visibility, and cross-user enumeration resistance.
+  - Result: the four listed routes plus `handle/$handle/index.ts` — the "public handle lookup" as an
+    *authenticated*, per-user rate-limited availability oracle, because an anonymous one is an
+    enumeration API by construction and nothing before the public page task needs it signed out.
+    32 handler tests cover the Verify matrix (mocked guard/context/repositories, real error
+    classes), and the e2e spec grew to 13 specs by making the API its own seed: profile creation,
+    rename by id, visibility round-trip, reservation against a rival, and deletion taking the
+    attachments with it all run against the real stack. Rate limits: create 10/day, reserve 5/day
+    (spec), lookup 30/min. Deletion and visibility changes are audited with the transition and
+    never the content.
+  - **The e2e found three RLS defects the superuser suites could not, and `0177` closes them** —
+    exactly the failure class task 2's notes predicted. (1) `reserveHandle`'s
+    `INSERT ... ON CONFLICT DO UPDATE` needs UPDATE privilege even when no conflict occurs, and
+    `0175` granted the app role none: every reservation was a 500. (2) The owner-only policy made
+    rival reservations invisible to `isHandleAvailable`, so a held handle read as free and a profile
+    could be created over somebody's hold. (3) No policy exposed soft-deleted rows, so the
+    thirty-day handle hold — the anti-impersonation property — did not exist for the role that
+    serves requests. `0177` adds the UPDATE grant, an existence-read policy on reservations, a
+    lapsed-takeover policy whose WITH CHECK forces the caller's own name, and a deleted-rows read
+    policy on profiles; the e2e now asserts the hold through the real role (a freed handle reads
+    taken, and creating over it is a 409).
+  - The razor race the availability read cannot close — two callers reserving in the same instant —
+    surfaces as the row policy refusing the DO UPDATE (42501) under RLS, or the unique key (23505)
+    without it; `reserveHandle` translates both to `handle-taken`, so losing the race is a 409 and
+    never a 500.
+  - `PATCH`/`DELETE` verify the path id against the caller's own profile and answer one 404 for
+    absent, deleted and foreign — asserted byte-for-byte identical in the handler tests, with the
+    write never called.
 
 - [ ] **Build the editor and public profile with explicit provenance**
   - Files: `src/routes/_dashboard/me/profile.tsx`, `src/routes/u/$handle.tsx`,

@@ -708,6 +708,10 @@
     "0176_self_managed_scan_state": {
       "sql": "34e6b18b6a753b0bcd5bc9cbd578657d6623849a870e18ee4a266bac71c80af6",
       "snapshot": "60416db1df973d52e2bc164c738c107f2f74bb9b922f6898e66037abae7555a0"
+    },
+    "0177_handle_reservation_policies": {
+      "sql": "b85c504bbe011cb86dc8a2d4e6361dd1280f9ce94a8e0eabc75d8b9ce04bae76",
+      "snapshot": "6b801f121b4bba8bc587d772a65fbc1fb391af2aa7a43d861fd0b0b4bac7fa9b"
     }
   }
 }
