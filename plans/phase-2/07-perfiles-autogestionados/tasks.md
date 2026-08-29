@@ -613,7 +613,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     generic over `(source, sourceId)`, so `self-managed:<profileId>` works, and task 7's test
     already proves `filterSuppressed` drops exactly that pair and not `github:<same id>`.
 
-- [ ] **Integrate onboarding, dashboard, landing, and truthful analytics**
+- [x] **Integrate onboarding, dashboard, landing, and truthful analytics**
   - Files: `src/routes/onboarding/building.tsx`,
     `src/modules/dashboard/lib/dashboard-presets.ts`,
     `src/modules/landing/content/segment-pages.ts`,
@@ -624,6 +624,36 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     allowlisted ids/statuses and never profile text, filenames, handles, or attachment metadata.
   - Verify: e2e covers landing → signup → building onboarding → editor → public profile and
     an existing-claim path; analytics assertions prove no PII enters event payloads.
+  - Result: the `building` branch now has two exits, `/for/builders` promises both, the dashboard
+    CTA points somewhere that works for the whole segment, and the funnel gained one step key. E2E
+    at 21 specs, unit suite 7,448.
+  - **The onboarding change is one comment being wrong and one being right.** That screen said, in
+    so many words, "no offer to create anything… a row this flow invented would be a profile nobody
+    could prove" — and it was correct while a claimed profile was the only kind. It is also exactly
+    the exclusion this plan exists to end. The offer is safe now because a self-managed profile
+    proves nothing and never pretends to: marked on every block, never the verified badge, content
+    declared by its owner. The comment now records the move rather than the conclusion, so the next
+    reader can see why the reasoning changed instead of assuming somebody forgot it.
+  - **`building_create` is its own step key.** "Skipped the lookup" and "was not in the index so
+    wrote a page anyway" are opposite answers to the question this rollout is watching, and both
+    used to report as `building_locate`. `exit()` takes an optional `OnboardingStepKey` — still the
+    enum, so a branch cannot invent a label the funnel does not know.
+  - **The dashboard CTA moved to `/me/profile`, and the closed union is why that was a decision.**
+    `DashboardCtaDestination` is a union rather than a string precisely so a new destination cannot
+    arrive by typo; adding a member is the honest way past it and a cast would not have been. `/me`
+    needs a claim to show anything, so it was a dead end for exactly the people this plan added,
+    while the self-managed editor serves the whole `building` segment.
+  - **`/for/builders` said the wrong thing to the right reader.** Every line assumed the visitor was
+    already indexed — "we already did", "the question is whether it is yours to edit" — which told a
+    translator or an illustrator with no connector footprint that the product was not for them. It
+    now states both paths, and the new limit is rendered at the same size as the promise: a page you
+    write yourself is Self-managed everywhere, never verified, nothing checked. Every claim still
+    links to a file that exists; the landing suite's `existsSync` check covers the new one too.
+  - **The analytics contract needed nothing loosened, which is the finding.** `parseConversionEvent`
+    is `.strict()` over closed enums, so a handle, a filename, an attachment title or a bio has
+    nowhere to go — three new tests assert exactly that by trying, rather than by reading the schema.
+    Publishing reports as `activation_reached` with `activationType: 'profile_published'`, an enum
+    member that says what kind of first value was reached and never which profile.
 
 - [ ] **Ship behind a fail-closed flag and record runtime evidence**
   - Files: `.env.example`, `docs/operations/self-managed-profiles-rollout.md`,

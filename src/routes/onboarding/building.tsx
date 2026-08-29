@@ -309,13 +309,27 @@ function BuildingStep() {
         {searched && !searching && candidates.length === 0 && !error && (
           <div className="card p-4 mb-4 text-sm text-bh-text-muted" data-testid="building-not-found">
             {/*
-              Said plainly, and with no offer to create anything. The index is built from what the
-              connectors find; a row this flow invented would be a profile nobody could prove.
+              This used to end here, with no offer to create anything, and the reason given was that
+              "a row this flow invented would be a profile nobody could prove". That was right while
+              the only kind of profile was a claimed one — and it is exactly the exclusion
+              phase-2/07 exists to end.
+              A self-managed profile proves nothing and never pretends to: it is marked
+              `Self-managed` on every block it renders, it can never carry the verified badge, and
+              its content is the owner's own declaration. So the offer below is not a weaker claim,
+              it is a different and honestly labelled thing — which is what makes it safe to make to
+              somebody whose work simply is not in any connector's index.
             */}
-            <p>
-              Nothing indexed under that handle yet. We index from public activity, so a profile
-              appears once we have seen some — nothing to do in the meantime.
+            <p className="mb-3">
+              Nothing indexed under that handle yet. We index from public activity, so a claimed
+              profile appears once we have seen some.
             </p>
+            <p className="mb-4">
+              You can write your own profile instead. It is marked <strong>Self-managed</strong>
+              {' '}wherever it appears — never verified — and you can attach work samples to it.
+            </p>
+            <LinkButton to="/me/profile" size="sm" data-testid="building-create" onClick={() => step.exit('building_create')}>
+              Write my own profile
+            </LinkButton>
           </div>
         )}
 
