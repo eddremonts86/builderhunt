@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
 
 export interface PublicSearchBuilder {
   id: string
@@ -31,8 +32,18 @@ const builderIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/)
 export const searchPublicBuilders = createServerFn({ method: 'GET' })
   .validator(publicSearchSchema)
   .handler(async ({ data }) => {
-    const { searchBuilders } = await import('~/lib/search')
-    const builders = await searchBuilders(data)
+    const { searchBuilders, DEFAULT_SEARCH_SOURCES } = await import('~/lib/search')
+    // Anonymous by construction — a public radar has no signed-in subject — so the default applies.
+    // Resolved through the policy rather than hard-coded: a public page showing a narrower set than
+    // the search behind it is a difference nobody would think to look for.
+    const builders = await searchBuilders({
+      ...data,
+      // `DEFAULT_SEARCH_SOURCES` and not `[]` when the caller named none. An absent list means
+      // "the defaults" to `searchBuilders`, but an *empty* one means "no sources at all" — so
+      // appending the origin to `[]` would have produced a search of nothing but self-managed
+      // profiles, which is the opposite of adding one origin to the usual set.
+      sources: withSelfManagedOrigin(data.sources ?? DEFAULT_SEARCH_SOURCES, decideSelfManagedInclusion()),
+    })
     return builders.map((builder): PublicSearchBuilder => ({
       id: builder.id,
       kind: builder.kind,

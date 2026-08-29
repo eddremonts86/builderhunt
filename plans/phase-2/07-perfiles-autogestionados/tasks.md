@@ -480,7 +480,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     rows and absent on others is one a renderer reads as `undefined` and treats as "no chip", which
     is exactly how the spec's "el chip nunca se omite por error visual" gets violated.
 
-- [ ] **Guard future matching surfaces mechanically**
+- [x] **Guard future matching surfaces mechanically**
   - Files: `scripts/check-self-managed-coverage.mjs`, `package.json`,
     `plans/_meta/conventions.md`
   - Do: add a repo-shape gate whose allowlist enumerates every route/worker that emits people or
@@ -488,6 +488,36 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     the script into `pnpm ci:local`; a new matching surface without a declaration must fail.
   - Verify: the script passes, then fails when a scratch matching route is added without a
     declaration, and passes again after the scratch file is removed.
+  - Result: `scripts/check-self-managed-coverage.mjs`, wired into `ci:local` and `quality.yml` as
+    `security:self-managed-coverage`, plus the convention in `plans/_meta/conventions.md`. Verified
+    exactly as written: passes, fails on a scratch `/api/scratch-matching-probe.ts` that calls
+    `searchBuilders` without declaring, passes again once it is removed. It reports
+    `{surfaces: 10, viaPolicy: 8, exempted: 2, knownUncovered: [...]}`.
+  - **The gate checks that the question was asked, never what the answer was.** Whether a given
+    surface should include self-managed people is a product question with legitimate answers both
+    ways; what must not happen is a surface omitting a whole class of people because nobody thought
+    about it — which is invisible, since it looks exactly like nobody matching.
+  - **Building it found six matching surfaces the previous task's Files list did not name**: export,
+    the saved-search RSS feed, the OG image, sprint preview, the public radar reader, and the
+    explore page's own search. All six are now wired; the two exemptions are `search.ts` (the
+    fan-out itself — a policy call there would decide for every caller at once, which is what the
+    per-surface toggle exists to prevent) and `discovery/worker.ts` (an ingestion crawl that shows
+    nobody a result; self-managed rows are already local, so crawling them re-indexes what was just
+    written).
+  - Solutions is recorded in `knownUncoveredSurfaces` and **printed on every run**, because the gate
+    cannot see a surface that produces people without going through `searchBuilders` — and a rule
+    this gate silently does not cover would be worse than no rule.
+  - **The gate caught a defect I had just introduced, in six places.** `searchBuilders` treats an
+    *absent* source list as "the defaults" and an *empty* one as "no sources at all", so wrapping
+    `sources ?? []` turned every default search into a search of nothing but self-managed profiles —
+    the exact opposite of adding one origin to the usual set. Every site now falls back to
+    `DEFAULT_SEARCH_SOURCES`, and a unit test pins the trap so the policy's honesty about what it
+    was handed cannot be mistaken for a bug later.
+  - **Making the lists explicit changed the search cache keys**, which is a real consequence worth
+    recording rather than a flaky test: five e2e cases seed an exact cache slot so no live connector
+    is contacted, and they were suddenly seeding a slot nothing reads. The helper now computes the
+    effective list with the same expression production uses, so the next change to the default
+    reaches one helper instead of quietly turning five tests into live searches.
 
 ## Phase 4 — promotion, privacy, lifecycle, and rollout
 

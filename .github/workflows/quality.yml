@@ -387,6 +387,7 @@ jobs:
       - run: pnpm security:auth-before-validate
       - run: pnpm test:e2e:coverage
       - run: pnpm security:provider-metering
+      - run: pnpm security:self-managed-coverage
       - name: Tenant schema classification
         run: pnpm db:audit-schema
       # eslint and tsc both keep a per-file fingerprint and skip what has not changed. Restored across

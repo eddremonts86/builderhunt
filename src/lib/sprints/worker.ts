@@ -15,7 +15,7 @@
 // of at most one federated search per organization per run — well within
 // the same load budget the spec computed for its own design.
 import { randomId } from '~/lib/utils'
-import { searchBuilders } from '~/lib/search'
+import { searchBuilders, DEFAULT_SEARCH_SOURCES } from '~/lib/search'
 import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
 import { getUserPreferences } from '~/shared/lib/repositories/user-preferences'
 import { log } from '~/shared/lib/log'
@@ -89,7 +89,7 @@ export async function runSprintsWorker(): Promise<SprintsWorkerResult> {
 
       const searchResults = await searchBuilders({
         keywords: variant.keywords,
-        sources: withSelfManagedOrigin(variant.sources ?? [], inclusion),
+        sources: withSelfManagedOrigin(variant.sources ?? DEFAULT_SEARCH_SOURCES, inclusion),
         language: variant.language,
         country: variant.country,
         page: sprint.cursor.page,

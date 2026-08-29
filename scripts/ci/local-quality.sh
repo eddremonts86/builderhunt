@@ -345,6 +345,7 @@ step security-route-methods pnpm security:route-methods
 step security-auth-before-validate pnpm security:auth-before-validate
 step e2e-route-coverage pnpm test:e2e:coverage
 step security-provider-metering pnpm security:provider-metering
+step security-self-managed-coverage pnpm security:self-managed-coverage
 step schema-audit pnpm db:audit-schema
 step lint pnpm lint
 step type-check pnpm type-check
