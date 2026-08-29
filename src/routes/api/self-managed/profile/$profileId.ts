@@ -5,6 +5,7 @@ import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 import { upsertSelfManagedProfileSchema } from '~/shared/lib/self-managed/contracts'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
+import { syncSelfManagedProfileIndex } from '~/lib/semantic/self-managed-index'
 import {
   getOwnProfile,
   ownProfileDto,
@@ -59,6 +60,7 @@ export const Route = createFileRoute('/api/self-managed/profile/$profileId')({
           })
 
           if (!updated) return Response.json({ error: 'not_found' }, { status: 404 })
+          void syncSelfManagedProfileIndex(updated.id)
           return Response.json({ profile: ownProfileDto(updated) })
         } catch (error) {
           if (error instanceof SelfManagedProfileError) return refusalResponse(error)
@@ -81,6 +83,10 @@ export const Route = createFileRoute('/api/self-managed/profile/$profileId')({
           })
 
           if (!deleted) return Response.json({ error: 'not_found' }, { status: 404 })
+
+          // Awaited, unlike the create and update paths. A withdrawn profile that is still
+          // findable has been told the delete worked and shown that it did not, so this one waits.
+          await syncSelfManagedProfileIndex(params.profileId)
 
           // A material change to what the world can see, recorded without recording the content.
           await emitSecurityAudit({

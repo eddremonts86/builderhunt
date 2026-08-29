@@ -66,6 +66,7 @@ import {
   withWorkerOrganization,
   type LeasedDocument,
 } from '~/shared/lib/repositories/interview-documents'
+import { syncSelfManagedProfileIndex } from '~/lib/semantic/self-managed-index'
 import {
   expireAbandonedAttachmentIntents,
   leaseAttachmentsForScan,
@@ -502,6 +503,14 @@ export async function runSelfManagedAttachmentScanWorker(
         await db.transaction((transaction) =>
           applyAttachmentScanOutcome(transaction as WorkerTransaction, attachment, outcome),
         )
+
+        // A clean verdict changes the profile's semantic document — the attachment's title and
+        // description become part of it the moment it is servable. Fired after the transaction
+        // commits, and not awaited: the index is a copy, and a copy that lags by a reconciliation
+        // pass is a worse outcome than a scan pass that stalls behind it.
+        if (outcome.kind === 'clean') {
+          void syncSelfManagedProfileIndex(attachment.profileId)
+        }
 
         result.processedCount += 1
         if (outcome.kind === 'clean') result.scannedClean += 1

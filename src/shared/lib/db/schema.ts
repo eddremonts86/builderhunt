@@ -4,7 +4,8 @@ import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 // The embedding projection and the Solutions catalog share one entity vocabulary on purpose —
 // see `builderEmbeddings.entityKind`. Type-only import, and `contracts.ts` imports nothing but
 // zod, so this cannot cycle back into the schema.
-import type { ComponentKind, ComponentKind as SemanticEntityKind } from '~/shared/lib/solutions/contracts'
+import type { ComponentKind } from '~/shared/lib/solutions/contracts'
+import type { SemanticEntityKind } from '~/shared/lib/semantic/entity-kinds'
 import type { EmbeddingPayload } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
 import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'

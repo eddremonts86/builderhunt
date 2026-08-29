@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { runSelfManagedAttachmentScanWorker } from '~/lib/scheduling/document-worker'
+import { runSelfManagedSemanticIndexWorker } from '~/lib/semantic/self-managed-reconcile-worker'
 import { methodNotAllowedAfter } from '~/shared/lib/http/method-not-allowed'
 
 /**
@@ -32,14 +33,25 @@ export const Route = createFileRoute('/api/admin/self-managed/run-worker')({
         try {
           const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
 
+          /*
+           * Both self-managed workers, in this order, behind one trigger.
+           *
+           * The scan is what turns an attachment `clean`, and a clean attachment's title and
+           * description are part of the semantic document — running the index first would index
+           * every profile one pass behind its own work samples. They keep separate job keys and
+           * therefore separate `job_runs` histories, because "the scanner is failing" and "the
+           * index is drifting" are different operational facts and a shared key would merge them
+           * into one line nobody can read.
+           */
           const result = await runSelfManagedAttachmentScanWorker()
+          const semanticIndex = await runSelfManagedSemanticIndexWorker()
           await auditPlatformAdminAction(principal, {
             action: 'admin.worker.run',
             targetType: 'worker',
             targetId: 'self-managed-attachments',
             result: 'allowed',
           })
-          return Response.json({ ok: true, ...result })
+          return Response.json({ ok: true, ...result, semanticIndex })
         } catch (err) {
           const response = platformAdminErrorResponse(err)
           if (response) return response

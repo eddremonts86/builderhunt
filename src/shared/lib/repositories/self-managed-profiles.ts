@@ -31,8 +31,9 @@ import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } f
 
 import { randomId } from '~/lib/utils'
 import type { TenantTransaction } from '../db/client'
-import { builderClaims, selfManagedHandleReservations, selfManagedProfiles } from '../db/schema'
+import { builderClaims, selfManagedAttachments, selfManagedHandleReservations, selfManagedProfiles } from '../db/schema'
 import {
+  MAX_ACTIVE_ATTACHMENTS,
   HANDLE_RELEASE_AFTER_DELETE_MS,
   HANDLE_RESERVATION_TTL_MS,
   isAllowedVisibilityTransition,
@@ -292,6 +293,105 @@ export async function searchPublicProfiles(
     .limit(input.limit)
 
   return rows
+}
+
+/** A public profile plus the clean attachments the semantic document may quote. */
+export interface IndexableSelfManagedProfile extends SearchableSelfManagedProfile {
+  attachments: Array<{ title: string; description: string | null }>
+}
+
+/**
+ * Public profiles in id order for the reconciliation pass, at most `limit` at a time.
+ *
+ * Ordered and cursored on `id` rather than `updated_at`: the worker's job is to walk the whole set
+ * exactly once per pass, and a cursor on a column an edit can move would revisit rows or skip them
+ * depending on who saved during the walk.
+ *
+ * Attachments are fetched per page rather than joined, so a profile with twelve of them cannot
+ * multiply its own row twelve times and silently shrink the page.
+ */
+export async function listIndexableProfiles(
+  transaction: TenantTransaction,
+  input: { after?: string | null; limit: number },
+): Promise<IndexableSelfManagedProfile[]> {
+  return listIndexableProfilesWhere(
+    transaction,
+    input.after ? gt(selfManagedProfiles.id, input.after) : undefined,
+    input.limit,
+  )
+}
+
+/** The one query both indexable reads run, so a filter added here cannot apply to only one of them. */
+async function listIndexableProfilesWhere(
+  transaction: TenantTransaction,
+  extra: ReturnType<typeof eq> | undefined,
+  limit: number,
+): Promise<IndexableSelfManagedProfile[]> {
+  const rows = await transaction
+    .select({
+      id: selfManagedProfiles.id,
+      handle: selfManagedProfiles.handle,
+      displayName: selfManagedProfiles.displayName,
+      headline: selfManagedProfiles.headline,
+      bio: selfManagedProfiles.bio,
+      locationCity: selfManagedProfiles.locationCity,
+      locationCountryCode: selfManagedProfiles.locationCountryCode,
+      languages: selfManagedProfiles.languages,
+      services: selfManagedProfiles.services,
+      topics: selfManagedProfiles.topics,
+      updatedAt: selfManagedProfiles.updatedAt,
+    })
+    .from(selfManagedProfiles)
+    .where(and(
+      eq(selfManagedProfiles.visibility, 'public'),
+      isNull(selfManagedProfiles.deletedAt),
+      ...(extra ? [extra] : []),
+    ))
+    .orderBy(asc(selfManagedProfiles.id))
+    .limit(limit)
+
+  if (rows.length === 0) return []
+
+  const attachments = await transaction
+    .select({
+      profileId: selfManagedAttachments.profileId,
+      title: selfManagedAttachments.title,
+      description: selfManagedAttachments.description,
+    })
+    .from(selfManagedAttachments)
+    .where(and(
+      inArray(selfManagedAttachments.profileId, rows.map((row) => row.id)),
+      // Clean only. An embedding is a copy: text that reaches the index has left the row policy
+      // behind and cannot be un-indexed by tightening one later.
+      eq(selfManagedAttachments.scanStatus, 'clean'),
+      isNull(selfManagedAttachments.deletedAt),
+    ))
+    .orderBy(asc(selfManagedAttachments.uploadedAt))
+    .limit(rows.length * MAX_ACTIVE_ATTACHMENTS)
+
+  const byProfile = new Map<string, Array<{ title: string; description: string | null }>>()
+  for (const attachment of attachments) {
+    const list = byProfile.get(attachment.profileId) ?? []
+    list.push({ title: attachment.title, description: attachment.description })
+    byProfile.set(attachment.profileId, list)
+  }
+
+  return rows.map((row) => ({ ...row, attachments: byProfile.get(row.id) ?? [] }))
+}
+
+/**
+ * One profile's indexable projection, or `null` when it is not eligible.
+ *
+ * `null` is the answer for absent, draft, unlisted and deleted alike, and the caller acts on it the
+ * same way in every case: take the row out of the index. Distinguishing them here would push a
+ * four-branch decision into every call site to reach the same conclusion.
+ */
+export async function findIndexableProfile(
+  transaction: TenantTransaction,
+  profileId: string,
+): Promise<IndexableSelfManagedProfile | null> {
+  const [row] = await listIndexableProfilesWhere(transaction, eq(selfManagedProfiles.id, profileId), 1)
+  return row ?? null
 }
 
 /**
