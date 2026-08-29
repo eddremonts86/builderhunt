@@ -603,6 +603,62 @@ test('publishing indexes the profile for semantic search, and hiding it removes 
   expect(await indexed()).toHaveLength(0)
 })
 
+test('a public profile reaches search and recommendations with its chip, and the opt-out removes it', async () => {
+  await resetUiBuilderProfile()
+  await createProfileVia(uiBuilder.api!, 'smprof-matching')
+  await uiBuilder.api!.patch(`/api/self-managed/profile/${(await (await uiBuilder.api!.get('/api/self-managed/profile')).json()).profile.id}`, {
+    data: {
+      handle: 'smprof-matching',
+      displayName: 'Marta Matching',
+      headline: 'Technical translator, es to en',
+      visibility: 'public',
+      topics: ['sonarqube-localization'],
+    },
+  })
+
+  // Search: the origin is only contacted when it is asked for, and it answers with the chip data.
+  const found = await uiBuilder.api!.post('/api/search/builders', {
+    data: { keywords: ['sonarqube-localization'], sources: ['self-managed'] },
+  })
+  expect(found.status(), await found.text()).toBe(200)
+  const results = (await found.json()).builders as Array<Record<string, unknown>>
+  expect(results.map((row) => row.username)).toContain('smprof-matching')
+
+  // Recommendations needs a saved search to run at all, and the row is seeded naming only network
+  // sources — which is the point: no saved query can name an origin that is not a `SourceName`, so
+  // the inclusion policy is the only thing that can put it in the fan-out.
+  await harness.sql`
+    insert into saved_queries (id, organization_id, user_id, name, keywords, sources)
+    values ('sq-smprof', ${uiBuilder.organizationId!}, ${uiBuilder.userId!}, 'Translators',
+            ${harness.sql.json(['sonarqube-localization'])}, ${harness.sql.json(['github'])})
+    on conflict (id) do nothing`
+
+  const defaultOn = await uiBuilder.api!.get('/api/recommendations')
+  expect(defaultOn.status()).toBe(200)
+  expect((await defaultOn.json()).meta).toMatchObject({
+    includesSelfManaged: true,
+    selfManagedInclusionReason: 'default-on',
+  })
+
+  // The opt-out is a real preference, on its own route rather than behind the segmentation flag.
+  const off = await uiBuilder.api!.patch('/api/me/preferences/self-managed', { data: { include: false } })
+  expect(off.status(), await off.text()).toBe(200)
+  expect(await off.json()).toEqual({ include: false, effective: false })
+
+  const optedOut = await uiBuilder.api!.get('/api/recommendations')
+  expect((await optedOut.json()).meta).toMatchObject({
+    includesSelfManaged: false,
+    selfManagedInclusionReason: 'account-opted-out',
+  })
+
+  // And it is reversible — nothing about the opt-out is a one-way door.
+  const back = await uiBuilder.api!.patch('/api/me/preferences/self-managed', { data: { include: true } })
+  expect(back.status()).toBe(200)
+  expect((await (await uiBuilder.api!.get('/api/recommendations')).json()).meta.includesSelfManaged).toBe(true)
+
+  await harness.sql`delete from saved_queries where id = 'sq-smprof'`
+})
+
 test('a pending attachment is the owner’s alone until the scanner clears it', async ({ page }) => {
   await resetUiBuilderProfile()
   await createProfileVia(uiBuilder.api!, 'smprof-pending')

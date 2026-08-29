@@ -1261,6 +1261,20 @@
       "when": 1788008415976,
       "tag": "0179_app_delete_builder_embeddings",
       "breakpoints": true
+    },
+    {
+      "idx": 180,
+      "version": "7",
+      "when": 1788011662693,
+      "tag": "0180_self_managed_inclusion_preference",
+      "breakpoints": true
+    },
+    {
+      "idx": 181,
+      "version": "7",
+      "when": 1788011835408,
+      "tag": "0181_sprint_include_self_managed",
+      "breakpoints": true
     }
   ]
 }
