@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { selfManagedDisabledResponse } from '~/shared/lib/self-managed/feature-flag'
 import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 import { upsertSelfManagedProfileSchema } from '~/shared/lib/self-managed/contracts'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
@@ -39,6 +40,8 @@ export const Route = createFileRoute('/api/self-managed/profile/$profileId')({
 
       PATCH: async ({ request, params }) => {
         try {
+          const disabled = selfManagedDisabledResponse()
+          if (disabled) return disabled
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 })
           const ownerUserId = session.user.id
@@ -71,6 +74,8 @@ export const Route = createFileRoute('/api/self-managed/profile/$profileId')({
 
       DELETE: async ({ request, params }) => {
         try {
+          const disabled = selfManagedDisabledResponse()
+          if (disabled) return disabled
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 })
           const ownerUserId = session.user.id

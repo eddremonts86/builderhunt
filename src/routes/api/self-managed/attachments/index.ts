@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { selfManagedDisabledResponse } from '~/shared/lib/self-managed/feature-flag'
 import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 import { getStorageProvider } from '~/lib/storage/provider'
 import { SELF_MANAGED_ATTACHMENT_POLICY } from '~/lib/storage/document-validation'
@@ -47,6 +48,8 @@ export const Route = createFileRoute('/api/self-managed/attachments/')({
 
       GET: async ({ request }) => {
         try {
+          const disabled = selfManagedDisabledResponse()
+          if (disabled) return disabled
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 })
           const ownerUserId = session.user.id
@@ -63,6 +66,8 @@ export const Route = createFileRoute('/api/self-managed/attachments/')({
 
       POST: async ({ request }) => {
         try {
+          const disabled = selfManagedDisabledResponse()
+          if (disabled) return disabled
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 })
           const ownerUserId = session.user.id

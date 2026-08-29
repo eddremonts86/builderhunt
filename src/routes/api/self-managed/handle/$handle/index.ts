@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { selfManagedDisabledResponse } from '~/shared/lib/self-managed/feature-flag'
 import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { handleSchema } from '~/shared/lib/self-managed/contracts'
@@ -25,6 +26,8 @@ export const Route = createFileRoute('/api/self-managed/handle/$handle/')({
 
       GET: async ({ request, params }) => {
         try {
+          const disabled = selfManagedDisabledResponse()
+          if (disabled) return disabled
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 })
           const userId = session.user.id

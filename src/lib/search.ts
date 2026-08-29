@@ -15,6 +15,7 @@ import { searchSelfManaged } from '~/lib/sources/self-managed'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { fuseByRank, scoreBuilders, type FusedBuilder } from '~/lib/score'
 import { isInternalOrigin, type RawBuilder, type SourceName } from '~/lib/sources/types'
+import { isSelfManagedEnabled } from '~/shared/lib/self-managed/feature-flag'
 import { env } from '~/shared/lib/env'
 import { CREDENTIAL_ENV_VARS, CREDENTIAL_MANDATORY_SOURCES } from '~/shared/lib/source-credentials'
 import { log } from '~/shared/lib/log'
@@ -264,7 +265,17 @@ export async function resolveContactableSources(requestedSources: readonly strin
    * inclusion policy and its opt-out own that decision, and turning it on before they exist would
    * put self-managed rows in front of every user with no way to say no.
    */
-  const internal = requestedSources.filter((source) => isInternalOrigin(source))
+  /*
+   * The feature flag is applied here and nowhere else in the fan-out.
+   *
+   * Eight surfaces resolve the inclusion policy and every one of them ends up asking for this
+   * origin by name, so this is the one place that can switch the whole feature off without eight
+   * chances to miss one. The policy itself stays pure — it answers what the *person* wants, and a
+   * flag is not a preference.
+   */
+  const internal = isSelfManagedEnabled()
+    ? requestedSources.filter((source) => isInternalOrigin(source))
+    : []
   const network = requestedSources.filter((source) => !isInternalOrigin(source))
 
   // The operator register decides which of the requested sources may be contacted at all. Consulted
