@@ -738,6 +738,53 @@ export async function unlinkBuilderClaim(
 }
 
 /**
+ * Everything an account erasure has to take with it that a foreign key cannot.
+ *
+ * `auth_users` cascades to `self_managed_profiles` and on to `self_managed_attachments`, which
+ * disposes of the rows — and that is exactly the problem. Two things outlive them:
+ *
+ *   - the semantic index row. `builder_embeddings` has no foreign key to a profile (its identity is
+ *     `(entity_kind, source, source_id)`, deliberately, so it can index things that are not rows in
+ *     one table). A cascade therefore leaves `self_managed_person:<profileId>` behind, and that row
+ *     is what semantic search reads — the profile would keep answering queries after the account
+ *     that owned it stopped existing.
+ *   - the objects. The retention sweep finds bytes through soft-deleted *rows*; a cascade deletes
+ *     the rows outright, so nothing ever holds those keys again and the files stay in the bucket
+ *     forever.
+ *
+ * Both have to be read *before* the delete, which is why this exists as its own function rather than
+ * as cleanup afterwards: afterwards there is nothing left to read.
+ *
+ * Soft-deleted rows are included. Erasure is not the thirty-day grace period — a person deleting
+ * their account is not waiting to change their mind about a profile they already deleted.
+ */
+export async function collectSelfManagedErasureTargets(
+  transaction: TenantTransaction,
+  ownerUserId: string,
+): Promise<{ profileIds: string[]; storageKeys: string[] }> {
+  const profiles = await transaction
+    .select({ id: selfManagedProfiles.id })
+    .from(selfManagedProfiles)
+    .where(eq(selfManagedProfiles.ownerUserId, ownerUserId))
+    // One live profile per person plus whatever they soft-deleted inside the handle-hold window.
+    // A person cannot accumulate these faster than one per thirty days.
+    .limit(64)
+
+  if (profiles.length === 0) return { profileIds: [], storageKeys: [] }
+
+  const profileIds = profiles.map((row) => row.id)
+  const attachments = await transaction
+    .select({ storageKey: selfManagedAttachments.storageKey })
+    .from(selfManagedAttachments)
+    .where(inArray(selfManagedAttachments.profileId, profileIds))
+    // Twelve live slots per profile, plus rejected rows the owner has not cleared. Four pages of
+    // quota each, matching the owner list's own ceiling.
+    .limit(profileIds.length * MAX_ACTIVE_ATTACHMENTS * 4)
+
+  return { profileIds, storageKeys: attachments.map((row) => row.storageKey) }
+}
+
+/**
  * Hold a handle for seven days before the profile exists.
  *
  * Keyed on the handle rather than the person, so one account cannot hold five. `onConflictDoUpdate`

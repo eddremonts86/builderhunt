@@ -564,7 +564,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     database refuses. Partial on live rows like its two siblings: a deleted page must not hold a
     verified identity hostage for thirty days.
 
-- [ ] **Extend data export, erasure, suppression, and retention**
+- [x] **Extend data export, erasure, suppression, and retention**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
     `src/shared/lib/repositories/profile-removal.ts`,
     `src/routes/api/me/data-export/index.ts`,
@@ -576,6 +576,42 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: export fixture contains declared content and no storage secret; an erasure e2e removes
     profile/search visibility immediately and a retention test seeded beyond one batch deletes every
     eligible blob while preserving active ones.
+  - Result: a `selfManaged` section in the export, erasure that takes what the cascade cannot, and
+    the thirty-day blob sweep wired into the scan worker. Unit suite 7,445, e2e 20 specs.
+  - **Two real erasure gaps, both found by reading what the cascade actually does.**
+    `auth_users → self_managed_profiles → self_managed_attachments` is `on delete cascade`, which
+    disposes of the rows — and that is the problem, because two things outlive them and both are
+    only reachable *before* the delete:
+    - **the semantic index row.** `builder_embeddings` has no foreign key to a profile (its identity
+      is `(entity_kind, source, source_id)`, deliberately, so it can index things that are not rows
+      in one table). A cascade left `self_managed_person:<profileId>` behind — and that row is what
+      semantic search reads, so a deleted person's profile would have kept answering queries.
+    - **the objects.** The retention sweep finds bytes through soft-deleted *rows*; a cascade
+      removes the rows outright, so nothing would ever hold those keys again and the files would sit
+      in the bucket forever.
+    `collectSelfManagedErasureTargets` reads both before the delete, and a test asserts the
+    *ordering* rather than the presence of the calls — afterwards there is nothing left to read.
+  - Storage deletion is best-effort and the index removal is not, deliberately: a briefly
+    unreachable bucket must not block a person's erasure, but a profile still answering semantic
+    queries after its account is gone is the failure the block exists to prevent.
+  - **The export discloses declared content and no capability.** Handle, bio, services, visibility,
+    attachment titles and sizes — and `scan_status`/`rejection_code`, because "we refused your
+    upload and this is why" is exactly what a person is entitled to be told. Never `storage_key`,
+    never `checksum_sha256`, never a signed URL: an object key is a capability rather than a fact
+    about someone, and a signed URL in an emailed export is a working handle to the bytes for as
+    long as the mailbox lasts. Asserted against the section's source, so a field added later has to
+    pass the same test.
+  - **The retention sweep had no caller until now.** `listPurgeableAttachments` /
+    `purgeDeletedAttachments` were built in task 2 with the right split and nothing ran them. The
+    scan worker now does: object first, row second, and the row only for objects that actually went
+    — a row deleted on a failed object delete is bytes nobody can ever find again. Bounded per pass
+    and idempotent, with a test for each of those three properties.
+  - Thirty days is the same constant the handle hold uses, so an attachment's bytes and its
+    profile's name become unrecoverable on the same day rather than a week apart for no stated
+    reason.
+  - Suppression needed no change and that was checked rather than assumed: `profile_suppressions` is
+    generic over `(source, sourceId)`, so `self-managed:<profileId>` works, and task 7's test
+    already proves `filterSuppressed` drops exactly that pair and not `github:<same id>`.
 
 - [ ] **Integrate onboarding, dashboard, landing, and truthful analytics**
   - Files: `src/routes/onboarding/building.tsx`,

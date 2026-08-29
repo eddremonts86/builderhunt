@@ -57,7 +57,11 @@ class FakeStorage {
     const body = this.objects.get(key)
     return body === undefined ? null : { bytes: body.length, contentType: 'text/plain', sha256: null }
   }
-  async deleteObject({ key }: { key: string }) { this.objects.delete(key) }
+  deleteShouldFail = false
+  async deleteObject({ key }: { key: string }) {
+    if (this.deleteShouldFail) throw new Error('delete failed')
+    this.objects.delete(key)
+  }
   async moveObject({ fromKey, toKey }: { fromKey: string; toKey: string }) {
     if (this.moveShouldFail) throw new Error('copy failed')
     const body = this.objects.get(fromKey)
@@ -607,6 +611,52 @@ describe('runSelfManagedAttachmentScanWorker', () => {
     expect((await readAttachment(fine.id)).scanStatus).toBe('clean')
     // The broken row keeps its lease; the stale reclaim is what returns it to the queue.
     expect((await readAttachment(broken.id)).scanStatus).toBe('scanning')
+  })
+
+  it('purges a soft-deleted attachment’s bytes after thirty days, object first', async () => {
+    const old = await seedAttachment()
+    const recent = await seedAttachment()
+    await db.update(selfManagedAttachments)
+      .set({ deletedAt: new Date(NOW.getTime() - 31 * 24 * 60 * 60_000) })
+      .where(eq(selfManagedAttachments.id, old.id))
+    await db.update(selfManagedAttachments)
+      .set({ deletedAt: new Date(NOW.getTime() - 3 * 24 * 60 * 60_000) })
+      .where(eq(selfManagedAttachments.id, recent.id))
+
+    const result = await runSelfManaged()
+
+    expect(result.purged).toBe(1)
+    // Bytes gone and row gone, together — and the three-day-old one keeps both, because thirty days
+    // is a grace period somebody might still be inside.
+    expect(storage.objects.has(old.storageKey)).toBe(false)
+    expect(storage.objects.has(recent.storageKey)).toBe(true)
+    const left = await db.select({ id: selfManagedAttachments.id }).from(selfManagedAttachments)
+    expect(left.map((row) => row.id)).toEqual([recent.id])
+  })
+
+  it('keeps the row when the object refuses to go, so the next pass tries again', async () => {
+    const doomed = await seedAttachment({ putObject: false })
+    await db.update(selfManagedAttachments)
+      .set({ deletedAt: new Date(NOW.getTime() - 31 * 24 * 60 * 60_000) })
+      .where(eq(selfManagedAttachments.id, doomed.id))
+    // A storage that throws rather than one that quietly succeeds on a missing key: the row must
+    // outlive a failed delete, or the bytes become something nobody holds a key to.
+    storage.deleteShouldFail = true
+
+    const result = await runSelfManaged()
+
+    expect(result.purged).toBe(0)
+    expect(await db.select({ id: selfManagedAttachments.id }).from(selfManagedAttachments)).toHaveLength(1)
+  })
+
+  it('is idempotent: a second pass finds nothing left to purge', async () => {
+    const old = await seedAttachment()
+    await db.update(selfManagedAttachments)
+      .set({ deletedAt: new Date(NOW.getTime() - 31 * 24 * 60 * 60_000) })
+      .where(eq(selfManagedAttachments.id, old.id))
+
+    expect((await runSelfManaged()).purged).toBe(1)
+    expect((await runSelfManaged()).purged).toBe(0)
   })
 
   it('reclaims a stale self-managed lease on its way in', async () => {

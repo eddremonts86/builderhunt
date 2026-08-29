@@ -83,7 +83,13 @@ vi.mock('~/shared/lib/db/tenant-context', () => ({
       update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
     })
   },
-  withAccountSubjectContext: async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run({}),
+  // The account-subject context now carries a read as well: erasure collects the self-managed
+  // profile ids and attachment keys before the cascade removes the rows that hold them. An empty
+  // result is the right shape here — this file is about membership batching, and a subject with no
+  // self-managed profile is the common case it already models.
+  withAccountSubjectContext: async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run({
+    select: () => ({ from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }) }),
+  }),
 }))
 
 vi.mock('~/shared/lib/repositories/interview-privacy', () => ({
