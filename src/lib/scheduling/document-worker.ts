@@ -67,6 +67,7 @@ import {
   type LeasedDocument,
 } from '~/shared/lib/repositories/interview-documents'
 import {
+  expireAbandonedAttachmentIntents,
   leaseAttachmentsForScan,
   markAttachmentClean,
   markAttachmentRejected,
@@ -419,6 +420,7 @@ const ATTACHMENTS_PER_RUN = 20
 
 export interface SelfManagedScanWorkerResult extends JobRunOutcome {
   reclaimed: number
+  abandonedIntents: number
   scannedClean: number
   scannedInfected: number
   scanRejected: number
@@ -454,6 +456,7 @@ export async function runSelfManagedAttachmentScanWorker(
   return withJobRun({ jobKey: SELF_MANAGED_SCAN_JOB_KEY, now, db }, async () => {
     const result: SelfManagedScanWorkerResult = {
       reclaimed: 0,
+      abandonedIntents: 0,
       scannedClean: 0,
       scannedInfected: 0,
       scanRejected: 0,
@@ -464,16 +467,28 @@ export async function runSelfManagedAttachmentScanWorker(
 
     // Committed on its own, same as the candidate worker: the lease has to be durable before any
     // network I/O starts, or a crash strands rows only the stale reclaim will ever rescue.
-    const toScan = await db.transaction(async (transaction) => {
+    const { toScan, abandoned } = await db.transaction(async (transaction) => {
       result.reclaimed = await reclaimStaleAttachmentScans(transaction as WorkerTransaction, {
         staleAfterMs: staleLeaseMs,
         now,
       })
-      return leaseAttachmentsForScan(transaction as WorkerTransaction, {
-        limit: perRun,
-        maxAttempts: MAX_SCAN_ATTEMPTS,
-      })
+      return {
+        abandoned: await expireAbandonedAttachmentIntents(transaction as WorkerTransaction, {
+          olderThan: new Date(now.getTime() - ABANDONED_INTENT_MS),
+        }),
+        toScan: await leaseAttachmentsForScan(transaction as WorkerTransaction, {
+          limit: perRun,
+          maxAttempts: MAX_SCAN_ATTEMPTS,
+        }),
+      }
     })
+
+    result.abandonedIntents = abandoned.length
+    // Any partial object a broken upload left behind. The row is already gone, so a failure here
+    // leaks bytes rather than state, and retention sweeps the prefix regardless.
+    for (const intent of abandoned) {
+      await storage.deleteObject({ key: intent.storageKey }).catch(() => undefined)
+    }
 
     for (const attachment of toScan) {
       try {

@@ -116,6 +116,32 @@ export const upsertAttachmentSchema = z
 export type UpsertAttachment = z.infer<typeof upsertAttachmentSchema>
 
 /**
+ * What an owner sends to reserve an upload slot.
+ *
+ * `declaredMediaType` is checked against the upload policy in the route — this module must not
+ * import the storage layer — and `declaredBytes` is the quota reservation, verified against the
+ * real object at completion. Neither is trusted past the intent.
+ */
+export const createAttachmentIntentSchema = z
+  .object({
+    kind: z.enum(SELF_MANAGED_ATTACHMENT_KINDS),
+    title: z.string().min(1).max(120),
+    description: z.string().max(600).nullable().optional(),
+    declaredMediaType: z.string().min(1).max(100),
+    declaredBytes: z.number().int().positive().max(MAX_ATTACHMENT_BYTES),
+  })
+  .strict()
+
+export type CreateAttachmentIntent = z.infer<typeof createAttachmentIntentSchema>
+
+/** The completion call's one claim: what the caller believes it uploaded. Verified, never trusted. */
+export const completeAttachmentUploadSchema = z
+  .object({
+    sha256: z.string().regex(/^[0-9a-f]{64}$/, 'sha256 is 64 lowercase hex characters'),
+  })
+  .strict()
+
+/**
  * Whether a visibility change is one the product allows.
  *
  * Every transition is legal today — the owner may move freely between the three — and this exists so
