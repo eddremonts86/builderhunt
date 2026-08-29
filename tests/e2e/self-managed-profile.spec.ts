@@ -27,6 +27,7 @@ import {
 } from './harness/fixtures/interviews'
 
 let harness: InterviewHarness
+let ownerProfileId: string
 
 const PNG = Buffer.from(buildPng())
 
@@ -40,12 +41,13 @@ function eicarBytes(): Buffer {
   return Buffer.from(parts.join(''), 'utf8')
 }
 
-async function seedProfile(userId: string, handle: string): Promise<string> {
-  const id = `smp-${handle}`
-  await harness.sql`
-    insert into self_managed_profiles (id, handle, owner_user_id, display_name, visibility)
-    values (${id}, ${handle}, ${userId}, ${handle}, 'public')`
-  return id
+/** Creates the caller's profile through the real route — the API is the seed. */
+async function createProfileVia(api: APIRequestContext, handle: string): Promise<string> {
+  const response = await api.post('/api/self-managed/profile', {
+    data: { handle, displayName: handle, visibility: 'public' },
+  })
+  expect(response.status(), await response.text()).toBe(200)
+  return (await response.json()).profile.id as string
 }
 
 function intentBody(overrides: Record<string, unknown> = {}) {
@@ -116,7 +118,7 @@ test.beforeAll(async () => {
   const health = await harness.owner.api!.get('/api/health')
   expect(health.status(), 'the worker server is up').toBe(200)
 
-  await seedProfile(harness.owner.userId!, 'smprof-ada')
+  ownerProfileId = await createProfileVia(harness.owner.api!, 'smprof-ada')
 })
 
 test.afterAll(async () => {
@@ -231,7 +233,7 @@ test('an infected object never reaches clean, even past validation', async () =>
 test('another user’s attachment id reads as not found, in every handler', async () => {
   const owner = harness.owner.api!
   const other = await addMember(harness, 'member')
-  await seedProfile(other.userId!, 'smprof-bob')
+  await createProfileVia(other.api!, 'smprof-bob')
 
   const intent = await createIntent(owner)
   expect(intent.status()).toBe(200)
@@ -291,6 +293,93 @@ test('one CV at a time, counted from the intent', async () => {
 
   // A work sample is not a CV; the CV rule does not block it.
   expect((await createIntent(api, { title: 'not a cv' })).status()).toBe(200)
+})
+
+test('the profile lifecycle answers over the API: read, rename, visibility, duplicates', async () => {
+  const api = harness.owner.api!
+
+  // The caller's own profile reads back, dates as strings and no subject id.
+  const own = await api.get('/api/self-managed/profile')
+  expect(own.status()).toBe(200)
+  const ownBody = (await own.json()).profile
+  expect(ownBody).toMatchObject({ id: ownerProfileId, handle: 'smprof-ada', visibility: 'public' })
+  expect(Object.keys(ownBody)).not.toContain('ownerUserId')
+
+  // One live profile per account: a second create is a refusal, not a replacement.
+  const duplicate = await api.post('/api/self-managed/profile', {
+    data: { handle: 'smprof-ada-two', displayName: 'Ada again' },
+  })
+  expect(duplicate.status()).toBe(409)
+  expect((await duplicate.json()).error).toBe('already-exists')
+
+  // The handle oracle sees what the profile holds.
+  expect(await (await api.get('/api/self-managed/handle/smprof-free')).json()).toMatchObject({ available: true })
+
+  // Rename through the full update, addressed by id — a foreign id is a 404, the own id works.
+  const foreign = await api.patch('/api/self-managed/profile/prof-not-mine', {
+    data: { handle: 'smprof-ada', displayName: 'Ada' },
+  })
+  expect(foreign.status()).toBe(404)
+  const renamed = await api.patch(`/api/self-managed/profile/${ownerProfileId}`, {
+    data: { handle: 'smprof-ada', displayName: 'Ada Lovelace', visibility: 'public' },
+  })
+  expect(renamed.status(), await renamed.text()).toBe(200)
+  expect((await renamed.json()).profile.displayName).toBe('Ada Lovelace')
+
+  // Visibility moves on its own route, and comes back.
+  const hidden = await api.patch('/api/self-managed/visibility', { data: { visibility: 'draft' } })
+  expect(hidden.status()).toBe(200)
+  expect((await (await api.get('/api/self-managed/profile')).json()).profile.visibility).toBe('draft')
+  const restored = await api.patch('/api/self-managed/visibility', { data: { visibility: 'public' } })
+  expect(restored.status()).toBe(200)
+})
+
+test('a reservation blocks a stranger and yields to its holder', async () => {
+  const holder = await addMember(harness, 'member')
+  const rival = await addMember(harness, 'member')
+
+  const reserved = await holder.api!.post('/api/self-managed/handle/smprof-held/reserve')
+  expect(reserved.status(), await reserved.text()).toBe(200)
+  expect(typeof (await reserved.json()).expiresAt).toBe('string')
+
+  // The rival sees it as taken and cannot create with it.
+  expect(await (await rival.api!.get('/api/self-managed/handle/smprof-held')).json()).toMatchObject({ available: false })
+  const stolen = await rival.api!.post('/api/self-managed/profile', {
+    data: { handle: 'smprof-held', displayName: 'Rival' },
+  })
+  expect(stolen.status()).toBe(409)
+
+  // The holder's own reservation is not an obstacle to the holder.
+  await createProfileVia(holder.api!, 'smprof-held')
+})
+
+test('deleting the profile takes everything with it', async () => {
+  const leaver = await addMember(harness, 'member')
+  const profileId = await createProfileVia(leaver.api!, 'smprof-leaver')
+  await uploadPending(leaver.api!)
+
+  const deleted = await leaver.api!.delete(`/api/self-managed/profile/${profileId}`)
+  expect(deleted.status()).toBe(200)
+
+  // The profile is gone, the attachments have no profile to hang off, and new uploads are refused
+  // with the reason the caller can act on.
+  expect((await leaver.api!.get('/api/self-managed/profile')).status()).toBe(404)
+  expect(await listAttachments(leaver.api!)).toHaveLength(0)
+  const orphanIntent = await createIntent(leaver.api!)
+  expect(orphanIntent.status()).toBe(404)
+  expect((await orphanIntent.json()).error).toBe('no-profile')
+
+  // The thirty-day handle hold, through the real app role — the property RLS silently voided until
+  // 0177: a stranger sees the freed handle as taken, and cannot create over it.
+  const vulture = await addMember(harness, 'member')
+  expect(await (await vulture.api!.get('/api/self-managed/handle/smprof-leaver')).json()).toMatchObject({
+    available: false,
+  })
+  const squat = await vulture.api!.post('/api/self-managed/profile', {
+    data: { handle: 'smprof-leaver', displayName: 'Vulture' },
+  })
+  expect(squat.status()).toBe(409)
+  expect((await squat.json()).error).toBe('handle-taken')
 })
 
 test('soft delete hides it, releases its slot, and is idempotent-ish about honesty', async () => {

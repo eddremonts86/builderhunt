@@ -339,6 +339,7 @@
     "/api/admin/self-managed/run-worker": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/admin.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
@@ -1620,6 +1621,36 @@
       ]
     },
     "/api/self-managed/attachments": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/handle/$handle": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/handle/$handle/reserve": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/profile/$profileId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/profile": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/visibility": {
       "status": "covered",
       "specs": [
         "tests/e2e/self-managed-profile.spec.ts"

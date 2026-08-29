@@ -141,6 +141,13 @@ export const completeAttachmentUploadSchema = z
   })
   .strict()
 
+/** A visibility change and nothing else — re-sending the whole profile is how a stale form reverts an edit. */
+export const setVisibilitySchema = z
+  .object({
+    visibility: z.enum(SELF_MANAGED_VISIBILITIES),
+  })
+  .strict()
+
 /**
  * Whether a visibility change is one the product allows.
  *

@@ -108,6 +108,32 @@ function rowToOwn(row: {
   return { ...row, visibility: narrowVisibility(row.visibility) }
 }
 
+/**
+ * The owner's profile as a route hands it back: named fields, dates as strings, no subject id.
+ *
+ * `ownerUserId` is dropped because the caller *is* the owner — echoing it adds nothing and puts an
+ * account id in every response body. A projection built by naming what goes in cannot leak a
+ * column added later.
+ */
+export function ownProfileDto(profile: OwnSelfManagedProfile) {
+  return {
+    id: profile.id,
+    handle: profile.handle,
+    displayName: profile.displayName,
+    headline: profile.headline,
+    bio: profile.bio,
+    locationCity: profile.locationCity,
+    locationCountryCode: profile.locationCountryCode,
+    languages: profile.languages,
+    services: profile.services,
+    topics: profile.topics,
+    visibility: profile.visibility,
+    promotedToBuilderClaimId: profile.promotedToBuilderClaimId,
+    declaredAt: profile.declaredAt.toISOString(),
+    updatedAt: profile.updatedAt.toISOString(),
+  }
+}
+
 /** The one live profile this person has, or `null`. Drafts included — it is their own. */
 export async function getOwnProfile(
   transaction: TenantTransaction,
@@ -427,20 +453,33 @@ export async function reserveHandle(
     throw new SelfManagedProfileError('handle-taken', `The handle "${input.handle}" is not available`)
   }
 
-  const [row] = await transaction
-    .insert(selfManagedHandleReservations)
-    .values({ handle: input.handle, reservedByUserId: input.userId, reservedAt: now, expiresAt })
-    .onConflictDoUpdate({
-      target: selfManagedHandleReservations.handle,
-      set: { reservedByUserId: input.userId, reservedAt: now, expiresAt },
-      // Only the caller's own row, or one that has already lapsed. Without this, a conflict on
-      // somebody else's live reservation would quietly reassign it.
-      setWhere: or(
-        eq(selfManagedHandleReservations.reservedByUserId, input.userId),
-        lt(selfManagedHandleReservations.expiresAt, now),
-      ),
-    })
-    .returning({ handle: selfManagedHandleReservations.handle, expiresAt: selfManagedHandleReservations.expiresAt })
+  let row
+  try {
+    ;[row] = await transaction
+      .insert(selfManagedHandleReservations)
+      .values({ handle: input.handle, reservedByUserId: input.userId, reservedAt: now, expiresAt })
+      .onConflictDoUpdate({
+        target: selfManagedHandleReservations.handle,
+        set: { reservedByUserId: input.userId, reservedAt: now, expiresAt },
+        // Only the caller's own row, or one that has already lapsed. Without this, a conflict on
+        // somebody else's live reservation would quietly reassign it.
+        setWhere: or(
+          eq(selfManagedHandleReservations.reservedByUserId, input.userId),
+          lt(selfManagedHandleReservations.expiresAt, now),
+        ),
+      })
+      .returning({ handle: selfManagedHandleReservations.handle, expiresAt: selfManagedHandleReservations.expiresAt })
+  } catch (error) {
+    // The availability read refuses a live rival first, so the only way here is losing a
+    // razor-thin race to one. Under RLS that surfaces as the row policy refusing the DO UPDATE
+    // (42501); on a database without RLS in force it would be the unique key (23505). Both mean
+    // exactly one thing to the caller.
+    const code = (error as { cause?: { code?: string } })?.cause?.code
+    if (code === '42501' || code === '23505') {
+      throw new SelfManagedProfileError('handle-taken', `The handle "${input.handle}" is not available`)
+    }
+    throw error
+  }
 
   if (!row) throw new SelfManagedProfileError('handle-taken', `The handle "${input.handle}" is not available`)
   return row
