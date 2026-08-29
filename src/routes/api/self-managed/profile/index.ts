@@ -4,6 +4,7 @@ import { auth } from '~/shared/lib/auth/better-auth'
 import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { upsertSelfManagedProfileSchema } from '~/shared/lib/self-managed/contracts'
+import { syncSelfManagedProfileIndex } from '~/lib/semantic/self-managed-index'
 import {
   createProfile,
   getOwnProfile,
@@ -76,6 +77,10 @@ export const Route = createFileRoute('/api/self-managed/profile/')({
 
           const profile = await withAccountSubjectContext(ownerUserId, (transaction) =>
             createProfile(transaction, { ownerUserId, profile: parsed.data }))
+
+          // Fire-and-forget, off the response path: a slow or failed index write must not make
+          // creating a profile slow or fail. The nightly reconciliation is what catches the miss.
+          void syncSelfManagedProfileIndex(profile.id)
 
           return Response.json({ profile: ownProfileDto(profile) })
         } catch (error) {

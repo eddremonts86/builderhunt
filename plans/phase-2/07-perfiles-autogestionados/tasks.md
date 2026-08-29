@@ -363,7 +363,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     for every search before a user can say no is the anti-pattern the spec's own coverage section
     forbids in the other direction. The origin is available the moment it is requested.
 
-- [ ] **Index public self-managed profiles for semantic search**
+- [x] **Index public self-managed profiles for semantic search**
   - Files: `src/lib/semantic/index-writer.ts`,
     `src/shared/lib/repositories/public-builder-embeddings.ts`,
     `src/shared/lib/operational-schedules.ts`,
@@ -375,6 +375,48 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     restriction removes the semantic row immediately.
   - Verify: repository tests prove entity-kind filtering and deletion; worker test proves bounded,
     idempotent reconciliation; semantic API e2e returns a public fixture and excludes draft/deleted.
+  - Result: `self_managed_person` as its own entity kind (`0178`), `semantic/entity-kinds.ts`,
+    `semantic/self-managed-index.ts`, the reconciliation worker under
+    `self-managed.semantic-index`, both self-managed jobs registered in `operational-schedules.ts`,
+    and the admin run-worker route now running scan then index. 28 unit tests across two files, the
+    e2e at 18 specs, unit suite 7,407, 180 migrations double-applied.
+  - **A distinct kind, and not by widening `COMPONENT_KINDS`.** That list is also the CHECK on
+    `solution_components.kind` and `solution_component_projections.kind`, so adding
+    `self_managed_person` there would have made it a type-legal component kind that two tables
+    refuse at the constraint — a type saying yes over a database saying no. `SEMANTIC_ENTITY_KINDS`
+    is the catalog's list plus one, `0178` moves only the embeddings CHECK, and a test asserts both
+    halves. Why a distinct kind at all: indexing these as `human_profile` would have added them to
+    every semantic search already filtering for humans, on the day the indexer shipped, with no way
+    for anyone to say no — the same opt-in reasoning as the search origin.
+  - **The e2e found a real grant gap, and `0179` closes it.** `0025` gave the app role SELECT,
+    INSERT and UPDATE on `builder_embeddings` and no DELETE, which was right while the only writer
+    was a write-through indexer that never removed anything. Self-managed profiles break that in the
+    urgent direction: hiding or deleting a profile has to take its row out *now*, on the request
+    path, as the app role. Without the grant the index write succeeded, the delete failed `42501`,
+    and the fire-and-forget contract swallowed it — the row stayed and only the nightly pass would
+    ever have cleared it. Verified through the real role: `permission denied` before, `DELETE 0`
+    after.
+  - **Removal is awaited; indexing is not.** Create and update fire the sync off the response path,
+    because a slow index must not make saving a profile slow. Visibility changes and deletes await
+    it: somebody who just withdrew and still turns up in search has been told the change applied and
+    shown that it did not. The e2e says the same thing by polling the first and not the second.
+  - **The document is declared content only.** Headline, bio, topics, services and the titles and
+    descriptions of `clean` attachments — never the filename, the object key or the checksum, and
+    never an unscanned attachment: an embedding is a copy, so text that reaches it has left the row
+    policy behind and cannot be un-indexed by tightening one later. The document states its own
+    provenance in its first lines, so a raw retrieval hit carries "declared by its owner, not
+    verified" without a join.
+  - **The reverse pass is skipped when the forward pass was truncated.** `eligible` is a partial set
+    at that point, and deleting against a partial set would remove live profiles the walk had simply
+    not reached. The truncation is logged rather than swallowed — a cap that silently covers the
+    first N profiles reads exactly like a pass that found nothing to do.
+  - `upsertBuilderEmbeddingStub` gained an injectable `db`, matching the read functions beside it, so
+    the disposable-database tests exercise the real `ON CONFLICT` and the real content-hash
+    comparison instead of a mock that would assert them into existence.
+  - Both jobs are in `OPERATIONAL_SCHEDULES` now — the scan every five minutes because its interval
+    is a person watching an upload say "checking for viruses", the reconciliation nightly because
+    write-through already handles the live path and a five-minute backstop would spend its life
+    confirming it.
 
 - [ ] **Apply the shared inclusion policy to every current matching surface**
   - Files: `src/shared/lib/self-managed/inclusion-policy.ts`,

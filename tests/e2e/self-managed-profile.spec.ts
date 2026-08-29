@@ -570,6 +570,39 @@ test('draft is a 404 and unlisted is a 200 that carries noindex', async ({ page 
   expect(malformed?.status()).toBe(404)
 })
 
+test('publishing indexes the profile for semantic search, and hiding it removes the row', async () => {
+  await resetUiBuilderProfile()
+  const profileId = await createProfileVia(uiBuilder.api!, 'smprof-semantic')
+
+  const indexed = async () => harness.sql`
+    select source_id, document from builder_embeddings
+    where entity_kind = 'self_managed_person' and source_id = ${profileId}`
+
+  // Polled, not asserted once: create and update fire the index write off the response path on
+  // purpose, so a slow index cannot make saving a profile slow. Removal is the half that is
+  // awaited, and the assertions below say so by not polling.
+  await expect.poll(async () => (await indexed()).length).toBe(1)
+  expect((await indexed())[0]!.document).toContain('declared by its owner, not verified')
+
+  // A clean attachment's words join the document — that is the "clean-scan" event.
+  await uploadPending(uiBuilder.api!, { title: 'A translated manual' })
+  await runScanWorker()
+  await expect.poll(async () => (await indexed())[0]?.document ?? '').toContain('A translated manual')
+
+  // Draft takes it out immediately, on the request path rather than at the next reconciliation.
+  const hidden = await uiBuilder.api!.patch('/api/self-managed/visibility', { data: { visibility: 'draft' } })
+  expect(hidden.status()).toBe(200)
+  expect(await indexed()).toHaveLength(0)
+
+  // And publishing again puts it back.
+  await uiBuilder.api!.patch('/api/self-managed/visibility', { data: { visibility: 'public' } })
+  expect(await indexed()).toHaveLength(1)
+
+  // Deleting the profile removes it too, and the row is gone before the response returns.
+  await uiBuilder.api!.delete(`/api/self-managed/profile/${profileId}`)
+  expect(await indexed()).toHaveLength(0)
+})
+
 test('a pending attachment is the owner’s alone until the scanner clears it', async ({ page }) => {
   await resetUiBuilderProfile()
   await createProfileVia(uiBuilder.api!, 'smprof-pending')

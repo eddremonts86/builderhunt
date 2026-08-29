@@ -2,12 +2,13 @@
 // Every function here uses `publicDb` directly — never `withTenantContext` —
 // since this table has no organizationId (public profile data, shared across
 // all users). See schema.ts's "Semantic Search" section comment.
-import { and, asc, cosineDistance, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import { and, asc, cosineDistance, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
 import { builderEmbeddings } from '../db/schema'
 import { randomId } from '~/lib/utils'
 import type { ComponentKind } from '~/shared/lib/solutions/contracts'
+import type { SemanticEntityKind } from '~/shared/lib/semantic/entity-kinds'
 import { asEmbeddedProfile, type EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 
 /** Real people — the only kind that existed before plan 43 Phase 2, and still the default. */
@@ -15,7 +16,7 @@ export const DEFAULT_ENTITY_KIND: ComponentKind = 'human_profile'
 
 export interface UpsertBuilderEmbeddingStubInput {
   /** Omitted means `human_profile`, which is what every pre-Phase-2 caller means. */
-  entityKind?: ComponentKind
+  entityKind?: SemanticEntityKind
   source: string
   sourceId: string
   document: string
@@ -36,15 +37,21 @@ export interface UpsertBuilderEmbeddingStubInput {
  * edit, `FALSE` for an identical re-index. See
  * `plans/implemented/03-postgres-18-upgrade/spec.md` §3B.
  */
-export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingStubInput): Promise<boolean> {
+export async function upsertBuilderEmbeddingStub(
+  input: UpsertBuilderEmbeddingStubInput,
+  // Injectable like the read functions below, so a disposable-database test can exercise the real
+  // statement instead of a mock of it — the upsert's `ON CONFLICT` target and its content-hash
+  // comparison are precisely the parts a mock would assert into existence.
+  db: PostgresJsDatabase | undefined = publicDb,
+): Promise<boolean> {
   // The RETURNING clause of an UPSERT cannot reference the `excluded`
   // pseudo-table (it's only available in the SET clause). To return
   // "did the content change", we read the existing content_hash FIRST
   // (if any), then run the upsert, then compare the hash that was
   // actually written. The read is bounded by the unique index on
   // (source, source_id) so it is O(1).
-  const entityKind = input.entityKind ?? DEFAULT_ENTITY_KIND
-  const [existing] = await publicDb
+  const entityKind: SemanticEntityKind = input.entityKind ?? DEFAULT_ENTITY_KIND
+  const [existing] = await db
     .select({ contentHash: builderEmbeddings.contentHash })
     .from(builderEmbeddings)
     .where(
@@ -55,7 +62,7 @@ export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingSt
       ),
     )
     .limit(1)
-  await publicDb
+  await db
     .insert(builderEmbeddings)
     .values({
       id: randomId(),
@@ -322,3 +329,53 @@ export async function searchBuilderEmbeddings(
   return { matches: profileRows.slice(0, page.limit), hasMore }
 }
 
+
+/**
+ * Remove one row from the semantic index, now.
+ *
+ * The plan requires that deleting or restricting a profile takes it out of semantic search
+ * *immediately*, not at the next reconciliation: a person who withdrew their profile and still
+ * appears in results has been told the delete worked and shown that it did not. Keyed on the full
+ * `(entity_kind, source, source_id)` triple — the table's own unique key — so a self-managed row
+ * can never take a claimed builder's row with it.
+ *
+ * Returns how many rows went, so a caller can log "nothing to remove" apart from "removed one".
+ */
+export async function deleteBuilderEmbedding(
+  input: { entityKind: SemanticEntityKind; source: string; sourceId: string },
+  db: PostgresJsDatabase | undefined = publicDb,
+): Promise<number> {
+  const rows = await db
+    .delete(builderEmbeddings)
+    .where(and(
+      eq(builderEmbeddings.entityKind, input.entityKind),
+      eq(builderEmbeddings.source, input.source),
+      eq(builderEmbeddings.sourceId, input.sourceId),
+    ))
+    .returning({ id: builderEmbeddings.id })
+  return rows.length
+}
+
+/**
+ * The `sourceId`s currently indexed under one entity kind, in id order, at most `limit` at a time.
+ *
+ * `after` is the last id of the previous page, so the reconciliation worker walks forward instead
+ * of re-reading the same page — the bound is what stops a growing index from turning one pass into
+ * a statement whose cost nobody has measured.
+ */
+export async function listIndexedSourceIds(
+  input: { entityKind: SemanticEntityKind; after?: string | null; limit: number },
+  db: PostgresJsDatabase | undefined = publicDb,
+): Promise<string[]> {
+  const conditions = [eq(builderEmbeddings.entityKind, input.entityKind)]
+  if (input.after) conditions.push(gt(builderEmbeddings.sourceId, input.after))
+
+  const rows = await db
+    .select({ sourceId: builderEmbeddings.sourceId })
+    .from(builderEmbeddings)
+    .where(and(...conditions))
+    .orderBy(asc(builderEmbeddings.sourceId))
+    .limit(input.limit)
+
+  return rows.map((row) => row.sourceId)
+}

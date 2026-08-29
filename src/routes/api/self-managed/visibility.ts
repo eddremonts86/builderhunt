@@ -5,6 +5,7 @@ import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 import { setVisibilitySchema } from '~/shared/lib/self-managed/contracts'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
+import { syncSelfManagedProfileIndex } from '~/lib/semantic/self-managed-index'
 import {
   getOwnProfile,
   ownProfileDto,
@@ -53,6 +54,12 @@ export const Route = createFileRoute('/api/self-managed/visibility')({
           })
 
           if (!result) return Response.json({ error: 'not_found' }, { status: 404 })
+
+          // The event that matters most in both directions: going public puts the profile in the
+          // index, and leaving public takes it out — which is why this is awaited rather than fired
+          // and forgotten. Somebody who just hid their profile and still turns up in a search has
+          // been told the change applied and shown that it did not.
+          await syncSelfManagedProfileIndex(result.updated.id)
 
           await emitSecurityAudit({
             organizationId: null,

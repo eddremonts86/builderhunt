@@ -1,0 +1,17 @@
+-- The app role may take a row out of the semantic index (plan:
+-- phase-2/07-perfiles-autogestionados, "Index public self-managed profiles for semantic search").
+--
+-- `0025` granted `builderhunt_app` SELECT, INSERT and UPDATE on `builder_embeddings` and no DELETE,
+-- which was right while the only writer was a write-through indexer: search ingestion adds rows and
+-- refreshes them, and nothing on a request path had cause to remove one.
+--
+-- Self-managed profiles break that assumption in the direction that matters. Hiding a profile or
+-- deleting it must remove its row *now* — a person who withdrew and is still returned by semantic
+-- search has been told the change applied and shown that it did not — and that removal happens on
+-- the request path, as the app role. Without this grant the index write succeeds, the delete fails
+-- with `42501`, and the failure is swallowed by the fire-and-forget contract the indexer inherits:
+-- the row stays, nothing is logged at the caller, and the only thing that would eventually clear it
+-- is the nightly reconciliation.
+--
+-- Scoped to this one table. The worker keeps its own grant from `0131` for the reconciliation pass.
+GRANT DELETE ON TABLE "builder_embeddings" TO "builderhunt_app";
