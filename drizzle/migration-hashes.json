@@ -728,6 +728,10 @@
     "0181_sprint_include_self_managed": {
       "sql": "0aea292c5efd38e6fed70b27dfb4a295bd73b77b81a8a75b84a7c03d2e791d9a",
       "snapshot": "c48b5ea7866ef076e56543d187184b979322ba9f7139cff22fbfc14429a182c2"
+    },
+    "0182_self_managed_claim_link_unique": {
+      "sql": "8174077bac3c9c77ab47f692d2a90dcf5c1a9b4e0ffc19c77e8f1f790c1799cc",
+      "snapshot": "2b1ef4e89fb97b65890767d08b80ecbb31774f09a839b8d25644733bb05f5978"
     }
   }
 }

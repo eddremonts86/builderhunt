@@ -4634,6 +4634,16 @@ export const selfManagedProfiles = pgTable(
     uniqueIndex('self_managed_profiles_owner_live_unique')
       .on(table.ownerUserId)
       .where(sql`${table.deletedAt} is null`),
+    /**
+     * One verified claim backs at most one live profile.
+     *
+     * A verified badge rendered on two pages from one claim has stopped meaning "this account was
+     * proven" and started meaning "somebody said so twice", and a reader cannot tell which page the
+     * claim describes.
+     */
+    uniqueIndex('self_managed_profiles_claim_live_unique')
+      .on(table.promotedToBuilderClaimId)
+      .where(sql`${table.promotedToBuilderClaimId} is not null and ${table.deletedAt} is null`),
     index('self_managed_profiles_visibility_idx').on(table.visibility),
     check(
       'self_managed_profiles_visibility_check',

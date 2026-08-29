@@ -322,6 +322,7 @@ import { Route as ApiSelfManagedAttachmentsAttachmentIdCompleteRouteImport } fro
 import { Route as ApiSelfManagedAttachmentsAttachmentIdDownloadRouteImport } from './routes/api/self-managed/attachments/$attachmentId/download'
 import { Route as ApiSelfManagedHandleHandleIndexRouteImport } from './routes/api/self-managed/handle/$handle/index'
 import { Route as ApiSelfManagedHandleHandleReserveRouteImport } from './routes/api/self-managed/handle/$handle/reserve'
+import { Route as ApiSelfManagedProfileProfileIdPromoteRouteImport } from './routes/api/self-managed/profile/$profileId/promote'
 import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/publish'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -2022,6 +2023,12 @@ const ApiSelfManagedHandleHandleReserveRoute =
     path: '/api/self-managed/handle/$handle/reserve',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiSelfManagedProfileProfileIdPromoteRoute =
+  ApiSelfManagedProfileProfileIdPromoteRouteImport.update({
+    id: '/promote',
+    path: '/promote',
+    getParentRoute: () => ApiSelfManagedProfileProfileIdRoute,
+  } as any)
 const ApiAdminBillingEventsEventIdReplayRoute =
   ApiAdminBillingEventsEventIdReplayRouteImport.update({
     id: '/replay',
@@ -2301,7 +2308,7 @@ export interface FileRoutesByFullPath {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
-  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRoute
+  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
   '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
@@ -2365,6 +2372,7 @@ export interface FileRoutesByFullPath {
   '/api/self-managed/attachments/$attachmentId/complete': typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRoute
   '/api/self-managed/attachments/$attachmentId/download': typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRoute
   '/api/self-managed/handle/$handle/reserve': typeof ApiSelfManagedHandleHandleReserveRoute
+  '/api/self-managed/profile/$profileId/promote': typeof ApiSelfManagedProfileProfileIdPromoteRoute
   '/api/admin/billing/events/': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
@@ -2618,7 +2626,7 @@ export interface FileRoutesByTo {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
-  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRoute
+  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
   '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
@@ -2682,6 +2690,7 @@ export interface FileRoutesByTo {
   '/api/self-managed/attachments/$attachmentId/complete': typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRoute
   '/api/self-managed/attachments/$attachmentId/download': typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRoute
   '/api/self-managed/handle/$handle/reserve': typeof ApiSelfManagedHandleHandleReserveRoute
+  '/api/self-managed/profile/$profileId/promote': typeof ApiSelfManagedProfileProfileIdPromoteRoute
   '/api/admin/billing/events': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief': typeof ApiInterviewsInterviewIdBriefIndexRoute
@@ -2940,7 +2949,7 @@ export interface FileRoutesById {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
-  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRoute
+  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
   '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
@@ -3004,6 +3013,7 @@ export interface FileRoutesById {
   '/api/self-managed/attachments/$attachmentId/complete': typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRoute
   '/api/self-managed/attachments/$attachmentId/download': typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRoute
   '/api/self-managed/handle/$handle/reserve': typeof ApiSelfManagedHandleHandleReserveRoute
+  '/api/self-managed/profile/$profileId/promote': typeof ApiSelfManagedProfileProfileIdPromoteRoute
   '/api/admin/billing/events/': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
@@ -3325,6 +3335,7 @@ export interface FileRouteTypes {
     | '/api/self-managed/attachments/$attachmentId/complete'
     | '/api/self-managed/attachments/$attachmentId/download'
     | '/api/self-managed/handle/$handle/reserve'
+    | '/api/self-managed/profile/$profileId/promote'
     | '/api/admin/billing/events/'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
@@ -3642,6 +3653,7 @@ export interface FileRouteTypes {
     | '/api/self-managed/attachments/$attachmentId/complete'
     | '/api/self-managed/attachments/$attachmentId/download'
     | '/api/self-managed/handle/$handle/reserve'
+    | '/api/self-managed/profile/$profileId/promote'
     | '/api/admin/billing/events'
     | '/api/builders/$builderId/evidence'
     | '/api/interviews/$interviewId/brief'
@@ -3963,6 +3975,7 @@ export interface FileRouteTypes {
     | '/api/self-managed/attachments/$attachmentId/complete'
     | '/api/self-managed/attachments/$attachmentId/download'
     | '/api/self-managed/handle/$handle/reserve'
+    | '/api/self-managed/profile/$profileId/promote'
     | '/api/admin/billing/events/'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
@@ -4137,7 +4150,7 @@ export interface RootRouteChildren {
   ApiQueriesIdShareRoute: typeof ApiQueriesIdShareRoute
   ApiQueriesIdVisibilityRoute: typeof ApiQueriesIdVisibilityRoute
   ApiSchedulingInvitationsInvitationIdRoute: typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
-  ApiSelfManagedProfileProfileIdRoute: typeof ApiSelfManagedProfileProfileIdRoute
+  ApiSelfManagedProfileProfileIdRoute: typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   ApiAdminAbuseIndexRoute: typeof ApiAdminAbuseIndexRoute
   ApiAdminAccessRequestsIndexRoute: typeof ApiAdminAccessRequestsIndexRoute
   ApiAdminBuilderClaimsIndexRoute: typeof ApiAdminBuilderClaimsIndexRoute
@@ -6385,6 +6398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSelfManagedHandleHandleReserveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/self-managed/profile/$profileId/promote': {
+      id: '/api/self-managed/profile/$profileId/promote'
+      path: '/promote'
+      fullPath: '/api/self-managed/profile/$profileId/promote'
+      preLoaderRoute: typeof ApiSelfManagedProfileProfileIdPromoteRouteImport
+      parentRoute: typeof ApiSelfManagedProfileProfileIdRoute
+    }
     '/api/admin/billing/events/$eventId/replay': {
       id: '/api/admin/billing/events/$eventId/replay'
       path: '/replay'
@@ -6872,6 +6892,21 @@ const ApiSchedulingInvitationsInvitationIdRouteWithChildren =
     ApiSchedulingInvitationsInvitationIdRouteChildren,
   )
 
+interface ApiSelfManagedProfileProfileIdRouteChildren {
+  ApiSelfManagedProfileProfileIdPromoteRoute: typeof ApiSelfManagedProfileProfileIdPromoteRoute
+}
+
+const ApiSelfManagedProfileProfileIdRouteChildren: ApiSelfManagedProfileProfileIdRouteChildren =
+  {
+    ApiSelfManagedProfileProfileIdPromoteRoute:
+      ApiSelfManagedProfileProfileIdPromoteRoute,
+  }
+
+const ApiSelfManagedProfileProfileIdRouteWithChildren =
+  ApiSelfManagedProfileProfileIdRoute._addFileChildren(
+    ApiSelfManagedProfileProfileIdRouteChildren,
+  )
+
 interface ApiAdminBillingEventsEventIdRouteChildren {
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
@@ -7084,7 +7119,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiQueriesIdVisibilityRoute: ApiQueriesIdVisibilityRoute,
   ApiSchedulingInvitationsInvitationIdRoute:
     ApiSchedulingInvitationsInvitationIdRouteWithChildren,
-  ApiSelfManagedProfileProfileIdRoute: ApiSelfManagedProfileProfileIdRoute,
+  ApiSelfManagedProfileProfileIdRoute:
+    ApiSelfManagedProfileProfileIdRouteWithChildren,
   ApiAdminAbuseIndexRoute: ApiAdminAbuseIndexRoute,
   ApiAdminAccessRequestsIndexRoute: ApiAdminAccessRequestsIndexRoute,
   ApiAdminBuilderClaimsIndexRoute: ApiAdminBuilderClaimsIndexRoute,
