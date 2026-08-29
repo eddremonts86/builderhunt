@@ -262,7 +262,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     absent, deleted and foreign — asserted byte-for-byte identical in the handler tests, with the
     write never called.
 
-- [ ] **Build the editor and public profile with explicit provenance**
+- [x] **Build the editor and public profile with explicit provenance**
   - Files: `src/routes/_dashboard/me/profile.tsx`, `src/routes/u/$handle.tsx`,
     `src/modules/builder-profile/components/SelfManagedProfile.tsx`,
     `src/modules/builder-profile/components/AttachmentUploader.tsx`,
@@ -274,6 +274,40 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: Playwright creates, edits, uploads, publishes, refreshes, and visits the profile as an
     anonymous browser; axe is clean; draft is 404; unlisted is `noindex`; the verified visual token
     never appears until an actual verified claim is linked.
+  - Result: `/me/profile` (editor), `/u/$handle` (public SSR), `SelfManagedProfile.tsx` with an
+    exported `SelfManagedChip`, and `AttachmentUploader.tsx` driving the three-call upload from the
+    browser. The e2e grew to 17 specs: the editor journey runs in a real browser (create, publish,
+    upload a PNG, run the worker, see it turn `Published`), a stranger reads the served HTML, and
+    axe finds no critical or serious violation on either surface.
+  - **The chip marks every self-declared block, not just the header.** A reader who lands mid-page
+    on a list of work samples is the one most likely to mistake declared for verified, so About,
+    Services, Languages/topics and Work samples each carry it. The caveat sentence is rendered at
+    reading size directly under the name — a disclaimer somebody has to go looking for only protects
+    the people who wrote it.
+  - **Neutral by construction, and asserted as such.** `BuilderProfilePage` renders "Verified" as
+    `bh-success` green with a `BadgeCheck`; the chip is `bh-surface-2` / `bh-border-strong` /
+    `bh-text` — a label, not an award, which is the honest shape for a claim nobody checked. Full
+    `bh-text` rather than the muted token puts it at ~16:1 in light and ~15:1 in dark, well past the
+    spec's 4.5:1. The e2e asserts `>Verified<` never appears in the served HTML.
+  - **Three visibility states, three HTTP answers, proved against the served bytes.** `public` is
+    200 and indexable, `unlisted` is 200 with `noindex` on both `robots` and `googlebot` (the root
+    sets its own `googlebot`, and Google honours the named tag), `draft` and soft-deleted are 404 —
+    byte-identical to a handle nobody ever took. Asserted with a request context rather than a
+    hydrated page: a crawler is the reader whose mistake would cost most, and hydration would paper
+    over a page that rendered nothing server-side.
+  - The public read runs with **no `app.user_id` set at all**, so only the `0175` public-read
+    policies can answer. That makes the anonymous page a test of those policies rather than of a
+    `WHERE` clause — a draft would have to escape both to leak. Only `clean` attachments reach it,
+    and the DTO names its fields: no key, no checksum, no scan status, no rejection code.
+  - **Not shipped, deliberately: a public download route.** The page lists each work sample with its
+    kind, size and description, but a stranger cannot fetch the bytes — an anonymous signed-download
+    endpoint is a bandwidth and hotlinking surface that needs its own rate-limit design, and it is
+    not among this task's Files. The owner-scoped download from task 4 is unchanged. Worth its own
+    task before the rollout claims a portfolio is browsable.
+  - The spec reuses one browser account across the UI tests and hard-deletes its profile between
+    them. Better Auth rate-limits sign-up per IP and every fixture here comes from one host, so a
+    fixture per test is a budget the file cannot afford — it failed on the tenth with a 429 that
+    reads exactly like a product bug.
 
 ## Phase 3 — unified discovery without duplicated source logic
 
