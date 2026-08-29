@@ -27,7 +27,7 @@
  * an unbounded delete on a growing table is a statement whose cost nobody has measured — it runs
  * fine for a year and then holds a lock for four minutes on the night it matters.
  */
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 
 import { randomId } from '~/lib/utils'
 import type { TenantTransaction } from '../db/client'
@@ -217,6 +217,81 @@ export async function getPublicProfileListing(
   }
 
   return { profile, listed: isSearchable(visibility) }
+}
+
+/** One searchable public profile, as the internal search origin reads it. */
+export interface SearchableSelfManagedProfile {
+  id: string
+  handle: string
+  displayName: string
+  headline: string | null
+  bio: string | null
+  locationCity: string | null
+  locationCountryCode: string | null
+  languages: string[]
+  services: string[]
+  topics: string[]
+  updatedAt: Date
+}
+
+/**
+ * Public, listed profiles matching any of `keywords`.
+ *
+ * `visibility = 'public'` and not `unlisted`: unlisted means reachable by anyone holding the link,
+ * and a search result is precisely the listing its owner opted out of. The row policy cannot tell
+ * the two apart — it sees a select either way — so this predicate is where the distinction lives,
+ * and `isSearchable` is the one place that decides it.
+ *
+ * Matching is case-insensitive over the declared text and the two tag arrays. Deliberately not
+ * `to_tsvector`: a self-managed profile's text is short, its services are a closed taxonomy, and a
+ * stemmed index would need a migration and a refresh path to answer questions this cardinality does
+ * not yet pose. When it does, the query changes here and nothing above it moves.
+ */
+export async function searchPublicProfiles(
+  transaction: TenantTransaction,
+  input: { keywords: readonly string[]; limit: number },
+): Promise<SearchableSelfManagedProfile[]> {
+  const terms = input.keywords.map((keyword) => keyword.trim().toLowerCase()).filter(Boolean)
+  if (terms.length === 0) return []
+
+  const matches = terms.map((term) => {
+    const like = `%${term.replace(/[%_\\]/g, (character) => `\\${character}`)}%`
+    return sql`(
+      lower(${selfManagedProfiles.displayName}) like ${like}
+      or lower(coalesce(${selfManagedProfiles.headline}, '')) like ${like}
+      or lower(coalesce(${selfManagedProfiles.bio}, '')) like ${like}
+      or lower(${selfManagedProfiles.handle}) like ${like}
+      or exists (select 1 from jsonb_array_elements_text(${selfManagedProfiles.topics}) as t(value) where lower(t.value) like ${like})
+      or exists (select 1 from jsonb_array_elements_text(${selfManagedProfiles.services}) as s(value) where lower(s.value) like ${like})
+    )`
+  })
+
+  const rows = await transaction
+    .select({
+      id: selfManagedProfiles.id,
+      handle: selfManagedProfiles.handle,
+      displayName: selfManagedProfiles.displayName,
+      headline: selfManagedProfiles.headline,
+      bio: selfManagedProfiles.bio,
+      locationCity: selfManagedProfiles.locationCity,
+      locationCountryCode: selfManagedProfiles.locationCountryCode,
+      languages: selfManagedProfiles.languages,
+      services: selfManagedProfiles.services,
+      topics: selfManagedProfiles.topics,
+      updatedAt: selfManagedProfiles.updatedAt,
+    })
+    .from(selfManagedProfiles)
+    .where(and(
+      eq(selfManagedProfiles.visibility, 'public'),
+      isNull(selfManagedProfiles.deletedAt),
+      or(...matches),
+    ))
+    // Freshest first, and bounded by the caller's provider page — the same ceiling every network
+    // connector answers within, so one origin cannot flood a fused page.
+    .orderBy(desc(selfManagedProfiles.updatedAt))
+    .limit(input.limit)
+
+  return rows
 }
 
 /**

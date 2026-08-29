@@ -11,9 +11,10 @@ import { searchCodeberg } from '~/lib/sources/codeberg'
 import { searchDevpost } from '~/lib/sources/devpost'
 import { searchProductHunt } from '~/lib/sources/producthunt'
 import { searchBluesky } from '~/lib/sources/bluesky'
+import { searchSelfManaged } from '~/lib/sources/self-managed'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { fuseByRank, scoreBuilders, type FusedBuilder } from '~/lib/score'
-import type { RawBuilder, SourceName } from '~/lib/sources/types'
+import { isInternalOrigin, type RawBuilder, type SourceName } from '~/lib/sources/types'
 import { env } from '~/shared/lib/env'
 import { CREDENTIAL_ENV_VARS, CREDENTIAL_MANDATORY_SOURCES } from '~/shared/lib/source-credentials'
 import { log } from '~/shared/lib/log'
@@ -251,6 +252,21 @@ export interface ContactableSources {
  * separately from the search that used it.
  */
 export async function resolveContactableSources(requestedSources: readonly string[]): Promise<ContactableSources> {
+  /*
+   * Internal origins are split off before anything else, because every question below is about a
+   * network connector and none of them applies. The register answers "may we contact this host";
+   * `CREDENTIAL_ENV_VARS` answers "which token does it need". A self-managed profile is a row this
+   * product owns: there is no host to permit and no token to be missing, and running it through
+   * either check would report it `disabled` for want of a register row nobody should have to add,
+   * or `unconfigured` for want of a credential that does not exist.
+   *
+   * They are still *requested* explicitly. Nothing here makes the origin default-on — the shared
+   * inclusion policy and its opt-out own that decision, and turning it on before they exist would
+   * put self-managed rows in front of every user with no way to say no.
+   */
+  const internal = requestedSources.filter((source) => isInternalOrigin(source))
+  const network = requestedSources.filter((source) => !isInternalOrigin(source))
+
   // The operator register decides which of the requested sources may be contacted at all. Consulted
   // before the cache, not after: a cache entry written while a source was enabled must not keep
   // serving that source's rows after it was switched off.
@@ -259,7 +275,7 @@ export async function resolveContactableSources(requestedSources: readonly strin
   // that the client bundle pulls in, and the repository imports `publicDb`, which constructs a real
   // `postgres()` client at module-evaluation time.
   const { partitionRequestedSources } = await import('~/shared/lib/repositories/search-sources')
-  const { allowed: permitted, refused } = await partitionRequestedSources([...requestedSources])
+  const { allowed: permitted, refused } = await partitionRequestedSources(network)
   const disabledStatuses: SourceStatus[] = refused.map((source) => ({
     source,
     health: 'disabled' as const,
@@ -297,7 +313,9 @@ export async function resolveContactableSources(requestedSources: readonly strin
   if (unconfigured.length > 0) log.warn('search_sources_unconfigured', { unconfigured })
 
   return {
-    contacted: permitted.filter((source) => !unconfigured.includes(source)),
+    // Internal origins first, in the caller's own order among themselves: they cost no round trip,
+    // so nothing is gained by making them wait behind thirteen HTTP requests.
+    contacted: [...internal, ...permitted.filter((source) => !unconfigured.includes(source))],
     notContacted: [...disabledStatuses, ...unconfiguredStatuses],
   }
 }
@@ -379,6 +397,11 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   if (want('devpost')) connectors.push({ source: 'devpost', run: () => searchDevpost(keywords, paged) })
   if (want('producthunt')) connectors.push({ source: 'producthunt', run: () => searchProductHunt(keywords, paged) })
   if (want('bluesky')) connectors.push({ source: 'bluesky', run: () => searchBluesky(keywords, paged) })
+  // Internal, and run through `runConnector` like the rest on purpose: the timeout, the health and
+  // the result count are what the search UI reports per origin, and an origin exempt from them is
+  // one whose failure nobody can see. It reaches a database rather than a host, so a `failed` here
+  // means this product is broken — which is exactly why it must be reportable.
+  if (want('self-managed')) connectors.push({ source: 'self-managed', run: () => searchSelfManaged(keywords, paged) })
 
   const outcomes = await Promise.all(connectors.map((connector) => runConnector(connector)))
   const all = outcomes.flatMap((outcome) => outcome.builders)
