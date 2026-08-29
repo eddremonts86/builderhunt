@@ -659,6 +659,62 @@ test('a public profile reaches search and recommendations with its chip, and the
   await harness.sql`delete from saved_queries where id = 'sq-smprof'`
 })
 
+test('promotion needs a verified claim the caller owns, and is reversible', async () => {
+  await resetUiBuilderProfile()
+  const profileId = await createProfileVia(uiBuilder.api!, 'smprof-promote')
+
+  // Unauthenticated, then a claim that does not exist: both refused before anything is linked.
+  const anonymous = await newApiContext(harness.baseURL)
+  try {
+    expect((await anonymous.post(`/api/self-managed/profile/${profileId}/promote`, {
+      data: { claimId: 'claim-x', confirm: true },
+    })).status()).toBe(401)
+  } finally {
+    await anonymous.dispose()
+  }
+
+  // Confirmation is required, and a request that cannot express intent cannot carry it.
+  const unconfirmed = await uiBuilder.api!.post(`/api/self-managed/profile/${profileId}/promote`, {
+    data: { claimId: 'claim-nope' },
+  })
+  expect(unconfirmed.status()).toBe(400)
+
+  const absent = await uiBuilder.api!.post(`/api/self-managed/profile/${profileId}/promote`, {
+    data: { claimId: 'claim-nope', confirm: true },
+  })
+  expect(absent.status()).toBe(404)
+  expect((await absent.json()).error).toBe('claim-not-found')
+
+  // A real verified claim on this account, seeded the way the claim flow leaves one.
+  await harness.sql`
+    insert into builder_identities (id, source, source_id, kind, username, profile_url)
+    values ('ident-smprof', 'github', 'smprof-ada-gh', 'person', 'smprof-ada-gh', 'https://github.com/smprof-ada-gh')
+    on conflict (id) do nothing`
+  await harness.sql`
+    insert into builder_claims (id, builder_identity_id, subject_user_id, evidence_source, evidence_reference, status, verified_at)
+    values ('claim-smprof', 'ident-smprof', ${uiBuilder.userId!}, 'github', 'https://gist.github.com/x', 'verified', now())
+    on conflict (id) do nothing`
+
+  const promoted = await uiBuilder.api!.post(`/api/self-managed/profile/${profileId}/promote`, {
+    data: { claimId: 'claim-smprof', confirm: true },
+  })
+  expect(promoted.status(), await promoted.text()).toBe(200)
+  expect((await promoted.json()).profile.promotedToBuilderClaimId).toBe('claim-smprof')
+
+  // The public page keeps its own content and stops calling itself unverified.
+  const page = await (await newApiContext(harness.baseURL)).get('/u/smprof-promote')
+  const html = await page.text()
+  expect(html).toContain('smprof-promote')
+
+  // Reversible, and the profile survives it intact.
+  const unlinked = await uiBuilder.api!.delete(`/api/self-managed/profile/${profileId}/promote`)
+  expect(unlinked.status()).toBe(200)
+  expect((await unlinked.json()).profile.promotedToBuilderClaimId).toBeNull()
+  expect((await unlinked.json()).profile.handle).toBe('smprof-promote')
+
+  await harness.sql`delete from builder_claims where id = 'claim-smprof'`
+})
+
 test('a pending attachment is the owner’s alone until the scanner clears it', async ({ page }) => {
   await resetUiBuilderProfile()
   await createProfileVia(uiBuilder.api!, 'smprof-pending')

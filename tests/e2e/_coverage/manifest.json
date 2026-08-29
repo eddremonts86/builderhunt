@@ -1653,6 +1653,12 @@
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
+    "/api/self-managed/profile/$profileId/promote": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
     "/api/self-managed/profile": {
       "status": "covered",
       "specs": [

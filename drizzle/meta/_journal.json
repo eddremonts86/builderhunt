@@ -1275,6 +1275,13 @@
       "when": 1788011835408,
       "tag": "0181_sprint_include_self_managed",
       "breakpoints": true
+    },
+    {
+      "idx": 182,
+      "version": "7",
+      "when": 1788018334168,
+      "tag": "0182_self_managed_claim_link_unique",
+      "breakpoints": true
     }
   ]
 }

@@ -448,7 +448,14 @@ export interface CreateProfileInput {
 /** Raised when the caller's request is refused for a reason the caller can act on. */
 export class SelfManagedProfileError extends Error {
   constructor(
-    readonly code: 'handle-taken' | 'already-exists' | 'not-found' | 'invalid-transition',
+    readonly code:
+      | 'handle-taken'
+      | 'already-exists'
+      | 'not-found'
+      | 'invalid-transition'
+      | 'claim-not-found'
+      | 'claim-not-verified'
+      | 'claim-already-linked',
     message: string,
   ) {
     super(message)
@@ -627,6 +634,107 @@ export async function softDeleteProfile(
     .returning({ id: selfManagedProfiles.id })
 
   return rows.length > 0
+}
+
+/**
+ * Link this profile to a claim the owner has already proven, or unlink it again.
+ *
+ * ## What promotion is, and what it is not
+ *
+ * It is additive. The profile keeps rendering from its own row — its bio, its handle, its
+ * attachments — and gains a verified block hydrated from the claim. Nothing is copied across and
+ * nothing is replaced, which is what makes the reverse operation a single `null` write rather than
+ * a restore.
+ *
+ * It is never inferred. The only signal this accepts is a claim id whose row is already
+ * `verified` and whose `subject_user_id` is the caller: the decision goes through
+ * `decideLink({ kind: 'verified_claim' })`, the module whose whole purpose is that resemblance is
+ * not evidence. A matching handle, an identical display name and a 99.99% embedding similarity are
+ * all equally insufficient here, and there is no parameter through which any of them could arrive.
+ *
+ * `promotion-*` errors are the caller's to act on; a lost race on the unique index comes back as
+ * `claim-already-linked` rather than a 500.
+ */
+export async function promoteToBuilderClaim(
+  transaction: TenantTransaction,
+  input: { ownerUserId: string; profileId: string; claimId: string; now?: Date },
+): Promise<OwnSelfManagedProfile> {
+  const now = input.now ?? new Date()
+
+  const existing = await getOwnProfile(transaction, input.ownerUserId)
+  // One 404 for absent, deleted and somebody else's: the id in the path either names the caller's
+  // own live profile or it names nothing.
+  if (!existing || existing.id !== input.profileId) {
+    throw new SelfManagedProfileError('not-found', 'This account has no such self-managed profile')
+  }
+
+  const [claim] = await transaction
+    .select({
+      id: builderClaims.id,
+      subjectUserId: builderClaims.subjectUserId,
+      status: builderClaims.status,
+      verifiedAt: builderClaims.verifiedAt,
+      revokedAt: builderClaims.revokedAt,
+    })
+    .from(builderClaims)
+    .where(eq(builderClaims.id, input.claimId))
+    .limit(1)
+
+  // Absent and somebody else's claim answer alike, so this cannot be used to learn that a claim id
+  // exists on another account.
+  if (!claim || claim.subjectUserId !== input.ownerUserId) {
+    throw new SelfManagedProfileError('claim-not-found', 'No such verified claim on this account')
+  }
+  // `status` and `revoked_at` are both checked. A revoked claim can keep a stale `verified` status
+  // for as long as it takes a writer to be wrong once, and this is the read that would publish it.
+  if (claim.status !== 'verified' || claim.verifiedAt === null || claim.revokedAt !== null) {
+    throw new SelfManagedProfileError('claim-not-verified', 'That claim is not verified')
+  }
+
+  let row
+  try {
+    ;[row] = await transaction
+      .update(selfManagedProfiles)
+      .set({ promotedToBuilderClaimId: claim.id, updatedAt: now })
+      .where(and(eq(selfManagedProfiles.id, existing.id), isNull(selfManagedProfiles.deletedAt)))
+      .returning(OWN_COLUMNS)
+  } catch (error) {
+    const code = (error as { cause?: { code?: string } })?.cause?.code
+    if (code === '23505') {
+      throw new SelfManagedProfileError('claim-already-linked', 'That claim already backs another profile')
+    }
+    throw error
+  }
+
+  if (!row) throw new Error(`refused to promote ${input.ownerUserId}'s self-managed profile`)
+  return rowToOwn(row)
+}
+
+/**
+ * Undo the link. The profile keeps everything it had before it was promoted.
+ *
+ * Idempotent by shape: unlinking a profile that is not linked writes `null` over `null` and reports
+ * the row unchanged, because "there was nothing to undo" is not a failure anybody can act on.
+ */
+export async function unlinkBuilderClaim(
+  transaction: TenantTransaction,
+  input: { ownerUserId: string; profileId: string; now?: Date },
+): Promise<OwnSelfManagedProfile> {
+  const now = input.now ?? new Date()
+
+  const existing = await getOwnProfile(transaction, input.ownerUserId)
+  if (!existing || existing.id !== input.profileId) {
+    throw new SelfManagedProfileError('not-found', 'This account has no such self-managed profile')
+  }
+
+  const [row] = await transaction
+    .update(selfManagedProfiles)
+    .set({ promotedToBuilderClaimId: null, updatedAt: now })
+    .where(and(eq(selfManagedProfiles.id, existing.id), isNull(selfManagedProfiles.deletedAt)))
+    .returning(OWN_COLUMNS)
+
+  if (!row) throw new Error(`refused to unlink ${input.ownerUserId}'s self-managed profile`)
+  return rowToOwn(row)
 }
 
 /**

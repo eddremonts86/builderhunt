@@ -521,7 +521,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
 
 ## Phase 4 — promotion, privacy, lifecycle, and rollout
 
-- [ ] **Implement reversible promotion to a verified claim**
+- [x] **Implement reversible promotion to a verified claim**
   - Files: `src/shared/lib/repositories/self-managed-profiles.ts`,
     `src/shared/lib/human-identity/link-policy.ts`,
     `src/routes/api/self-managed/profile/$profileId/promote.ts`,
@@ -532,6 +532,37 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     auto-promote.
   - Verify: tests cover verified/unverified claim, wrong owner, conflicting link, unlink/relink,
     retained attachments and no automatic link from a high similarity score.
+  - Result: `promoteToBuilderClaim` / `unlinkBuilderClaim`, the `promote` route (POST links, DELETE
+    unlinks), migration `0182`, and 14 tests under `tests/unit/security/` — filed there because that
+    is what this is: the one place a page of self-declared content can acquire a *verified*
+    identity. E2E at 20 specs, unit suite 7,440.
+  - **Additive, so reversible is a `null` write rather than a restore.** Promotion writes one id; the
+    profile keeps its handle, its words and its attachments. `verified` on the public page was
+    already derived by join from the claim's own status, so a claim revoked tomorrow stops backing
+    the page tomorrow with nothing to undo here — asserted directly by revoking a linked claim and
+    reading the page again.
+  - **Both `status` and `revoked_at` are checked.** A revoked claim can carry a stale `verified`
+    status for as long as it takes one writer to be wrong, and this is the read that would publish
+    it. There is a test for exactly that row shape.
+  - **An absent claim and somebody else's claim answer identically**, so the endpoint cannot be used
+    to learn that a claim id exists on another account — asserted by comparing the two errors rather
+    than by reading the code.
+  - **Nothing here can be talked into inferring.** The only accepted evidence is a claim id, so a
+    probabilistic signal cannot be constructed from the request body at all — a stronger guarantee
+    than checking a score and refusing it. The audit record routes through
+    `decideLink({ kind: 'verified_claim' })`, the module that exists because resemblance is not
+    evidence, so a future "promote on a strong match" would have to construct a signal that module
+    rejects rather than skip a comment. The lookalike case is tested: a claim on a *different*
+    account whose username equals this profile's handle — the exact false positive `dedup.ts` was
+    once wrong about — is refused and the page stays unverified.
+  - **The conflicting-link test found that the state is already unreachable through the API**, and
+    is written accordingly. Promotion requires the claim's subject to be the caller, and
+    `self_managed_profiles_owner_live_unique` allows one live profile per person, so two live
+    profiles pointing at one claim cannot happen through this repository. `0182` is defence in depth
+    against a writer that is not this repository — and defence in depth is only worth having if
+    somebody checks it holds, so the test writes straight past the repository and asserts the
+    database refuses. Partial on live rows like its two siblings: a deleted page must not hold a
+    verified identity hostage for thirty days.
 
 - [ ] **Extend data export, erasure, suppression, and retention**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
