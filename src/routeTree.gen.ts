@@ -41,6 +41,7 @@ import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welco
 import { Route as PortfolioClaimIdRouteImport } from './routes/portfolio/$claimId'
 import { Route as RSlugRouteImport } from './routes/r/$slug'
 import { Route as ScheduleInvitationIdRouteImport } from './routes/schedule/$invitationId'
+import { Route as UHandleRouteImport } from './routes/u/$handle'
 import { Route as DashboardAdminIndexRouteImport } from './routes/_dashboard/admin/index'
 import { Route as DashboardAdminAbuseRouteImport } from './routes/_dashboard/admin/abuse'
 import { Route as DashboardAdminAccessRequestsRouteImport } from './routes/_dashboard/admin/access-requests'
@@ -66,6 +67,7 @@ import { Route as DashboardInterviewsInvitationsRouteImport } from './routes/_da
 import { Route as DashboardListsIndexRouteImport } from './routes/_dashboard/lists/index'
 import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/lists/$listId'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
+import { Route as DashboardMeProfileRouteImport } from './routes/_dashboard/me/profile'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
@@ -484,6 +486,11 @@ const ScheduleInvitationIdRoute = ScheduleInvitationIdRouteImport.update({
   path: '/schedule/$invitationId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UHandleRoute = UHandleRouteImport.update({
+  id: '/u/$handle',
+  path: '/u/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardAdminIndexRoute = DashboardAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -613,6 +620,11 @@ const DashboardListsListIdRoute = DashboardListsListIdRouteImport.update({
 const DashboardMeIndexRoute = DashboardMeIndexRouteImport.update({
   id: '/me/',
   path: '/me/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardMeProfileRoute = DashboardMeProfileRouteImport.update({
+  id: '/me/profile',
+  path: '/me/profile',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
@@ -2073,6 +2085,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
+  '/u/$handle': typeof UHandleRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/access-requests': typeof DashboardAdminAccessRequestsRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
@@ -2091,6 +2104,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
+  '/me/profile': typeof DashboardMeProfileRoute
   '/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/security': typeof DashboardSettingsSecurityRoute
@@ -2388,6 +2402,7 @@ export interface FileRoutesByTo {
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
+  '/u/$handle': typeof UHandleRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/access-requests': typeof DashboardAdminAccessRequestsRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
@@ -2406,6 +2421,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
+  '/me/profile': typeof DashboardMeProfileRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/security': typeof DashboardSettingsSecurityRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
@@ -2705,6 +2721,7 @@ export interface FileRoutesById {
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
+  '/u/$handle': typeof UHandleRoute
   '/_landing/': typeof LandingIndexRoute
   '/_dashboard/admin/abuse': typeof DashboardAdminAbuseRoute
   '/_dashboard/admin/access-requests': typeof DashboardAdminAccessRequestsRoute
@@ -2724,6 +2741,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/_dashboard/lists/$listId': typeof DashboardListsListIdRoute
+  '/_dashboard/me/profile': typeof DashboardMeProfileRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/_dashboard/settings/security': typeof DashboardSettingsSecurityRoute
@@ -3024,6 +3042,7 @@ export interface FileRouteTypes {
     | '/portfolio/$claimId'
     | '/r/$slug'
     | '/schedule/$invitationId'
+    | '/u/$handle'
     | '/admin/abuse'
     | '/admin/access-requests'
     | '/admin/billing'
@@ -3042,6 +3061,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/interviews/invitations'
     | '/lists/$listId'
+    | '/me/profile'
     | '/settings/billing'
     | '/settings/privacy'
     | '/settings/security'
@@ -3339,6 +3359,7 @@ export interface FileRouteTypes {
     | '/portfolio/$claimId'
     | '/r/$slug'
     | '/schedule/$invitationId'
+    | '/u/$handle'
     | '/admin/abuse'
     | '/admin/access-requests'
     | '/admin/billing'
@@ -3357,6 +3378,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/interviews/invitations'
     | '/lists/$listId'
+    | '/me/profile'
     | '/settings/privacy'
     | '/settings/security'
     | '/settings/team'
@@ -3655,6 +3677,7 @@ export interface FileRouteTypes {
     | '/portfolio/$claimId'
     | '/r/$slug'
     | '/schedule/$invitationId'
+    | '/u/$handle'
     | '/_landing/'
     | '/_dashboard/admin/abuse'
     | '/_dashboard/admin/access-requests'
@@ -3674,6 +3697,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/users'
     | '/_dashboard/interviews/invitations'
     | '/_dashboard/lists/$listId'
+    | '/_dashboard/me/profile'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
     | '/_dashboard/settings/security'
@@ -3956,6 +3980,7 @@ export interface RootRouteChildren {
   PortfolioClaimIdRoute: typeof PortfolioClaimIdRoute
   RSlugRoute: typeof RSlugRoute
   ScheduleInvitationIdRoute: typeof ScheduleInvitationIdRoute
+  UHandleRoute: typeof UHandleRoute
   ApiAdminPreferencesRoute: typeof ApiAdminPreferencesRoute
   ApiAdminSearchSourcesRoute: typeof ApiAdminSearchSourcesRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
@@ -4379,6 +4404,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScheduleInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/u/$handle': {
+      id: '/u/$handle'
+      path: '/u/$handle'
+      fullPath: '/u/$handle'
+      preLoaderRoute: typeof UHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/admin/': {
       id: '/_dashboard/admin/'
       path: '/admin'
@@ -4552,6 +4584,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/me/'
       preLoaderRoute: typeof DashboardMeIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/me/profile': {
+      id: '/_dashboard/me/profile'
+      path: '/me/profile'
+      fullPath: '/me/profile'
+      preLoaderRoute: typeof DashboardMeProfileRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/search/': {
@@ -6406,6 +6445,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardInterviewsInvitationsRoute: typeof DashboardInterviewsInvitationsRoute
   DashboardListsListIdRoute: typeof DashboardListsListIdRoute
+  DashboardMeProfileRoute: typeof DashboardMeProfileRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRouteWithChildren
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
   DashboardSettingsSecurityRoute: typeof DashboardSettingsSecurityRoute
@@ -6448,6 +6488,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardInterviewsInvitationsRoute: DashboardInterviewsInvitationsRoute,
   DashboardListsListIdRoute: DashboardListsListIdRoute,
+  DashboardMeProfileRoute: DashboardMeProfileRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRouteWithChildren,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
   DashboardSettingsSecurityRoute: DashboardSettingsSecurityRoute,
@@ -6872,6 +6913,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortfolioClaimIdRoute: PortfolioClaimIdRoute,
   RSlugRoute: RSlugRoute,
   ScheduleInvitationIdRoute: ScheduleInvitationIdRoute,
+  UHandleRoute: UHandleRoute,
   ApiAdminPreferencesRoute: ApiAdminPreferencesRoute,
   ApiAdminSearchSourcesRoute: ApiAdminSearchSourcesRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,

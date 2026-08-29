@@ -37,6 +37,7 @@ import {
   HANDLE_RESERVATION_TTL_MS,
   isAllowedVisibilityTransition,
   isPubliclyReadable,
+  isSearchable,
   type PublicSelfManagedProfile,
   type SelfManagedVisibility,
   type UpsertSelfManagedProfile,
@@ -163,6 +164,21 @@ export async function getPublicProfileByHandle(
   transaction: TenantTransaction,
   handle: string,
 ): Promise<PublicSelfManagedProfile | null> {
+  return (await getPublicProfileListing(transaction, handle))?.profile ?? null
+}
+
+/**
+ * The same public projection, plus whether the profile is *listed*.
+ *
+ * The page needs one bit the projection deliberately withholds: `unlisted` must be served and
+ * kept out of the index, and `public` must be served and indexed. Returning `listed` rather than
+ * `visibility` gives the route exactly that decision without handing a reader the state name —
+ * and `draft` never gets here at all, because it is not publicly readable.
+ */
+export async function getPublicProfileListing(
+  transaction: TenantTransaction,
+  handle: string,
+): Promise<{ profile: PublicSelfManagedProfile; listed: boolean } | null> {
   const [row] = await transaction
     .select({
       handle: selfManagedProfiles.handle,
@@ -183,9 +199,10 @@ export async function getPublicProfileByHandle(
     .where(and(eq(selfManagedProfiles.handle, handle), isNull(selfManagedProfiles.deletedAt)))
     .limit(1)
 
-  if (!row || !isPubliclyReadable(narrowVisibility(row.visibility))) return null
+  const visibility = row ? narrowVisibility(row.visibility) : null
+  if (!row || !visibility || !isPubliclyReadable(visibility)) return null
 
-  return {
+  const profile: PublicSelfManagedProfile = {
     handle: row.handle,
     displayName: row.displayName,
     headline: row.headline,
@@ -198,6 +215,8 @@ export async function getPublicProfileByHandle(
     updatedAt: row.updatedAt.toISOString(),
     verified: row.claimStatus === 'verified',
   }
+
+  return { profile, listed: isSearchable(visibility) }
 }
 
 /**

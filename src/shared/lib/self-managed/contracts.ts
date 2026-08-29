@@ -168,3 +168,22 @@ export function isPubliclyReadable(visibility: SelfManagedVisibility): boolean {
 export function isSearchable(visibility: SelfManagedVisibility): boolean {
   return visibility === 'public'
 }
+
+/**
+ * What a stranger sees of an attachment.
+ *
+ * A projection built by naming what goes in: no storage key, no checksum, no scan status and no
+ * rejection code. Only `clean` rows ever reach a public surface, so a status field would say the
+ * same thing on every row it appeared on — and `rejectionCode` is the owner's to read, never a
+ * visitor's.
+ */
+export interface PublicSelfManagedAttachment {
+  id: string
+  kind: SelfManagedAttachmentKind
+  title: string
+  description: string | null
+  mediaType: string
+  sizeBytes: number
+  durationSeconds: number | null
+  uploadedAt: string
+}
