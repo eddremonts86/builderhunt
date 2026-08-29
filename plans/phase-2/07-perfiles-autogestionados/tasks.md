@@ -655,7 +655,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     Publishing reports as `activation_reached` with `activationType: 'profile_published'`, an enum
     member that says what kind of first value was reached and never which profile.
 
-- [ ] **Ship behind a fail-closed flag and record runtime evidence**
+- [~] **Ship behind a fail-closed flag and record runtime evidence**
   - Files: `.env.example`, `docs/operations/self-managed-profiles-rollout.md`,
     `content/changelog/self-managed-profiles.md`
   - Do: add one server-owned feature flag that returns 404/disabled UI when off, document migration,
@@ -664,3 +664,37 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: `pnpm ci:local` is green; the complete Playwright flow passes against real Postgres,
     MinIO and ClamAV with flag on; flag off hides entry points and blocks writes while data export and
     erasure remain available; runtime evidence is linked from the rollout document.
+  - Partial. The flag, the runbook and the changelog are done and proved locally; **the rollout
+    itself — enabling it in Coolify, the ramp, and the D7 observation — needs a window and an
+    explicit approval and is not something this branch can close.** Everything else in the Verify
+    line is met.
+  - **One flag for the whole feature.** `SELF_MANAGED_PROFILES_ENABLED`, `false` by default like
+    every flag in `env.ts`. Several flags would allow states nobody designed: a public page for
+    profiles nobody can edit, or an index of rows with no surface. Applied in the ten API routes,
+    the editor, the public page, the onboarding branch, the index worker — and, for search, at the
+    single point where the origin is contacted, which covers all eight wired matching surfaces at
+    once instead of giving eight chances to miss one.
+  - **Off is a rollback, not a deletion.** Rows stay, so switching back on restores rather than
+    rebuilds, and no write slips through a tab somebody left open — the routes 404 before they read
+    a body. 404 and not 503: with the feature off these surfaces do not exist, and a 503 would say
+    "this is ours and it is broken" about something an operator switched off deliberately.
+  - **Two things deliberately keep working with the flag off**, and both are tested: data export and
+    erasure, because a person's right to see and delete what is held about them is not a feature and
+    a rollback that took it with it would turn an operational decision into a compliance one; and
+    the *scan* worker, which only moves already-accepted bytes toward a verdict — stopping it would
+    leave unscanned uploads sitting in quarantine for the length of the rollback. Indexing does
+    stop, which is what the task asks for.
+  - **The flag exposed a latent fragility in the specs, and the gate is what found it.** The main
+    e2e spawns its own worker server from `process.env` and was relying on the shared server's pin —
+    a server it does not use. With the flag defaulting off, every route 404'd, and because
+    `self-managed-flag.spec.ts` sorts first its flag-off server was reused for the file after it.
+    Both now declare their own flags, which is the convention the harness documents by name, and the
+    two files pass together in the order that failed.
+  - Three unit suites now state that they test the feature *on* rather than inheriting it. That is
+    not ceremony: `SELF_MANAGED_PROFILES_ENABLED` defaults to `false` everywhere, so a suite that
+    said nothing was testing the disabled path and passing for the wrong reason.
+  - Runtime evidence is in
+    [`docs/operations/self-managed-profiles-rollout.md`](../../../docs/operations/self-managed-profiles-rollout.md),
+    with the metrics, the stop conditions and what the harness does *not* cover written next to each
+    other. Changelog copy: `content/changelog/self-managed-profiles.md` — it says the chip is the
+    point rather than apologising for it.

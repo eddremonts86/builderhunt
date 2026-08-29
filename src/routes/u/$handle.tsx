@@ -2,6 +2,7 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 
 import { SelfManagedProfile } from '~/modules/builder-profile/components/SelfManagedProfile'
 import { HANDLE_PATTERN } from '~/shared/lib/self-managed/contracts'
+import { getSelfManagedEnabled } from '~/shared/lib/self-managed/feature-flag'
 import {
   resolvePublicSelfManagedProfile,
   type PublicSelfManagedProfilePage,
@@ -32,6 +33,9 @@ const SITE_NAME = 'BuilderHunt'
  */
 export const Route = createFileRoute('/u/$handle')({
   loader: async ({ params }): Promise<PublicSelfManagedProfilePage> => {
+    // The same 404 a handle nobody took gets. With the feature off these pages do not exist, and a
+    // "coming soon" would be a public URL that still answers 200 and still gets indexed.
+    if (!(await getSelfManagedEnabled())) throw notFound()
     if (!HANDLE_PATTERN.test(params.handle)) throw notFound()
     const page = await resolvePublicSelfManagedProfile({ data: params.handle })
     if (!page) throw notFound()

@@ -25,6 +25,19 @@ const mocks = vi.hoisted(() => ({
   isHandleAvailable: vi.fn(),
 }))
 
+/**
+ * The feature flag is on for this suite, stated rather than inherited.
+ *
+ * `SELF_MANAGED_PROFILES_ENABLED` defaults to `false` — production inherits no `.env`, so every
+ * flag in `env.ts` is off unless somebody turns it on. These tests are about what the feature does
+ * when it exists; what it does when it does not is `tests/e2e/self-managed-flag.spec.ts`, and
+ * asserting both from one file would mean neither could set the flag at module load.
+ */
+vi.mock('~/shared/lib/self-managed/feature-flag', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/shared/lib/self-managed/feature-flag')>()
+  return { ...actual, isSelfManagedEnabled: () => true, selfManagedDisabledResponse: () => null }
+})
+
 vi.mock('~/shared/lib/auth/better-auth', () => ({
   auth: { api: { getSession: mocks.getSession } },
 }))

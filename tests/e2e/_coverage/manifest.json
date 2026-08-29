@@ -1166,7 +1166,8 @@
       "status": "covered",
       "specs": [
         "tests/e2e/api/cross-tenant.spec.ts",
-        "tests/e2e/api/privacy.spec.ts"
+        "tests/e2e/api/privacy.spec.ts",
+        "tests/e2e/self-managed-flag.spec.ts"
       ]
     },
     "/api/me/delete-account": {
@@ -1601,6 +1602,7 @@
       "specs": [
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/search.spec.ts",
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
@@ -1614,60 +1616,70 @@
     "/api/self-managed/attachments/$attachmentId/complete": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/attachments/$attachmentId/download": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/attachments/$attachmentId": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/attachments": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/handle/$handle": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/handle/$handle/reserve": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/profile/$profileId": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/profile/$profileId/promote": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/profile": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/self-managed/visibility": {
       "status": "covered",
       "specs": [
+        "tests/e2e/self-managed-flag.spec.ts",
         "tests/e2e/self-managed-profile.spec.ts"
       ]
     },

@@ -7,17 +7,31 @@
  */
 import { eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import { authUsers, builderEmbeddings, jobRuns, selfManagedAttachments, selfManagedProfiles } from '~/shared/lib/db/schema'
 import { SELF_MANAGED_ENTITY_KIND } from '~/shared/lib/semantic/entity-kinds'
 import { buildSelfManagedDoc } from '~/lib/semantic/self-managed-index'
 import {
+
   runSelfManagedSemanticIndexWorker,
   SELF_MANAGED_INDEX_JOB_KEY,
   type SelfManagedIndexWorkerOptions,
 } from '~/lib/semantic/self-managed-reconcile-worker'
+
+/**
+ * The feature flag is on for this suite, stated rather than inherited.
+ *
+ * `SELF_MANAGED_PROFILES_ENABLED` defaults to `false` — production inherits no `.env`, so every
+ * flag in `env.ts` is off unless somebody turns it on. These tests are about what the feature does
+ * when it exists; what it does when it does not is `tests/e2e/self-managed-flag.spec.ts`, and
+ * asserting both from one file would mean neither could set the flag at module load.
+ */
+vi.mock('~/shared/lib/self-managed/feature-flag', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/shared/lib/self-managed/feature-flag')>()
+  return { ...actual, isSelfManagedEnabled: () => true, selfManagedDisabledResponse: () => null }
+})
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>

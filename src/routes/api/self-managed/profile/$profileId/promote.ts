@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { selfManagedDisabledResponse } from '~/shared/lib/self-managed/feature-flag'
 import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 import { decideLink } from '~/shared/lib/human-identity/link-policy'
 import {
@@ -55,6 +56,8 @@ export const Route = createFileRoute('/api/self-managed/profile/$profileId/promo
 
       POST: async ({ request, params }) => {
         try {
+          const disabled = selfManagedDisabledResponse()
+          if (disabled) return disabled
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 })
           const ownerUserId = session.user.id
@@ -105,6 +108,8 @@ export const Route = createFileRoute('/api/self-managed/profile/$profileId/promo
 
       DELETE: async ({ request, params }) => {
         try {
+          const disabled = selfManagedDisabledResponse()
+          if (disabled) return disabled
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 })
           const ownerUserId = session.user.id

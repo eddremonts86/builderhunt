@@ -1,8 +1,9 @@
 import * as React from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, notFound } from '@tanstack/react-router'
 import { ExternalLink, Loader2, Save } from 'lucide-react'
 
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { getSelfManagedEnabled } from '~/shared/lib/self-managed/feature-flag'
 import { Button } from '~/components/ui/button'
 import { Input, Textarea } from '~/components/ui'
 import { AttachmentUploader, type OwnerAttachment } from '~/modules/builder-profile/components/AttachmentUploader'
@@ -47,6 +48,10 @@ export const Route = createFileRoute('/_dashboard/me/profile')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) throw new Error('Unauthorized')
+    // Resolved through the server function, not `env`: `beforeLoad` runs in the browser for a link
+    // navigation, where `env.ts` hands back a stub — the editor would open on a click and 404 on a
+    // refresh, from one deploy, with the flag on the whole time.
+    if (!(await getSelfManagedEnabled())) throw notFound()
     return { user }
   },
   loader: async ({ context }) => context,

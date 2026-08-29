@@ -4,6 +4,7 @@ import { listIndexedSourceIds } from '~/shared/lib/repositories/public-builder-e
 import { withJobRun, type JobRunOutcome } from '~/shared/lib/repositories/platform-operations'
 import { workerDb } from '~/shared/lib/db/worker-db'
 import { log } from '~/shared/lib/log'
+import { isSelfManagedEnabled } from '~/shared/lib/self-managed/feature-flag'
 
 /**
  * Reconciles the semantic index against the profiles that should be in it
@@ -53,6 +54,11 @@ export interface SelfManagedIndexWorkerOptions {
   maxPerRun?: number
 }
 
+/** The shape a pass returns when it did nothing, so the disabled path cannot drift from the real one. */
+function result0(): SelfManagedIndexWorkerResult {
+  return { scanned: 0, indexed: 0, unchanged: 0, removed: 0, truncated: false, processedCount: 0, failedCount: 0 }
+}
+
 export async function runSelfManagedSemanticIndexWorker(
   options: SelfManagedIndexWorkerOptions = {},
 ): Promise<SelfManagedIndexWorkerResult> {
@@ -62,6 +68,22 @@ export async function runSelfManagedSemanticIndexWorker(
   const maxPerRun = options.maxPerRun ?? MAX_PER_RUN
 
   return withJobRun({ jobKey: SELF_MANAGED_INDEX_JOB_KEY, now, db }, async () => {
+    /*
+     * Indexing stops with the feature, and the job run is still recorded.
+     *
+     * A rollback that left this running would keep writing rows for a surface nobody can reach.
+     * Recording the run anyway is what keeps the operations page honest: "ran, indexed nothing,
+     * because the feature is off" reads differently from a job that silently stopped firing.
+     *
+     * The scan worker deliberately keeps running — it moves already-accepted bytes toward a verdict,
+     * and stopping it would leave unscanned uploads sitting in quarantine for the length of a
+     * rollback.
+     */
+    if (!isSelfManagedEnabled()) {
+      log.info('self_managed_index_skipped', { reason: 'feature_disabled' })
+      return result0()
+    }
+
     const { listIndexableProfiles } = await import('~/shared/lib/repositories/self-managed-profiles')
 
     const result: SelfManagedIndexWorkerResult = {

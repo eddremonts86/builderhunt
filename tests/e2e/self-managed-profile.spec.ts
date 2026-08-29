@@ -123,7 +123,14 @@ test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
   test.setTimeout(300_000)
-  harness = await startInterviewHarness({ scope: 'smprof' })
+  harness = await startInterviewHarness({
+    scope: 'smprof',
+    // Declared, not inherited. This spec spawns its own worker server from `process.env`, where
+    // `SELF_MANAGED_PROFILES_ENABLED` is unset and therefore `false` — the same default production
+    // gets. Relying on the shared server's pin would have been relying on a server this file does
+    // not use, and the failure looks like every route 404-ing for no reason.
+    flags: { SELF_MANAGED_PROFILES_ENABLED: 'true' },
+  })
 
   // MinIO and ClamAV come from docker-compose. Without them every assertion below would fail as a
   // storage error, which reads as a product bug rather than a missing container.
