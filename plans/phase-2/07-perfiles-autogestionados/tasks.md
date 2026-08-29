@@ -417,6 +417,9 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     is a person watching an upload say "checking for viruses", the reconciliation nightly because
     write-through already handles the live path and a five-minute backstop would spend its life
     confirming it.
+    Two visual baselines moved with them and only those two of the forty-four: `/admin/operations`
+    renders the registry, so two new rows on that page is the change being visible rather than a
+    regression — which is the whole reason that gate screenshots the operations page at all.
 
 - [ ] **Apply the shared inclusion policy to every current matching surface**
   - Files: `src/shared/lib/self-managed/inclusion-policy.ts`,
