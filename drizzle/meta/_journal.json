@@ -1233,6 +1233,13 @@
       "when": 1787083652408,
       "tag": "0175_self_managed_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 176,
+      "version": "7",
+      "when": 1787986270849,
+      "tag": "0176_self_managed_scan_state",
+      "breakpoints": true
     }
   ]
 }

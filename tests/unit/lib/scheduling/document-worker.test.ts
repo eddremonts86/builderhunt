@@ -21,9 +21,17 @@ import {
   documentExtractions,
   organizations,
   schedulingInvitations,
+  selfManagedAttachments,
+  selfManagedProfiles,
 } from '~/shared/lib/db/schema'
-import { MAX_SCAN_ATTEMPTS, runDocumentWorker, type DocumentWorkerOptions } from '~/lib/scheduling/document-worker'
-import { CLEAN_PREFIX, quarantineKeyFor } from '~/lib/storage/object-keys'
+import {
+  MAX_SCAN_ATTEMPTS,
+  runDocumentWorker,
+  runSelfManagedAttachmentScanWorker,
+  type DocumentWorkerOptions,
+  type SelfManagedScanWorkerOptions,
+} from '~/lib/scheduling/document-worker'
+import { CLEAN_PREFIX, cleanKeyFor, quarantineKeyFor, selfManagedQuarantineKeyFor } from '~/lib/storage/object-keys'
 import { DocumentExtractionError, ScanProviderError, type ScanResult } from '~/lib/storage/types'
 
 let db: PostgresJsDatabase
@@ -438,5 +446,179 @@ describe('stale leases are reclaimed', () => {
     const result = await run({ staleLeaseMs: 15 * 60_000 })
     expect(result.reclaimed).toBe(0)
     expect((await readDocument(document.id)).scanStatus).toBe('scanning')
+  })
+})
+
+describe('runSelfManagedAttachmentScanWorker', () => {
+  const PROFILE = 'dw-sm-profile'
+  let seq = 0
+
+  function runSelfManaged(overrides: Partial<SelfManagedScanWorkerOptions> = {}) {
+    return runSelfManagedAttachmentScanWorker({
+      now: NOW,
+      db: db as unknown as SelfManagedScanWorkerOptions['db'],
+      storage: storage as unknown as SelfManagedScanWorkerOptions['storage'],
+      scanner,
+      ...overrides,
+    })
+  }
+
+  beforeEach(async () => {
+    await db.delete(selfManagedAttachments)
+    await db.delete(selfManagedProfiles)
+    await db.insert(selfManagedProfiles).values({
+      id: PROFILE,
+      handle: 'dw-ada',
+      ownerUserId: OWNER,
+      displayName: 'Ada',
+      visibility: 'public',
+    })
+  })
+
+  /** A pending attachment whose bytes already sit in quarantine — the worker's actual input. */
+  async function seedAttachment(options: { scanAttempts?: number; storageKey?: string; putObject?: boolean } = {}) {
+    seq += 1
+    const id = `sm-att-${seq}`
+    const storageKey =
+      options.storageKey ?? selfManagedQuarantineKeyFor({ ownerUserId: OWNER, profileId: PROFILE, attachmentId: id })
+    if (options.putObject !== false) storage.objects.set(storageKey, 'attachment bytes')
+    await db.insert(selfManagedAttachments).values({
+      id,
+      profileId: PROFILE,
+      kind: 'work-sample',
+      title: id,
+      storageKey,
+      mimeType: 'application/pdf',
+      sizeBytes: 1024,
+      checksumSha256: 'a'.repeat(64),
+      scanStatus: 'pending',
+      scanAttempts: options.scanAttempts ?? 0,
+      uploadedAt: NOW,
+      updatedAt: NOW,
+    })
+    return { id, storageKey }
+  }
+
+  async function readAttachment(id: string) {
+    const [row] = await db.select().from(selfManagedAttachments).where(eq(selfManagedAttachments.id, id))
+    if (!row) throw new Error(`attachment ${id} vanished`)
+    return row
+  }
+
+  it('promotes a clean attachment out of quarantine and marks the row in that order', async () => {
+    const seeded = await seedAttachment()
+
+    const result = await runSelfManaged()
+
+    expect(result).toMatchObject({ scannedClean: 1, processedCount: 1, failedCount: 0 })
+    const row = await readAttachment(seeded.id)
+    expect(row.scanStatus).toBe('clean')
+    expect(row.storageKey).toBe(cleanKeyFor(seeded.storageKey))
+    expect(row.storageKey.startsWith(`${CLEAN_PREFIX}self-managed/`)).toBe(true)
+    expect(storage.objects.has(row.storageKey)).toBe(true)
+    expect(storage.objects.has(seeded.storageKey)).toBe(false)
+  })
+
+  it('rejects an infected attachment and deletes its bytes', async () => {
+    const seeded = await seedAttachment()
+    scanBehaviour = async () => ({ status: 'infected', detailCode: 'Win.Test.EICAR_HDB-1' })
+
+    const result = await runSelfManaged()
+
+    expect(result).toMatchObject({ scannedInfected: 1, failedCount: 1 })
+    const row = await readAttachment(seeded.id)
+    expect(row.scanStatus).toBe('infected')
+    expect(row.rejectionCode).toBe('Win.Test.EICAR_HDB-1')
+    expect(storage.objects.size).toBe(0)
+  })
+
+  it('treats "cannot scan this file" as a verdict, not a retry', async () => {
+    const seeded = await seedAttachment()
+    scanBehaviour = async () => ({ status: 'error', detailCode: 'encrypted_archive' })
+
+    const result = await runSelfManaged()
+
+    expect(result).toMatchObject({ scanRejected: 1, scanRetried: 0 })
+    const row = await readAttachment(seeded.id)
+    expect(row.scanStatus).toBe('failed')
+    expect(row.rejectionCode).toBe('encrypted_archive')
+    expect(storage.objects.size).toBe(0)
+  })
+
+  it('retries an unavailable scanner until the cap, then fails without ever saying clean', async () => {
+    const seeded = await seedAttachment()
+    scanBehaviour = async () => {
+      throw new ScanProviderError('down', 'provider_unavailable')
+    }
+
+    expect(await runSelfManaged()).toMatchObject({ scanRetried: 1 })
+    expect((await readAttachment(seeded.id)).scanStatus).toBe('pending')
+    expect(await runSelfManaged()).toMatchObject({ scanRetried: 1 })
+    const third = await runSelfManaged()
+
+    expect(third).toMatchObject({ scanRejected: 1, failedCount: 1 })
+    const row = await readAttachment(seeded.id)
+    expect(row.scanStatus).toBe('failed')
+    expect(row.scanAttempts).toBe(MAX_SCAN_ATTEMPTS)
+    expect(row.rejectionCode).toBe('scan_unavailable')
+    // Failed scans stay quarantined: the bytes were never judged, so they are never promoted —
+    // and never served, because only `clean` rows are readable publicly.
+    expect(storage.objects.has(seeded.storageKey)).toBe(true)
+  })
+
+  it('never marks clean when the promotion move fails', async () => {
+    const seeded = await seedAttachment({ scanAttempts: MAX_SCAN_ATTEMPTS - 1 })
+    storage.moveShouldFail = true
+
+    const result = await runSelfManaged()
+
+    expect(result).toMatchObject({ scanRejected: 1 })
+    const row = await readAttachment(seeded.id)
+    expect(row.scanStatus).toBe('failed')
+    expect(row.rejectionCode).toBe('promotion_failed')
+    expect(storage.objects.has(seeded.storageKey)).toBe(true)
+  })
+
+  it('re-earns the verdict on a key already under clean/ without repeating the move', async () => {
+    // A previous pass moved the object and died before the mark landed; the reclaim brought the row
+    // back to `pending` with its promoted key. A repeated move would fail on the missing source.
+    const quarantineKey = selfManagedQuarantineKeyFor({ ownerUserId: OWNER, profileId: PROFILE, attachmentId: 'sm-att-jam' })
+    const promotedKey = cleanKeyFor(quarantineKey)
+    const seeded = await seedAttachment({ storageKey: promotedKey })
+    storage.moveShouldFail = true
+
+    const result = await runSelfManaged()
+
+    expect(result).toMatchObject({ scannedClean: 1, failedCount: 0 })
+    const row = await readAttachment(seeded.id)
+    expect(row.scanStatus).toBe('clean')
+    expect(row.storageKey).toBe(promotedKey)
+    expect(storage.objects.has(promotedKey)).toBe(true)
+  })
+
+  it('lets one broken attachment fail without stalling the batch', async () => {
+    // A key in neither space: `cleanKeyFor` throws, which is the per-attachment catch's job.
+    const broken = await seedAttachment({ storageKey: 'landing/nowhere' })
+    const fine = await seedAttachment()
+
+    const result = await runSelfManaged()
+
+    expect(result).toMatchObject({ scannedClean: 1, failedCount: 1 })
+    expect((await readAttachment(fine.id)).scanStatus).toBe('clean')
+    // The broken row keeps its lease; the stale reclaim is what returns it to the queue.
+    expect((await readAttachment(broken.id)).scanStatus).toBe('scanning')
+  })
+
+  it('reclaims a stale self-managed lease on its way in', async () => {
+    const seeded = await seedAttachment()
+    await db.update(selfManagedAttachments)
+      .set({ scanStatus: 'scanning', updatedAt: new Date(NOW.getTime() - 60 * 60_000) })
+      .where(eq(selfManagedAttachments.id, seeded.id))
+
+    const result = await runSelfManaged({ staleLeaseMs: 15 * 60_000 })
+
+    expect(result.reclaimed).toBe(1)
+    // Reclaimed and re-leased in the same pass, so it also completes.
+    expect((await readAttachment(seeded.id)).scanStatus).toBe('clean')
   })
 })

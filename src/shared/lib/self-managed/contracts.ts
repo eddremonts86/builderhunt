@@ -27,6 +27,23 @@ export type SelfManagedVisibility = (typeof SELF_MANAGED_VISIBILITIES)[number]
 export const SELF_MANAGED_ATTACHMENT_KINDS = ['cv', 'work-sample', 'certificate', 'other'] as const
 export type SelfManagedAttachmentKind = (typeof SELF_MANAGED_ATTACHMENT_KINDS)[number]
 
+/**
+ * The attachment scan state machine, mirroring `candidate_documents` (migration 0176).
+ *
+ * `awaiting_upload` is an intent row with no bytes; `pending` means the bytes landed and were
+ * verified; `scanning` is a worker's lease; `clean`, `infected` and `failed` are terminal. Only
+ * `clean` is ever served to a stranger — the row policy and every public query agree on that.
+ */
+export const SELF_MANAGED_SCAN_STATUSES = [
+  'awaiting_upload',
+  'pending',
+  'scanning',
+  'clean',
+  'infected',
+  'failed',
+] as const
+export type SelfManagedScanStatus = (typeof SELF_MANAGED_SCAN_STATUSES)[number]
+
 /** Twelve active work samples, from the spec. Enforced in the repository, mirrored here for the form. */
 export const MAX_ACTIVE_ATTACHMENTS = 12
 /** 25 MB, from the spec. */

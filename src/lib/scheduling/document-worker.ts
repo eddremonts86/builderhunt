@@ -1,6 +1,8 @@
 /**
  * Scans and extracts candidate documents (plan:
- * calendar-scheduling-interview-intelligence, Phase 6, "Implement document repository and worker").
+ * calendar-scheduling-interview-intelligence, Phase 6, "Implement document repository and worker"),
+ * and scans self-managed profile attachments over the same primitives
+ * (plan: phase-2/07-perfiles-autogestionados) — two workers, one scan-and-promote core.
  *
  * ## The status is the lease, and the network I/O happens outside the transaction
  *
@@ -39,7 +41,7 @@
  */
 import { getStorageProvider, getVirusScanner } from '~/lib/storage/provider'
 import { PARSER_VERSION, StoredDocumentExtractor } from '~/lib/storage/document-extraction'
-import { cleanKeyFor } from '~/lib/storage/object-keys'
+import { cleanKeyFor, isCleanKey } from '~/lib/storage/object-keys'
 import {
   DocumentExtractionError,
   type DocumentExtractionProvider,
@@ -64,6 +66,14 @@ import {
   withWorkerOrganization,
   type LeasedDocument,
 } from '~/shared/lib/repositories/interview-documents'
+import {
+  leaseAttachmentsForScan,
+  markAttachmentClean,
+  markAttachmentRejected,
+  reclaimStaleAttachmentScans,
+  releaseAttachmentForScanRetry,
+  type LeasedSelfManagedAttachment,
+} from '~/shared/lib/repositories/self-managed-attachments'
 
 // Namespaced like the other workers' keys (`calendar.recurrence-materialization`,
 // `calendar.reminder-delivery`). The key is what `operational_schedules` and the job-run feed join
@@ -221,11 +231,77 @@ export async function runDocumentWorker(options: DocumentWorkerOptions = {}): Pr
   })
 }
 
+/** The table-agnostic half of a scan verdict: what happened to the object, not to any row. */
+type ObjectScanOutcome =
+  | { kind: 'clean'; cleanObjectKey: string }
+  | { kind: 'infected'; rejectionCode: string }
+  | { kind: 'reject'; rejectionCode: string }
+  | { kind: 'retry' }
+
 type ScanOutcome =
   | { kind: 'clean'; cleanObjectKey: string; detectedMediaType: string }
   | { kind: 'infected'; rejectionCode: string }
   | { kind: 'reject'; rejectionCode: string }
   | { kind: 'retry' }
+
+/**
+ * Scan one stored object and, on a clean verdict, promote it out of quarantine.
+ *
+ * Shared by the candidate and self-managed pipelines: everything here is about an object key and an
+ * attempt counter, and nothing is about which table the row lives in. The verdict handling is the
+ * module-comment contract — an unavailable scanner never produces `clean`.
+ */
+async function scanStoredObject(params: {
+  objectKey: string
+  scanAttempts: number
+  maxAttempts: number
+  scanner: VirusScanProvider
+  storage: StorageProvider
+}): Promise<ObjectScanOutcome> {
+  const { objectKey, scanAttempts, maxAttempts, scanner, storage } = params
+
+  let verdict
+  try {
+    verdict = await scanner.scanObject({ key: objectKey })
+  } catch {
+    // Infrastructure. Nothing about this says anything about the file, so the document keeps its
+    // place in the queue until the attempt cap decides otherwise.
+    return scanAttempts >= maxAttempts
+      ? { kind: 'reject', rejectionCode: 'scan_unavailable' }
+      : { kind: 'retry' }
+  }
+
+  if (verdict.status === 'infected') {
+    // Deleted, not kept for inspection: nobody is going to forensically examine an infected CV,
+    // and retaining known malware in a bucket the app can read is a liability.
+    await storage.deleteObject({ key: objectKey }).catch(() => undefined)
+    return { kind: 'infected', rejectionCode: verdict.detailCode ?? 'infected' }
+  }
+
+  if (verdict.status === 'error') {
+    await storage.deleteObject({ key: objectKey }).catch(() => undefined)
+    return { kind: 'reject', rejectionCode: verdict.detailCode ?? 'scan_error' }
+  }
+
+  // A leased key already under `clean/` means a previous pass moved the object and died before the
+  // mark landed. The verdict still has to be earned on every pass; the move does not.
+  if (isCleanKey(objectKey)) {
+    return { kind: 'clean', cleanObjectKey: objectKey }
+  }
+
+  const cleanObjectKey = cleanKeyFor(objectKey)
+  try {
+    await storage.moveObject({ fromKey: objectKey, toKey: cleanObjectKey })
+  } catch {
+    // The verdict was clean but the object did not make it across. Retry rather than mark clean:
+    // marking clean would point the row at a key that may hold nothing.
+    return scanAttempts >= maxAttempts
+      ? { kind: 'reject', rejectionCode: 'promotion_failed' }
+      : { kind: 'retry' }
+  }
+
+  return { kind: 'clean', cleanObjectKey }
+}
 
 async function scanOne(params: {
   document: LeasedDocument
@@ -233,42 +309,16 @@ async function scanOne(params: {
   storage: StorageProvider
 }): Promise<ScanOutcome> {
   const { document, scanner, storage } = params
-
-  let verdict
-  try {
-    verdict = await scanner.scanObject({ key: document.objectKey })
-  } catch {
-    // Infrastructure. Nothing about this says anything about the file, so the document keeps its
-    // place in the queue until the attempt cap decides otherwise.
-    return document.scanAttempts >= MAX_SCAN_ATTEMPTS
-      ? { kind: 'reject', rejectionCode: 'scan_unavailable' }
-      : { kind: 'retry' }
-  }
-
-  if (verdict.status === 'infected') {
-    // Deleted, not kept for inspection: nobody is going to forensically examine a candidate's
-    // infected CV, and retaining known malware in a bucket the app can read is a liability.
-    await storage.deleteObject({ key: document.objectKey }).catch(() => undefined)
-    return { kind: 'infected', rejectionCode: verdict.detailCode ?? 'infected' }
-  }
-
-  if (verdict.status === 'error') {
-    await storage.deleteObject({ key: document.objectKey }).catch(() => undefined)
-    return { kind: 'reject', rejectionCode: verdict.detailCode ?? 'scan_error' }
-  }
-
-  const cleanObjectKey = cleanKeyFor(document.objectKey)
-  try {
-    await storage.moveObject({ fromKey: document.objectKey, toKey: cleanObjectKey })
-  } catch {
-    // The verdict was clean but the object did not make it across. Retry rather than mark clean:
-    // marking clean would point the row at a key that may hold nothing.
-    return document.scanAttempts >= MAX_SCAN_ATTEMPTS
-      ? { kind: 'reject', rejectionCode: 'promotion_failed' }
-      : { kind: 'retry' }
-  }
-
-  return { kind: 'clean', cleanObjectKey, detectedMediaType: effectiveMediaType(document) }
+  const outcome = await scanStoredObject({
+    objectKey: document.objectKey,
+    scanAttempts: document.scanAttempts,
+    maxAttempts: MAX_SCAN_ATTEMPTS,
+    scanner,
+    storage,
+  })
+  return outcome.kind === 'clean'
+    ? { ...outcome, detectedMediaType: effectiveMediaType(document) }
+    : outcome
 }
 
 async function applyScanOutcome(
@@ -351,6 +401,140 @@ async function extractOne(params: {
     return document.extractionAttempts >= MAX_EXTRACTION_ATTEMPTS
       ? { kind: 'reject', errorCode: 'extraction_unavailable' }
       : { kind: 'retry' }
+  }
+}
+
+// ── Self-managed profile attachments ──────────────────────────────────────────────────────────
+
+/**
+ * Its own job key and its own worker, not a fourth phase of `runDocumentWorker`: that worker's loop,
+ * kill switch and job history are all per-organization things, and a self-managed profile belongs to
+ * an account, not a tenant. Sharing `interviews.document-processing` would also merge two features'
+ * run histories under one key, which is the row nobody finds when they go looking by prefix.
+ */
+export const SELF_MANAGED_SCAN_JOB_KEY = 'self-managed.attachment-scan'
+
+/** Same bound as `DOCUMENTS_PER_TENANT`, global here — there is no tenant to be fair between. */
+const ATTACHMENTS_PER_RUN = 20
+
+export interface SelfManagedScanWorkerResult extends JobRunOutcome {
+  reclaimed: number
+  scannedClean: number
+  scannedInfected: number
+  scanRejected: number
+  scanRetried: number
+  processedCount: number
+  failedCount: number
+}
+
+export interface SelfManagedScanWorkerOptions {
+  now?: Date
+  db?: typeof workerDb
+  storage?: StorageProvider
+  scanner?: VirusScanProvider
+  attachmentsPerRun?: number
+  staleLeaseMs?: number
+}
+
+/**
+ * One pass over pending self-managed attachments: reclaim, lease, scan, apply — the same
+ * three-step contract as `runDocumentWorker`, minus the tenant loop and the extraction phase.
+ * Nothing extracts text from a profile attachment; a stranger downloads the bytes or nothing.
+ */
+export async function runSelfManagedAttachmentScanWorker(
+  options: SelfManagedScanWorkerOptions = {},
+): Promise<SelfManagedScanWorkerResult> {
+  const now = options.now ?? new Date()
+  const db = options.db ?? workerDb
+  const perRun = options.attachmentsPerRun ?? ATTACHMENTS_PER_RUN
+  const staleLeaseMs = options.staleLeaseMs ?? STALE_LEASE_MS
+  const storage = options.storage ?? getStorageProvider()
+  const scanner = options.scanner ?? getVirusScanner()
+
+  return withJobRun({ jobKey: SELF_MANAGED_SCAN_JOB_KEY, now, db }, async () => {
+    const result: SelfManagedScanWorkerResult = {
+      reclaimed: 0,
+      scannedClean: 0,
+      scannedInfected: 0,
+      scanRejected: 0,
+      scanRetried: 0,
+      processedCount: 0,
+      failedCount: 0,
+    }
+
+    // Committed on its own, same as the candidate worker: the lease has to be durable before any
+    // network I/O starts, or a crash strands rows only the stale reclaim will ever rescue.
+    const toScan = await db.transaction(async (transaction) => {
+      result.reclaimed = await reclaimStaleAttachmentScans(transaction as WorkerTransaction, {
+        staleAfterMs: staleLeaseMs,
+        now,
+      })
+      return leaseAttachmentsForScan(transaction as WorkerTransaction, {
+        limit: perRun,
+        maxAttempts: MAX_SCAN_ATTEMPTS,
+      })
+    })
+
+    for (const attachment of toScan) {
+      try {
+        const outcome = await scanStoredObject({
+          objectKey: attachment.storageKey,
+          scanAttempts: attachment.scanAttempts,
+          maxAttempts: MAX_SCAN_ATTEMPTS,
+          scanner,
+          storage,
+        })
+        await db.transaction((transaction) =>
+          applyAttachmentScanOutcome(transaction as WorkerTransaction, attachment, outcome),
+        )
+
+        result.processedCount += 1
+        if (outcome.kind === 'clean') result.scannedClean += 1
+        else if (outcome.kind === 'infected') { result.scannedInfected += 1; result.failedCount += 1 }
+        else if (outcome.kind === 'reject') { result.scanRejected += 1; result.failedCount += 1 }
+        else result.scanRetried += 1
+      } catch (error) {
+        // One broken attachment must not stall the batch. The row stays `scanning` and the stale
+        // reclaim returns it to the queue. Only the id is logged: an error from storage or the
+        // scanner can carry a signed URL or an object key.
+        result.failedCount += 1
+        console.error('self-managed attachment scan failed:', attachment.id, (error as Error)?.name)
+      }
+    }
+
+    return result
+  })
+}
+
+async function applyAttachmentScanOutcome(
+  transaction: WorkerTransaction,
+  attachment: LeasedSelfManagedAttachment,
+  outcome: ObjectScanOutcome,
+): Promise<void> {
+  switch (outcome.kind) {
+    case 'clean':
+      await markAttachmentClean(transaction, {
+        attachmentId: attachment.id,
+        cleanObjectKey: outcome.cleanObjectKey,
+      })
+      break
+    case 'infected':
+      await markAttachmentRejected(transaction, {
+        attachmentId: attachment.id,
+        scanStatus: 'infected',
+        rejectionCode: outcome.rejectionCode,
+      })
+      break
+    case 'reject':
+      await markAttachmentRejected(transaction, {
+        attachmentId: attachment.id,
+        scanStatus: 'failed',
+        rejectionCode: outcome.rejectionCode,
+      })
+      break
+    case 'retry':
+      await releaseAttachmentForScanRetry(transaction, { attachmentId: attachment.id })
+      break
   }
 }
 
