@@ -70,6 +70,8 @@ import { syncSelfManagedProfileIndex } from '~/lib/semantic/self-managed-index'
 import {
   expireAbandonedAttachmentIntents,
   leaseAttachmentsForScan,
+  listPurgeableAttachments,
+  purgeDeletedAttachments,
   markAttachmentClean,
   markAttachmentRejected,
   reclaimStaleAttachmentScans,
@@ -103,6 +105,13 @@ const STALE_LEASE_MS = 15 * 60_000
  * mid-upload is locked out of part of their 25 MB with nothing on screen explaining why.
  */
 const ABANDONED_INTENT_MS = 60 * 60_000
+
+/**
+ * Thirty days from the spec, and the same number `HANDLE_RELEASE_AFTER_DELETE_MS` uses for a
+ * deleted profile's handle — one policy, so an attachment's bytes and its profile's name become
+ * unrecoverable on the same day rather than a week apart for no stated reason.
+ */
+const ATTACHMENT_RETENTION_MS = 30 * 24 * 60 * 60_000
 
 export interface DocumentWorkerResult extends JobRunOutcome {
   organizationsProcessed: number
@@ -422,6 +431,8 @@ const ATTACHMENTS_PER_RUN = 20
 export interface SelfManagedScanWorkerResult extends JobRunOutcome {
   reclaimed: number
   abandonedIntents: number
+  /** Soft-deleted attachments whose bytes and rows are now gone (30-day retention). */
+  purged: number
   scannedClean: number
   scannedInfected: number
   scanRejected: number
@@ -458,6 +469,7 @@ export async function runSelfManagedAttachmentScanWorker(
     const result: SelfManagedScanWorkerResult = {
       reclaimed: 0,
       abandonedIntents: 0,
+      purged: 0,
       scannedClean: 0,
       scannedInfected: 0,
       scanRejected: 0,
@@ -523,6 +535,43 @@ export async function runSelfManagedAttachmentScanWorker(
         // scanner can carry a signed URL or an object key.
         result.failedCount += 1
         console.error('self-managed attachment scan failed:', attachment.id, (error as Error)?.name)
+      }
+    }
+
+    /*
+     * Retention: soft-deleted attachments lose their bytes after thirty days.
+     *
+     * Object first, row second, and the row only for the objects that actually went. Deleting the
+     * row first would leave bytes nobody holds a key to; re-running the predicate instead of
+     * passing back the ids would delete rows that became eligible between the two statements and
+     * strand *their* bytes the same way. The repository split into
+     * `listPurgeableAttachments`/`purgeDeletedAttachments` exists for exactly this ordering, and
+     * until now had no caller.
+     *
+     * Bounded per pass, and idempotent: an object already gone deletes cleanly and its row goes
+     * with the batch, so a pass interrupted halfway is simply a pass that did less.
+     */
+    const purgeBefore = new Date(now.getTime() - ATTACHMENT_RETENTION_MS)
+    const purgeable = await db.transaction((transaction) =>
+      listPurgeableAttachments(transaction as never, { deletedBefore: purgeBefore, limit: perRun }))
+
+    if (purgeable.length > 0) {
+      const removed: string[] = []
+      for (const attachment of purgeable) {
+        try {
+          await storage.deleteObject({ key: attachment.storageKey })
+          removed.push(attachment.id)
+        } catch (error) {
+          // The row stays, so the next pass tries again. A row deleted here on a failed object
+          // delete would be bytes nobody can ever find.
+          result.failedCount += 1
+          console.error('self-managed attachment purge failed:', attachment.id, (error as Error)?.name)
+        }
+      }
+      if (removed.length > 0) {
+        result.purged = await db.transaction((transaction) =>
+          purgeDeletedAttachments(transaction as never, removed))
+        result.processedCount += result.purged
       }
     }
 
