@@ -89,6 +89,59 @@ export class SelfManagedAttachmentError extends Error {
   }
 }
 
+/**
+ * The statuses that hold one of the twelve slots (and the single CV slot).
+ *
+ * An intent holds its slot from the moment it is issued — that is what makes the limit a
+ * reservation instead of a race — and a terminal rejection releases it, because a profile with
+ * twelve refused uploads and no way to try again would be locked shut by its own failures.
+ */
+const QUOTA_SCAN_STATUSES = ['awaiting_upload', 'pending', 'scanning', 'clean'] as const
+
+/** Throws the refusal the owner can act on; returns quietly when the upload may proceed. */
+async function assertAttachmentQuota(
+  transaction: TenantTransaction,
+  params: { profileId: string; kind: SelfManagedAttachmentKind; sizeBytes: number },
+): Promise<void> {
+  if (params.sizeBytes <= 0 || params.sizeBytes > MAX_ATTACHMENT_BYTES) {
+    throw new SelfManagedAttachmentError(
+      'too-large',
+      `An attachment is at most ${MAX_ATTACHMENT_BYTES} bytes; this one is ${params.sizeBytes}`,
+    )
+  }
+
+  const [live] = await transaction
+    .select({ total: count() })
+    .from(selfManagedAttachments)
+    .where(
+      and(
+        eq(selfManagedAttachments.profileId, params.profileId),
+        isNull(selfManagedAttachments.deletedAt),
+        inArray(selfManagedAttachments.scanStatus, [...QUOTA_SCAN_STATUSES]),
+      ),
+    )
+  if ((live?.total ?? 0) >= MAX_ACTIVE_ATTACHMENTS) {
+    throw new SelfManagedAttachmentError('too-many', `A profile holds at most ${MAX_ACTIVE_ATTACHMENTS} attachments`)
+  }
+
+  if (params.kind === 'cv') {
+    const [cv] = await transaction
+      .select({ total: count() })
+      .from(selfManagedAttachments)
+      .where(
+        and(
+          eq(selfManagedAttachments.profileId, params.profileId),
+          eq(selfManagedAttachments.kind, 'cv'),
+          isNull(selfManagedAttachments.deletedAt),
+          inArray(selfManagedAttachments.scanStatus, [...QUOTA_SCAN_STATUSES]),
+        ),
+      )
+    if ((cv?.total ?? 0) > 0) {
+      throw new SelfManagedAttachmentError('cv-exists', 'This profile already has a CV; delete it before adding another')
+    }
+  }
+}
+
 function rowToAttachment(
   row: { kind: string; scanStatus: string } & Omit<SelfManagedAttachment, 'kind' | 'scanStatus'>,
 ): SelfManagedAttachment {
@@ -132,9 +185,11 @@ export async function listOwnAttachments(
     .from(selfManagedAttachments)
     .where(and(eq(selfManagedAttachments.profileId, profileId), isNull(selfManagedAttachments.deletedAt)))
     .orderBy(desc(selfManagedAttachments.uploadedAt))
-    // The ceiling is the model's, not a page size: `addAttachment` counts live rows in the same
-    // transaction as the insert and refuses the thirteenth, so twelve is every row there can be.
-    .limit(MAX_ACTIVE_ATTACHMENTS)
+    // Twelve is the quota, but rejected rows stay visible so the owner can read *why* — and they
+    // hold no slot, so more than twelve non-deleted rows can exist. Four pages of quota is room
+    // for every live row plus a generous backlog of rejections awaiting the owner's cleanup, and
+    // it is still one bounded read.
+    .limit(MAX_ACTIVE_ATTACHMENTS * 4)
 
   return rows.map(rowToAttachment)
 }
@@ -208,36 +263,11 @@ export async function addAttachment(
   const now = input.now ?? new Date()
   const profileId = await requireLiveProfileId(transaction, input.ownerUserId)
 
-  if (input.sizeBytes <= 0 || input.sizeBytes > MAX_ATTACHMENT_BYTES) {
-    throw new SelfManagedAttachmentError(
-      'too-large',
-      `An attachment is at most ${MAX_ATTACHMENT_BYTES} bytes; this one is ${input.sizeBytes}`,
-    )
-  }
-
-  const [live] = await transaction
-    .select({ total: count() })
-    .from(selfManagedAttachments)
-    .where(and(eq(selfManagedAttachments.profileId, profileId), isNull(selfManagedAttachments.deletedAt)))
-  if ((live?.total ?? 0) >= MAX_ACTIVE_ATTACHMENTS) {
-    throw new SelfManagedAttachmentError('too-many', `A profile holds at most ${MAX_ACTIVE_ATTACHMENTS} attachments`)
-  }
-
-  if (input.attachment.kind === 'cv') {
-    const [cv] = await transaction
-      .select({ total: count() })
-      .from(selfManagedAttachments)
-      .where(
-        and(
-          eq(selfManagedAttachments.profileId, profileId),
-          eq(selfManagedAttachments.kind, 'cv'),
-          isNull(selfManagedAttachments.deletedAt),
-        ),
-      )
-    if ((cv?.total ?? 0) > 0) {
-      throw new SelfManagedAttachmentError('cv-exists', 'This profile already has a CV; delete it before adding another')
-    }
-  }
+  await assertAttachmentQuota(transaction, {
+    profileId,
+    kind: input.attachment.kind,
+    sizeBytes: input.sizeBytes,
+  })
 
   const [row] = await transaction
     .insert(selfManagedAttachments)
@@ -321,6 +351,221 @@ export async function softDeleteAttachment(
     .returning({ id: selfManagedAttachments.id })
 
   return rows.length > 0
+}
+
+// ── Upload intents ────────────────────────────────────────────────────────────────────────────
+//
+// The route-facing half of the flow `interview-documents.ts` proved: the row exists before the
+// bytes do (the quota is a reservation, not a check), completion is single-use and re-checked in
+// the UPDATE, and everything here resolves the profile from the authenticated owner.
+
+export interface AttachmentUploadIntent {
+  id: string
+  storageKey: string
+}
+
+/**
+ * Reserves an upload slot: an `awaiting_upload` row with the declared size and no hash yet.
+ *
+ * The id is generated here so the object key — which contains it — can go into the same INSERT,
+ * exactly as the candidate flow does. The declared size is written as the reservation; completion
+ * overwrites it with what the object store actually measured.
+ */
+export async function createAttachmentUploadIntent(
+  transaction: TenantTransaction,
+  input: {
+    ownerUserId: string
+    attachment: UpsertAttachment
+    declaredMediaType: string
+    declaredBytes: number
+    keyFor: (params: { profileId: string; attachmentId: string }) => string
+    now?: Date
+  },
+): Promise<AttachmentUploadIntent> {
+  const now = input.now ?? new Date()
+  const profileId = await requireLiveProfileId(transaction, input.ownerUserId)
+
+  await assertAttachmentQuota(transaction, {
+    profileId,
+    kind: input.attachment.kind,
+    sizeBytes: input.declaredBytes,
+  })
+
+  const attachmentId = randomId()
+  const storageKey = input.keyFor({ profileId, attachmentId })
+
+  const [row] = await transaction
+    .insert(selfManagedAttachments)
+    .values({
+      id: attachmentId,
+      profileId,
+      kind: input.attachment.kind,
+      title: input.attachment.title,
+      description: input.attachment.description ?? null,
+      storageKey,
+      mimeType: input.declaredMediaType,
+      sizeBytes: input.declaredBytes,
+      checksumSha256: null,
+      scanStatus: 'awaiting_upload',
+      uploadedAt: now,
+      updatedAt: now,
+    })
+    .returning({ id: selfManagedAttachments.id })
+
+  if (!row) throw new Error(`refused to reserve an upload slot on ${input.ownerUserId}'s profile`)
+  return { id: row.id, storageKey }
+}
+
+export interface AttachmentForCompletion {
+  id: string
+  storageKey: string
+  declaredMediaType: string
+  declaredBytes: number
+  title: string
+}
+
+/**
+ * The row a completion call is allowed to act on: the caller's own, still awaiting its bytes.
+ *
+ * Restricting to `awaiting_upload` is what makes completion single-use — a replayed call cannot
+ * rewrite the hash of an attachment the scanner already judged.
+ */
+export async function findAwaitingUploadAttachment(
+  transaction: TenantTransaction,
+  params: { ownerUserId: string; attachmentId: string },
+): Promise<AttachmentForCompletion | null> {
+  const profileId = await liveProfileIdFor(transaction, params.ownerUserId)
+  if (!profileId) return null
+
+  const [row] = await transaction
+    .select({
+      id: selfManagedAttachments.id,
+      storageKey: selfManagedAttachments.storageKey,
+      declaredMediaType: selfManagedAttachments.mimeType,
+      declaredBytes: selfManagedAttachments.sizeBytes,
+      title: selfManagedAttachments.title,
+    })
+    .from(selfManagedAttachments)
+    .where(
+      and(
+        eq(selfManagedAttachments.id, params.attachmentId),
+        eq(selfManagedAttachments.profileId, profileId),
+        eq(selfManagedAttachments.scanStatus, 'awaiting_upload'),
+        isNull(selfManagedAttachments.deletedAt),
+      ),
+    )
+    .limit(1)
+  if (!row) return null
+  return { ...row, declaredBytes: row.declaredBytes ?? 0 }
+}
+
+/**
+ * Hands a verified upload to the scan queue.
+ *
+ * Size and media type are overwritten with what was measured, never kept as declared, and the
+ * status is re-checked in the UPDATE so two racing completions cannot both write.
+ */
+export async function markAttachmentUploaded(
+  transaction: TenantTransaction,
+  params: { attachmentId: string; sha256: string; actualBytes: number; detectedMediaType: string },
+) {
+  return transaction
+    .update(selfManagedAttachments)
+    .set({
+      scanStatus: 'pending',
+      checksumSha256: params.sha256,
+      sizeBytes: params.actualBytes,
+      mimeType: params.detectedMediaType,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(selfManagedAttachments.id, params.attachmentId),
+        eq(selfManagedAttachments.scanStatus, 'awaiting_upload'),
+      ),
+    )
+    .returning({ id: selfManagedAttachments.id })
+}
+
+/**
+ * Records an upload that failed validation, keeping the row so the owner can see *why*.
+ *
+ * The hash and size stored are computed from the object, not claimed — the claim is what was just
+ * rejected. A `failed` row no longer holds a quota slot, so the owner can retry immediately.
+ */
+export async function rejectAttachmentUploadOnCompletion(
+  transaction: TenantTransaction,
+  params: { attachmentId: string; rejectionCode: string; computedSha256: string; actualBytes: number },
+) {
+  return transaction
+    .update(selfManagedAttachments)
+    .set({
+      scanStatus: 'failed',
+      rejectionCode: params.rejectionCode.slice(0, 64),
+      checksumSha256: params.computedSha256,
+      sizeBytes: params.actualBytes,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(selfManagedAttachments.id, params.attachmentId),
+        eq(selfManagedAttachments.scanStatus, 'awaiting_upload'),
+      ),
+    )
+    .returning({ id: selfManagedAttachments.id })
+}
+
+/**
+ * The one row a download may sign: the caller's own, scanned clean, not deleted.
+ *
+ * The `clean` filter lives in the query, matching the candidate download route: there is no code
+ * path that holds an unscanned attachment's key and then decides not to sign it.
+ */
+export async function findCleanAttachmentForDownload(
+  transaction: TenantTransaction,
+  params: { ownerUserId: string; attachmentId: string },
+): Promise<{ id: string; storageKey: string; mimeType: string; title: string } | null> {
+  const profileId = await liveProfileIdFor(transaction, params.ownerUserId)
+  if (!profileId) return null
+
+  const [row] = await transaction
+    .select({
+      id: selfManagedAttachments.id,
+      storageKey: selfManagedAttachments.storageKey,
+      mimeType: selfManagedAttachments.mimeType,
+      title: selfManagedAttachments.title,
+    })
+    .from(selfManagedAttachments)
+    .where(
+      and(
+        eq(selfManagedAttachments.id, params.attachmentId),
+        eq(selfManagedAttachments.profileId, profileId),
+        eq(selfManagedAttachments.scanStatus, 'clean'),
+        isNull(selfManagedAttachments.deletedAt),
+      ),
+    )
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * Expires intents nobody completed, returning their keys so the caller can delete any partial
+ * object. Without this an abandoned upload holds one of the twelve slots forever, with nothing on
+ * screen explaining why. `uploadedAt` is the intent's creation stamp — bytes never arrived.
+ */
+export async function expireAbandonedAttachmentIntents(
+  transaction: WorkerTransaction,
+  params: { olderThan: Date },
+): Promise<{ id: string; storageKey: string }[]> {
+  return transaction
+    .delete(selfManagedAttachments)
+    .where(
+      and(
+        eq(selfManagedAttachments.scanStatus, 'awaiting_upload'),
+        lt(selfManagedAttachments.uploadedAt, params.olderThan),
+      ),
+    )
+    .returning({ id: selfManagedAttachments.id, storageKey: selfManagedAttachments.storageKey })
 }
 
 /**

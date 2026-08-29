@@ -43,6 +43,14 @@
         "tests/e2e/api/admin.spec.ts"
       ]
     },
+    "/api/admin/billing/beta-mode": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/api/beta-mode-lifecycle.spec.ts",
+        "tests/e2e/api/beta-mode.spec.ts"
+      ]
+    },
     "/api/admin/billing/configuration": {
       "status": "covered",
       "specs": [
@@ -52,7 +60,8 @@
     "/api/admin/billing/disputes": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/admin.spec.ts"
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
       ]
     },
     "/api/admin/billing/events/$eventId": {
@@ -95,7 +104,8 @@
     "/api/admin/billing/refunds": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/admin.spec.ts"
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
       ]
     },
     "/api/admin/billing/risk-exceptions": {
@@ -244,6 +254,27 @@
     "/api/admin/metrics": {
       "status": "covered",
       "specs": [
+        "tests/e2e/admin-metrics-shell.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/metrics/overview": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-metrics-shell.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/metrics/run-retention": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/metrics/sections": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-metrics-shell.spec.ts",
         "tests/e2e/api/admin.spec.ts"
       ]
     },
@@ -281,6 +312,12 @@
         "tests/e2e/api/admin.spec.ts"
       ]
     },
+    "/api/admin/preferences": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
     "/api/admin/roadmap/$id": {
       "status": "covered",
       "specs": [
@@ -297,6 +334,12 @@
       "status": "covered",
       "specs": [
         "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/self-managed/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/admin/seo": {
@@ -387,7 +430,8 @@
       "specs": [
         "tests/e2e/alerts.spec.ts",
         "tests/e2e/api/alerts-triggers.spec.ts",
-        "tests/e2e/api/cross-tenant.spec.ts"
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/onboarding-investing.spec.ts"
       ]
     },
     "/api/alerts/test-trigger": {
@@ -405,6 +449,7 @@
     "/api/alerts/triggers": {
       "status": "covered",
       "specs": [
+        "tests/e2e/alerts.spec.ts",
         "tests/e2e/api/alerts-triggers.spec.ts"
       ]
     },
@@ -421,10 +466,20 @@
     "/api/auth/$": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/pgbouncer-compatibility.spec.ts",
         "tests/e2e/auth-and-sessions.spec.ts",
         "tests/e2e/harness/fixtures.spec.ts",
+        "tests/e2e/load-minted-session.spec.ts",
         "tests/e2e/signup-active-organization.spec.ts",
         "tests/e2e/team-accounts.spec.ts"
+      ]
+    },
+    "/api/beta-mode": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/beta-mode-lifecycle.spec.ts",
+        "tests/e2e/api/beta-mode.spec.ts",
+        "tests/e2e/invitation-walkthrough.spec.ts"
       ]
     },
     "/api/billing/auto-recharge": {
@@ -528,6 +583,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -544,6 +600,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -560,6 +617,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -576,6 +634,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -592,6 +651,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -608,6 +668,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -624,6 +685,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -640,6 +702,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -656,6 +719,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -672,6 +736,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -688,6 +753,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -704,6 +770,7 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
@@ -720,9 +787,16 @@
         "tests/e2e/builder-workspace-navigation.spec.ts",
         "tests/e2e/claimable-profiles.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
         "tests/e2e/onboarding.spec.ts",
         "tests/e2e/profile-view-analytics.spec.ts",
         "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/claim/candidates": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/onboarding-building.spec.ts"
       ]
     },
     "/api/builders/claim/verify": {
@@ -815,22 +889,38 @@
         "tests/e2e/public-and-consent.spec.ts"
       ]
     },
-    "/api/dashboard/overview": {
+    "/api/dashboard/context": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/dashboard-context.spec.ts"
+      ]
+    },
+    "/api/dashboard/organization-admin": {
       "status": "covered",
       "specs": [
         "tests/e2e/dashboard-api.spec.ts"
+      ]
+    },
+    "/api/dashboard/overview": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/pgbouncer-compatibility.spec.ts",
+        "tests/e2e/dashboard-api.spec.ts",
+        "tests/e2e/dashboard-shell.spec.ts"
       ]
     },
     "/api/dashboard/preferences": {
       "status": "covered",
       "specs": [
-        "tests/e2e/dashboard-api.spec.ts"
+        "tests/e2e/dashboard-api.spec.ts",
+        "tests/e2e/dashboard-presets.spec.ts"
       ]
     },
     "/api/dashboard/stats": {
       "status": "covered",
       "specs": [
-        "tests/e2e/dashboard-api.spec.ts"
+        "tests/e2e/dashboard-api.spec.ts",
+        "tests/e2e/dashboard-shell.spec.ts"
       ]
     },
     "/api/e2e/billing-provider": {
@@ -1084,6 +1174,12 @@
         "tests/e2e/api/account.spec.ts"
       ]
     },
+    "/api/me/preferences": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/me-preferences.spec.ts"
+      ]
+    },
     "/api/me/sessions": {
       "status": "covered",
       "specs": [
@@ -1111,7 +1207,17 @@
     "/api/onboarding/status": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/onboarding-v2.spec.ts",
         "tests/e2e/onboarding.spec.ts"
+      ]
+    },
+    "/api/onboarding/v2": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/onboarding-v2.spec.ts",
+        "tests/e2e/onboarding-building.spec.ts",
+        "tests/e2e/onboarding-investing.spec.ts",
+        "tests/e2e/onboarding-rollout.spec.ts"
       ]
     },
     "/api/organizations/activity": {
@@ -1150,13 +1256,29 @@
     "/api/organizations/invitations/$invitationId": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/organizations-invitations.spec.ts"
+        "tests/e2e/api/organizations-invitations.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts"
       ]
     },
     "/api/organizations/invitations/$invitationId/accept": {
       "status": "covered",
       "specs": [
-        "tests/e2e/api/organizations-invitations.spec.ts"
+        "tests/e2e/api/organizations-invitations.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts"
+      ]
+    },
+    "/api/organizations/invitations/$invitationId/reject": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations-invitations.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts"
+      ]
+    },
+    "/api/organizations/invitations/$invitationId/review": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations-invitations.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts"
       ]
     },
     "/api/organizations/invitations": {
@@ -1194,7 +1316,22 @@
       "specs": [
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/api/organizations.spec.ts",
-        "tests/e2e/harness/fixtures.spec.ts"
+        "tests/e2e/harness/fixtures.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts"
+      ]
+    },
+    "/api/organizations/team/invitations": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts"
+      ]
+    },
+    "/api/organizations/team/members": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts"
       ]
     },
     "/api/organizations/transfer-ownership-preview": {
@@ -1387,7 +1524,9 @@
     "/api/queries": {
       "status": "covered",
       "specs": [
+        "tests/e2e/dashboard-presets.spec.ts",
         "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding-investing.spec.ts",
         "tests/e2e/onboarding.spec.ts"
       ]
     },
@@ -1451,13 +1590,39 @@
     "/api/search/builders": {
       "status": "covered",
       "specs": [
-        "tests/e2e/onboarding.spec.ts"
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/search.spec.ts"
       ]
     },
     "/api/search/semantic": {
       "status": "covered",
       "specs": [
+        "tests/e2e/search.spec.ts",
         "tests/e2e/semantic-search.spec.ts"
+      ]
+    },
+    "/api/self-managed/attachments/$attachmentId/complete": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/attachments/$attachmentId/download": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/attachments/$attachmentId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
+      ]
+    },
+    "/api/self-managed/attachments": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/self-managed-profile.spec.ts"
       ]
     },
     "/api/solutions/billing-state": {
@@ -1511,21 +1676,27 @@
       "status": "covered",
       "specs": [
         "tests/e2e/api/claim-verify-fingerprint-sprints.spec.ts",
-        "tests/e2e/api/cross-tenant.spec.ts"
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/pgbouncer-compatibility.spec.ts",
+        "tests/e2e/data-tables.spec.ts"
       ]
     },
     "/api/sprints/$sprintId/results": {
       "status": "covered",
       "specs": [
         "tests/e2e/api/claim-verify-fingerprint-sprints.spec.ts",
-        "tests/e2e/api/cross-tenant.spec.ts"
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/pgbouncer-compatibility.spec.ts",
+        "tests/e2e/data-tables.spec.ts"
       ]
     },
     "/api/sprints": {
       "status": "covered",
       "specs": [
         "tests/e2e/api/claim-verify-fingerprint-sprints.spec.ts",
-        "tests/e2e/api/cross-tenant.spec.ts"
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/pgbouncer-compatibility.spec.ts",
+        "tests/e2e/data-tables.spec.ts"
       ]
     },
     "/api/sprints/preview": {
@@ -1537,6 +1708,7 @@
     "/api/status": {
       "status": "covered",
       "specs": [
+        "tests/e2e/auth-and-sessions.spec.ts",
         "tests/e2e/public-content.spec.ts"
       ]
     },
@@ -1544,6 +1716,12 @@
       "status": "covered",
       "specs": [
         "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/status/summary": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/auth-and-sessions.spec.ts"
       ]
     },
     "/api/webhooks/stripe": {

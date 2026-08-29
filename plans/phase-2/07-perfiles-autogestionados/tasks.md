@@ -172,7 +172,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     `pending` in the meantime, which is what its fixtures now mean: stored, verified, awaiting the
     scanner's word.
 
-- [ ] **Expose upload intent, completion, download, and deletion routes**
+- [x] **Expose upload intent, completion, download, and deletion routes**
   - Files: `src/routes/api/self-managed/attachments/index.ts`,
     `src/routes/api/self-managed/attachments/$attachmentId/complete.ts`,
     `src/routes/api/self-managed/attachments/$attachmentId/download.ts`,
@@ -185,6 +185,40 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     keys, hashes, rejection details, or signed URLs.
   - Verify: the e2e spec runs against real Postgres, MinIO, and ClamAV and covers clean download,
     infected refusal, expired/foreign capability refusal, cross-user 404, quota, and soft delete.
+  - Result: the four routes plus two the flow could not ship without — a `GET` list on the
+    collection (the owner has to be able to *see* `pending`/`failed`/`rejectionCode`, and nothing
+    else serves that until the editor task) and `api/admin/self-managed/run-worker`, the cron/admin
+    trigger without which nothing in production ever scans. The later reconciliation task extends
+    that route's job; it does not add a second one. E2E: 10 specs, all green against real Postgres,
+    MinIO and ClamAV — 10.9 s. "Expired/foreign capability refusal" from the Verify line translates
+    to this flow's authority model as: unauthenticated 401 on every handler, and a foreign *user*
+    reading another owner's attachment id as 404 in completion, download and delete alike.
+  - **Session + `withAccountSubjectContext`, not a tenant principal.** A profile belongs to a
+    person; requiring an active organization would refuse a signed-in builder without one. The
+    context sets `app.user_id` and nothing else, which is exactly the identity `0175`'s owner
+    policies key on — and `auth.api.getSession` is both the guard the coverage gate recognises and
+    the first await in every handler, which is what `check-authenticate-before-validate` pins.
+  - **Completion is one role, unlike the candidate flow, and that is not a shortcut.** Candidates
+    need a worker-role UPDATE because the capability role deliberately holds none; here the caller
+    is the authenticated owner, `builderhunt_app` holds UPDATE, and the owner policy scopes it. The
+    single-use property is the same: `awaiting_upload` is re-checked inside the UPDATE, so a
+    replayed completion cannot rewrite a judged row's hash.
+  - **The validator sees a synthesized filename.** This model stores no client filename by design —
+    the spec forbids names in keys, and a name nobody renders is PII retained for nothing — but the
+    shared validator checks extension-vs-type. The name it gets is built from the declared type's
+    own extension; the magic bytes still decide.
+  - **Quota is a reservation, and a rejection releases it.** The intent row holds one of the twelve
+    slots (and the CV slot) from the moment it is issued; `infected`/`failed` rows stop counting, so
+    a profile cannot be locked shut by its own refused uploads. `addAttachment`'s counts moved onto
+    the same rule, the abandoned-intent sweep joined the scan worker (an hour-old `awaiting_upload`
+    is deleted and its partial object removed), and the owner list's bound grew from twelve to
+    forty-eight because rejected rows stay visible — the *why* is the one thing the owner can act on.
+  - The e2e's scanner-leg test promotes an EICAR object to `pending` by SQL, deliberately: the
+    policy has no magic-byte-less format, so no EICAR body can pass completion honestly (that
+    refusal is its own test), and the worker's fail-closed verdict has to hold even if validation
+    is somehow sidestepped. Defence in depth, tested as depth.
+  - A zero-byte PUT completes as `upload_missing` rather than entering the reject path — the
+    rejection path records the measured size, and the schema rightly refuses a size of zero.
 
 ## Phase 2 — profile API and public/editor UI
 
