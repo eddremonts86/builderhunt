@@ -43,7 +43,7 @@ beforeAll(async () => {
   )
   await db.insert(builderIdentities).values(
     ['ident-a', 'ident-b', 'ident-c'].map((id) => ({
-      id, source: 'github', sourceId: id, kind: 'person', username: id, profileUrl: `https://github.com/${id}`,
+      id, source: 'github', sourceId: id, kind: 'person' as const, username: id, profileUrl: `https://github.com/${id}`,
     })),
   )
 }, 120_000)
@@ -284,9 +284,9 @@ describe('resemblance is never evidence', () => {
     // A claim on a *different* account whose username is identical to this profile's handle: the
     // single most tempting false positive, and the one `dedup.ts` was once wrong about.
     await db.insert(builderIdentities).values({
-      id: 'ident-ada', source: 'github', sourceId: 'ada', kind: 'person', username: 'ada',
+      id: 'ident-ada', source: 'github', sourceId: 'ada', kind: 'person' as const, username: 'ada',
       profileUrl: 'https://github.com/ada',
-    } as never)
+    })
     await seedClaim('claim-lookalike', 'own-b', { builderIdentityId: 'ident-ada' })
 
     await expect(
