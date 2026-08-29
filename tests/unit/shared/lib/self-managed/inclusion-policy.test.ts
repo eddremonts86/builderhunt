@@ -82,6 +82,16 @@ describe('withSelfManagedOrigin', () => {
     expect(withSelfManagedOrigin(['github', SELF_MANAGED_ORIGIN], exclude)).toEqual(['github'])
   })
 
+  it('does not manufacture a search out of an empty list', () => {
+    // The trap this exists for, found by breaking it: `searchBuilders` treats an *absent* source
+    // list as "the defaults" and an *empty* one as "no sources at all". So appending the origin to
+    // `[]` produces a search of nothing but self-managed profiles — the opposite of adding one
+    // origin to the usual set. The policy stays honest about what it was handed; the caller passes
+    // `DEFAULT_SEARCH_SOURCES` when it means the defaults.
+    expect(withSelfManagedOrigin([], include)).toEqual([SELF_MANAGED_ORIGIN])
+    expect(withSelfManagedOrigin([], exclude)).toEqual([])
+  })
+
   it('does not change the network sources it was handed, ever', () => {
     const sources = ['github', 'hn', 'devto']
     expect(withSelfManagedOrigin(sources, include).slice(0, 3)).toEqual(sources)

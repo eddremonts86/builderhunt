@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
-import { searchBuilders } from '~/lib/search'
+import { searchBuilders, DEFAULT_SEARCH_SOURCES } from '~/lib/search'
 import {
   decideSelfManagedInclusion,
   isSelfManagedRow,
@@ -126,7 +126,13 @@ export const Route = createFileRoute('/api/recommendations/')({
             accountPreference: (await withTenantContext(principal, (tx) =>
               getUserPreferences(tx, principal.userId))).searchIncludeSelfManaged,
           })
-          const searchSources = withSelfManagedOrigin(sourcesUnion, inclusion)
+          // The union falls back to the defaults when every saved query is silent about sources:
+          // an empty list means "no sources at all" to the fan-out, so appending the origin to it
+          // would have searched nothing but self-managed profiles.
+          const searchSources = withSelfManagedOrigin(
+            sourcesUnion.length > 0 ? sourcesUnion : DEFAULT_SEARCH_SOURCES,
+            inclusion,
+          )
 
           // 3. Run all queries in parallel via the search pipeline
           const queryResults = await Promise.all(
