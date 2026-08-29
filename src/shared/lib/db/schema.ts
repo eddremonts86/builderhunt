@@ -4623,7 +4623,21 @@ export const selfManagedProfiles = pgTable(
   ],
 )
 
-/** Up to twelve live work samples per profile. The bound is enforced in the repository, not here. */
+/**
+ * Up to twelve live work samples per profile. The bound is enforced in the repository, not here.
+ *
+ * ## The scan state machine lives on the row (migration 0176)
+ *
+ * Mirrors `candidate_documents`, the precedent: `awaiting_upload` is the intent row a presigned PUT
+ * is issued against, `pending` means the bytes landed and were verified, `scanning` is a worker's
+ * lease, and the three terminal states are `clean`, `infected` and `failed`. Only `clean` rows are
+ * publicly readable — the row policy says so as well as the queries.
+ *
+ * `size_bytes` and `checksum_sha256` are nullable for exactly one state: an `awaiting_upload` row
+ * has no bytes yet. The two presence checks close the window again the moment the row leaves that
+ * state, and `rejection_code` is present iff the scan ended in rejection, so a rejected row can
+ * always say why and no other row can pretend to.
+ */
 export const selfManagedAttachments = pgTable(
   'self_managed_attachments',
   {
@@ -4637,10 +4651,18 @@ export const selfManagedAttachments = pgTable(
     /** Set by the server after the upload completes. Never accepted from a request body. */
     storageKey: text('storage_key').notNull(),
     mimeType: text('mime_type').notNull(),
-    sizeBytes: integer('size_bytes').notNull(),
+    /** Null only while `awaiting_upload` — the row exists before the bytes do. */
+    sizeBytes: integer('size_bytes'),
     durationSeconds: integer('duration_seconds'),
-    checksumSha256: text('checksum_sha256').notNull(),
+    /** Null only while `awaiting_upload`, same as `candidate_documents.sha256`. */
+    checksumSha256: text('checksum_sha256'),
+    scanStatus: text('scan_status').notNull().default('awaiting_upload'),
+    /** Persisted, because the retry cap is the only thing separating "try again later" from a loop. */
+    scanAttempts: integer('scan_attempts').notNull().default(0),
+    rejectionCode: text('rejection_code'),
     uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+    /** Every transition writes it; the stale-lease reclaim reads it. */
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
   },
   (table) => [
@@ -4648,10 +4670,36 @@ export const selfManagedAttachments = pgTable(
     // would let a deleted attachment's bytes resurface under a new title.
     uniqueIndex('self_managed_attachments_storage_key_unique').on(table.storageKey),
     index('self_managed_attachments_profile_idx').on(table.profileId),
+    // What the scan worker's lease query walks.
+    index('self_managed_attachments_scan_status_idx').on(table.scanStatus),
     check('self_managed_attachments_kind_check', sql`${table.kind} in ('cv', 'work-sample', 'certificate', 'other')`),
     // 25 MB, from the spec. A negative or zero size is a bug upstream, not a small file.
-    check('self_managed_attachments_size_check', sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= 26214400`),
-    check('self_managed_attachments_checksum_check', sql`${table.checksumSha256} ~ '^[0-9a-f]{64}$'`),
+    check(
+      'self_managed_attachments_size_check',
+      sql`${table.sizeBytes} is null or (${table.sizeBytes} > 0 and ${table.sizeBytes} <= 26214400)`,
+    ),
+    check(
+      'self_managed_attachments_checksum_check',
+      sql`${table.checksumSha256} is null or ${table.checksumSha256} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'self_managed_attachments_scan_status_check',
+      sql`${table.scanStatus} in ('awaiting_upload', 'pending', 'scanning', 'clean', 'infected', 'failed')`,
+    ),
+    // The nullable window is exactly one state wide, in both columns.
+    check(
+      'self_managed_attachments_checksum_present_check',
+      sql`${table.scanStatus} = 'awaiting_upload' or ${table.checksumSha256} is not null`,
+    ),
+    check(
+      'self_managed_attachments_size_present_check',
+      sql`${table.scanStatus} = 'awaiting_upload' or ${table.sizeBytes} is not null`,
+    ),
+    // Iff, not implies: a rejection always says why, and nothing else may carry a code.
+    check(
+      'self_managed_attachments_rejection_check',
+      sql`(${table.scanStatus} in ('infected', 'failed')) = (${table.rejectionCode} is not null)`,
+    ),
   ],
 )
 

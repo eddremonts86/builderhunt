@@ -704,6 +704,10 @@
     "0175_self_managed_profiles": {
       "sql": "cada5aca728a8052e1192cd400f2caaef520d9f972e0254e84e13d89cf1d4035",
       "snapshot": "cd85238ef208de074598bb7d47cbb3769ff643280dbe1da6d341f64c0dba0596"
+    },
+    "0176_self_managed_scan_state": {
+      "sql": "34e6b18b6a753b0bcd5bc9cbd578657d6623849a870e18ee4a266bac71c80af6",
+      "snapshot": "60416db1df973d52e2bc164c738c107f2f74bb9b922f6898e66037abae7555a0"
     }
   }
 }

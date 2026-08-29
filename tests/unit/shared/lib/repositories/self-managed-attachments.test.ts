@@ -7,19 +7,26 @@
  * own profile. An attachment id is guessable and arrives from a URL, so "matches this id" and
  * "matches this id *on your profile*" are the whole difference between an edit and a defacement.
  */
+import { eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { TenantTransaction } from '~/shared/lib/db/client'
+import type { WorkerTransaction } from '~/shared/lib/db/worker-db'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import { authUsers, selfManagedAttachments, selfManagedProfiles } from '~/shared/lib/db/schema'
 import { MAX_ACTIVE_ATTACHMENTS, MAX_ATTACHMENT_BYTES } from '~/shared/lib/self-managed/contracts'
 import {
   addAttachment,
+  leaseAttachmentsForScan,
   listOwnAttachments,
   listPublicAttachments,
   listPurgeableAttachments,
+  markAttachmentClean,
+  markAttachmentRejected,
   purgeDeletedAttachments,
+  reclaimStaleAttachmentScans,
+  releaseAttachmentForScanRetry,
   softDeleteAttachment,
   updateAttachment,
 } from '~/shared/lib/repositories/self-managed-attachments'
@@ -28,6 +35,12 @@ import { createProfile, setVisibility, softDeleteProfile } from '~/shared/lib/re
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
 const tx = () => db as unknown as TenantTransaction
+const wtx = () => db as unknown as WorkerTransaction
+
+/** The worker's half of the flow, for tests about what a stranger sees after a clean verdict. */
+async function scanCleanInPlace(attachment: { id: string; storageKey: string }) {
+  await markAttachmentClean(wtx(), { attachmentId: attachment.id, cleanObjectKey: attachment.storageKey })
+}
 
 const NOW = new Date('2027-03-01T10:00:00Z')
 
@@ -197,8 +210,22 @@ describe('softDeleteAttachment', () => {
 })
 
 describe('listPublicAttachments', () => {
+  it('serves nothing the scanner has not cleared, whatever the profile’s visibility', async () => {
+    const added = await addAttachment(tx(), upload('one'))
+
+    // Born `pending`: stored and verified, but the scan worker has not spoken yet.
+    expect(added.scanStatus).toBe('pending')
+    expect(await listPublicAttachments(tx(), 'ada')).toHaveLength(0)
+
+    // A rejection is just as invisible — and only the owner's list carries the why.
+    await markAttachmentRejected(wtx(), { attachmentId: added.id, scanStatus: 'infected', rejectionCode: 'eicar' })
+    expect(await listPublicAttachments(tx(), 'ada')).toHaveLength(0)
+    expect((await listOwnAttachments(tx(), 'owner-a'))[0]?.rejectionCode).toBe('eicar')
+  })
+
   it('follows the profile’s visibility rather than a flag of its own', async () => {
-    await addAttachment(tx(), upload('one'))
+    const added = await addAttachment(tx(), upload('one'))
+    await scanCleanInPlace(added)
     expect(await listPublicAttachments(tx(), 'ada')).toHaveLength(1)
 
     await setVisibility(tx(), { ownerUserId: 'owner-a', visibility: 'unlisted', now: NOW })
@@ -210,10 +237,118 @@ describe('listPublicAttachments', () => {
   })
 
   it('goes silent when the profile is soft-deleted', async () => {
-    await addAttachment(tx(), upload('one'))
+    const added = await addAttachment(tx(), upload('one'))
+    await scanCleanInPlace(added)
     await softDeleteProfile(tx(), { ownerUserId: 'owner-a', now: NOW })
 
     expect(await listPublicAttachments(tx(), 'ada')).toHaveLength(0)
+  })
+})
+
+describe('the scan pipeline', () => {
+  it('leases only pending live rows under the attempt cap, oldest upload first', async () => {
+    const oldest = await addAttachment(tx(), upload('oldest', { now: new Date(NOW.getTime() - 2000) }))
+    const newer = await addAttachment(tx(), upload('newer', { now: new Date(NOW.getTime() - 1000) }))
+    const deleted = await addAttachment(tx(), upload('deleted'))
+    await softDeleteAttachment(tx(), { ownerUserId: 'owner-a', attachmentId: deleted.id, now: NOW })
+    const exhausted = await addAttachment(tx(), upload('exhausted'))
+    await db.update(selfManagedAttachments).set({ scanAttempts: 3 }).where(eq(selfManagedAttachments.id, exhausted.id))
+    const alreadyClean = await addAttachment(tx(), upload('already-clean'))
+    await scanCleanInPlace(alreadyClean)
+
+    // `RETURNING` order is not the subquery's `ORDER BY` — what the query promises is which rows
+    // fall under the limit. A limit of one must claim the owner who has waited longest.
+    const first = await leaseAttachmentsForScan(wtx(), { limit: 1, maxAttempts: 3 })
+    expect(first.map((row) => row.id)).toEqual([oldest.id])
+    expect(first[0]).toMatchObject({ storageKey: oldest.storageKey, mimeType: 'application/pdf', scanAttempts: 1 })
+
+    // The rest of the queue is one row: deleted, exhausted and clean are nobody's work.
+    const rest = await leaseAttachmentsForScan(wtx(), { limit: 10, maxAttempts: 3 })
+    expect(rest.map((row) => row.id)).toEqual([newer.id])
+
+    const [row] = await db
+      .select({ scanStatus: selfManagedAttachments.scanStatus, scanAttempts: selfManagedAttachments.scanAttempts })
+      .from(selfManagedAttachments)
+      .where(eq(selfManagedAttachments.id, oldest.id))
+    expect(row).toMatchObject({ scanStatus: 'scanning', scanAttempts: 1 })
+  })
+
+  it('marks clean with the promoted key, in the same statement', async () => {
+    const added = await addAttachment(tx(), upload('one', { storageKey: 'quarantine/self-managed/o/p/one' }))
+    await leaseAttachmentsForScan(wtx(), { limit: 1, maxAttempts: 3 })
+
+    await markAttachmentClean(wtx(), { attachmentId: added.id, cleanObjectKey: 'clean/self-managed/o/p/one' })
+
+    const [row] = await db
+      .select({ scanStatus: selfManagedAttachments.scanStatus, storageKey: selfManagedAttachments.storageKey })
+      .from(selfManagedAttachments)
+      .where(eq(selfManagedAttachments.id, added.id))
+    expect(row).toMatchObject({ scanStatus: 'clean', storageKey: 'clean/self-managed/o/p/one' })
+    expect(await listPublicAttachments(tx(), 'ada')).toHaveLength(1)
+  })
+
+  it('truncates a rejection code to what a status field may carry', async () => {
+    const added = await addAttachment(tx(), upload('one'))
+
+    await markAttachmentRejected(wtx(), { attachmentId: added.id, scanStatus: 'failed', rejectionCode: 'x'.repeat(200) })
+
+    const [row] = await db
+      .select({ rejectionCode: selfManagedAttachments.rejectionCode })
+      .from(selfManagedAttachments)
+      .where(eq(selfManagedAttachments.id, added.id))
+    expect(row?.rejectionCode).toBe('x'.repeat(64))
+  })
+
+  it('releases a transient failure back to the queue with its attempt kept', async () => {
+    const added = await addAttachment(tx(), upload('one'))
+    await leaseAttachmentsForScan(wtx(), { limit: 1, maxAttempts: 3 })
+
+    await releaseAttachmentForScanRetry(wtx(), { attachmentId: added.id })
+
+    const [row] = await db
+      .select({ scanStatus: selfManagedAttachments.scanStatus, scanAttempts: selfManagedAttachments.scanAttempts })
+      .from(selfManagedAttachments)
+      .where(eq(selfManagedAttachments.id, added.id))
+    expect(row).toMatchObject({ scanStatus: 'pending', scanAttempts: 1 })
+  })
+
+  it('reclaims a stale lease and leaves a fresh one alone', async () => {
+    const stale = await addAttachment(tx(), upload('stale'))
+    const fresh = await addAttachment(tx(), upload('fresh'))
+    await db.update(selfManagedAttachments)
+      .set({ scanStatus: 'scanning', updatedAt: new Date(NOW.getTime() - 60 * 60_000) })
+      .where(eq(selfManagedAttachments.id, stale.id))
+    await db.update(selfManagedAttachments)
+      .set({ scanStatus: 'scanning', updatedAt: NOW })
+      .where(eq(selfManagedAttachments.id, fresh.id))
+
+    expect(await reclaimStaleAttachmentScans(wtx(), { staleAfterMs: 15 * 60_000, now: NOW })).toBe(1)
+
+    const rows = await db
+      .select({ id: selfManagedAttachments.id, scanStatus: selfManagedAttachments.scanStatus })
+      .from(selfManagedAttachments)
+    expect(rows.find((row) => row.id === stale.id)?.scanStatus).toBe('pending')
+    expect(rows.find((row) => row.id === fresh.id)?.scanStatus).toBe('scanning')
+  })
+
+  it('lets the constraints refuse a rejection without a reason, and a reason without a rejection', async () => {
+    const added = await addAttachment(tx(), upload('one'))
+
+    // Straight past the repository, the way only a bug could write: the CHECK is the last line.
+    await expect(
+      db.update(selfManagedAttachments).set({ scanStatus: 'infected' }).where(eq(selfManagedAttachments.id, added.id)),
+    ).rejects.toMatchObject({ cause: { code: '23514' } })
+    await expect(
+      db.update(selfManagedAttachments).set({ rejectionCode: 'oops' }).where(eq(selfManagedAttachments.id, added.id)),
+    ).rejects.toMatchObject({ cause: { code: '23514' } })
+  })
+
+  it('keeps the no-bytes window one state wide', async () => {
+    const added = await addAttachment(tx(), upload('one'))
+
+    await expect(
+      db.update(selfManagedAttachments).set({ checksumSha256: null }).where(eq(selfManagedAttachments.id, added.id)),
+    ).rejects.toMatchObject({ cause: { code: '23514' } })
   })
 })
 

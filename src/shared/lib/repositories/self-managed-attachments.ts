@@ -25,15 +25,18 @@
  * `listPurgeableAttachments` is what the sweep reads, and `purgeDeletedAttachments` is what it calls
  * once the object is actually gone.
  */
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 
 import { randomId } from '~/lib/utils'
 import type { TenantTransaction } from '../db/client'
+import type { WorkerTransaction } from '../db/worker-db'
 import { selfManagedAttachments, selfManagedProfiles } from '../db/schema'
 import {
   MAX_ACTIVE_ATTACHMENTS,
   MAX_ATTACHMENT_BYTES,
+  SELF_MANAGED_SCAN_STATUSES,
   type SelfManagedAttachmentKind,
+  type SelfManagedScanStatus,
   type UpsertAttachment,
 } from '../self-managed/contracts'
 
@@ -45,9 +48,17 @@ export interface SelfManagedAttachment {
   description: string | null
   storageKey: string
   mimeType: string
-  sizeBytes: number
+  /** Null only while `awaiting_upload` — see the scan state machine on the table. */
+  sizeBytes: number | null
   durationSeconds: number | null
-  checksumSha256: string
+  /** Null only while `awaiting_upload`. */
+  checksumSha256: string | null
+  scanStatus: SelfManagedScanStatus
+  /**
+   * Why a scan rejected, iff it did. Internal: the owner's editor may show it, a public
+   * projection must never include it — task 4's DTOs name their fields for exactly this reason.
+   */
+  rejectionCode: string | null
   uploadedAt: Date
 }
 
@@ -62,6 +73,8 @@ const ATTACHMENT_COLUMNS = {
   sizeBytes: selfManagedAttachments.sizeBytes,
   durationSeconds: selfManagedAttachments.durationSeconds,
   checksumSha256: selfManagedAttachments.checksumSha256,
+  scanStatus: selfManagedAttachments.scanStatus,
+  rejectionCode: selfManagedAttachments.rejectionCode,
   uploadedAt: selfManagedAttachments.uploadedAt,
 } as const
 
@@ -76,11 +89,18 @@ export class SelfManagedAttachmentError extends Error {
   }
 }
 
-function rowToAttachment(row: { kind: string } & Omit<SelfManagedAttachment, 'kind'>): SelfManagedAttachment {
+function rowToAttachment(
+  row: { kind: string; scanStatus: string } & Omit<SelfManagedAttachment, 'kind' | 'scanStatus'>,
+): SelfManagedAttachment {
   // A stored kind outside the set would have to have been written around the CHECK constraint.
   // Reading it back as `other` keeps one bad row from throwing on a page that lists twelve.
   const kind = row.kind === 'cv' || row.kind === 'work-sample' || row.kind === 'certificate' ? row.kind : 'other'
-  return { ...row, kind }
+  // Same reasoning, opposite direction: a status written around the CHECK reads back as a
+  // rejection, because the one coercion that must never happen is toward `clean`.
+  const scanStatus = (SELF_MANAGED_SCAN_STATUSES as readonly string[]).includes(row.scanStatus)
+    ? (row.scanStatus as SelfManagedScanStatus)
+    : 'failed'
+  return { ...row, kind, scanStatus }
 }
 
 /** The owner's live profile id, or `null` if they have none. */
@@ -125,6 +145,9 @@ export async function listOwnAttachments(
  * The visibility test is a join against the profile rather than a column on the attachment, matching
  * the row policy in `0175`. Two places to keep in step is how an attachment outlives the decision to
  * hide the profile it belongs to.
+ *
+ * Only `clean` rows, same as the row policy since `0176`: an attachment the scanner has not cleared
+ * is not served to anybody but its owner, whatever the profile's visibility says.
  */
 export async function listPublicAttachments(
   transaction: TenantTransaction,
@@ -139,6 +162,7 @@ export async function listPublicAttachments(
         eq(selfManagedProfiles.handle, handle),
         isNull(selfManagedProfiles.deletedAt),
         isNull(selfManagedAttachments.deletedAt),
+        eq(selfManagedAttachments.scanStatus, 'clean'),
         inArray(selfManagedProfiles.visibility, ['public', 'unlisted']),
       ),
     )
@@ -154,8 +178,8 @@ export interface AddAttachmentInput {
   ownerUserId: string
   attachment: UpsertAttachment
   /**
-   * Set by the server after the upload lands in `clean/`, never accepted from a request body — the
-   * key names a real object and a caller-chosen one is a caller-chosen file.
+   * Set by the server after the upload lands in quarantine, never accepted from a request body —
+   * the key names a real object and a caller-chosen one is a caller-chosen file.
    */
   storageKey: string
   mimeType: string
@@ -166,7 +190,12 @@ export interface AddAttachmentInput {
 }
 
 /**
- * Record an attachment whose bytes are already stored and scanned.
+ * Record an attachment whose bytes are already stored and verified, queued for the scan.
+ *
+ * The row is written `pending`: the scan worker is what moves it to `clean`, and until it does the
+ * attachment is the owner's alone — the public policy and `listPublicAttachments` both say so.
+ * (Task 4's upload routes add the earlier `awaiting_upload` intent step; this function is the
+ * post-verification write they and today's tests share.)
  *
  * The size check is here as well as in the column's CHECK because the two say different things: the
  * constraint stops a bad row, this stops a bad row *with a message*, and an upload that got past the
@@ -223,7 +252,9 @@ export async function addAttachment(
       sizeBytes: input.sizeBytes,
       durationSeconds: input.durationSeconds ?? null,
       checksumSha256: input.checksumSha256,
+      scanStatus: 'pending',
       uploadedAt: now,
+      updatedAt: now,
     })
     .returning(ATTACHMENT_COLUMNS)
 
@@ -252,6 +283,7 @@ export async function updateAttachment(
       kind: input.attachment.kind,
       title: input.attachment.title,
       description: input.attachment.description ?? null,
+      updatedAt: new Date(),
     })
     .where(
       and(
@@ -278,7 +310,7 @@ export async function softDeleteAttachment(
 
   const rows = await transaction
     .update(selfManagedAttachments)
-    .set({ deletedAt: now })
+    .set({ deletedAt: now, updatedAt: now })
     .where(
       and(
         eq(selfManagedAttachments.id, input.attachmentId),
@@ -337,6 +369,135 @@ export async function purgeDeletedAttachments(
         isNotNull(selfManagedAttachments.deletedAt),
       ),
     )
+    .returning({ id: selfManagedAttachments.id })
+
+  return rows.length
+}
+
+// ── Scan pipeline ─────────────────────────────────────────────────────────────────────────────
+//
+// The worker-side half of the state machine, mirroring `interview-documents.ts` — same lease shape,
+// same "the status is the lease" contract, same injected clock rule. These run as
+// `builderhunt_worker`, whose access comes from the per-operation policies `0176` added; there is no
+// organization to scope to, because a self-managed profile is account-subject data.
+
+/** What the scan worker leases: enough to fetch, scan and move the object, and nothing more. */
+export interface LeasedSelfManagedAttachment {
+  id: string
+  profileId: string
+  storageKey: string
+  mimeType: string
+  scanAttempts: number
+}
+
+const LEASED_ATTACHMENT_COLUMNS = sql`id, profile_id, storage_key, mime_type, scan_attempts`
+
+function toLeasedAttachment(row: Record<string, unknown>): LeasedSelfManagedAttachment {
+  return {
+    id: String(row.id),
+    profileId: String(row.profile_id),
+    storageKey: String(row.storage_key),
+    mimeType: String(row.mime_type),
+    scanAttempts: Number(row.scan_attempts),
+  }
+}
+
+/**
+ * Claims up to `limit` pending attachments for scanning and marks them `scanning` atomically.
+ *
+ * `order by uploaded_at` so the owner who has been waiting longest is scanned first. Soft-deleted
+ * rows are skipped: their bytes belong to the retention sweep, and scanning a file nobody can ever
+ * see again is a ClamAV stream spent on nothing.
+ */
+export async function leaseAttachmentsForScan(
+  transaction: WorkerTransaction,
+  options: { limit: number; maxAttempts: number },
+): Promise<LeasedSelfManagedAttachment[]> {
+  const result = await transaction.execute(sql`
+    update self_managed_attachments
+    set scan_status = 'scanning', scan_attempts = scan_attempts + 1, updated_at = now()
+    where id in (
+      select id from self_managed_attachments
+      where scan_status = 'pending'
+        and scan_attempts < ${options.maxAttempts}
+        and deleted_at is null
+      order by uploaded_at
+      limit ${options.limit}
+      for update skip locked
+    )
+    returning ${LEASED_ATTACHMENT_COLUMNS}
+  `)
+  return [...(result as unknown as Iterable<Record<string, unknown>>)].map(toLeasedAttachment)
+}
+
+/**
+ * Records a clean verdict and the key the object now lives under.
+ *
+ * The key is updated in the same statement as the status because the two must agree: a row marked
+ * clean whose key still points at the quarantine prefix would be served from a location the move
+ * already emptied.
+ */
+export async function markAttachmentClean(
+  transaction: WorkerTransaction,
+  params: { attachmentId: string; cleanObjectKey: string },
+) {
+  return transaction
+    .update(selfManagedAttachments)
+    .set({
+      scanStatus: 'clean',
+      storageKey: params.cleanObjectKey,
+      rejectionCode: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(selfManagedAttachments.id, params.attachmentId))
+    .returning({ id: selfManagedAttachments.id, scanStatus: selfManagedAttachments.scanStatus })
+}
+
+/** Terminal rejection. The code is truncated because it can reach the owner's editor as a status. */
+export async function markAttachmentRejected(
+  transaction: WorkerTransaction,
+  params: { attachmentId: string; scanStatus: 'infected' | 'failed'; rejectionCode: string },
+) {
+  return transaction
+    .update(selfManagedAttachments)
+    .set({
+      scanStatus: params.scanStatus,
+      rejectionCode: params.rejectionCode.slice(0, 64),
+      updatedAt: new Date(),
+    })
+    .where(eq(selfManagedAttachments.id, params.attachmentId))
+    .returning({ id: selfManagedAttachments.id, scanStatus: selfManagedAttachments.scanStatus })
+}
+
+/** Returns an attachment to the scan queue after a transient failure. The attempt already counted. */
+export async function releaseAttachmentForScanRetry(
+  transaction: WorkerTransaction,
+  params: { attachmentId: string },
+) {
+  return transaction
+    .update(selfManagedAttachments)
+    .set({ scanStatus: 'pending', rejectionCode: null, updatedAt: new Date() })
+    .where(eq(selfManagedAttachments.id, params.attachmentId))
+    .returning({ id: selfManagedAttachments.id })
+}
+
+/**
+ * Rescues rows a killed process left `scanning` forever.
+ *
+ * The cutoff comes from the caller's `now`, not from Postgres's `now()`, matching every other worker
+ * in this codebase: a clock the worker accepts but some of its queries ignore lets a test set up a
+ * scenario the code then evaluates against a different timeline.
+ */
+export async function reclaimStaleAttachmentScans(
+  transaction: WorkerTransaction,
+  params: { staleAfterMs: number; now: Date },
+): Promise<number> {
+  const cutoff = new Date(params.now.getTime() - params.staleAfterMs)
+
+  const rows = await transaction
+    .update(selfManagedAttachments)
+    .set({ scanStatus: 'pending', updatedAt: new Date() })
+    .where(and(eq(selfManagedAttachments.scanStatus, 'scanning'), lt(selfManagedAttachments.updatedAt, cutoff)))
     .returning({ id: selfManagedAttachments.id })
 
   return rows.length

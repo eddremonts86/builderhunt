@@ -98,7 +98,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
 
 ## Phase 1 — uploads on the existing document pipeline
 
-- [~] **Extend the existing quarantine and scanning pipeline for profile attachments**
+- [x] **Extend the existing quarantine and scanning pipeline for profile attachments**
   - Files: `src/lib/storage/document-validation.ts`, `src/lib/storage/object-keys.ts`,
     `src/lib/storage/provider.ts`, `src/lib/storage/clamav.ts`,
     `src/lib/scheduling/document-worker.ts`,
@@ -111,8 +111,11 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     safety into a second storage tree.
   - Verify: unit tests reject MIME/magic-byte mismatch and EICAR, keep failed scans quarantined,
     promote a clean object, enforce both quotas, and prove object keys never contain user filenames.
-  - Partial. The validation contract and the key space are done and proved by 24 new tests; the scan
-    pipeline itself is blocked on a schema change, described below.
+  - Done in two halves: the validation contract and the key space first (24 tests), then the scan
+    pipeline once `drizzle/0176_self_managed_scan_state.sql` gave the table a scan state —
+    `runSelfManagedAttachmentScanWorker` in `document-worker.ts`, the lease/mark/reclaim functions in
+    the attachment repository, and 16 new cases across the two suites (the attachment repository's
+    25 and the worker's 23 are all green, as is the full unit run: 7,351).
   - **Done: a policy, not a second validator.** `UploadPolicy` names the only two things the
     candidate path and this one actually differ on — the accepted formats and the byte cap — and
     `validateDocument` takes one, defaulting to the candidate contract so every existing caller is
@@ -131,18 +134,43 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     `quarantine/<owner>/<profile>/<attachment>` — same prefix, same arity, nothing saying which is
     which. The two are authorized completely differently, so a route checking the wrong one would
     still find an object. The infix makes that impossible in the key rather than in every caller.
-  - **Blocked: `self_managed_attachments` has no scan state**, so there is nothing for the worker to
-    lease and nothing a download route could refuse. This is not an oversight in task 1 — `spec.md`
-    contradicts itself. Its §"Modelo canónico de datos" lists the table without a status field, and
-    its §"Adjuntos" requires that "adjuntos recién subidos quedan en estado `pending` y no se sirven
-    hasta que el scan devuelva `clean`". Task 1 built what the data model specified.
-  - What unblocking costs, and why it is a real migration rather than one column: `candidate_documents`
-    is the precedent, and it carries `scan_status`, `scan_attempts` and `rejection_code` with a CHECK
-    pairing a rejection to a reason. It also makes `sha256` nullable, because an `awaiting_upload` row
-    has no bytes yet — and `0175` made `size_bytes` and `checksum_sha256` `NOT NULL` with a
-    `size_bytes > 0` CHECK, all three of which have to be relaxed for the intent step task 4 specifies.
-    That belongs in one migration written deliberately, not appended to this task at the end of a
-    session. `0175` is applied in production, so it is `0176` and nothing edits `0175`.
+  - **Unblocked by `0176`, written as its own deliberate migration** (the spec contradiction stands
+    recorded below for the next reader). It mirrors `candidate_documents` exactly: the six-state
+    machine (`awaiting_upload → pending → scanning → clean | infected | failed`), persisted
+    `scan_attempts`, `rejection_code` as an **iff** with the two rejection states, and a nullable
+    window for `size_bytes`/`checksum_sha256` that is exactly one state wide — two presence CHECKs
+    close it the moment a row leaves `awaiting_upload`. Pre-`0176` rows are backfilled to `pending`,
+    not `clean`: their old contract *claimed* "already scanned", but nothing ever scanned them, and
+    the worker earning the verdict is cheaper than trusting a claim no scanner made.
+  - **The public-read policy now requires `scan_status = 'clean'`**, and so does
+    `listPublicAttachments`. Before `0176`, "pending attachments are not served" rested entirely on
+    queries remembering a filter that did not exist yet; now the row policy says it too.
+  - **`0175`'s worker grants were unreachable, and `0176` closes that for all three tables.** The
+    `0175` comment claimed the worker "bypasses RLS through its own role" — but `builderhunt_worker`
+    is `NOBYPASSRLS` (`scripts/db/roles.sql`) and the tables are FORCE RLS, so a role with grants and
+    no policy gets empty results, not errors: the exact failure mode `0085` warns about. `0176` adds
+    the per-operation `USING (true)` worker policies `candidate_documents` got in `0085`, to
+    attachments, profiles and handle reservations alike — without them the scan lease, the retention
+    sweep and the reservation sweep would all have silently swept nothing. Verified through the real
+    role identity, not just the superuser suites: on a freshly migrated scratch database,
+    `SET ROLE builderhunt_worker` sees a seeded pending attachment and the lease UPDATE claims it
+    (`pending → scanning`, `UPDATE 1`).
+  - **The scan worker is a second worker, not a fourth phase of `runDocumentWorker`.** That worker's
+    loop, kill switch and job history are per-organization; a self-managed profile is account-subject
+    and has no tenant to iterate. `runSelfManagedAttachmentScanWorker` runs under its own
+    `self-managed.attachment-scan` job key with the same three-step contract (reclaim + lease
+    committed first, network I/O outside any transaction, one short transaction per outcome), and one
+    broken attachment fails alone rather than stalling the batch. What is shared is the part that
+    must never fork: `scanStoredObject` — extracted from the candidate `scanOne`, byte-for-byte the
+    same verdict handling — plus provider, ClamAV, key derivation and the move-before-mark ordering.
+  - One deliberate improvement over the precedent, in the shared core: a leased key already under
+    `clean/` (a previous pass moved the object and died before the mark landed) re-earns its verdict
+    but skips the move, instead of failing forever on a source the move already emptied. For
+    candidate rows this state is unreachable today, so their behavior is unchanged.
+  - Deliberately left for task 4: the routes that *feed* this pipeline (intent → `awaiting_upload`,
+    completion → `pending`) and the admin run-worker route that triggers it. `addAttachment` writes
+    `pending` in the meantime, which is what its fixtures now mean: stored, verified, awaiting the
+    scanner's word.
 
 - [ ] **Expose upload intent, completion, download, and deletion routes**
   - Files: `src/routes/api/self-managed/attachments/index.ts`,
