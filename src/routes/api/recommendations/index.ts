@@ -189,6 +189,17 @@ export const Route = createFileRoute('/api/recommendations/')({
                 reason: 'no_matches',
                 basedOnSearches: userQueries.length,
                 totalCandidates: 0,
+                // The same two fields the populated response carries, for the
+                // same stated reason — "so a surface can explain a short list
+                // instead of showing a gap". An empty list is the extreme case
+                // of a short one, and opting out is one of the things that can
+                // empty it: without these, the API is least explicable exactly
+                // when the explanation matters most. It is also the shape bug
+                // warned about further down — a field present on some
+                // responses and absent on others is one a reader treats as
+                // `undefined` and quietly ignores.
+                includesSelfManaged: inclusion.include,
+                selfManagedInclusionReason: inclusion.reason,
               },
             })
           }
