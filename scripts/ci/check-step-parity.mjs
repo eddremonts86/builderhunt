@@ -136,6 +136,69 @@ const exempt = (script) =>
   Object.keys(RUNNER_PLUMBING).some((prefix) => script === prefix || script.startsWith(`${prefix} `))
 
 /**
+ * Every `job: body` pair inside a workflow's `jobs:` block.
+ *
+ * Two regex bugs have lived in this splitter, and both of them made a check pass by seeing nothing.
+ * The first was `\Z`, which JavaScript does not have — it matched a literal Z, so the last job in
+ * every file fell outside the split.
+ *
+ * The second is why this is now one function instead of a pattern retyped per check: the job name
+ * was `[a-z][a-z-]*`, with no digits. `quality.yml`'s job is called **`e2e`**. It never matched, so
+ * the split ran straight through it and its whole body was read as part of `unit`'s — and every
+ * check here has therefore been judging the repository's largest suite-running job by whichever
+ * steps happened to sit above it. `jobsMissingABuild` reported parity for a job it had never seen.
+ */
+function jobsIn(source) {
+  const section = /^jobs:$([\s\S]*)$/m.exec(source)
+  if (!section) return []
+  const JOB = /^ {2}([a-z][a-z0-9_-]*):$([\s\S]*?)(?=^ {2}[a-z][a-z0-9_-]*:$|$(?![\s\S]))/gm
+  return [...section[1].matchAll(JOB)].map((m) => [m[1], m[2]])
+}
+
+/**
+ * The steps that put tables in the database the *shared* server answers from.
+ *
+ * Every suite-running job stands up one `vite dev` from `playwright.config.ts` alongside the
+ * per-worker servers, and that one connects to the job's own `builderhunt_security_test_ci`. The
+ * harness migrates its disposable databases itself; nothing migrates that one except these steps.
+ *
+ * `visual-baselines.yml` carries a long comment about what a job with an empty database produces —
+ * a dashboard with a 650 px hole where seven widgets belong, screenshotted twice, stable both
+ * times. It describes that as the reason *it* needed these steps, and states that `advisory.yml`'s
+ * visual job already ran them. It did not. Neither did `quality.yml`'s e2e job, whose every shard
+ * logged eleven `relation "event_participants" does not exist`, nor the nightly.
+ *
+ * Which is the whole argument for checking it here rather than writing it down again: a claim in a
+ * comment about another file is not a check, and this one was wrong for as long as it existed.
+ */
+const DATABASE_PREPARATION = [
+  'pnpm test:migrations:local',
+  'scripts/db/prepare-rls-fixture.mjs',
+  'drizzle-kit migrate',
+  'pnpm db:seed:admin',
+]
+
+function jobsMissingDatabasePreparation() {
+  const problems = []
+  for (const file of SUITE_RUNNING_WORKFLOWS) {
+    const source = readFileSync(join(root, file), 'utf8')
+    for (const [job, body] of jobsIn(source)) {
+      if (!/pnpm test:(e2e|visual)\b/.test(body)) continue
+      // Comments stripped first. The block explaining *why* `drizzle-kit migrate` is needed contains
+      // the words `drizzle-kit migrate`, so a substring search over the raw body was satisfied by the
+      // prose — deleting the step it describes left this check green. Verified by deleting it.
+      const runnable = body.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n')
+      for (const step of DATABASE_PREPARATION) {
+        if (!runnable.includes(step)) {
+          problems.push(`${file.split('/').pop()}'s ${job} job runs the suite without \`${step}\``)
+        }
+      }
+    }
+  }
+  return problems
+}
+
+/**
  * Any job that drives the worker harness has to build first.
  *
  * `tests/e2e/harness/server.ts` serves `dist/` rather than starting a dev server, so a job that runs
@@ -147,14 +210,7 @@ function jobsMissingABuild() {
   const problems = []
   for (const file of SUITE_RUNNING_WORKFLOWS) {
     const source = readFileSync(join(root, file), 'utf8')
-    // Only inside `jobs:` — an earlier version matched two-space keys anywhere and counted `push:`
-    // from the trigger block as a job.
-    const section = /^jobs:$([\s\S]*)$/m.exec(source)
-    if (!section) continue
-    // `$(?![\s\S])` rather than `\Z`, which JavaScript does not have: it was matching a literal Z,
-    // so the last job in every file fell outside the split and this check quietly passed.
-    for (const m of section[1].matchAll(/^ {2}([a-z][a-z-]*):$([\s\S]*?)(?=^ {2}[a-z][a-z-]*:$|$(?![\s\S]))/gm)) {
-      const [, job, body] = m
+    for (const [job, body] of jobsIn(source)) {
       if (!/pnpm test:(e2e|visual)\b/.test(body)) continue
       if (/^ +- run: pnpm build$/m.test(body)) continue
       problems.push(`${file.split('/').pop()}'s ${job} job runs the suite without building first`)
@@ -164,6 +220,7 @@ function jobsMissingABuild() {
 }
 
 const missingBuilds = jobsMissingABuild()
+const missingDatabase = jobsMissingDatabasePreparation()
 const envDrift = envBlocksAgree()
 const missing = [...workflow].filter((script) => !local.has(script) && !exempt(script)).sort()
 const stale = Object.keys(RUNNER_PLUMBING).filter(
@@ -177,6 +234,7 @@ console.log(JSON.stringify({
   missingLocally: missing.length,
   envBlocksDrifted: envDrift.length,
   jobsMissingABuild: missingBuilds.length,
+  jobsMissingDatabasePreparation: missingDatabase.length,
 }))
 
 if (stale.length > 0) {
@@ -209,4 +267,23 @@ if (missingBuilds.length > 0) {
   console.error('\n  The harness serves dist/. Without `pnpm build` the suite dies before its first assertion.\n')
 }
 
-if (missing.length > 0 || stale.length > 0 || envDrift.length > 0 || missingBuilds.length > 0) process.exit(1)
+if (missingDatabase.length > 0) {
+  console.error(
+    `\n${missingDatabase.length} missing database-preparation step${missingDatabase.length === 1 ? '' : 's'}:\n`,
+  )
+  for (const line of missingDatabase) console.error(`  - ${line}`)
+  console.error(
+    '\n  The per-worker harness migrates its own disposable databases; the shared `vite dev` from'
+    + '\n  playwright.config.ts answers from the job\'s own database and nothing else migrates it.'
+    + '\n  A job without these serves a schemaless database to whichever specs use that server —'
+    + '\n  and a page that renders nothing renders it consistently, so a baseline taken there passes.\n',
+  )
+}
+
+if (
+  missing.length > 0
+  || stale.length > 0
+  || envDrift.length > 0
+  || missingBuilds.length > 0
+  || missingDatabase.length > 0
+) process.exit(1)

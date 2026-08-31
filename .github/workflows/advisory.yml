@@ -276,6 +276,45 @@ jobs:
       # timeout each. The reasoning is in the script.
       - run: ./scripts/ci/install-chromium.sh
 
+      # ── The database this job judges against ────────────────────────────────────────────────────
+      #
+      # The same four steps `visual-baselines.yml` runs, and its header already explains why: a
+      # refresh workflow that regenerates against a different database than the gate judges against
+      # launders a degraded render into the expected state. That comment was written about *this*
+      # job having them and the refresh not — and it was reading a claim, not the file. This job
+      # never ran them.
+      #
+      # What it cost, visible in this job's own log on every run: the shared `vite dev` server points
+      # at `builderhunt_security_test_ci`, which nothing migrated, so it has no application tables.
+      # Every request it serves records a service metric, and every flush thirty seconds later died
+      # on `relation "service_metric_buckets" does not exist`. Twelve public-surface baselines are
+      # captured against that server. They pass today because those pages happen not to read the
+      # database — the first one that does would be screenshotted as an error page and the gate would
+      # defend it, which is the identical failure in the opposite direction.
+      #
+      # `scripts/ci/check-step-parity.mjs` now compares this block against the refresh workflow's, so
+      # the next divergence is a failed gate rather than a claim in a comment.
+      - run: pnpm test:migrations:local
+      - run: node scripts/db/prepare-rls-fixture.mjs
+
+      - name: Migrate and seed, so the gate judges the same state the refresh regenerates from
+        run: |
+          pnpm exec drizzle-kit migrate
+          pnpm db:seed:admin
+
+          # `seed-admin.ts` mints a fresh id per run, so the platform-admin env list cannot be
+          # hardcoded — it is read back from the row just written. The admin specs here mint their
+          # own principal through the worker harness and do not need this, but the shared server
+          # does: without it an `/admin/*` URL on that server redirects, and a redirect screenshots
+          # perfectly well.
+          ADMIN_ID="$(psql "$DATABASE_MIGRATION_URL" -Atc "select id from auth_users where email = 'edd_admin@local.com'")"
+          if [ -z "$ADMIN_ID" ]; then
+            echo "Seeded admin not found — every /admin/* gate would redirect." >&2
+            exit 1
+          fi
+          echo "ADMIN_USER_IDS=$ADMIN_ID" >> "$GITHUB_ENV"
+          echo "Platform admin: $ADMIN_ID"
+
       # Before the preview, not after it. Playwright starts its own dev server for these
       # projects and `reuseExistingServer` is false under CI by design, so running this while
       # `pnpm preview` held port 3000 failed with "http://localhost:3000 is already used" —
