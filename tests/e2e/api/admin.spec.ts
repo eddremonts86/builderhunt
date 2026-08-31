@@ -207,6 +207,7 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'roadmap/index.ts', method: 'POST', path: '/api/admin/roadmap' },
   { file: 'search-sources.ts', method: 'GET', path: '/api/admin/search-sources' },
   { file: 'search-sources.ts', method: 'POST', path: '/api/admin/search-sources' },
+  { file: 'self-managed/run-worker.ts', method: 'POST', path: '/api/admin/self-managed/run-worker' },
   { file: 'seo/index.ts', method: 'GET', path: '/api/admin/seo' },
   { file: 'seo/index.ts', method: 'PATCH', path: '/api/admin/seo' },
   { file: 'solutions/gold-briefs.ts', method: 'GET', path: '/api/admin/solutions/gold-briefs' },

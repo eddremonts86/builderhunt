@@ -150,6 +150,26 @@ const zodEnv = z.object({
    * disagree about whether a page exists.
    */
   SEGMENTED_LANDING_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  /**
+   * Whether self-managed profiles exist (plan: phase-2/07-perfiles-autogestionados).
+   *
+   * One flag for the whole feature — the editor, the public page, the upload routes, the profile
+   * routes, the search origin and the semantic indexing. Several flags would let a deployment sit
+   * in a state nobody designed: a public page for profiles nobody can edit, or an index of rows
+   * that no longer have a surface.
+   *
+   * Off is **fail-closed and additive-safe**: every entry point answers 404 and every write is
+   * refused, while the rows stay exactly where they are. What deliberately keeps working with the
+   * flag off is data export and erasure — a person's right to see and delete what is held about
+   * them is not a feature that can be switched off, and a rollback that took it with it would turn
+   * an operational decision into a compliance one.
+   *
+   * Default `false`, like every other flag here: production inherits neither `.env` nor
+   * `.env.example`, so turning this on for real people stays a deliberate act in Coolify rather
+   * than a side effect of a merge.
+   */
+  SELF_MANAGED_PROFILES_ENABLED: z.enum(['true', 'false']).default('false'),
   /**
    * Percentage of accounts on onboarding v2 (plan: phase-2/03-onboarding-segmentado).
    *

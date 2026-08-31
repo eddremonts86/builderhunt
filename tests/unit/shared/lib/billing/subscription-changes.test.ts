@@ -181,7 +181,7 @@ async function freshOrgWithOwner(): Promise<TenantPrincipal> {
 async function seedActiveSubscription(
   organizationId: string,
   provider: FakeBillingProvider,
-  overrides: Partial<{ catalogKey: string; tier: 'pro' | 'pro_max' | 'team'; interval: 'monthly' | 'annual'; currentPeriodStart: Date; currentPeriodEnd: Date; providerSyncedAt: Date }> = {},
+  overrides: Partial<{ catalogKey: string; tier: 'pro' | 'pro_max' | 'team'; interval: 'monthly' | 'annual'; currentPeriodStart: Date; currentPeriodEnd: Date; providerSyncedAt: Date; stripeStatus: string }> = {},
 ): Promise<string> {
   const customerId = uniqueId('cust')
   const stripeSubscriptionId = `sub_${uniqueId('sub')}`
@@ -190,7 +190,7 @@ async function seedActiveSubscription(
   await db.insert(billingSubscriptions).values({
     id: uniqueId('subrow'), organizationId, customerId, livemode: false,
     catalogKey, tier: overrides.tier ?? 'pro', interval: overrides.interval ?? 'monthly', catalogVersion: 1,
-    stripeSubscriptionId, stripeStatus: 'active',
+    stripeSubscriptionId, stripeStatus: overrides.stripeStatus ?? 'active',
     currentPeriodStart: overrides.currentPeriodStart ?? new Date('2026-03-01T00:00:00Z'),
     currentPeriodEnd: overrides.currentPeriodEnd ?? new Date('2026-04-01T00:00:00Z'),
     providerSyncedAt: overrides.providerSyncedAt ?? new Date('2026-03-01T00:00:00Z'),
@@ -576,3 +576,77 @@ describe('cancelSubscriptionImmediately', () => {
     expect(result).toEqual({ canceled: true, canceledAt: null })
   })
 })
+
+/**
+ * A plan change on a subscription whose first payment never completed.
+ *
+ * Stripe began refusing this on 2026-08-24 with an `invalid_request_error`, which `mapStripeError`
+ * turns into a plain `Error` rather than a `BillingProviderError` — its comment says an invalid
+ * request "is a real bug in how we called Stripe, not a customer-facing decline/timeout scenario",
+ * which stopped being true for this one. So it escapes `changeSubscription`'s catch and the route
+ * answers 500 for something the customer can fix themselves.
+ *
+ * `findFullActiveBillingSubscription` filters on `canceled_at is null` and nothing else, so an
+ * `incomplete` row is very much reachable here — that is what makes this production exposure rather
+ * than a test-only concern.
+ */
+describe('a subscription whose first payment has not completed', () => {
+  /** Reports whatever status it is told to, so the guard's second question has an answer to read. */
+  class StatusProvider extends FakeBillingProvider {
+    constructor(private readonly reported: 'incomplete' | 'active') { super() }
+    override async getSubscription(subscriptionId: string): ReturnType<FakeBillingProvider['getSubscription']> {
+      const found = await super.getSubscription(subscriptionId)
+      return found ? { ...found, status: this.reported } : found
+    }
+  }
+
+  it('is refused with a code the surface can act on, not a 500', async () => {
+    const principal = await freshOrgWithOwner()
+    const provider = new StatusProvider('incomplete')
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider, { stripeStatus: 'incomplete' })
+    const preview = await previewSubscriptionChange(db as never, principal, { newCatalogKey: 'pro_max_monthly' }, { provider })
+
+    await expect(
+      changeSubscription(db as never, principal, {
+        newCatalogKey: 'pro_max_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('change'),
+      }, { provider }),
+    ).rejects.toMatchObject({ code: 'subscription_incomplete' })
+
+    // And nothing was applied — the row still holds the plan it started on.
+    expect((await readSubscription(stripeSubscriptionId)).catalogKey).toBe('pro_monthly')
+  })
+
+  it('goes ahead when our row is stale and the provider says it is active', async () => {
+    const principal = await freshOrgWithOwner()
+    // The row lags a webhook: it still says `incomplete` while Stripe has moved on. Refusing here
+    // would tell somebody to finish a payment they finished a second ago.
+    const provider = new StatusProvider('active')
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider, { stripeStatus: 'incomplete' })
+    const preview = await previewSubscriptionChange(db as never, principal, { newCatalogKey: 'pro_max_monthly' }, { provider })
+
+    const result = await changeSubscription(db as never, principal, {
+      newCatalogKey: 'pro_max_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('change'),
+    }, { provider })
+
+    expect(result.applied).toBe('immediate')
+    expect((await readSubscription(stripeSubscriptionId)).catalogKey).toBe('pro_max_monthly')
+  })
+
+  it('never asks the provider at all when the stored status is fine', async () => {
+    const principal = await freshOrgWithOwner()
+    const provider = new FakeBillingProvider()
+    const asked = vi.spyOn(provider, 'getSubscription')
+    await seedActiveSubscription(principal.organizationId, provider)
+    const preview = await previewSubscriptionChange(db as never, principal, { newCatalogKey: 'pro_max_monthly' }, { provider })
+    asked.mockClear()
+
+    await changeSubscription(db as never, principal, {
+      newCatalogKey: 'pro_max_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('change'),
+    }, { provider })
+
+    // The common path pays nothing for this guard, which is the whole reason it reads the stored
+    // status first instead of asking Stripe on every plan change.
+    expect(asked).not.toHaveBeenCalled()
+  })
+})
+

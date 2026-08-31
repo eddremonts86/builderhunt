@@ -22,6 +22,9 @@ const SUBSCRIPTION_CHANGE_ERROR_STATUS: Record<SubscriptionChangeErrorCode, numb
   payment_failed: 402,
   requires_action: 402,
   seat_limit_exceeded: 409,
+  // 409 rather than 402: nothing is owed to *this* request, and a card form would be the wrong
+  // response. The subscription is in a state that has to resolve first, which is a conflict.
+  subscription_incomplete: 409,
 }
 
 /**

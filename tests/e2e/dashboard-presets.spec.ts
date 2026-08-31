@@ -87,7 +87,9 @@ test('a workspace with no segment gets the dashboard it already had', async ({ p
  */
 test('the empty state says what each route is for', async ({ page }) => {
   for (const [segment, expected, label, href] of [
-    ['building', 'Complete your profile', 'Go to my profile', '/me'],
+    // `/me/profile`, not `/me`: the `building` segment covers people with an indexed footprint to
+    // claim and people with none, and only the self-managed editor serves both (phase-2/07).
+    ['building', 'Write your profile', 'Go to my profile', '/me/profile'],
     ['hiring', 'Start a sourcing sprint', 'Create a sprint', '/sprints'],
     ['investing', 'Save your first search', 'Run a search', '/search'],
   ] as const) {

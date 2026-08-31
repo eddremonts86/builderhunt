@@ -27,16 +27,18 @@
  * an unbounded delete on a growing table is a statement whose cost nobody has measured — it runs
  * fine for a year and then holds a lock for four minutes on the night it matters.
  */
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 
 import { randomId } from '~/lib/utils'
 import type { TenantTransaction } from '../db/client'
-import { builderClaims, selfManagedHandleReservations, selfManagedProfiles } from '../db/schema'
+import { builderClaims, selfManagedAttachments, selfManagedHandleReservations, selfManagedProfiles } from '../db/schema'
 import {
+  MAX_ACTIVE_ATTACHMENTS,
   HANDLE_RELEASE_AFTER_DELETE_MS,
   HANDLE_RESERVATION_TTL_MS,
   isAllowedVisibilityTransition,
   isPubliclyReadable,
+  isSearchable,
   type PublicSelfManagedProfile,
   type SelfManagedVisibility,
   type UpsertSelfManagedProfile,
@@ -108,6 +110,32 @@ function rowToOwn(row: {
   return { ...row, visibility: narrowVisibility(row.visibility) }
 }
 
+/**
+ * The owner's profile as a route hands it back: named fields, dates as strings, no subject id.
+ *
+ * `ownerUserId` is dropped because the caller *is* the owner — echoing it adds nothing and puts an
+ * account id in every response body. A projection built by naming what goes in cannot leak a
+ * column added later.
+ */
+export function ownProfileDto(profile: OwnSelfManagedProfile) {
+  return {
+    id: profile.id,
+    handle: profile.handle,
+    displayName: profile.displayName,
+    headline: profile.headline,
+    bio: profile.bio,
+    locationCity: profile.locationCity,
+    locationCountryCode: profile.locationCountryCode,
+    languages: profile.languages,
+    services: profile.services,
+    topics: profile.topics,
+    visibility: profile.visibility,
+    promotedToBuilderClaimId: profile.promotedToBuilderClaimId,
+    declaredAt: profile.declaredAt.toISOString(),
+    updatedAt: profile.updatedAt.toISOString(),
+  }
+}
+
 /** The one live profile this person has, or `null`. Drafts included — it is their own. */
 export async function getOwnProfile(
   transaction: TenantTransaction,
@@ -137,6 +165,21 @@ export async function getPublicProfileByHandle(
   transaction: TenantTransaction,
   handle: string,
 ): Promise<PublicSelfManagedProfile | null> {
+  return (await getPublicProfileListing(transaction, handle))?.profile ?? null
+}
+
+/**
+ * The same public projection, plus whether the profile is *listed*.
+ *
+ * The page needs one bit the projection deliberately withholds: `unlisted` must be served and
+ * kept out of the index, and `public` must be served and indexed. Returning `listed` rather than
+ * `visibility` gives the route exactly that decision without handing a reader the state name —
+ * and `draft` never gets here at all, because it is not publicly readable.
+ */
+export async function getPublicProfileListing(
+  transaction: TenantTransaction,
+  handle: string,
+): Promise<{ profile: PublicSelfManagedProfile; listed: boolean } | null> {
   const [row] = await transaction
     .select({
       handle: selfManagedProfiles.handle,
@@ -157,9 +200,10 @@ export async function getPublicProfileByHandle(
     .where(and(eq(selfManagedProfiles.handle, handle), isNull(selfManagedProfiles.deletedAt)))
     .limit(1)
 
-  if (!row || !isPubliclyReadable(narrowVisibility(row.visibility))) return null
+  const visibility = row ? narrowVisibility(row.visibility) : null
+  if (!row || !visibility || !isPubliclyReadable(visibility)) return null
 
-  return {
+  const profile: PublicSelfManagedProfile = {
     handle: row.handle,
     displayName: row.displayName,
     headline: row.headline,
@@ -172,6 +216,182 @@ export async function getPublicProfileByHandle(
     updatedAt: row.updatedAt.toISOString(),
     verified: row.claimStatus === 'verified',
   }
+
+  return { profile, listed: isSearchable(visibility) }
+}
+
+/** One searchable public profile, as the internal search origin reads it. */
+export interface SearchableSelfManagedProfile {
+  id: string
+  handle: string
+  displayName: string
+  headline: string | null
+  bio: string | null
+  locationCity: string | null
+  locationCountryCode: string | null
+  languages: string[]
+  services: string[]
+  topics: string[]
+  updatedAt: Date
+}
+
+/**
+ * Public, listed profiles matching any of `keywords`.
+ *
+ * `visibility = 'public'` and not `unlisted`: unlisted means reachable by anyone holding the link,
+ * and a search result is precisely the listing its owner opted out of. The row policy cannot tell
+ * the two apart — it sees a select either way — so this predicate is where the distinction lives,
+ * and `isSearchable` is the one place that decides it.
+ *
+ * Matching is case-insensitive over the declared text and the two tag arrays. Deliberately not
+ * `to_tsvector`: a self-managed profile's text is short, its services are a closed taxonomy, and a
+ * stemmed index would need a migration and a refresh path to answer questions this cardinality does
+ * not yet pose. When it does, the query changes here and nothing above it moves.
+ */
+export async function searchPublicProfiles(
+  transaction: TenantTransaction,
+  input: { keywords: readonly string[]; limit: number },
+): Promise<SearchableSelfManagedProfile[]> {
+  const terms = input.keywords.map((keyword) => keyword.trim().toLowerCase()).filter(Boolean)
+  if (terms.length === 0) return []
+
+  const matches = terms.map((term) => {
+    const like = `%${term.replace(/[%_\\]/g, (character) => `\\${character}`)}%`
+    return sql`(
+      lower(${selfManagedProfiles.displayName}) like ${like}
+      or lower(coalesce(${selfManagedProfiles.headline}, '')) like ${like}
+      or lower(coalesce(${selfManagedProfiles.bio}, '')) like ${like}
+      or lower(${selfManagedProfiles.handle}) like ${like}
+      or exists (select 1 from jsonb_array_elements_text(${selfManagedProfiles.topics}) as t(value) where lower(t.value) like ${like})
+      or exists (select 1 from jsonb_array_elements_text(${selfManagedProfiles.services}) as s(value) where lower(s.value) like ${like})
+    )`
+  })
+
+  const rows = await transaction
+    .select({
+      id: selfManagedProfiles.id,
+      handle: selfManagedProfiles.handle,
+      displayName: selfManagedProfiles.displayName,
+      headline: selfManagedProfiles.headline,
+      bio: selfManagedProfiles.bio,
+      locationCity: selfManagedProfiles.locationCity,
+      locationCountryCode: selfManagedProfiles.locationCountryCode,
+      languages: selfManagedProfiles.languages,
+      services: selfManagedProfiles.services,
+      topics: selfManagedProfiles.topics,
+      updatedAt: selfManagedProfiles.updatedAt,
+    })
+    .from(selfManagedProfiles)
+    .where(and(
+      eq(selfManagedProfiles.visibility, 'public'),
+      isNull(selfManagedProfiles.deletedAt),
+      or(...matches),
+    ))
+    // Freshest first, and bounded by the caller's provider page — the same ceiling every network
+    // connector answers within, so one origin cannot flood a fused page.
+    .orderBy(desc(selfManagedProfiles.updatedAt))
+    .limit(input.limit)
+
+  return rows
+}
+
+/** A public profile plus the clean attachments the semantic document may quote. */
+export interface IndexableSelfManagedProfile extends SearchableSelfManagedProfile {
+  attachments: Array<{ title: string; description: string | null }>
+}
+
+/**
+ * Public profiles in id order for the reconciliation pass, at most `limit` at a time.
+ *
+ * Ordered and cursored on `id` rather than `updated_at`: the worker's job is to walk the whole set
+ * exactly once per pass, and a cursor on a column an edit can move would revisit rows or skip them
+ * depending on who saved during the walk.
+ *
+ * Attachments are fetched per page rather than joined, so a profile with twelve of them cannot
+ * multiply its own row twelve times and silently shrink the page.
+ */
+export async function listIndexableProfiles(
+  transaction: TenantTransaction,
+  input: { after?: string | null; limit: number },
+): Promise<IndexableSelfManagedProfile[]> {
+  return listIndexableProfilesWhere(
+    transaction,
+    input.after ? gt(selfManagedProfiles.id, input.after) : undefined,
+    input.limit,
+  )
+}
+
+/** The one query both indexable reads run, so a filter added here cannot apply to only one of them. */
+async function listIndexableProfilesWhere(
+  transaction: TenantTransaction,
+  extra: ReturnType<typeof eq> | undefined,
+  limit: number,
+): Promise<IndexableSelfManagedProfile[]> {
+  const rows = await transaction
+    .select({
+      id: selfManagedProfiles.id,
+      handle: selfManagedProfiles.handle,
+      displayName: selfManagedProfiles.displayName,
+      headline: selfManagedProfiles.headline,
+      bio: selfManagedProfiles.bio,
+      locationCity: selfManagedProfiles.locationCity,
+      locationCountryCode: selfManagedProfiles.locationCountryCode,
+      languages: selfManagedProfiles.languages,
+      services: selfManagedProfiles.services,
+      topics: selfManagedProfiles.topics,
+      updatedAt: selfManagedProfiles.updatedAt,
+    })
+    .from(selfManagedProfiles)
+    .where(and(
+      eq(selfManagedProfiles.visibility, 'public'),
+      isNull(selfManagedProfiles.deletedAt),
+      ...(extra ? [extra] : []),
+    ))
+    .orderBy(asc(selfManagedProfiles.id))
+    .limit(limit)
+
+  if (rows.length === 0) return []
+
+  const attachments = await transaction
+    .select({
+      profileId: selfManagedAttachments.profileId,
+      title: selfManagedAttachments.title,
+      description: selfManagedAttachments.description,
+    })
+    .from(selfManagedAttachments)
+    .where(and(
+      inArray(selfManagedAttachments.profileId, rows.map((row) => row.id)),
+      // Clean only. An embedding is a copy: text that reaches the index has left the row policy
+      // behind and cannot be un-indexed by tightening one later.
+      eq(selfManagedAttachments.scanStatus, 'clean'),
+      isNull(selfManagedAttachments.deletedAt),
+    ))
+    .orderBy(asc(selfManagedAttachments.uploadedAt))
+    .limit(rows.length * MAX_ACTIVE_ATTACHMENTS)
+
+  const byProfile = new Map<string, Array<{ title: string; description: string | null }>>()
+  for (const attachment of attachments) {
+    const list = byProfile.get(attachment.profileId) ?? []
+    list.push({ title: attachment.title, description: attachment.description })
+    byProfile.set(attachment.profileId, list)
+  }
+
+  return rows.map((row) => ({ ...row, attachments: byProfile.get(row.id) ?? [] }))
+}
+
+/**
+ * One profile's indexable projection, or `null` when it is not eligible.
+ *
+ * `null` is the answer for absent, draft, unlisted and deleted alike, and the caller acts on it the
+ * same way in every case: take the row out of the index. Distinguishing them here would push a
+ * four-branch decision into every call site to reach the same conclusion.
+ */
+export async function findIndexableProfile(
+  transaction: TenantTransaction,
+  profileId: string,
+): Promise<IndexableSelfManagedProfile | null> {
+  const [row] = await listIndexableProfilesWhere(transaction, eq(selfManagedProfiles.id, profileId), 1)
+  return row ?? null
 }
 
 /**
@@ -228,7 +448,14 @@ export interface CreateProfileInput {
 /** Raised when the caller's request is refused for a reason the caller can act on. */
 export class SelfManagedProfileError extends Error {
   constructor(
-    readonly code: 'handle-taken' | 'already-exists' | 'not-found' | 'invalid-transition',
+    readonly code:
+      | 'handle-taken'
+      | 'already-exists'
+      | 'not-found'
+      | 'invalid-transition'
+      | 'claim-not-found'
+      | 'claim-not-verified'
+      | 'claim-already-linked',
     message: string,
   ) {
     super(message)
@@ -410,6 +637,154 @@ export async function softDeleteProfile(
 }
 
 /**
+ * Link this profile to a claim the owner has already proven, or unlink it again.
+ *
+ * ## What promotion is, and what it is not
+ *
+ * It is additive. The profile keeps rendering from its own row — its bio, its handle, its
+ * attachments — and gains a verified block hydrated from the claim. Nothing is copied across and
+ * nothing is replaced, which is what makes the reverse operation a single `null` write rather than
+ * a restore.
+ *
+ * It is never inferred. The only signal this accepts is a claim id whose row is already
+ * `verified` and whose `subject_user_id` is the caller: the decision goes through
+ * `decideLink({ kind: 'verified_claim' })`, the module whose whole purpose is that resemblance is
+ * not evidence. A matching handle, an identical display name and a 99.99% embedding similarity are
+ * all equally insufficient here, and there is no parameter through which any of them could arrive.
+ *
+ * `promotion-*` errors are the caller's to act on; a lost race on the unique index comes back as
+ * `claim-already-linked` rather than a 500.
+ */
+export async function promoteToBuilderClaim(
+  transaction: TenantTransaction,
+  input: { ownerUserId: string; profileId: string; claimId: string; now?: Date },
+): Promise<OwnSelfManagedProfile> {
+  const now = input.now ?? new Date()
+
+  const existing = await getOwnProfile(transaction, input.ownerUserId)
+  // One 404 for absent, deleted and somebody else's: the id in the path either names the caller's
+  // own live profile or it names nothing.
+  if (!existing || existing.id !== input.profileId) {
+    throw new SelfManagedProfileError('not-found', 'This account has no such self-managed profile')
+  }
+
+  const [claim] = await transaction
+    .select({
+      id: builderClaims.id,
+      subjectUserId: builderClaims.subjectUserId,
+      status: builderClaims.status,
+      verifiedAt: builderClaims.verifiedAt,
+      revokedAt: builderClaims.revokedAt,
+    })
+    .from(builderClaims)
+    .where(eq(builderClaims.id, input.claimId))
+    .limit(1)
+
+  // Absent and somebody else's claim answer alike, so this cannot be used to learn that a claim id
+  // exists on another account.
+  if (!claim || claim.subjectUserId !== input.ownerUserId) {
+    throw new SelfManagedProfileError('claim-not-found', 'No such verified claim on this account')
+  }
+  // `status` and `revoked_at` are both checked. A revoked claim can keep a stale `verified` status
+  // for as long as it takes a writer to be wrong once, and this is the read that would publish it.
+  if (claim.status !== 'verified' || claim.verifiedAt === null || claim.revokedAt !== null) {
+    throw new SelfManagedProfileError('claim-not-verified', 'That claim is not verified')
+  }
+
+  let row
+  try {
+    ;[row] = await transaction
+      .update(selfManagedProfiles)
+      .set({ promotedToBuilderClaimId: claim.id, updatedAt: now })
+      .where(and(eq(selfManagedProfiles.id, existing.id), isNull(selfManagedProfiles.deletedAt)))
+      .returning(OWN_COLUMNS)
+  } catch (error) {
+    const code = (error as { cause?: { code?: string } })?.cause?.code
+    if (code === '23505') {
+      throw new SelfManagedProfileError('claim-already-linked', 'That claim already backs another profile')
+    }
+    throw error
+  }
+
+  if (!row) throw new Error(`refused to promote ${input.ownerUserId}'s self-managed profile`)
+  return rowToOwn(row)
+}
+
+/**
+ * Undo the link. The profile keeps everything it had before it was promoted.
+ *
+ * Idempotent by shape: unlinking a profile that is not linked writes `null` over `null` and reports
+ * the row unchanged, because "there was nothing to undo" is not a failure anybody can act on.
+ */
+export async function unlinkBuilderClaim(
+  transaction: TenantTransaction,
+  input: { ownerUserId: string; profileId: string; now?: Date },
+): Promise<OwnSelfManagedProfile> {
+  const now = input.now ?? new Date()
+
+  const existing = await getOwnProfile(transaction, input.ownerUserId)
+  if (!existing || existing.id !== input.profileId) {
+    throw new SelfManagedProfileError('not-found', 'This account has no such self-managed profile')
+  }
+
+  const [row] = await transaction
+    .update(selfManagedProfiles)
+    .set({ promotedToBuilderClaimId: null, updatedAt: now })
+    .where(and(eq(selfManagedProfiles.id, existing.id), isNull(selfManagedProfiles.deletedAt)))
+    .returning(OWN_COLUMNS)
+
+  if (!row) throw new Error(`refused to unlink ${input.ownerUserId}'s self-managed profile`)
+  return rowToOwn(row)
+}
+
+/**
+ * Everything an account erasure has to take with it that a foreign key cannot.
+ *
+ * `auth_users` cascades to `self_managed_profiles` and on to `self_managed_attachments`, which
+ * disposes of the rows — and that is exactly the problem. Two things outlive them:
+ *
+ *   - the semantic index row. `builder_embeddings` has no foreign key to a profile (its identity is
+ *     `(entity_kind, source, source_id)`, deliberately, so it can index things that are not rows in
+ *     one table). A cascade therefore leaves `self_managed_person:<profileId>` behind, and that row
+ *     is what semantic search reads — the profile would keep answering queries after the account
+ *     that owned it stopped existing.
+ *   - the objects. The retention sweep finds bytes through soft-deleted *rows*; a cascade deletes
+ *     the rows outright, so nothing ever holds those keys again and the files stay in the bucket
+ *     forever.
+ *
+ * Both have to be read *before* the delete, which is why this exists as its own function rather than
+ * as cleanup afterwards: afterwards there is nothing left to read.
+ *
+ * Soft-deleted rows are included. Erasure is not the thirty-day grace period — a person deleting
+ * their account is not waiting to change their mind about a profile they already deleted.
+ */
+export async function collectSelfManagedErasureTargets(
+  transaction: TenantTransaction,
+  ownerUserId: string,
+): Promise<{ profileIds: string[]; storageKeys: string[] }> {
+  const profiles = await transaction
+    .select({ id: selfManagedProfiles.id })
+    .from(selfManagedProfiles)
+    .where(eq(selfManagedProfiles.ownerUserId, ownerUserId))
+    // One live profile per person plus whatever they soft-deleted inside the handle-hold window.
+    // A person cannot accumulate these faster than one per thirty days.
+    .limit(64)
+
+  if (profiles.length === 0) return { profileIds: [], storageKeys: [] }
+
+  const profileIds = profiles.map((row) => row.id)
+  const attachments = await transaction
+    .select({ storageKey: selfManagedAttachments.storageKey })
+    .from(selfManagedAttachments)
+    .where(inArray(selfManagedAttachments.profileId, profileIds))
+    // Twelve live slots per profile, plus rejected rows the owner has not cleared. Four pages of
+    // quota each, matching the owner list's own ceiling.
+    .limit(profileIds.length * MAX_ACTIVE_ATTACHMENTS * 4)
+
+  return { profileIds, storageKeys: attachments.map((row) => row.storageKey) }
+}
+
+/**
  * Hold a handle for seven days before the profile exists.
  *
  * Keyed on the handle rather than the person, so one account cannot hold five. `onConflictDoUpdate`
@@ -427,20 +802,33 @@ export async function reserveHandle(
     throw new SelfManagedProfileError('handle-taken', `The handle "${input.handle}" is not available`)
   }
 
-  const [row] = await transaction
-    .insert(selfManagedHandleReservations)
-    .values({ handle: input.handle, reservedByUserId: input.userId, reservedAt: now, expiresAt })
-    .onConflictDoUpdate({
-      target: selfManagedHandleReservations.handle,
-      set: { reservedByUserId: input.userId, reservedAt: now, expiresAt },
-      // Only the caller's own row, or one that has already lapsed. Without this, a conflict on
-      // somebody else's live reservation would quietly reassign it.
-      setWhere: or(
-        eq(selfManagedHandleReservations.reservedByUserId, input.userId),
-        lt(selfManagedHandleReservations.expiresAt, now),
-      ),
-    })
-    .returning({ handle: selfManagedHandleReservations.handle, expiresAt: selfManagedHandleReservations.expiresAt })
+  let row
+  try {
+    ;[row] = await transaction
+      .insert(selfManagedHandleReservations)
+      .values({ handle: input.handle, reservedByUserId: input.userId, reservedAt: now, expiresAt })
+      .onConflictDoUpdate({
+        target: selfManagedHandleReservations.handle,
+        set: { reservedByUserId: input.userId, reservedAt: now, expiresAt },
+        // Only the caller's own row, or one that has already lapsed. Without this, a conflict on
+        // somebody else's live reservation would quietly reassign it.
+        setWhere: or(
+          eq(selfManagedHandleReservations.reservedByUserId, input.userId),
+          lt(selfManagedHandleReservations.expiresAt, now),
+        ),
+      })
+      .returning({ handle: selfManagedHandleReservations.handle, expiresAt: selfManagedHandleReservations.expiresAt })
+  } catch (error) {
+    // The availability read refuses a live rival first, so the only way here is losing a
+    // razor-thin race to one. Under RLS that surfaces as the row policy refusing the DO UPDATE
+    // (42501); on a database without RLS in force it would be the unique key (23505). Both mean
+    // exactly one thing to the caller.
+    const code = (error as { cause?: { code?: string } })?.cause?.code
+    if (code === '42501' || code === '23505') {
+      throw new SelfManagedProfileError('handle-taken', `The handle "${input.handle}" is not available`)
+    }
+    throw error
+  }
 
   if (!row) throw new SelfManagedProfileError('handle-taken', `The handle "${input.handle}" is not available`)
   return row

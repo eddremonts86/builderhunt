@@ -26,6 +26,9 @@ import { publicDb } from '~/shared/lib/db/client'
 import { savedQueries } from '~/shared/lib/db/schema'
 import { resolveFeedCapability } from '~/shared/lib/repositories/public-feeds'
 import { and, eq } from 'drizzle-orm'
+import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
+import { getUserPreferences } from '~/shared/lib/repositories/user-preferences'
+import { withAccountSubjectContext } from '~/shared/lib/db/tenant-context'
 
 const RATE_BUCKET = new Map<string, { count: number; resetAt: number }>()
 const RATE_LIMIT = 60
@@ -221,6 +224,9 @@ async function findSavedQueryForCapability(organizationId: string, queryId: stri
     .select({
       id: savedQueries.id,
       name: savedQueries.name,
+      // Projected so the feed can resolve *whose* preference governs it. A public feed is still
+      // one person's saved search on a schedule; nobody subscribed to anyone else's judgement.
+      userId: savedQueries.userId,
       keywords: savedQueries.keywords,
       sources: savedQueries.sources,
       language: savedQueries.language,
@@ -285,9 +291,15 @@ export const Route = createFileRoute('/api/feeds/$searchId')({
           }
 
           const sources = (search.sources ?? ['github']) as string[]
+          // A feed is a saved search on a schedule, so it follows the same policy the search does.
+          // The subject is the search's owner: nobody else is subscribed to their judgement.
+          const feedInclusion = decideSelfManagedInclusion({
+            accountPreference: (await withAccountSubjectContext(search.userId, (tx) =>
+              getUserPreferences(tx, search.userId))).searchIncludeSelfManaged,
+          })
           const results = await searchBuilders({
             keywords: search.keywords,
-            sources,
+            sources: withSelfManagedOrigin(sources, feedInclusion),
             language: search.language ?? undefined,
             country: search.country ?? undefined,
             perPage: 50,

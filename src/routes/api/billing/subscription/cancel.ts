@@ -15,6 +15,10 @@ const SUBSCRIPTION_CHANGE_ERROR_STATUS: Record<SubscriptionChangeErrorCode, numb
   payment_failed: 402,
   requires_action: 402,
   seat_limit_exceeded: 409,
+  // Never raised on this route — the guard lives in `changeSubscription`, because cancelling and
+  // previewing an incomplete subscription are both things Stripe allows. Present because the map is
+  // exhaustive over the shared code union, which is what surfaced this file when the code was added.
+  subscription_incomplete: 409,
 }
 
 /**

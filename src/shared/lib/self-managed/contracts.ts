@@ -27,6 +27,23 @@ export type SelfManagedVisibility = (typeof SELF_MANAGED_VISIBILITIES)[number]
 export const SELF_MANAGED_ATTACHMENT_KINDS = ['cv', 'work-sample', 'certificate', 'other'] as const
 export type SelfManagedAttachmentKind = (typeof SELF_MANAGED_ATTACHMENT_KINDS)[number]
 
+/**
+ * The attachment scan state machine, mirroring `candidate_documents` (migration 0176).
+ *
+ * `awaiting_upload` is an intent row with no bytes; `pending` means the bytes landed and were
+ * verified; `scanning` is a worker's lease; `clean`, `infected` and `failed` are terminal. Only
+ * `clean` is ever served to a stranger — the row policy and every public query agree on that.
+ */
+export const SELF_MANAGED_SCAN_STATUSES = [
+  'awaiting_upload',
+  'pending',
+  'scanning',
+  'clean',
+  'infected',
+  'failed',
+] as const
+export type SelfManagedScanStatus = (typeof SELF_MANAGED_SCAN_STATUSES)[number]
+
 /** Twelve active work samples, from the spec. Enforced in the repository, mirrored here for the form. */
 export const MAX_ACTIVE_ATTACHMENTS = 12
 /** 25 MB, from the spec. */
@@ -99,6 +116,39 @@ export const upsertAttachmentSchema = z
 export type UpsertAttachment = z.infer<typeof upsertAttachmentSchema>
 
 /**
+ * What an owner sends to reserve an upload slot.
+ *
+ * `declaredMediaType` is checked against the upload policy in the route — this module must not
+ * import the storage layer — and `declaredBytes` is the quota reservation, verified against the
+ * real object at completion. Neither is trusted past the intent.
+ */
+export const createAttachmentIntentSchema = z
+  .object({
+    kind: z.enum(SELF_MANAGED_ATTACHMENT_KINDS),
+    title: z.string().min(1).max(120),
+    description: z.string().max(600).nullable().optional(),
+    declaredMediaType: z.string().min(1).max(100),
+    declaredBytes: z.number().int().positive().max(MAX_ATTACHMENT_BYTES),
+  })
+  .strict()
+
+export type CreateAttachmentIntent = z.infer<typeof createAttachmentIntentSchema>
+
+/** The completion call's one claim: what the caller believes it uploaded. Verified, never trusted. */
+export const completeAttachmentUploadSchema = z
+  .object({
+    sha256: z.string().regex(/^[0-9a-f]{64}$/, 'sha256 is 64 lowercase hex characters'),
+  })
+  .strict()
+
+/** A visibility change and nothing else — re-sending the whole profile is how a stale form reverts an edit. */
+export const setVisibilitySchema = z
+  .object({
+    visibility: z.enum(SELF_MANAGED_VISIBILITIES),
+  })
+  .strict()
+
+/**
  * Whether a visibility change is one the product allows.
  *
  * Every transition is legal today — the owner may move freely between the three — and this exists so
@@ -117,4 +167,23 @@ export function isPubliclyReadable(visibility: SelfManagedVisibility): boolean {
 /** Whether it may appear in search. `unlisted` is reachable by link and never listed. */
 export function isSearchable(visibility: SelfManagedVisibility): boolean {
   return visibility === 'public'
+}
+
+/**
+ * What a stranger sees of an attachment.
+ *
+ * A projection built by naming what goes in: no storage key, no checksum, no scan status and no
+ * rejection code. Only `clean` rows ever reach a public surface, so a status field would say the
+ * same thing on every row it appeared on — and `rejectionCode` is the owner's to read, never a
+ * visitor's.
+ */
+export interface PublicSelfManagedAttachment {
+  id: string
+  kind: SelfManagedAttachmentKind
+  title: string
+  description: string | null
+  mediaType: string
+  sizeBytes: number
+  durationSeconds: number | null
+  uploadedAt: string
 }

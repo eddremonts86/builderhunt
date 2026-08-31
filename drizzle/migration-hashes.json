@@ -704,6 +704,34 @@
     "0175_self_managed_profiles": {
       "sql": "cada5aca728a8052e1192cd400f2caaef520d9f972e0254e84e13d89cf1d4035",
       "snapshot": "cd85238ef208de074598bb7d47cbb3769ff643280dbe1da6d341f64c0dba0596"
+    },
+    "0176_self_managed_scan_state": {
+      "sql": "34e6b18b6a753b0bcd5bc9cbd578657d6623849a870e18ee4a266bac71c80af6",
+      "snapshot": "60416db1df973d52e2bc164c738c107f2f74bb9b922f6898e66037abae7555a0"
+    },
+    "0177_handle_reservation_policies": {
+      "sql": "b85c504bbe011cb86dc8a2d4e6361dd1280f9ce94a8e0eabc75d8b9ce04bae76",
+      "snapshot": "6b801f121b4bba8bc587d772a65fbc1fb391af2aa7a43d861fd0b0b4bac7fa9b"
+    },
+    "0178_self_managed_entity_kind": {
+      "sql": "4af8f82a255466d9c669246d653abe072e29fe5d22840c69508da2381bd5d23f",
+      "snapshot": "c8a1de772a3f0cadc7da1bf5a183fc30381275709b95106629efe7e2902d3c36"
+    },
+    "0179_app_delete_builder_embeddings": {
+      "sql": "656d02779fc69c5db2d22f9ac406f9d7e1e712e03064fe21575e78e86b512bc9",
+      "snapshot": "becf64fb4ebc6bba0f7d533372f770c401cd159e49f5046a43b9dc977f627eed"
+    },
+    "0180_self_managed_inclusion_preference": {
+      "sql": "ed1c46774a175a1f79c97ef96d7c7ce372f3ddebdfd0a63f12b5be17d89aff9c",
+      "snapshot": "35b137649e1569759ad97d02e7c49017e100777b7676984352fcd6aeb2b17959"
+    },
+    "0181_sprint_include_self_managed": {
+      "sql": "0aea292c5efd38e6fed70b27dfb4a295bd73b77b81a8a75b84a7c03d2e791d9a",
+      "snapshot": "c48b5ea7866ef076e56543d187184b979322ba9f7139cff22fbfc14429a182c2"
+    },
+    "0182_self_managed_claim_link_unique": {
+      "sql": "8174077bac3c9c77ab47f692d2a90dcf5c1a9b4e0ffc19c77e8f1f790c1799cc",
+      "snapshot": "2b1ef4e89fb97b65890767d08b80ecbb31774f09a839b8d25644733bb05f5978"
     }
   }
 }

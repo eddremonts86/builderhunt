@@ -145,12 +145,18 @@ export const SEGMENT_PAGES: Record<SegmentPageKey, SegmentPageContent> = {
     segment: 'building',
     slug: 'builders',
     path: '/for/builders',
-    title: 'Claim the profile we already indexed',
+    title: 'Claim your profile, or write one',
     metaDescription:
-      'Your work is spread across five platforms. Claim the profile BuilderHunt indexed and decide what it says.',
-    heading: 'Claim your profile, and decide what it says',
+      'Claim the profile BuilderHunt indexed and decide what it says — or write your own, no GitHub account required.',
+    heading: 'Claim your profile, or write one',
+    /*
+     * Rewritten for phase-2/07. Every line here used to assume the reader was already in the index
+     * — "we already did", "the question is whether it is yours to edit" — which told a translator,
+     * a technical writer or an illustrator with no connector footprint that this product was not
+     * for them. It now says both, because both now exist.
+     */
     subheading:
-      'Your work is spread across five platforms and none of them puts it together. We already did — the question is whether it is yours to edit.',
+      'If your work is spread across the platforms we index, claim what we found and decide what it says. If it is not, write your own page — no GitHub account required.',
     claims: [
       {
         text: 'Prove the account is yours by publishing a one-time challenge on it.',
@@ -163,6 +169,10 @@ export const SEGMENT_PAGES: Record<SegmentPageKey, SegmentPageContent> = {
       {
         text: 'Publish a portfolio page from the same profile.',
         evidence: 'src/routes/api/me/builder-claims/$claimId/portfolio/publish.ts',
+      },
+      {
+        text: 'No indexed activity? Write your own page instead, with work samples attached.',
+        evidence: 'src/routes/_dashboard/me/profile.tsx',
       },
       {
         text: 'Or have the profile removed instead. That is a flow, not an email address.',
@@ -178,6 +188,7 @@ export const SEGMENT_PAGES: Record<SegmentPageKey, SegmentPageContent> = {
     limits: [
       'Claiming proves you control that external account. It does not verify your identity or anything you have said about your experience.',
       'Claiming does not change where you rank, and it does not generate profile views or opportunities.',
+      'A page you write yourself is shown as Self-managed everywhere it appears. It never carries the verified badge, and nothing on it has been checked against an external account.',
     ],
   },
 }

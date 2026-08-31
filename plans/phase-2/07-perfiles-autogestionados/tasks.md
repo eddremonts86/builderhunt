@@ -98,7 +98,7 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
 
 ## Phase 1 — uploads on the existing document pipeline
 
-- [~] **Extend the existing quarantine and scanning pipeline for profile attachments**
+- [x] **Extend the existing quarantine and scanning pipeline for profile attachments**
   - Files: `src/lib/storage/document-validation.ts`, `src/lib/storage/object-keys.ts`,
     `src/lib/storage/provider.ts`, `src/lib/storage/clamav.ts`,
     `src/lib/scheduling/document-worker.ts`,
@@ -111,8 +111,11 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     safety into a second storage tree.
   - Verify: unit tests reject MIME/magic-byte mismatch and EICAR, keep failed scans quarantined,
     promote a clean object, enforce both quotas, and prove object keys never contain user filenames.
-  - Partial. The validation contract and the key space are done and proved by 24 new tests; the scan
-    pipeline itself is blocked on a schema change, described below.
+  - Done in two halves: the validation contract and the key space first (24 tests), then the scan
+    pipeline once `drizzle/0176_self_managed_scan_state.sql` gave the table a scan state —
+    `runSelfManagedAttachmentScanWorker` in `document-worker.ts`, the lease/mark/reclaim functions in
+    the attachment repository, and 16 new cases across the two suites (the attachment repository's
+    25 and the worker's 23 are all green, as is the full unit run: 7,351).
   - **Done: a policy, not a second validator.** `UploadPolicy` names the only two things the
     candidate path and this one actually differ on — the accepted formats and the byte cap — and
     `validateDocument` takes one, defaulting to the candidate contract so every existing caller is
@@ -131,20 +134,45 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     `quarantine/<owner>/<profile>/<attachment>` — same prefix, same arity, nothing saying which is
     which. The two are authorized completely differently, so a route checking the wrong one would
     still find an object. The infix makes that impossible in the key rather than in every caller.
-  - **Blocked: `self_managed_attachments` has no scan state**, so there is nothing for the worker to
-    lease and nothing a download route could refuse. This is not an oversight in task 1 — `spec.md`
-    contradicts itself. Its §"Modelo canónico de datos" lists the table without a status field, and
-    its §"Adjuntos" requires that "adjuntos recién subidos quedan en estado `pending` y no se sirven
-    hasta que el scan devuelva `clean`". Task 1 built what the data model specified.
-  - What unblocking costs, and why it is a real migration rather than one column: `candidate_documents`
-    is the precedent, and it carries `scan_status`, `scan_attempts` and `rejection_code` with a CHECK
-    pairing a rejection to a reason. It also makes `sha256` nullable, because an `awaiting_upload` row
-    has no bytes yet — and `0175` made `size_bytes` and `checksum_sha256` `NOT NULL` with a
-    `size_bytes > 0` CHECK, all three of which have to be relaxed for the intent step task 4 specifies.
-    That belongs in one migration written deliberately, not appended to this task at the end of a
-    session. `0175` is applied in production, so it is `0176` and nothing edits `0175`.
+  - **Unblocked by `0176`, written as its own deliberate migration** (the spec contradiction stands
+    recorded below for the next reader). It mirrors `candidate_documents` exactly: the six-state
+    machine (`awaiting_upload → pending → scanning → clean | infected | failed`), persisted
+    `scan_attempts`, `rejection_code` as an **iff** with the two rejection states, and a nullable
+    window for `size_bytes`/`checksum_sha256` that is exactly one state wide — two presence CHECKs
+    close it the moment a row leaves `awaiting_upload`. Pre-`0176` rows are backfilled to `pending`,
+    not `clean`: their old contract *claimed* "already scanned", but nothing ever scanned them, and
+    the worker earning the verdict is cheaper than trusting a claim no scanner made.
+  - **The public-read policy now requires `scan_status = 'clean'`**, and so does
+    `listPublicAttachments`. Before `0176`, "pending attachments are not served" rested entirely on
+    queries remembering a filter that did not exist yet; now the row policy says it too.
+  - **`0175`'s worker grants were unreachable, and `0176` closes that for all three tables.** The
+    `0175` comment claimed the worker "bypasses RLS through its own role" — but `builderhunt_worker`
+    is `NOBYPASSRLS` (`scripts/db/roles.sql`) and the tables are FORCE RLS, so a role with grants and
+    no policy gets empty results, not errors: the exact failure mode `0085` warns about. `0176` adds
+    the per-operation `USING (true)` worker policies `candidate_documents` got in `0085`, to
+    attachments, profiles and handle reservations alike — without them the scan lease, the retention
+    sweep and the reservation sweep would all have silently swept nothing. Verified through the real
+    role identity, not just the superuser suites: on a freshly migrated scratch database,
+    `SET ROLE builderhunt_worker` sees a seeded pending attachment and the lease UPDATE claims it
+    (`pending → scanning`, `UPDATE 1`).
+  - **The scan worker is a second worker, not a fourth phase of `runDocumentWorker`.** That worker's
+    loop, kill switch and job history are per-organization; a self-managed profile is account-subject
+    and has no tenant to iterate. `runSelfManagedAttachmentScanWorker` runs under its own
+    `self-managed.attachment-scan` job key with the same three-step contract (reclaim + lease
+    committed first, network I/O outside any transaction, one short transaction per outcome), and one
+    broken attachment fails alone rather than stalling the batch. What is shared is the part that
+    must never fork: `scanStoredObject` — extracted from the candidate `scanOne`, byte-for-byte the
+    same verdict handling — plus provider, ClamAV, key derivation and the move-before-mark ordering.
+  - One deliberate improvement over the precedent, in the shared core: a leased key already under
+    `clean/` (a previous pass moved the object and died before the mark landed) re-earns its verdict
+    but skips the move, instead of failing forever on a source the move already emptied. For
+    candidate rows this state is unreachable today, so their behavior is unchanged.
+  - Deliberately left for task 4: the routes that *feed* this pipeline (intent → `awaiting_upload`,
+    completion → `pending`) and the admin run-worker route that triggers it. `addAttachment` writes
+    `pending` in the meantime, which is what its fixtures now mean: stored, verified, awaiting the
+    scanner's word.
 
-- [ ] **Expose upload intent, completion, download, and deletion routes**
+- [x] **Expose upload intent, completion, download, and deletion routes**
   - Files: `src/routes/api/self-managed/attachments/index.ts`,
     `src/routes/api/self-managed/attachments/$attachmentId/complete.ts`,
     `src/routes/api/self-managed/attachments/$attachmentId/download.ts`,
@@ -157,10 +185,44 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     keys, hashes, rejection details, or signed URLs.
   - Verify: the e2e spec runs against real Postgres, MinIO, and ClamAV and covers clean download,
     infected refusal, expired/foreign capability refusal, cross-user 404, quota, and soft delete.
+  - Result: the four routes plus two the flow could not ship without — a `GET` list on the
+    collection (the owner has to be able to *see* `pending`/`failed`/`rejectionCode`, and nothing
+    else serves that until the editor task) and `api/admin/self-managed/run-worker`, the cron/admin
+    trigger without which nothing in production ever scans. The later reconciliation task extends
+    that route's job; it does not add a second one. E2E: 10 specs, all green against real Postgres,
+    MinIO and ClamAV — 10.9 s. "Expired/foreign capability refusal" from the Verify line translates
+    to this flow's authority model as: unauthenticated 401 on every handler, and a foreign *user*
+    reading another owner's attachment id as 404 in completion, download and delete alike.
+  - **Session + `withAccountSubjectContext`, not a tenant principal.** A profile belongs to a
+    person; requiring an active organization would refuse a signed-in builder without one. The
+    context sets `app.user_id` and nothing else, which is exactly the identity `0175`'s owner
+    policies key on — and `auth.api.getSession` is both the guard the coverage gate recognises and
+    the first await in every handler, which is what `check-authenticate-before-validate` pins.
+  - **Completion is one role, unlike the candidate flow, and that is not a shortcut.** Candidates
+    need a worker-role UPDATE because the capability role deliberately holds none; here the caller
+    is the authenticated owner, `builderhunt_app` holds UPDATE, and the owner policy scopes it. The
+    single-use property is the same: `awaiting_upload` is re-checked inside the UPDATE, so a
+    replayed completion cannot rewrite a judged row's hash.
+  - **The validator sees a synthesized filename.** This model stores no client filename by design —
+    the spec forbids names in keys, and a name nobody renders is PII retained for nothing — but the
+    shared validator checks extension-vs-type. The name it gets is built from the declared type's
+    own extension; the magic bytes still decide.
+  - **Quota is a reservation, and a rejection releases it.** The intent row holds one of the twelve
+    slots (and the CV slot) from the moment it is issued; `infected`/`failed` rows stop counting, so
+    a profile cannot be locked shut by its own refused uploads. `addAttachment`'s counts moved onto
+    the same rule, the abandoned-intent sweep joined the scan worker (an hour-old `awaiting_upload`
+    is deleted and its partial object removed), and the owner list's bound grew from twelve to
+    forty-eight because rejected rows stay visible — the *why* is the one thing the owner can act on.
+  - The e2e's scanner-leg test promotes an EICAR object to `pending` by SQL, deliberately: the
+    policy has no magic-byte-less format, so no EICAR body can pass completion honestly (that
+    refusal is its own test), and the worker's fail-closed verdict has to hold even if validation
+    is somehow sidestepped. Defence in depth, tested as depth.
+  - A zero-byte PUT completes as `upload_missing` rather than entering the reject path — the
+    rejection path records the measured size, and the schema rightly refuses a size of zero.
 
 ## Phase 2 — profile API and public/editor UI
 
-- [ ] **Expose strict owner and public profile APIs**
+- [x] **Expose strict owner and public profile APIs**
   - Files: `src/routes/api/self-managed/profile/index.ts`,
     `src/routes/api/self-managed/profile/$profileId.ts`,
     `src/routes/api/self-managed/handle/$handle/reserve.ts`,
@@ -172,8 +234,35 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     logging profile content.
   - Verify: route tests cover 200/400/401/404/409/429, unknown fields, handle expiry, idempotent
     retries, draft/unlisted/public visibility, and cross-user enumeration resistance.
+  - Result: the four listed routes plus `handle/$handle/index.ts` — the "public handle lookup" as an
+    *authenticated*, per-user rate-limited availability oracle, because an anonymous one is an
+    enumeration API by construction and nothing before the public page task needs it signed out.
+    32 handler tests cover the Verify matrix (mocked guard/context/repositories, real error
+    classes), and the e2e spec grew to 13 specs by making the API its own seed: profile creation,
+    rename by id, visibility round-trip, reservation against a rival, and deletion taking the
+    attachments with it all run against the real stack. Rate limits: create 10/day, reserve 5/day
+    (spec), lookup 30/min. Deletion and visibility changes are audited with the transition and
+    never the content.
+  - **The e2e found three RLS defects the superuser suites could not, and `0177` closes them** —
+    exactly the failure class task 2's notes predicted. (1) `reserveHandle`'s
+    `INSERT ... ON CONFLICT DO UPDATE` needs UPDATE privilege even when no conflict occurs, and
+    `0175` granted the app role none: every reservation was a 500. (2) The owner-only policy made
+    rival reservations invisible to `isHandleAvailable`, so a held handle read as free and a profile
+    could be created over somebody's hold. (3) No policy exposed soft-deleted rows, so the
+    thirty-day handle hold — the anti-impersonation property — did not exist for the role that
+    serves requests. `0177` adds the UPDATE grant, an existence-read policy on reservations, a
+    lapsed-takeover policy whose WITH CHECK forces the caller's own name, and a deleted-rows read
+    policy on profiles; the e2e now asserts the hold through the real role (a freed handle reads
+    taken, and creating over it is a 409).
+  - The razor race the availability read cannot close — two callers reserving in the same instant —
+    surfaces as the row policy refusing the DO UPDATE (42501) under RLS, or the unique key (23505)
+    without it; `reserveHandle` translates both to `handle-taken`, so losing the race is a 409 and
+    never a 500.
+  - `PATCH`/`DELETE` verify the path id against the caller's own profile and answer one 404 for
+    absent, deleted and foreign — asserted byte-for-byte identical in the handler tests, with the
+    write never called.
 
-- [ ] **Build the editor and public profile with explicit provenance**
+- [x] **Build the editor and public profile with explicit provenance**
   - Files: `src/routes/_dashboard/me/profile.tsx`, `src/routes/u/$handle.tsx`,
     `src/modules/builder-profile/components/SelfManagedProfile.tsx`,
     `src/modules/builder-profile/components/AttachmentUploader.tsx`,
@@ -185,10 +274,44 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: Playwright creates, edits, uploads, publishes, refreshes, and visits the profile as an
     anonymous browser; axe is clean; draft is 404; unlisted is `noindex`; the verified visual token
     never appears until an actual verified claim is linked.
+  - Result: `/me/profile` (editor), `/u/$handle` (public SSR), `SelfManagedProfile.tsx` with an
+    exported `SelfManagedChip`, and `AttachmentUploader.tsx` driving the three-call upload from the
+    browser. The e2e grew to 17 specs: the editor journey runs in a real browser (create, publish,
+    upload a PNG, run the worker, see it turn `Published`), a stranger reads the served HTML, and
+    axe finds no critical or serious violation on either surface.
+  - **The chip marks every self-declared block, not just the header.** A reader who lands mid-page
+    on a list of work samples is the one most likely to mistake declared for verified, so About,
+    Services, Languages/topics and Work samples each carry it. The caveat sentence is rendered at
+    reading size directly under the name — a disclaimer somebody has to go looking for only protects
+    the people who wrote it.
+  - **Neutral by construction, and asserted as such.** `BuilderProfilePage` renders "Verified" as
+    `bh-success` green with a `BadgeCheck`; the chip is `bh-surface-2` / `bh-border-strong` /
+    `bh-text` — a label, not an award, which is the honest shape for a claim nobody checked. Full
+    `bh-text` rather than the muted token puts it at ~16:1 in light and ~15:1 in dark, well past the
+    spec's 4.5:1. The e2e asserts `>Verified<` never appears in the served HTML.
+  - **Three visibility states, three HTTP answers, proved against the served bytes.** `public` is
+    200 and indexable, `unlisted` is 200 with `noindex` on both `robots` and `googlebot` (the root
+    sets its own `googlebot`, and Google honours the named tag), `draft` and soft-deleted are 404 —
+    byte-identical to a handle nobody ever took. Asserted with a request context rather than a
+    hydrated page: a crawler is the reader whose mistake would cost most, and hydration would paper
+    over a page that rendered nothing server-side.
+  - The public read runs with **no `app.user_id` set at all**, so only the `0175` public-read
+    policies can answer. That makes the anonymous page a test of those policies rather than of a
+    `WHERE` clause — a draft would have to escape both to leak. Only `clean` attachments reach it,
+    and the DTO names its fields: no key, no checksum, no scan status, no rejection code.
+  - **Not shipped, deliberately: a public download route.** The page lists each work sample with its
+    kind, size and description, but a stranger cannot fetch the bytes — an anonymous signed-download
+    endpoint is a bandwidth and hotlinking surface that needs its own rate-limit design, and it is
+    not among this task's Files. The owner-scoped download from task 4 is unchanged. Worth its own
+    task before the rollout claims a portfolio is browsable.
+  - The spec reuses one browser account across the UI tests and hard-deletes its profile between
+    them. Better Auth rate-limits sign-up per IP and every fixture here comes from one host, so a
+    fixture per test is a budget the file cannot afford — it failed on the tenth with a 429 that
+    reads exactly like a product bug.
 
 ## Phase 3 — unified discovery without duplicated source logic
 
-- [ ] **Add self-managed as a typed internal search origin**
+- [x] **Add self-managed as a typed internal search origin**
   - Files: `src/lib/sources/types.ts`, `src/lib/sources/self-managed.ts`,
     `src/lib/search.ts`, `src/lib/dedup.ts`, `src/shared/lib/profile-suppression.ts`,
     `tests/unit/lib/search/self-managed.test.ts`
@@ -201,8 +324,46 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: `pnpm type-check` catches every exhaustive registry; unit tests prove inclusion,
     exclusion, dedup, suppression, timeout/error reporting, and unchanged relative order for
     pre-existing results.
+  - Result: the separate typed union, which is the branch the task offers second and the honest one.
+    `INTERNAL_ORIGIN_NAMES` / `BuilderOrigin` in `sources/types.ts`, `sources/self-managed.ts` as
+    the origin, a bounded `searchPublicProfiles` in the profile repository, and the fan-out split in
+    `resolveContactableSources`. 21 new tests across two files, the full unit suite at 7,403, and
+    `search.spec.ts` green — the ranking fixture did not move.
+  - **Why not `SourceName`.** Every registry keyed on that union describes a *network connector*:
+    the operator register decides whether a host may be contacted, `CREDENTIAL_ENV_VARS` says which
+    token it needs, the discovery matrix schedules crawls, and the acquisition policy records what
+    its terms permit. A self-managed profile is a row this product owns — no host, no token, no
+    terms — and its honest answers to those questions ("always enabled", "no credential", "never
+    crawled") are **indistinguishable from a connector somebody forgot to configure**. Adding it
+    there would have bought a `disabled` status for a missing register row and an `unconfigured` for
+    an absent credential, both of which read as operator decisions nobody made. Asserted directly:
+    the origin is absent from `SOURCE_NAMES`, from `CREDENTIAL_ENV_VARS`, and never reaches
+    `partitionRequestedSources` — which is called with the network sources alone.
+  - Widening `RawBuilder.source` to `BuilderOrigin` produced **zero type errors**, which is worth
+    recording rather than celebrating: nothing indexes a `Record<SourceName, …>` by a builder's own
+    source today, so the compiler had nothing to catch. The guard that does hold is the split in
+    `resolveContactableSources` plus its test.
+  - **`dedup.ts` and `profile-suppression.ts` needed no change, and that is the finding.** Dedup has
+    keyed on `(source, sourceId)` since plan 43 — never the username — so a self-managed profile and
+    a GitHub account sharing a handle are already two identities; the test pins it so a future
+    "merge by display name" cannot quietly absorb one person's page into another's. Suppression is
+    generic over `{source, sourceId}` strings, so `self-managed:<id>` works the day somebody files
+    one, and it already runs before `scoreBuilders` on both the live and the cached path.
+  - **`unlisted` is not searchable, and the predicate is where that lives.** The row policy permits
+    reading an unlisted profile because a policy cannot tell a direct visit from a listing; the
+    query filters `visibility = 'public'`. Soft-deleted rows are gone from search immediately rather
+    than at purge time.
+  - **Nothing invents a signal.** `followersCount` is left undefined rather than zeroed, and
+    `lastSeen` is deliberately unset: deriving it from `updatedAt` would let editing a bio outrank a
+    builder who shipped this morning, which is the dilution the plan's risk table names. The scoring
+    branch adds only a small capped services term, and a test asserts the existing builders' scores
+    are byte-identical with a self-managed row in the list.
+  - **Deliberately not default-on.** `DEFAULT_SEARCH_SOURCES` is unchanged and a test pins that,
+    because the shared inclusion policy and its opt-out are the next task's — turning the origin on
+    for every search before a user can say no is the anti-pattern the spec's own coverage section
+    forbids in the other direction. The origin is available the moment it is requested.
 
-- [ ] **Index public self-managed profiles for semantic search**
+- [x] **Index public self-managed profiles for semantic search**
   - Files: `src/lib/semantic/index-writer.ts`,
     `src/shared/lib/repositories/public-builder-embeddings.ts`,
     `src/shared/lib/operational-schedules.ts`,
@@ -214,8 +375,53 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     restriction removes the semantic row immediately.
   - Verify: repository tests prove entity-kind filtering and deletion; worker test proves bounded,
     idempotent reconciliation; semantic API e2e returns a public fixture and excludes draft/deleted.
+  - Result: `self_managed_person` as its own entity kind (`0178`), `semantic/entity-kinds.ts`,
+    `semantic/self-managed-index.ts`, the reconciliation worker under
+    `self-managed.semantic-index`, both self-managed jobs registered in `operational-schedules.ts`,
+    and the admin run-worker route now running scan then index. 28 unit tests across two files, the
+    e2e at 18 specs, unit suite 7,407, 180 migrations double-applied.
+  - **A distinct kind, and not by widening `COMPONENT_KINDS`.** That list is also the CHECK on
+    `solution_components.kind` and `solution_component_projections.kind`, so adding
+    `self_managed_person` there would have made it a type-legal component kind that two tables
+    refuse at the constraint — a type saying yes over a database saying no. `SEMANTIC_ENTITY_KINDS`
+    is the catalog's list plus one, `0178` moves only the embeddings CHECK, and a test asserts both
+    halves. Why a distinct kind at all: indexing these as `human_profile` would have added them to
+    every semantic search already filtering for humans, on the day the indexer shipped, with no way
+    for anyone to say no — the same opt-in reasoning as the search origin.
+  - **The e2e found a real grant gap, and `0179` closes it.** `0025` gave the app role SELECT,
+    INSERT and UPDATE on `builder_embeddings` and no DELETE, which was right while the only writer
+    was a write-through indexer that never removed anything. Self-managed profiles break that in the
+    urgent direction: hiding or deleting a profile has to take its row out *now*, on the request
+    path, as the app role. Without the grant the index write succeeded, the delete failed `42501`,
+    and the fire-and-forget contract swallowed it — the row stayed and only the nightly pass would
+    ever have cleared it. Verified through the real role: `permission denied` before, `DELETE 0`
+    after.
+  - **Removal is awaited; indexing is not.** Create and update fire the sync off the response path,
+    because a slow index must not make saving a profile slow. Visibility changes and deletes await
+    it: somebody who just withdrew and still turns up in search has been told the change applied and
+    shown that it did not. The e2e says the same thing by polling the first and not the second.
+  - **The document is declared content only.** Headline, bio, topics, services and the titles and
+    descriptions of `clean` attachments — never the filename, the object key or the checksum, and
+    never an unscanned attachment: an embedding is a copy, so text that reaches it has left the row
+    policy behind and cannot be un-indexed by tightening one later. The document states its own
+    provenance in its first lines, so a raw retrieval hit carries "declared by its owner, not
+    verified" without a join.
+  - **The reverse pass is skipped when the forward pass was truncated.** `eligible` is a partial set
+    at that point, and deleting against a partial set would remove live profiles the walk had simply
+    not reached. The truncation is logged rather than swallowed — a cap that silently covers the
+    first N profiles reads exactly like a pass that found nothing to do.
+  - `upsertBuilderEmbeddingStub` gained an injectable `db`, matching the read functions beside it, so
+    the disposable-database tests exercise the real `ON CONFLICT` and the real content-hash
+    comparison instead of a mock that would assert them into existence.
+  - Both jobs are in `OPERATIONAL_SCHEDULES` now — the scan every five minutes because its interval
+    is a person watching an upload say "checking for viruses", the reconciliation nightly because
+    write-through already handles the live path and a five-minute backstop would spend its life
+    confirming it.
+    Two visual baselines moved with them and only those two of the forty-four: `/admin/operations`
+    renders the registry, so two new rows on that page is the change being visible rather than a
+    regression — which is the whole reason that gate screenshots the operations page at all.
 
-- [ ] **Apply the shared inclusion policy to every current matching surface**
+- [~] **Apply the shared inclusion policy to every current matching surface**
   - Files: `src/shared/lib/self-managed/inclusion-policy.ts`,
     `src/routes/api/recommendations/index.ts`, `src/lib/sprints/results.ts`,
     `src/lib/alerts/worker.ts`, `src/lib/solutions/`,
@@ -229,8 +435,52 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     sprint.
   - Verify: unit matrix covers default-on, explicit-off, deleted, suppressed, draft, unlisted and
     rank preservation; e2e asserts the chip on search, recommendations and sprint results.
+  - Partial. The policy, the opt-out and three of the four surfaces are done and proved by 53 unit
+    tests plus an e2e; **Solutions is not, and the reason is structural rather than a shortfall of
+    effort** — described below so the next reader does not start from the symptom.
+  - **Done: `inclusion-policy.ts`** — one module deciding included-by-default, filterable, never
+    hidden without asking. Precedence is the spec's: the surface first, then the account, then the
+    default (`el toggle global solo se aplica si el toggle por superficie no está definido`). At
+    both levels `null` means "never chosen" and resolves to *included*, never to `false`: collapsing
+    them would make a later change of default overwrite the choice of everyone who had answered.
+  - **Done: the opt-out is real, and typed.** `user_preferences.search_include_self_managed`
+    (`0180`) and `sourcing_sprints.include_self_managed` (`0181`) — columns, not keys in a jsonb
+    blob, which the task forbids by name and for the reason both tables demonstrate: a preference
+    nobody can read in a `select` is one nobody can count, migrate or constrain.
+  - **Its own route, `PATCH /api/me/preferences/self-managed`, not a field on the existing
+    preferences PATCH.** That route refuses the whole request when `USER_SEGMENTATION_ENABLED` is
+    off, and an opt-out that disappears with an unrelated feature flag is not an opt-out.
+  - **Done: recommendations, sprints, alerts.** All three reach people through `searchBuilders`, so
+    the policy's job is to decide whether the origin joins their source list —
+    `withSelfManagedOrigin` *appends*, never inserts, so the sources a person actually chose keep
+    their order and nothing re-ranks for people who never asked for this feature. Subjects are the
+    people who own the surface: the searcher for recommendations, the sprint's creator for a sprint,
+    the alert's owner for an alert. An organisation has no preferences; people do.
+  - Recommendations needed one extra line and it is worth naming: a self-managed row matches a saved
+    query without that query naming the origin — no saved search can name it — so without an
+    explicit reason it arrived with none and read as an unexplained recommendation, which is the one
+    thing that list must never be.
+  - **Not done: Solutions, and it is not a wiring job.** The people lane
+    (`src/lib/solutions/retrieval/lanes.ts`) selects `from builder_embeddings e join
+    builder_identities i on i.source = e.source and i.source_id = e.source_id` — self-managed
+    profiles have no `builder_identities` row, so widening the entity-kind filter alone returns
+    nothing. Closing it means a parallel CTE against `self_managed_profiles`, a `HumanCandidate`
+    that can carry no identity id, a third `componentId` prefix beside `human:` and `account:`, and
+    `human_profile` branches in `composer/coverage.ts`, `composer/estimate.ts` and
+    `composer/compose.ts` that would each have to learn the new kind or silently stop counting these
+    people toward human coverage. That is the plan's own 4b.6 (1.5 days, the largest subfase) and it
+    belongs in its own task with its own tests — wiring a policy call there now would have made the
+    surface *look* covered while returning nothing, which is worse than the gap being visible.
+  - Deliberately no eligibility logic in the policy: public, undeleted and unsuppressed are decided
+    where the rows come from — the origin's query and `filterSuppressed`, which already runs before
+    ranking on every path. A second copy would be a second thing to keep in step with the row
+    policies, and the one that lags is the one that shows a withdrawn profile. The unit matrix says
+    this out loud rather than leaving it implied.
+  - Provenance is attached to **every** row, not only the self-managed ones: a field present on some
+    rows and absent on others is one a renderer reads as `undefined` and treats as "no chip", which
+    is exactly how the spec's "el chip nunca se omite por error visual" gets violated.
 
-- [ ] **Guard future matching surfaces mechanically**
+- [x] **Guard future matching surfaces mechanically**
   - Files: `scripts/check-self-managed-coverage.mjs`, `package.json`,
     `plans/_meta/conventions.md`
   - Do: add a repo-shape gate whose allowlist enumerates every route/worker that emits people or
@@ -238,10 +488,40 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     the script into `pnpm ci:local`; a new matching surface without a declaration must fail.
   - Verify: the script passes, then fails when a scratch matching route is added without a
     declaration, and passes again after the scratch file is removed.
+  - Result: `scripts/check-self-managed-coverage.mjs`, wired into `ci:local` and `quality.yml` as
+    `security:self-managed-coverage`, plus the convention in `plans/_meta/conventions.md`. Verified
+    exactly as written: passes, fails on a scratch `/api/scratch-matching-probe.ts` that calls
+    `searchBuilders` without declaring, passes again once it is removed. It reports
+    `{surfaces: 10, viaPolicy: 8, exempted: 2, knownUncovered: [...]}`.
+  - **The gate checks that the question was asked, never what the answer was.** Whether a given
+    surface should include self-managed people is a product question with legitimate answers both
+    ways; what must not happen is a surface omitting a whole class of people because nobody thought
+    about it — which is invisible, since it looks exactly like nobody matching.
+  - **Building it found six matching surfaces the previous task's Files list did not name**: export,
+    the saved-search RSS feed, the OG image, sprint preview, the public radar reader, and the
+    explore page's own search. All six are now wired; the two exemptions are `search.ts` (the
+    fan-out itself — a policy call there would decide for every caller at once, which is what the
+    per-surface toggle exists to prevent) and `discovery/worker.ts` (an ingestion crawl that shows
+    nobody a result; self-managed rows are already local, so crawling them re-indexes what was just
+    written).
+  - Solutions is recorded in `knownUncoveredSurfaces` and **printed on every run**, because the gate
+    cannot see a surface that produces people without going through `searchBuilders` — and a rule
+    this gate silently does not cover would be worse than no rule.
+  - **The gate caught a defect I had just introduced, in six places.** `searchBuilders` treats an
+    *absent* source list as "the defaults" and an *empty* one as "no sources at all", so wrapping
+    `sources ?? []` turned every default search into a search of nothing but self-managed profiles —
+    the exact opposite of adding one origin to the usual set. Every site now falls back to
+    `DEFAULT_SEARCH_SOURCES`, and a unit test pins the trap so the policy's honesty about what it
+    was handed cannot be mistaken for a bug later.
+  - **Making the lists explicit changed the search cache keys**, which is a real consequence worth
+    recording rather than a flaky test: five e2e cases seed an exact cache slot so no live connector
+    is contacted, and they were suddenly seeding a slot nothing reads. The helper now computes the
+    effective list with the same expression production uses, so the next change to the default
+    reaches one helper instead of quietly turning five tests into live searches.
 
 ## Phase 4 — promotion, privacy, lifecycle, and rollout
 
-- [ ] **Implement reversible promotion to a verified claim**
+- [x] **Implement reversible promotion to a verified claim**
   - Files: `src/shared/lib/repositories/self-managed-profiles.ts`,
     `src/shared/lib/human-identity/link-policy.ts`,
     `src/routes/api/self-managed/profile/$profileId/promote.ts`,
@@ -252,8 +532,39 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     auto-promote.
   - Verify: tests cover verified/unverified claim, wrong owner, conflicting link, unlink/relink,
     retained attachments and no automatic link from a high similarity score.
+  - Result: `promoteToBuilderClaim` / `unlinkBuilderClaim`, the `promote` route (POST links, DELETE
+    unlinks), migration `0182`, and 14 tests under `tests/unit/security/` — filed there because that
+    is what this is: the one place a page of self-declared content can acquire a *verified*
+    identity. E2E at 20 specs, unit suite 7,440.
+  - **Additive, so reversible is a `null` write rather than a restore.** Promotion writes one id; the
+    profile keeps its handle, its words and its attachments. `verified` on the public page was
+    already derived by join from the claim's own status, so a claim revoked tomorrow stops backing
+    the page tomorrow with nothing to undo here — asserted directly by revoking a linked claim and
+    reading the page again.
+  - **Both `status` and `revoked_at` are checked.** A revoked claim can carry a stale `verified`
+    status for as long as it takes one writer to be wrong, and this is the read that would publish
+    it. There is a test for exactly that row shape.
+  - **An absent claim and somebody else's claim answer identically**, so the endpoint cannot be used
+    to learn that a claim id exists on another account — asserted by comparing the two errors rather
+    than by reading the code.
+  - **Nothing here can be talked into inferring.** The only accepted evidence is a claim id, so a
+    probabilistic signal cannot be constructed from the request body at all — a stronger guarantee
+    than checking a score and refusing it. The audit record routes through
+    `decideLink({ kind: 'verified_claim' })`, the module that exists because resemblance is not
+    evidence, so a future "promote on a strong match" would have to construct a signal that module
+    rejects rather than skip a comment. The lookalike case is tested: a claim on a *different*
+    account whose username equals this profile's handle — the exact false positive `dedup.ts` was
+    once wrong about — is refused and the page stays unverified.
+  - **The conflicting-link test found that the state is already unreachable through the API**, and
+    is written accordingly. Promotion requires the claim's subject to be the caller, and
+    `self_managed_profiles_owner_live_unique` allows one live profile per person, so two live
+    profiles pointing at one claim cannot happen through this repository. `0182` is defence in depth
+    against a writer that is not this repository — and defence in depth is only worth having if
+    somebody checks it holds, so the test writes straight past the repository and asserts the
+    database refuses. Partial on live rows like its two siblings: a deleted page must not hold a
+    verified identity hostage for thirty days.
 
-- [ ] **Extend data export, erasure, suppression, and retention**
+- [x] **Extend data export, erasure, suppression, and retention**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
     `src/shared/lib/repositories/profile-removal.ts`,
     `src/routes/api/me/data-export/index.ts`,
@@ -265,8 +576,44 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: export fixture contains declared content and no storage secret; an erasure e2e removes
     profile/search visibility immediately and a retention test seeded beyond one batch deletes every
     eligible blob while preserving active ones.
+  - Result: a `selfManaged` section in the export, erasure that takes what the cascade cannot, and
+    the thirty-day blob sweep wired into the scan worker. Unit suite 7,445, e2e 20 specs.
+  - **Two real erasure gaps, both found by reading what the cascade actually does.**
+    `auth_users → self_managed_profiles → self_managed_attachments` is `on delete cascade`, which
+    disposes of the rows — and that is the problem, because two things outlive them and both are
+    only reachable *before* the delete:
+    - **the semantic index row.** `builder_embeddings` has no foreign key to a profile (its identity
+      is `(entity_kind, source, source_id)`, deliberately, so it can index things that are not rows
+      in one table). A cascade left `self_managed_person:<profileId>` behind — and that row is what
+      semantic search reads, so a deleted person's profile would have kept answering queries.
+    - **the objects.** The retention sweep finds bytes through soft-deleted *rows*; a cascade
+      removes the rows outright, so nothing would ever hold those keys again and the files would sit
+      in the bucket forever.
+    `collectSelfManagedErasureTargets` reads both before the delete, and a test asserts the
+    *ordering* rather than the presence of the calls — afterwards there is nothing left to read.
+  - Storage deletion is best-effort and the index removal is not, deliberately: a briefly
+    unreachable bucket must not block a person's erasure, but a profile still answering semantic
+    queries after its account is gone is the failure the block exists to prevent.
+  - **The export discloses declared content and no capability.** Handle, bio, services, visibility,
+    attachment titles and sizes — and `scan_status`/`rejection_code`, because "we refused your
+    upload and this is why" is exactly what a person is entitled to be told. Never `storage_key`,
+    never `checksum_sha256`, never a signed URL: an object key is a capability rather than a fact
+    about someone, and a signed URL in an emailed export is a working handle to the bytes for as
+    long as the mailbox lasts. Asserted against the section's source, so a field added later has to
+    pass the same test.
+  - **The retention sweep had no caller until now.** `listPurgeableAttachments` /
+    `purgeDeletedAttachments` were built in task 2 with the right split and nothing ran them. The
+    scan worker now does: object first, row second, and the row only for objects that actually went
+    — a row deleted on a failed object delete is bytes nobody can ever find again. Bounded per pass
+    and idempotent, with a test for each of those three properties.
+  - Thirty days is the same constant the handle hold uses, so an attachment's bytes and its
+    profile's name become unrecoverable on the same day rather than a week apart for no stated
+    reason.
+  - Suppression needed no change and that was checked rather than assumed: `profile_suppressions` is
+    generic over `(source, sourceId)`, so `self-managed:<profileId>` works, and task 7's test
+    already proves `filterSuppressed` drops exactly that pair and not `github:<same id>`.
 
-- [ ] **Integrate onboarding, dashboard, landing, and truthful analytics**
+- [x] **Integrate onboarding, dashboard, landing, and truthful analytics**
   - Files: `src/routes/onboarding/building.tsx`,
     `src/modules/dashboard/lib/dashboard-presets.ts`,
     `src/modules/landing/content/segment-pages.ts`,
@@ -277,8 +624,38 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
     allowlisted ids/statuses and never profile text, filenames, handles, or attachment metadata.
   - Verify: e2e covers landing → signup → building onboarding → editor → public profile and
     an existing-claim path; analytics assertions prove no PII enters event payloads.
+  - Result: the `building` branch now has two exits, `/for/builders` promises both, the dashboard
+    CTA points somewhere that works for the whole segment, and the funnel gained one step key. E2E
+    at 21 specs, unit suite 7,448.
+  - **The onboarding change is one comment being wrong and one being right.** That screen said, in
+    so many words, "no offer to create anything… a row this flow invented would be a profile nobody
+    could prove" — and it was correct while a claimed profile was the only kind. It is also exactly
+    the exclusion this plan exists to end. The offer is safe now because a self-managed profile
+    proves nothing and never pretends to: marked on every block, never the verified badge, content
+    declared by its owner. The comment now records the move rather than the conclusion, so the next
+    reader can see why the reasoning changed instead of assuming somebody forgot it.
+  - **`building_create` is its own step key.** "Skipped the lookup" and "was not in the index so
+    wrote a page anyway" are opposite answers to the question this rollout is watching, and both
+    used to report as `building_locate`. `exit()` takes an optional `OnboardingStepKey` — still the
+    enum, so a branch cannot invent a label the funnel does not know.
+  - **The dashboard CTA moved to `/me/profile`, and the closed union is why that was a decision.**
+    `DashboardCtaDestination` is a union rather than a string precisely so a new destination cannot
+    arrive by typo; adding a member is the honest way past it and a cast would not have been. `/me`
+    needs a claim to show anything, so it was a dead end for exactly the people this plan added,
+    while the self-managed editor serves the whole `building` segment.
+  - **`/for/builders` said the wrong thing to the right reader.** Every line assumed the visitor was
+    already indexed — "we already did", "the question is whether it is yours to edit" — which told a
+    translator or an illustrator with no connector footprint that the product was not for them. It
+    now states both paths, and the new limit is rendered at the same size as the promise: a page you
+    write yourself is Self-managed everywhere, never verified, nothing checked. Every claim still
+    links to a file that exists; the landing suite's `existsSync` check covers the new one too.
+  - **The analytics contract needed nothing loosened, which is the finding.** `parseConversionEvent`
+    is `.strict()` over closed enums, so a handle, a filename, an attachment title or a bio has
+    nowhere to go — three new tests assert exactly that by trying, rather than by reading the schema.
+    Publishing reports as `activation_reached` with `activationType: 'profile_published'`, an enum
+    member that says what kind of first value was reached and never which profile.
 
-- [ ] **Ship behind a fail-closed flag and record runtime evidence**
+- [~] **Ship behind a fail-closed flag and record runtime evidence**
   - Files: `.env.example`, `docs/operations/self-managed-profiles-rollout.md`,
     `content/changelog/self-managed-profiles.md`
   - Do: add one server-owned feature flag that returns 404/disabled UI when off, document migration,
@@ -287,3 +664,37 @@ Execute top to bottom. Each task ends in a reviewable, independently testable de
   - Verify: `pnpm ci:local` is green; the complete Playwright flow passes against real Postgres,
     MinIO and ClamAV with flag on; flag off hides entry points and blocks writes while data export and
     erasure remain available; runtime evidence is linked from the rollout document.
+  - Partial. The flag, the runbook and the changelog are done and proved locally; **the rollout
+    itself — enabling it in Coolify, the ramp, and the D7 observation — needs a window and an
+    explicit approval and is not something this branch can close.** Everything else in the Verify
+    line is met.
+  - **One flag for the whole feature.** `SELF_MANAGED_PROFILES_ENABLED`, `false` by default like
+    every flag in `env.ts`. Several flags would allow states nobody designed: a public page for
+    profiles nobody can edit, or an index of rows with no surface. Applied in the ten API routes,
+    the editor, the public page, the onboarding branch, the index worker — and, for search, at the
+    single point where the origin is contacted, which covers all eight wired matching surfaces at
+    once instead of giving eight chances to miss one.
+  - **Off is a rollback, not a deletion.** Rows stay, so switching back on restores rather than
+    rebuilds, and no write slips through a tab somebody left open — the routes 404 before they read
+    a body. 404 and not 503: with the feature off these surfaces do not exist, and a 503 would say
+    "this is ours and it is broken" about something an operator switched off deliberately.
+  - **Two things deliberately keep working with the flag off**, and both are tested: data export and
+    erasure, because a person's right to see and delete what is held about them is not a feature and
+    a rollback that took it with it would turn an operational decision into a compliance one; and
+    the *scan* worker, which only moves already-accepted bytes toward a verdict — stopping it would
+    leave unscanned uploads sitting in quarantine for the length of the rollback. Indexing does
+    stop, which is what the task asks for.
+  - **The flag exposed a latent fragility in the specs, and the gate is what found it.** The main
+    e2e spawns its own worker server from `process.env` and was relying on the shared server's pin —
+    a server it does not use. With the flag defaulting off, every route 404'd, and because
+    `self-managed-flag.spec.ts` sorts first its flag-off server was reused for the file after it.
+    Both now declare their own flags, which is the convention the harness documents by name, and the
+    two files pass together in the order that failed.
+  - Three unit suites now state that they test the feature *on* rather than inheriting it. That is
+    not ceremony: `SELF_MANAGED_PROFILES_ENABLED` defaults to `false` everywhere, so a suite that
+    said nothing was testing the disabled path and passing for the wrong reason.
+  - Runtime evidence is in
+    [`docs/operations/self-managed-profiles-rollout.md`](../../../docs/operations/self-managed-profiles-rollout.md),
+    with the metrics, the stop conditions and what the harness does *not* cover written next to each
+    other. Changelog copy: `content/changelog/self-managed-profiles.md` — it says the chip is the
+    point rather than apologising for it.

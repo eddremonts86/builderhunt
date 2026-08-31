@@ -5,6 +5,7 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button, Input, LinkButton } from '~/components/ui'
 import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
 import { useOnboardingStep } from '~/shared/lib/useOnboardingStep'
+import { getSelfManagedEnabled } from '~/shared/lib/self-managed/feature-flag'
 
 /**
  * The building branch (plan: phase-2/03-onboarding-segmentado).
@@ -60,6 +61,18 @@ interface PendingClaim {
 function BuildingStep() {
   const navigate = useNavigate()
   const step = useOnboardingStep('building')
+  /*
+   * Resolved from the server, and defaulting to *not offered*.
+   *
+   * A component cannot read the flag — `env.ts` gives the browser a stub — so this asks the server
+   * function once. `false` until it answers is the right default for a feature switch: showing the
+   * offer and then withdrawing it reads as a broken screen, while showing it a moment late reads as
+   * a page finishing loading.
+   */
+  const [selfManagedEnabled, setSelfManagedEnabled] = React.useState(false)
+  React.useEffect(() => {
+    void getSelfManagedEnabled().then(setSelfManagedEnabled).catch(() => setSelfManagedEnabled(false))
+  }, [])
   const [handle, setHandle] = React.useState('')
   const [searching, setSearching] = React.useState(false)
   const [searched, setSearched] = React.useState(false)
@@ -309,13 +322,31 @@ function BuildingStep() {
         {searched && !searching && candidates.length === 0 && !error && (
           <div className="card p-4 mb-4 text-sm text-bh-text-muted" data-testid="building-not-found">
             {/*
-              Said plainly, and with no offer to create anything. The index is built from what the
-              connectors find; a row this flow invented would be a profile nobody could prove.
+              This used to end here, with no offer to create anything, and the reason given was that
+              "a row this flow invented would be a profile nobody could prove". That was right while
+              the only kind of profile was a claimed one — and it is exactly the exclusion
+              phase-2/07 exists to end.
+              A self-managed profile proves nothing and never pretends to: it is marked
+              `Self-managed` on every block it renders, it can never carry the verified badge, and
+              its content is the owner's own declaration. So the offer below is not a weaker claim,
+              it is a different and honestly labelled thing — which is what makes it safe to make to
+              somebody whose work simply is not in any connector's index.
             */}
-            <p>
-              Nothing indexed under that handle yet. We index from public activity, so a profile
-              appears once we have seen some — nothing to do in the meantime.
+            <p className="mb-3">
+              Nothing indexed under that handle yet. We index from public activity, so a claimed
+              profile appears once we have seen some.
             </p>
+            {selfManagedEnabled && (
+              <p className="mb-4">
+                You can write your own profile instead. It is marked <strong>Self-managed</strong>
+                {' '}wherever it appears — never verified — and you can attach work samples to it.
+              </p>
+            )}
+            {selfManagedEnabled && (
+              <LinkButton to="/me/profile" size="sm" data-testid="building-create" onClick={() => step.exit('building_create')}>
+                Write my own profile
+              </LinkButton>
+            )}
           </div>
         )}
 

@@ -1233,6 +1233,55 @@
       "when": 1787083652408,
       "tag": "0175_self_managed_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 176,
+      "version": "7",
+      "when": 1787986270849,
+      "tag": "0176_self_managed_scan_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 177,
+      "version": "7",
+      "when": 1787999588503,
+      "tag": "0177_handle_reservation_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 178,
+      "version": "7",
+      "when": 1788007856455,
+      "tag": "0178_self_managed_entity_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 179,
+      "version": "7",
+      "when": 1788008415976,
+      "tag": "0179_app_delete_builder_embeddings",
+      "breakpoints": true
+    },
+    {
+      "idx": 180,
+      "version": "7",
+      "when": 1788011662693,
+      "tag": "0180_self_managed_inclusion_preference",
+      "breakpoints": true
+    },
+    {
+      "idx": 181,
+      "version": "7",
+      "when": 1788011835408,
+      "tag": "0181_sprint_include_self_managed",
+      "breakpoints": true
+    },
+    {
+      "idx": 182,
+      "version": "7",
+      "when": 1788018334168,
+      "tag": "0182_self_managed_claim_link_unique",
+      "breakpoints": true
     }
   ]
 }

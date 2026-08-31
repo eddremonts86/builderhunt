@@ -38,6 +38,8 @@ import {
   type StrictBrowserGuard,
 } from './harness/browser'
 import { createFeedCapability } from '../../src/shared/lib/repositories/public-feeds'
+import { DEFAULT_SEARCH_SOURCES } from '~/lib/search'
+import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
 
 interface Harness {
   workerIndex: number
@@ -190,11 +192,24 @@ function searchCacheKey(opts: {
   return `${[...opts.keywords].sort().join(',')}-${[...(opts.sources ?? [])].sort().join(',')}-${opts.country ?? ''}-${opts.language ?? ''}-${opts.page ?? 1}-${opts.perPage ?? 30}`
 }
 
+/**
+ * Seed the exact cache slot a public surface will read.
+ *
+ * The effective source list is computed the way the surfaces compute it, not written out by hand:
+ * every anonymous surface here resolves the self-managed inclusion policy, which is default-on, so
+ * a seed naming only the caller's own sources lands in a slot nothing reads. Mirroring the
+ * expression means the next change to the default reaches this helper instead of silently turning
+ * five tests into live searches against fake connectors.
+ */
+function effectiveSources(sources?: string[]): string[] {
+  return withSelfManagedOrigin(sources ?? [...DEFAULT_SEARCH_SOURCES], decideSelfManagedInclusion())
+}
+
 async function seedSearchCache(
   opts: Parameters<typeof searchCacheKey>[0],
   builders: FakeBuilder[],
 ): Promise<void> {
-  const key = `search:${searchCacheKey(opts)}`
+  const key = `search:${searchCacheKey({ ...opts, sources: effectiveSources(opts.sources) })}`
   harness.seededSearchKeys.push(key)
   // Match the app's own write: 5-minute TTL is plenty for one spec run.
   await harness.redis.set(key, JSON.stringify(builders), 'EX', 300)
