@@ -33,10 +33,23 @@ const RUNNER_PLUMBING = {
   vitest: 'the Stripe sandbox certification job, which makes real test-mode API calls and is gated on a repository secret rather than run on every push',
 }
 
+/**
+ * Lines that could run something, with the commentary removed.
+ *
+ * Both file kinds here comment with `#`, and every check below searches text for the name of a
+ * step. Prose that *names* a step therefore counts as running it — which is not a hypothetical:
+ * adding this very script to `quality.yml` with a comment explaining the spelling made the file
+ * report `pnpm check:step-parity` as a check the workflow runs and the machine does not. It was
+ * reading its own explanation.
+ */
+function runnable(source) {
+  return source.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n')
+}
+
 /** `pnpm <script>` invocations inside a shell block, ignoring flags and arguments. */
 function pnpmScripts(source) {
   const found = new Set()
-  for (const m of source.matchAll(/\bpnpm\s+((?:exec\s+)?[a-z][a-z0-9:_-]*)/g)) {
+  for (const m of runnable(source).matchAll(/\bpnpm\s+((?:exec\s+)?[a-z][a-z0-9:_-]*)/g)) {
     found.add(m[1].replace(/\s+/g, ' '))
   }
   return found
@@ -194,12 +207,12 @@ function jobsMissingDatabasePreparation() {
     const source = readFileSync(join(root, file), 'utf8')
     for (const [job, body] of jobsIn(source)) {
       if (!/pnpm test:(e2e|visual)\b/.test(body)) continue
-      // Comments stripped first. The block explaining *why* `drizzle-kit migrate` is needed contains
-      // the words `drizzle-kit migrate`, so a substring search over the raw body was satisfied by the
-      // prose — deleting the step it describes left this check green. Verified by deleting it.
-      const runnable = body.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n')
+      // The same reason `runnable` exists at all: the block explaining *why* `drizzle-kit migrate` is
+      // needed contains the words `drizzle-kit migrate`, so a substring search over the raw body was
+      // satisfied by the prose, and deleting the step it describes left this check green.
+      const steps = runnable(body)
       for (const step of DATABASE_PREPARATION) {
-        if (!runnable.includes(step)) {
+        if (!steps.includes(step)) {
           problems.push(`${file.split('/').pop()}'s ${job} job runs the suite without \`${step}\``)
         }
       }

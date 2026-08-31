@@ -381,6 +381,22 @@ jobs:
       # request-abort or visibility guard. Static, so it fails on the pull request rather than on the deploy.
       - run: pnpm check:admin-metrics
       - run: pnpm check:table-surfaces
+      # The parity checker, run where it cannot be skipped.
+      #
+      # It lived only in `scripts/ci/local-quality.sh`, behind the pre-push hook — and a hook is one
+      # `--no-verify` away from not existing. Its own header says a branch is guarded by that script
+      # and nothing else, which was written when the workflow fired on master alone; pull requests
+      # are checked now, so the strongest place for it is here.
+      #
+      # Nothing about it needs a laptop: it compares committed workflow files against a committed
+      # shell script. Its sibling `check-env-fidelity` stays local by contrast, and correctly — there
+      # is no `.env` on a runner for it to read.
+      #
+      # Spelled as `node …` rather than `pnpm check:step-parity` to match how local-quality.sh
+      # invokes it. `pnpmScripts()` collects `pnpm <script>` from both sides and compares them, so
+      # the two spellings would make this step report itself as a check the workflow runs and the
+      # machine does not.
+      - run: node scripts/ci/check-step-parity.mjs
       - run: pnpm security:ui-route-graph
       - run: pnpm security:route-client-boundary
       - run: pnpm security:route-methods
