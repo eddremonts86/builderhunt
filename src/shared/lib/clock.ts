@@ -28,11 +28,21 @@
  *
  * ## Why this is safe in production
  *
- * Two conditions, not one. `E2E_MODE=true` is how this repository already reaches its test seams —
- * the email short-circuit, the claim-proof stubs, the embedding and enrichment stubs all read it —
- * and the harness sets `NODE_ENV=test` on its server even though `vite preview` would otherwise say
- * `production`. Requiring both means a production process cannot be talked into a false clock by one
- * stray environment variable, which is a stronger guarantee than the seams beside it make.
+ * `E2E_MODE=true` is how this repository already reaches every test seam it has — the email
+ * short-circuit, the claim-proof stubs, the embedding and enrichment stubs all read exactly this and
+ * nothing else. A process with `E2E_MODE=true` in production is already not serving anyone: its mail
+ * goes to a buffer and its embeddings are stubs. One more thing that misbehaves under a variable that
+ * already breaks the application is not a new exposure.
+ *
+ * **`NODE_ENV` must not be part of the condition, and this is not a preference.** The first version
+ * of this function also required `process.env.NODE_ENV !== 'production'`, on the reasoning that the
+ * harness pins `NODE_ENV=test` on its server and a production process therefore could not be talked
+ * into a false clock by one stray variable. Vite *constant-folds* `process.env.NODE_ENV` into the
+ * bundle, so that term does not read the process at all — it reads whichever value the build had.
+ * A local `pnpm build` folded it to `false` and the seam worked; CI's build folded it to `true` and
+ * the whole condition short-circuited, so the Linux baseline came back holding the real clock again
+ * while the darwin one held the pinned one. A guard that is decided by how the artefact was built,
+ * and reads as stricter than it is, is worse than no guard.
  *
  * An unparseable `E2E_FIXED_TIME` returns the real clock rather than throwing: this is read on a
  * request path, and a malformed test variable must not be why a page 500s.
@@ -47,7 +57,7 @@
  */
 export function requestNow(): Date {
   if (typeof process === 'undefined') return new Date()
-  if (process.env.E2E_MODE !== 'true' || process.env.NODE_ENV === 'production') return new Date()
+  if (process.env.E2E_MODE !== 'true') return new Date()
   const fixed = process.env.E2E_FIXED_TIME
   if (!fixed) return new Date()
   const epochMs = Date.parse(fixed)
