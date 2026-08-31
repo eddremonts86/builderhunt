@@ -71,6 +71,7 @@ export type SubscriptionChangeErrorCode =
   | 'payment_failed'
   | 'requires_action'
   | 'seat_limit_exceeded'
+  | 'subscription_incomplete'
 
 export class SubscriptionChangeError extends Error {
   constructor(
@@ -262,6 +263,59 @@ export interface SubscriptionChangeInput {
   idempotencyKey: string
 }
 
+/**
+ * Statuses Stripe refuses to update in any way that produces an invoice.
+ *
+ * Not `past_due` or `unpaid` — those still take a plan change. Only these two, quoting the refusal:
+ * "You cannot update a subscription in `incomplete` status in a way that results in a new invoice or
+ * invoice items. Only minor attributes, like `metadata` or `default_payment_method`, can be updated
+ * on such subscriptions."
+ */
+const UNCHANGEABLE_STRIPE_STATUSES = new Set(['incomplete', 'incomplete_expired'])
+
+/**
+ * Refuse a plan change on a subscription whose first payment has not completed, and say so.
+ *
+ * ## Why this is a precondition rather than a mapped error
+ *
+ * Until 2026-08-24 Stripe accepted this and the flow worked. It now answers `invalid_request_error`,
+ * which `mapStripeError` deliberately turns into a plain `Error` rather than a `BillingProviderError`
+ * — its comment says an invalid request "is a real bug in how we called Stripe, not a customer-facing
+ * decline/timeout scenario". That was true when it was written and is no longer: this particular
+ * invalid request is produced by the *customer's* state. So the error escapes the `catch` below,
+ * which only handles `BillingProviderError`, and the route's catch-all answers 500 "Failed to change
+ * subscription" — an opaque server error for a situation the customer can fix in a minute.
+ *
+ * Mapping the Stripe error instead would mean matching on its message: the refusal carries no `code`
+ * and no `param`, only `type: StripeInvalidRequestError` and prose. Measured, not assumed. Keying a
+ * customer-facing branch on a third party's wording is a branch that breaks silently the day they
+ * reword it.
+ *
+ * ## Why it asks the provider rather than trusting our own row
+ *
+ * `stripe_status` is written by webhooks, so it lags. A customer who completes 3DS and immediately
+ * clicks upgrade would be refused by a check on the stored value alone — told to finish a payment
+ * they had just finished. The stored status is therefore only used to decide whether the question is
+ * worth asking; Stripe answers it. That costs one extra API call on a path that is already rare, and
+ * none at all on the common one.
+ */
+async function assertSubscriptionCanBeChanged(
+  subscription: FullBillingSubscriptionRecord,
+  provider: BillingProvider,
+): Promise<void> {
+  if (!UNCHANGEABLE_STRIPE_STATUSES.has(subscription.stripeStatus)) return
+
+  const live = await provider.getSubscription(subscription.stripeSubscriptionId)
+  // Gone from the provider, or the row was stale and it is fine now — either way this guard has
+  // nothing to say. A subscription the provider cannot find fails later, with its own message.
+  if (!live || !UNCHANGEABLE_STRIPE_STATUSES.has(live.status)) return
+
+  throw new SubscriptionChangeError(
+    'This subscription is still waiting on its first payment to complete. Finish that payment, then change the plan.',
+    'subscription_incomplete',
+  )
+}
+
 export async function changeSubscription(
   transaction: TenantTransaction,
   principal: TenantPrincipal,
@@ -288,6 +342,8 @@ export async function changeSubscription(
       creditDelta: alreadyGranted?.grant.originalUnits ?? 0,
     }
   }
+
+  await assertSubscriptionCanBeChanged(subscription, options.provider)
 
   if (classification.timing === 'scheduled') {
     // Never send Stripe (or even record our own schedule) while current seat usage exceeds the

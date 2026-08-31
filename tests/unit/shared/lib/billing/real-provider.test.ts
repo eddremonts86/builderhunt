@@ -120,15 +120,30 @@ describe.skipIf(!shouldRun)('RealBillingProvider (real Stripe test-mode network 
 
   it('supports the full subscription lifecycle: change price, preview, cancel at period end, cancel immediately', async () => {
     const customer = await provider.createCustomer({ email: 'subscription-test@example.com', idempotencyKey: `sub-customer-${Date.now()}` })
+    // A payment method, attached and made the default, *before* the subscription exists.
+    //
+    // This used to seed with `payment_behavior: 'default_incomplete'` and no card, which left the
+    // subscription in `incomplete` — and on 2026-08-24 Stripe began refusing the very next call:
+    // "You cannot update a subscription in `incomplete` status in a way that results in a new invoice
+    // or invoice items." The test had always been asking for a transition the rule forbids; it simply
+    // stopped being tolerated. Certifying the lifecycle means driving the states a paying customer
+    // actually passes through, so the subscription has to be able to charge.
+    const paymentMethod = await stripe.paymentMethods.attach('pm_card_visa', { customer: customer.id })
+    await stripe.customers.update(customer.id, { invoice_settings: { default_payment_method: paymentMethod.id } })
+
     // Seeded via a REAL stripe.subscriptions.create — never through changeSubscription on a
     // fabricated id, since real Stripe assigns subscription ids itself (see real-provider.ts's
     // header comment on this documented divergence from the fake provider / contract suite).
     const seeded = await stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: proMonthlyPriceId! }],
-      payment_behavior: 'default_incomplete',
     })
     cleanupSubscriptionIds.push(seeded.id)
+
+    // Asserted, not assumed. If this ever lands somewhere else, the failure should name the status
+    // rather than surfacing three calls later as an opaque Stripe refusal — which is exactly how the
+    // original version of this test failed.
+    expect(seeded.status).toBe('active')
 
     const fetched = await provider.getSubscription(seeded.id)
     expect(fetched?.id).toBe(seeded.id)
