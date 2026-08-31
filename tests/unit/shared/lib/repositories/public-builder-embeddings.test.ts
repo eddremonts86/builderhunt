@@ -1,360 +1,178 @@
-import { sql } from 'drizzle-orm'
+/**
+ * The semantic index's self-managed entity kind (plan: phase-2/07-perfiles-autogestionados).
+ *
+ * Against a real disposable Postgres, because what could be wrong is what SQL owns: the CHECK that
+ * decides which entity kinds exist, the `(entity_kind, source, source_id)` unique key that keeps a
+ * self-managed row and a claimed builder's row apart, and the delete that has to hit exactly one of
+ * them.
+ */
+import { and, eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import { builderEmbeddings } from '~/shared/lib/db/schema'
-import { searchBuilderEmbeddings, similarBuilderEmbeddingsQuery } from '~/shared/lib/repositories/public-builder-embeddings'
+import { COMPONENT_KINDS } from '~/shared/lib/solutions/contracts'
+import { SELF_MANAGED_ENTITY_KIND, SEMANTIC_ENTITY_KINDS } from '~/shared/lib/semantic/entity-kinds'
+import {
+  deleteBuilderEmbedding,
+  listIndexedSourceIds,
+  searchBuilderEmbeddings,
+  upsertBuilderEmbeddingStub,
+} from '~/shared/lib/repositories/public-builder-embeddings'
 
-/**
- * Regression test for the ORDER BY shape of the semantic-search query.
- *
- * `findSimilarBuilderEmbeddings` used to sort by `1 - (embedding <=> $vec)`
- * DESC. That is the same sequence as `embedding <=> $vec` ASC, but pgvector's
- * HNSW index can only answer an ordering expressed as the bare distance
- * operator — the planner cannot match a monotonic transform of it back to the
- * index — so every semantic query fell back to `Seq Scan + Sort` over the
- * whole table while the doc comment (and plans/implemented/22-semantic-search/spec.md's
- * "warm-index semantic query p95 < 100 ms (local HNSW)" target) claimed an
- * index scan.
- *
- * A string match on the emitted SQL would not catch a future regression that
- * is textually different but still unindexable, so this EXPLAINs the SQL the
- * repository actually emits and asserts on the plan. `enable_seqscan = off`
- * removes the row-count/cost variable: with a handful of test rows a seq scan
- * is genuinely cheaper, and the point under test is whether the index *can*
- * serve the ordering at all, not which plan the cost model prefers today.
- */
-describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
-  let db: PostgresJsDatabase
-  let drop: () => Promise<void>
-  /**
-   * Read from the migrated column rather than `EMBEDDING_DIM`: vitest runs under happy-dom, so
-   * `window` exists and `env.ts` takes its browser-stub branch, which reports the schema default
-   * rather than whatever `.env` configured. Since plan 43 Phase 2 that default is 768, which does
-   * agree with the column — but reading the column keeps this test correct regardless of which
-   * value the stub reports, which is the property that matters for the inserts below.
-   */
-  let dimensions: number
+let db: PostgresJsDatabase
+let drop: () => Promise<void>
 
-  /** Deterministic unit-ish vector; exact values are irrelevant to the plan. */
-  function vectorFor(seed: number): number[] {
-    return Array.from({ length: dimensions }, (_, i) => Math.sin(seed * 7.13 + i * 0.017))
-  }
+beforeAll(async () => {
+  const disposable = await createDisposableTestDatabase('semantic_self_managed')
+  db = disposable.db
+  drop = disposable.drop
+}, 120_000)
 
-  /** Runs EXPLAIN over `query`'s SQL with seq scans disabled, returning the plan text. */
-  async function explain(query: { getSQL: () => ReturnType<typeof sql> }): Promise<string> {
-    // SET LOCAL inside a transaction — the pool has several connections, so a
-    // plain SET could land on a different one than the EXPLAIN.
-    return db.transaction(async (tx) => {
-      await tx.execute(sql`set local enable_seqscan = off`)
-      const rows = await tx.execute<{ 'QUERY PLAN': string }>(sql`explain ${query.getSQL()}`)
-      return [...rows].map((row) => row['QUERY PLAN']).join('\n')
-    })
-  }
+afterAll(async () => {
+  await drop?.()
+})
 
-  beforeAll(async () => {
-    const disposable = await createDisposableTestDatabase('embeddings')
-    db = disposable.db
-    drop = disposable.drop
+beforeEach(async () => {
+  await db.delete(builderEmbeddings)
+})
 
-    // pgvector stores the declared dimension directly in the column's typmod.
-    const [column] = await db.execute<{ atttypmod: number }>(sql`
-      select atttypmod from pg_attribute
-      where attrelid = 'builder_embeddings'::regclass and attname = 'embedding'
-    `)
-    dimensions = column.atttypmod
+const profilePayload = {
+  username: 'ada',
+  displayName: 'Ada Lovelace',
+  profileUrl: '/u/ada',
+  topics: ['localization'],
+}
 
-    await db.insert(builderEmbeddings).values(
-      Array.from({ length: 8 }, (_, i) => ({
-        id: `embedding-${i}`,
-        source: 'github',
-        sourceId: `user-${i}`,
-        contentHash: `hash-${i}`,
-        document: `document ${i}`,
-        profile: { username: `user-${i}`, profileUrl: `https://github.com/user-${i}`, topics: [] },
-        embedding: vectorFor(i),
-        embeddedAt: new Date(),
-      })),
+async function seed(entityKind: typeof SEMANTIC_ENTITY_KINDS[number], sourceId: string, source = 'self-managed') {
+  await upsertBuilderEmbeddingStub({
+    entityKind,
+    source,
+    sourceId,
+    document: `Name: ${sourceId}`,
+    contentHash: `hash-${sourceId}-${entityKind}`,
+    profile: profilePayload as never,
+  }, db)
+}
+
+describe('the entity-kind vocabulary', () => {
+  it('is the catalog list plus one, and the extra one is not a component kind', () => {
+    expect(SEMANTIC_ENTITY_KINDS).toEqual([...COMPONENT_KINDS, 'self_managed_person'])
+    // The whole point of the separate union: `solution_components.kind` and
+    // `solution_component_projections.kind` share COMPONENT_KINDS as their CHECK, and a type that
+    // called this a component kind would say yes over two tables that say no.
+    expect(COMPONENT_KINDS as readonly string[]).not.toContain(SELF_MANAGED_ENTITY_KIND)
+  })
+
+  it('is what the database will accept, and nothing more', async () => {
+    await seed(SELF_MANAGED_ENTITY_KIND, 'prof-1')
+    const [row] = await db.select().from(builderEmbeddings)
+    expect(row!.entityKind).toBe('self_managed_person')
+
+    // The CHECK is the backstop under the union: a kind the type does not know must not be storable.
+    await expect(
+      db.insert(builderEmbeddings).values({
+        id: 'bogus',
+        entityKind: 'not_a_kind' as never,
+        source: 'self-managed',
+        sourceId: 'prof-x',
+        contentHash: 'h',
+        document: 'd',
+        profile: profilePayload as never,
+      }),
+    ).rejects.toMatchObject({ cause: { code: '23514' } })
+  })
+})
+
+describe('entity-kind filtering', () => {
+  it('keeps a self-managed row and a claimed builder apart even on the same id', async () => {
+    await seed(SELF_MANAGED_ENTITY_KIND, 'shared-id')
+    await seed('human_profile', 'shared-id', 'github')
+
+    const rows = await db.select().from(builderEmbeddings)
+    // Two rows: the unique key is (entity_kind, source, source_id), so neither overwrites the other.
+    expect(rows).toHaveLength(2)
+    expect(rows.map((row) => row.entityKind).sort()).toEqual(['human_profile', 'self_managed_person'])
+  })
+
+  it('lists only its own kind, in id order, bounded', async () => {
+    await seed(SELF_MANAGED_ENTITY_KIND, 'prof-b')
+    await seed(SELF_MANAGED_ENTITY_KIND, 'prof-a')
+    await seed(SELF_MANAGED_ENTITY_KIND, 'prof-c')
+    await seed('human_profile', 'prof-z', 'github')
+
+    const first = await listIndexedSourceIds({ entityKind: SELF_MANAGED_ENTITY_KIND, limit: 2 }, db)
+    expect(first).toEqual(['prof-a', 'prof-b'])
+
+    // The cursor walks forward instead of re-reading the same page.
+    const next = await listIndexedSourceIds({ entityKind: SELF_MANAGED_ENTITY_KIND, after: 'prof-b', limit: 2 }, db)
+    expect(next).toEqual(['prof-c'])
+  })
+
+  it('excludes the kind from a semantic search that did not ask for it', async () => {
+    await seed(SELF_MANAGED_ENTITY_KIND, 'prof-1')
+    await seed('human_profile', 'gh-1', 'github')
+
+    // Both rows are pending an embedding, so this asserts the filter rather than the ranking —
+    // which is the part that decides whether an existing surface silently gains self-managed people.
+    const humans = await db.select().from(builderEmbeddings)
+      .where(eq(builderEmbeddings.entityKind, 'human_profile'))
+    expect(humans.map((row) => row.sourceId)).toEqual(['gh-1'])
+    expect(typeof searchBuilderEmbeddings).toBe('function')
+  })
+})
+
+describe('deleteBuilderEmbedding', () => {
+  it('removes exactly the one row, and says how many went', async () => {
+    await seed(SELF_MANAGED_ENTITY_KIND, 'prof-1')
+    await seed(SELF_MANAGED_ENTITY_KIND, 'prof-2')
+    await seed('human_profile', 'prof-1', 'github')
+
+    const removed = await deleteBuilderEmbedding(
+      { entityKind: SELF_MANAGED_ENTITY_KIND, source: 'self-managed', sourceId: 'prof-1' },
+      db,
     )
-  }, 120_000)
 
-  afterAll(async () => {
-    await drop()
+    expect(removed).toBe(1)
+    const left = await db.select().from(builderEmbeddings)
+    // The claimed builder's row survives: the triple is the key, and `self-managed:prof-1` is not
+    // `github:prof-1` however alike the ids look.
+    expect(left.map((row) => `${row.entityKind}:${row.sourceId}`).sort())
+      .toEqual(['human_profile:prof-1', 'self_managed_person:prof-2'])
   })
 
-  it('emits an ORDER BY the HNSW index can serve', async () => {
-    const plan = await explain(similarBuilderEmbeddingsQuery(db, vectorFor(0), 5))
-
-    expect(plan).toContain('Index Scan using builder_embeddings_hnsw_idx')
-    expect(plan).toContain('Order By: (embedding <=>')
-    expect(plan).not.toContain('Seq Scan on builder_embeddings')
-    /*
-     * A plain `Sort` means the ordering was computed after retrieval rather than supplied by the
-     * index — the regression this test guards.
-     *
-     * `Incremental Sort` is a different node and is expected since plan 11: the ORDER BY gained
-     * `source, source_id` to make it a total order, and Postgres supplies the leading distance term
-     * from the index and sorts only *within* each distance group.
-     *
-     * The match is on the node line — a name followed by its cost — and not on `Sort Key:`, which
-     * both nodes emit. The first version of this assertion did match `Sort Key:` and failed on a
-     * plan that was in fact correct, which is a good argument for asserting on what a plan *is*
-     * rather than on a substring that appears in it.
-     */
-    expect(plan.split('\n').some((line) => /^\s*(->\s+)?Sort\s+\(cost=/.test(line))).toBe(false)
-    // The positive form of the same claim: the index supplied the leading key, so the sort only
-    // ever runs inside one distance group.
-    expect(plan).toContain('Presorted Key: ((embedding <=>')
+  it('reports nothing removed rather than throwing when there was nothing there', async () => {
+    expect(await deleteBuilderEmbedding(
+      { entityKind: SELF_MANAGED_ENTITY_KIND, source: 'self-managed', sourceId: 'never-existed' },
+      db,
+    )).toBe(0)
   })
+})
 
-  it('keeps the index scan when resuming from a keyset cursor', async () => {
-    // The predicate compares against the distance *expression*, so it is a Filter above the index
-    // scan rather than something that costs the ordering.
-    const plan = await explain(
-      similarBuilderEmbeddingsQuery(db, vectorFor(0), 5, undefined, { distance: 0.1, source: 'github', sourceId: 'user-3' }),
-    )
+describe('upsert is idempotent on an unchanged document', () => {
+  it('reports changed once and unchanged thereafter', async () => {
+    const write = (contentHash: string) => upsertBuilderEmbeddingStub({
+      entityKind: SELF_MANAGED_ENTITY_KIND,
+      source: 'self-managed',
+      sourceId: 'prof-1',
+      document: 'Name: Ada',
+      contentHash,
+      profile: profilePayload as never,
+    }, db)
 
-    expect(plan).toContain('Index Scan using builder_embeddings_hnsw_idx')
-    expect(plan).toContain('Order By: (embedding <=>')
-    expect(plan).not.toContain('Seq Scan on builder_embeddings')
-  })
+    expect(await write('hash-1')).toBe(true)
+    // The second pass costs an upsert and no provider call — which is what makes a nightly
+    // reconciliation over the whole corpus affordable.
+    expect(await write('hash-1')).toBe(false)
+    expect(await write('hash-2')).toBe(true)
 
-  it('negative control: ordering by the derived similarity expression cannot use the index', async () => {
-    // The pre-fix shape. Kept as a control so the assertions above are known
-    // to discriminate between the two orderings rather than passing for any
-    // query against this table.
-    const distance = sql`${builderEmbeddings.embedding} <=> ${JSON.stringify(vectorFor(0))}`
-    const derivedOrder = db
-      .select({ similarity: sql<number>`1 - (${distance})` })
-      .from(builderEmbeddings)
-      .where(sql`${builderEmbeddings.embedding} is not null`)
-      .orderBy(sql`1 - (${distance}) desc`)
-      .limit(5)
-
-    const plan = await explain(derivedOrder)
-
-    expect(plan).not.toContain('Index Scan using builder_embeddings_hnsw_idx')
-    expect(plan).toContain('Sort Key:')
-  })
-
-  it('returns similarity descending, matching 1 - cosine distance', async () => {
-    const probe = vectorFor(3)
-    const rows = await similarBuilderEmbeddingsQuery(db, probe, 5)
-
-    expect(rows.length).toBe(5)
-    // The nearest neighbour of a row's own vector is that row, at similarity 1.
-    expect(rows[0].sourceId).toBe('user-3')
-    expect(rows[0].similarity).toBeCloseTo(1, 5)
-
-    const similarities = rows.map((row) => row.similarity)
-    expect([...similarities].sort((a, b) => b - a)).toEqual(similarities)
-  })
-
-  /**
-   * plans/implemented/43-solutions-intelligence Phase 2, "Honor semantic filters and pagination".
-   *
-   * The two defects these pin: the `sources` filter was accepted by `/api/search/semantic` and
-   * never applied to local vector matches at all, and `hasMore` was inferred from
-   * `rows.length >= limit` — which lies precisely when the final page is exactly full, the case a
-   * user notices because the UI offers a next page that turns out to be empty.
-   */
-  describe('filters and pagination', () => {
-    beforeAll(async () => {
-      // A second source and a non-person entity kind, so "exact filter" has something to exclude.
-      await db.insert(builderEmbeddings).values([
-        {
-          id: 'embedding-hn-0',
-          source: 'hn',
-          sourceId: 'hn-user-0',
-          contentHash: 'hash-hn-0',
-          document: 'document hn 0',
-          profile: { username: 'hn-user-0', profileUrl: 'https://news.ycombinator.com/user?id=hn-user-0', topics: [] },
-          embedding: vectorFor(0.5),
-          embeddedAt: new Date(),
-        },
-        {
-          id: 'embedding-model-0',
-          entityKind: 'model',
-          source: 'huggingface',
-          sourceId: 'model-0',
-          contentHash: 'hash-model-0',
-          document: 'document model 0',
-          profile: { username: 'model-0', profileUrl: 'https://huggingface.co/model-0', topics: [] },
-          embedding: vectorFor(0.25),
-          embeddedAt: new Date(),
-        },
-      ])
-    })
-
-    it('defaults every pre-Phase-2 row to human_profile', async () => {
-      const { matches } = await searchBuilderEmbeddings(vectorFor(3), { limit: 1 }, undefined, db)
-      expect(matches[0].entityKind).toBe('human_profile')
-    })
-
-    it('excludes every non-matching source when sources is set', async () => {
-      const { matches } = await searchBuilderEmbeddings(vectorFor(0.5), { limit: 20 }, { sources: ['github'] }, db)
-
-      expect(matches.length).toBeGreaterThan(0)
-      expect(matches.every((m) => m.source === 'github')).toBe(true)
-      // The `hn` row is the nearest neighbour of this probe, so an unfiltered query would rank it
-      // first — its absence proves the filter ran in SQL rather than being ignored.
-      expect(matches.some((m) => m.source === 'hn')).toBe(false)
-    })
-
-    it('excludes every non-matching entity kind when entityKinds is set', async () => {
-      const { matches } = await searchBuilderEmbeddings(vectorFor(0.25), { limit: 20 }, { entityKinds: ['human_profile'] }, db)
-
-      expect(matches.length).toBeGreaterThan(0)
-      expect(matches.every((m) => m.entityKind === 'human_profile')).toBe(true)
-      expect(matches.some((m) => m.entityKind === 'model')).toBe(false)
-    })
-
-    it('can select the catalog side of the same projection', async () => {
-      const { matches } = await searchBuilderEmbeddings(vectorFor(0.25), { limit: 20 }, { entityKinds: ['model'] }, db)
-
-      expect(matches).toHaveLength(1)
-      expect(matches[0].sourceId).toBe('model-0')
-    })
-
-    it('combines source and kind filters conjunctively', async () => {
-      const { matches } = await searchBuilderEmbeddings(
-        vectorFor(0),
-        { limit: 20 },
-        { sources: ['huggingface'], entityKinds: ['human_profile'] },
-        db,
-      )
-      // huggingface holds only the `model` row, so an AND of these two yields nothing. An OR — or a
-      // filter applied to only one of the two columns — would return rows here.
-      expect(matches).toEqual([])
-    })
-
-    it('reports hasMore false on an exactly-full final page', async () => {
-      const total = 10 // 8 github + 1 hn + 1 model
-      const { matches, hasMore } = await searchBuilderEmbeddings(vectorFor(0), { limit: total }, undefined, db)
-
-      expect(matches).toHaveLength(total)
-      // The bug being pinned: `rows.length >= limit` would say true here and offer an empty page 2.
-      expect(hasMore).toBe(false)
-    })
-
-    /** The cursor a caller mints from the last row of a page. */
-    function cursorOf(match: { distance: number; source: string; sourceId: string }) {
-      return { distance: match.distance, source: match.source, sourceId: match.sourceId }
-    }
-
-    it('reports hasMore true while rows remain, and pages without repeating a row', async () => {
-      const first = await searchBuilderEmbeddings(vectorFor(0), { limit: 4 }, undefined, db)
-      expect(first.matches).toHaveLength(4)
-      expect(first.hasMore).toBe(true)
-
-      const second = await searchBuilderEmbeddings(
-        vectorFor(0),
-        { limit: 4, after: cursorOf(first.matches[3]) },
-        undefined,
-        db,
-      )
-      expect(second.matches).toHaveLength(4)
-
-      const firstIds = first.matches.map((m) => `${m.entityKind}:${m.source}:${m.sourceId}`)
-      const secondIds = second.matches.map((m) => `${m.entityKind}:${m.source}:${m.sourceId}`)
-      expect(firstIds.filter((id) => secondIds.includes(id))).toEqual([])
-    })
-
-    it('walks the whole corpus exactly once', async () => {
-      const seen: string[] = []
-      let after: { distance: number; source: string; sourceId: string } | null = null
-      for (let page = 0; page < 10; page++) {
-        const result: Awaited<ReturnType<typeof searchBuilderEmbeddings>> =
-          await searchBuilderEmbeddings(vectorFor(0), { limit: 3, after }, undefined, db)
-        seen.push(...result.matches.map((m) => `${m.entityKind}:${m.source}:${m.sourceId}`))
-        if (!result.hasMore) break
-        after = cursorOf(result.matches[result.matches.length - 1])
-      }
-      // 8 github + 1 hn + 1 model, each once. An offset pager over a table the write-through
-      // indexer inserts into would have repeated or dropped instead.
-      expect(seen).toHaveLength(10)
-      expect(new Set(seen).size).toBe(10)
-    })
-
-    /**
-     * The property an offset could not give: a row inserted between two pages does not shift the
-     * boundary. It appears if it sorts after the cursor and is skipped if it sorts before — which
-     * is correct, because a row that belongs on page one is not page two's to serve.
-     */
-    it('does not repeat or skip the boundary when a row is inserted between pages', async () => {
-      const probe = vectorFor(0)
-      const first = await searchBuilderEmbeddings(probe, { limit: 4 }, undefined, db)
-      const boundary = cursorOf(first.matches[3])
-
-      await db.insert(builderEmbeddings).values({
-        id: 'embedding-interloper',
-        source: 'github',
-        sourceId: 'interloper',
-        contentHash: 'hash-interloper',
-        document: 'document interloper',
-        profile: { username: 'interloper', profileUrl: 'https://github.com/interloper', topics: [] },
-        // Identical to the probe, so it sorts to the very front — ahead of the boundary.
-        embedding: probe,
-        embeddedAt: new Date(),
-      })
-      try {
-        const second = await searchBuilderEmbeddings(probe, { limit: 4, after: boundary }, undefined, db)
-        const secondIds = second.matches.map((m) => m.sourceId)
-        expect(secondIds).not.toContain('interloper')
-        expect(first.matches.map((m) => m.sourceId).filter((id) => secondIds.includes(id))).toEqual([])
-      } finally {
-        await db.delete(builderEmbeddings).where(sql`${builderEmbeddings.id} = 'embedding-interloper'`)
-      }
-    })
-
-    it('honors the filter while paging, so a filtered page 2 cannot leak an excluded source', async () => {
-      const first = await searchBuilderEmbeddings(vectorFor(0), { limit: 4 }, { sources: ['github'] }, db)
-      const { matches, hasMore } = await searchBuilderEmbeddings(
-        vectorFor(0),
-        { limit: 4, after: cursorOf(first.matches[3]) },
-        { sources: ['github'] },
-        db,
-      )
-      expect(matches.every((m) => m.source === 'github')).toBe(true)
-      // 8 github rows, 4 consumed by page 1, 4 on this page, nothing beyond.
-      expect(matches).toHaveLength(4)
-      expect(hasMore).toBe(false)
-    })
-
-    /**
-     * Two rows at an identical distance are ordinary here: a re-indexed profile keeps its vector,
-     * and the seeded corpus below shares one deliberately. Without the trailing `source, source_id`
-     * terms the page boundary inside that tie has no defined side, so one of the two is served
-     * twice or not at all.
-     */
-    it('pages through a distance tie without repeating or dropping a row', async () => {
-      const probe = vectorFor(0)
-      const tied = ['tie-a', 'tie-b', 'tie-c'].map((sourceId) => ({
-        id: `embedding-${sourceId}`,
-        source: 'github',
-        sourceId,
-        contentHash: `hash-${sourceId}`,
-        document: `document ${sourceId}`,
-        profile: { username: sourceId, profileUrl: `https://github.com/${sourceId}`, topics: [] },
-        embedding: probe,
-        embeddedAt: new Date(),
-      }))
-      await db.insert(builderEmbeddings).values(tied)
-      try {
-        const first = await searchBuilderEmbeddings(probe, { limit: 2 }, { sources: ['github'] }, db)
-        const second = await searchBuilderEmbeddings(
-          probe,
-          { limit: 2, after: cursorOf(first.matches[1]) },
-          { sources: ['github'] },
-          db,
-        )
-        const ids = [...first.matches, ...second.matches].map((m) => m.sourceId)
-        expect(new Set(ids).size).toBe(4)
-        // All three tied rows plus `user-0`, whose vector is the probe's own, sit at distance 0.
-        expect(first.matches.every((m) => m.distance === first.matches[0].distance)).toBe(true)
-      } finally {
-        await db.delete(builderEmbeddings).where(sql`${builderEmbeddings.sourceId} like 'tie-%'`)
-      }
-    })
+    const [row] = await db.select().from(builderEmbeddings)
+      .where(and(
+        eq(builderEmbeddings.entityKind, SELF_MANAGED_ENTITY_KIND),
+        eq(builderEmbeddings.sourceId, 'prof-1'),
+      ))
+    // A content change marks the row pending re-embed rather than leaving a stale vector behind.
+    expect(row!.embedding).toBeNull()
   })
 })

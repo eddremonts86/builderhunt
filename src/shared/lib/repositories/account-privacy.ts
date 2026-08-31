@@ -6,6 +6,8 @@ import { accountDb } from '../db/client'
 // this account-subject export must read them through authDb, not accountDb.
 import { authDb } from '../db/auth-db'
 import { withAccountSubjectContext, withTenantContext } from '../db/tenant-context'
+import { collectSelfManagedErasureTargets } from './self-managed-profiles'
+import { removeSelfManagedFromIndex } from '~/lib/semantic/self-managed-index'
 import type { OrganizationRole } from '../authorization/permissions'
 import {
   alerts,
@@ -24,6 +26,8 @@ import {
   organizationMembers,
   organizations,
   publishedBuilderProfiles,
+  selfManagedAttachments,
+  selfManagedProfiles,
   savedQueries,
   sourcingSprints,
   userConsents,
@@ -203,6 +207,56 @@ export async function loadAccountExportSource(userId: string) {
     ),
   )
 
+  /*
+   * The self-managed profile, as the subject's own declared content.
+   *
+   * Named fields only, and deliberately none of `storage_key`, `checksum_sha256` or a signed URL:
+   * a subject access request discloses what is held *about* a person, and an object key is a
+   * capability rather than a fact about them. Handing one out in an emailed export would put a
+   * bucket path in a mailbox for as long as the mailbox lasts.
+   *
+   * `scan_status` and `rejection_code` are included, because "we refused your upload and this is
+   * why" is precisely the kind of thing a person is entitled to be told.
+   */
+  const selfManaged = await withAccountSubjectContext(userId, async (transaction) => {
+    const [profile] = await transaction.select({
+      handle: selfManagedProfiles.handle,
+      displayName: selfManagedProfiles.displayName,
+      headline: selfManagedProfiles.headline,
+      bio: selfManagedProfiles.bio,
+      locationCity: selfManagedProfiles.locationCity,
+      locationCountryCode: selfManagedProfiles.locationCountryCode,
+      languages: selfManagedProfiles.languages,
+      services: selfManagedProfiles.services,
+      topics: selfManagedProfiles.topics,
+      visibility: selfManagedProfiles.visibility,
+      promotedToBuilderClaimId: selfManagedProfiles.promotedToBuilderClaimId,
+      declaredAt: selfManagedProfiles.declaredAt,
+      updatedAt: selfManagedProfiles.updatedAt,
+      deletedAt: selfManagedProfiles.deletedAt,
+      id: selfManagedProfiles.id,
+    }).from(selfManagedProfiles).where(eq(selfManagedProfiles.ownerUserId, userId)).limit(1)
+    if (!profile) return null
+
+    // unbounded-read-ok: an export must be complete, and the row count is bounded by the model —
+    // twelve live slots plus whatever the owner has not cleared, for one profile.
+    const attachments = await transaction.select({
+      kind: selfManagedAttachments.kind,
+      title: selfManagedAttachments.title,
+      description: selfManagedAttachments.description,
+      mimeType: selfManagedAttachments.mimeType,
+      sizeBytes: selfManagedAttachments.sizeBytes,
+      durationSeconds: selfManagedAttachments.durationSeconds,
+      scanStatus: selfManagedAttachments.scanStatus,
+      rejectionCode: selfManagedAttachments.rejectionCode,
+      uploadedAt: selfManagedAttachments.uploadedAt,
+      deletedAt: selfManagedAttachments.deletedAt,
+    }).from(selfManagedAttachments).where(eq(selfManagedAttachments.profileId, profile.id))
+
+    const { id: _profileId, ...disclosed } = profile
+    return { profile: disclosed, attachments }
+  })
+
   return {
     user,
     auth: account[0] ? { providerId: account[0].providerId, hasPassword: Boolean(account[0].password), createdAt: account[0].createdAt } : null,
@@ -234,6 +288,8 @@ export async function loadAccountExportSource(userId: string) {
      * `interview-privacy.ts`.
      */
     interviews: interviewSections,
+    /** The profile this person wrote themselves, and the metadata of what they attached to it. */
+    selfManaged,
   }
 }
 
@@ -358,6 +414,46 @@ export const listExpiredPendingDeletionRequests = (
   .limit(limit)
 
 export async function hardDeleteAccountSubject(userId: string, batchSize: number = DELETION_BATCH) {
+  /*
+   * What the cascade cannot take with it, taken first.
+   *
+   * `auth_users` cascades to `self_managed_profiles` and on to `self_managed_attachments`, which
+   * disposes of the rows — and that is the problem, because two things outlive them and both are
+   * only reachable *before* the delete:
+   *
+   *   - the semantic index row. `builder_embeddings` has no foreign key to a profile, so a cascade
+   *     leaves `self_managed_person:<profileId>` behind — and that row is what semantic search
+   *     reads. Erasure has to be a tombstone in search immediately, not eventually.
+   *   - the objects. The retention sweep finds bytes through soft-deleted rows; a cascade deletes
+   *     the rows outright, so nothing would ever hold those keys again.
+   *
+   * Best-effort on the storage side and deliberately so: a bucket that is briefly unreachable must
+   * not block a person's erasure, and the alternative — refusing to delete the account until the
+   * object store answers — is worse for the person doing the asking. What is *not* best-effort is
+   * the index row: that one runs inside its own await and a failure propagates, because a profile
+   * still answering semantic queries after its account is gone is the failure this whole block
+   * exists to prevent.
+   */
+  const erasure = await withAccountSubjectContext(userId, (transaction) =>
+    collectSelfManagedErasureTargets(transaction, userId))
+
+  for (const profileId of erasure.profileIds) {
+    await removeSelfManagedFromIndex(profileId)
+  }
+  if (erasure.storageKeys.length > 0) {
+    const { getStorageProvider } = await import('~/lib/storage/provider')
+    // Resolved inside the branch: a deployment with no object storage configured must still be
+    // able to erase an account, and `getStorageProvider` throws when it is unconfigured.
+    try {
+      const storage = getStorageProvider()
+      for (const key of erasure.storageKeys) {
+        await storage.deleteObject({ key }).catch(() => undefined)
+      }
+    } catch {
+      // No storage configured. There are no objects to remove in such a deployment.
+    }
+  }
+
   // `builder_notes`/`alerts`/`saved_queries`/`builders` are tenant-private
   // with RLS forced on organization_id — a plain `accountDb.transaction()`
   // with no `app.organization_id` set silently deletes ZERO rows (RLS

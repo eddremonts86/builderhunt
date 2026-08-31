@@ -52,6 +52,48 @@ describe('hardDeleteAccountSubject FK-safe delete order', () => {
   })
 })
 
+describe('self-managed profiles in export and erasure (plan: phase-2/07)', () => {
+  it('discloses the declared content and never a storage capability', async () => {
+    const source = await readFile('src/shared/lib/repositories/account-privacy.ts', 'utf8')
+    const start = source.indexOf('const selfManaged = await withAccountSubjectContext')
+    const end = source.indexOf('return {', start)
+    const section = source.slice(start, end)
+
+    expect(start).toBeGreaterThan(-1)
+    // What a person is owed: their own words, and why an upload was refused.
+    for (const field of ['handle', 'bio', 'services', 'scanStatus', 'rejectionCode']) {
+      expect(section, field).toContain(field)
+    }
+    // An object key is a capability, not a fact about a person. A signed URL is worse — it would
+    // put a working handle to the bytes in a mailbox for as long as the mailbox lasts.
+    expect(section).not.toContain('storageKey')
+    expect(section).not.toContain('checksumSha256')
+    expect(section).not.toContain('createSignedDownloadUrl')
+  })
+
+  it('takes the semantic row and the objects before the cascade takes the rows', async () => {
+    const source = await readFile('src/shared/lib/repositories/account-privacy.ts', 'utf8')
+    const fnStart = source.indexOf('export async function hardDeleteAccountSubject')
+    const fnEnd = source.indexOf('\n}\n', fnStart)
+    const fnBody = source.slice(fnStart, fnEnd)
+
+    const collect = fnBody.indexOf('collectSelfManagedErasureTargets')
+    const unindex = fnBody.indexOf('removeSelfManagedFromIndex')
+    const deleteObject = fnBody.indexOf('deleteObject')
+    const deleteUser = fnBody.indexOf('tx.delete(authUsers)')
+
+    expect(collect).toBeGreaterThan(-1)
+    // Order is the whole property. `builder_embeddings` has no foreign key to a profile, so a
+    // cascade leaves the row that semantic search reads; and the retention sweep finds bytes
+    // through soft-deleted rows, which a cascade removes outright. Both are only reachable before
+    // the delete — afterwards there is nothing left to read.
+    expect(unindex).toBeGreaterThan(collect)
+    expect(deleteObject).toBeGreaterThan(collect)
+    expect(deleteUser).toBeGreaterThan(unindex)
+    expect(deleteUser).toBeGreaterThan(deleteObject)
+  })
+})
+
 describe('lifecycle emails (Phase 2) — no new paid dependency, reuses email.ts\'s Resend-optional pattern', () => {
   it('delete-account route sends the deletion-scheduled email', async () => {
     const source = await readFile('src/routes/api/me/delete-account/index.ts', 'utf8')

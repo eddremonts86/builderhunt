@@ -4,7 +4,8 @@ import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 // The embedding projection and the Solutions catalog share one entity vocabulary on purpose —
 // see `builderEmbeddings.entityKind`. Type-only import, and `contracts.ts` imports nothing but
 // zod, so this cannot cycle back into the schema.
-import type { ComponentKind, ComponentKind as SemanticEntityKind } from '~/shared/lib/solutions/contracts'
+import type { ComponentKind } from '~/shared/lib/solutions/contracts'
+import type { SemanticEntityKind } from '~/shared/lib/semantic/entity-kinds'
 import type { EmbeddingPayload } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
 import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'
@@ -1395,6 +1396,16 @@ export const sourcingSprints = pgTable(
     variants: jsonb('variants').$type<QueryVariant[]>().notNull(),
     status: text('status').notNull().default('active'),
     quota: integer('quota').notNull().default(200),
+    /**
+     * Whether this shortlist includes self-managed profiles (plan:
+     * phase-2/07-perfiles-autogestionados).
+     *
+     * A column of its own rather than a key inside `variants`, even though that jsonb was right
+     * there: the choice belongs to the sprint, not to one query variant, and a value hidden in a
+     * blob is one nobody can filter a report by. `null` means the sprint is silent and the
+     * organiser's own standing preference decides.
+     */
+    includeSelfManaged: boolean('include_self_managed'),
     cursor: jsonb('cursor').$type<SprintCursor>().notNull().default({ variantIndex: 0, page: 1 }),
     lastRunAt: timestamp('last_run_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -4542,6 +4553,19 @@ export const userPreferences = pgTable('user_preferences', {
   segmentSource: text('segment_source'),
   segmentSchemaVersion: integer('segment_schema_version'),
   segmentSelectedAt: timestamp('segment_selected_at', { withTimezone: true }),
+  /**
+   * Whether matching surfaces include self-managed profiles (plan:
+   * phase-2/07-perfiles-autogestionados).
+   *
+   * A typed column, not a key in a JSON blob — the plan forbids the blob by name, and for the
+   * reason this table already demonstrates: a preference nobody can read in a `select` is a
+   * preference nobody can count, migrate or constrain.
+   *
+   * Nullable, and `null` is not `false`: it means never chosen, which resolves to *included*. The
+   * distinction is what lets a later default change reach people who never expressed a preference
+   * without overwriting the choice of those who did.
+   */
+  searchIncludeSelfManaged: boolean('search_include_self_managed'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
@@ -4610,6 +4634,16 @@ export const selfManagedProfiles = pgTable(
     uniqueIndex('self_managed_profiles_owner_live_unique')
       .on(table.ownerUserId)
       .where(sql`${table.deletedAt} is null`),
+    /**
+     * One verified claim backs at most one live profile.
+     *
+     * A verified badge rendered on two pages from one claim has stopped meaning "this account was
+     * proven" and started meaning "somebody said so twice", and a reader cannot tell which page the
+     * claim describes.
+     */
+    uniqueIndex('self_managed_profiles_claim_live_unique')
+      .on(table.promotedToBuilderClaimId)
+      .where(sql`${table.promotedToBuilderClaimId} is not null and ${table.deletedAt} is null`),
     index('self_managed_profiles_visibility_idx').on(table.visibility),
     check(
       'self_managed_profiles_visibility_check',
@@ -4623,7 +4657,21 @@ export const selfManagedProfiles = pgTable(
   ],
 )
 
-/** Up to twelve live work samples per profile. The bound is enforced in the repository, not here. */
+/**
+ * Up to twelve live work samples per profile. The bound is enforced in the repository, not here.
+ *
+ * ## The scan state machine lives on the row (migration 0176)
+ *
+ * Mirrors `candidate_documents`, the precedent: `awaiting_upload` is the intent row a presigned PUT
+ * is issued against, `pending` means the bytes landed and were verified, `scanning` is a worker's
+ * lease, and the three terminal states are `clean`, `infected` and `failed`. Only `clean` rows are
+ * publicly readable — the row policy says so as well as the queries.
+ *
+ * `size_bytes` and `checksum_sha256` are nullable for exactly one state: an `awaiting_upload` row
+ * has no bytes yet. The two presence checks close the window again the moment the row leaves that
+ * state, and `rejection_code` is present iff the scan ended in rejection, so a rejected row can
+ * always say why and no other row can pretend to.
+ */
 export const selfManagedAttachments = pgTable(
   'self_managed_attachments',
   {
@@ -4637,10 +4685,18 @@ export const selfManagedAttachments = pgTable(
     /** Set by the server after the upload completes. Never accepted from a request body. */
     storageKey: text('storage_key').notNull(),
     mimeType: text('mime_type').notNull(),
-    sizeBytes: integer('size_bytes').notNull(),
+    /** Null only while `awaiting_upload` — the row exists before the bytes do. */
+    sizeBytes: integer('size_bytes'),
     durationSeconds: integer('duration_seconds'),
-    checksumSha256: text('checksum_sha256').notNull(),
+    /** Null only while `awaiting_upload`, same as `candidate_documents.sha256`. */
+    checksumSha256: text('checksum_sha256'),
+    scanStatus: text('scan_status').notNull().default('awaiting_upload'),
+    /** Persisted, because the retry cap is the only thing separating "try again later" from a loop. */
+    scanAttempts: integer('scan_attempts').notNull().default(0),
+    rejectionCode: text('rejection_code'),
     uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+    /** Every transition writes it; the stale-lease reclaim reads it. */
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
   },
   (table) => [
@@ -4648,10 +4704,36 @@ export const selfManagedAttachments = pgTable(
     // would let a deleted attachment's bytes resurface under a new title.
     uniqueIndex('self_managed_attachments_storage_key_unique').on(table.storageKey),
     index('self_managed_attachments_profile_idx').on(table.profileId),
+    // What the scan worker's lease query walks.
+    index('self_managed_attachments_scan_status_idx').on(table.scanStatus),
     check('self_managed_attachments_kind_check', sql`${table.kind} in ('cv', 'work-sample', 'certificate', 'other')`),
     // 25 MB, from the spec. A negative or zero size is a bug upstream, not a small file.
-    check('self_managed_attachments_size_check', sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= 26214400`),
-    check('self_managed_attachments_checksum_check', sql`${table.checksumSha256} ~ '^[0-9a-f]{64}$'`),
+    check(
+      'self_managed_attachments_size_check',
+      sql`${table.sizeBytes} is null or (${table.sizeBytes} > 0 and ${table.sizeBytes} <= 26214400)`,
+    ),
+    check(
+      'self_managed_attachments_checksum_check',
+      sql`${table.checksumSha256} is null or ${table.checksumSha256} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'self_managed_attachments_scan_status_check',
+      sql`${table.scanStatus} in ('awaiting_upload', 'pending', 'scanning', 'clean', 'infected', 'failed')`,
+    ),
+    // The nullable window is exactly one state wide, in both columns.
+    check(
+      'self_managed_attachments_checksum_present_check',
+      sql`${table.scanStatus} = 'awaiting_upload' or ${table.checksumSha256} is not null`,
+    ),
+    check(
+      'self_managed_attachments_size_present_check',
+      sql`${table.scanStatus} = 'awaiting_upload' or ${table.sizeBytes} is not null`,
+    ),
+    // Iff, not implies: a rejection always says why, and nothing else may carry a code.
+    check(
+      'self_managed_attachments_rejection_check',
+      sql`(${table.scanStatus} in ('infected', 'failed')) = (${table.rejectionCode} is not null)`,
+    ),
   ],
 )
 

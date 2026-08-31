@@ -1,4 +1,6 @@
 import { CronExpressionParser } from 'cron-parser'
+import { SELF_MANAGED_SCAN_JOB_KEY } from '~/lib/scheduling/document-worker'
+import { SELF_MANAGED_INDEX_JOB_KEY } from '~/lib/semantic/self-managed-reconcile-worker'
 import { RECURRENCE_JOB_KEY } from '~/lib/calendar/recurrence-worker'
 import { REMINDER_JOB_KEY } from '~/lib/calendar/reminder-worker'
 
@@ -38,6 +40,28 @@ export interface OperationalScheduleDefinition {
  * frequent job pinned to a local zone gains or loses one interval twice a year for no benefit.
  */
 export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
+  {
+    // Every five minutes, because the wait it decides is a person watching an upload say
+    // "checking for viruses" — the one place in this feature where a cron interval is a
+    // user-visible delay rather than a freshness budget.
+    jobKey: SELF_MANAGED_SCAN_JOB_KEY,
+    cronExpression: '*/5 * * * *',
+    timezone: 'UTC',
+    scope: 'platform',
+    label: 'Self-managed attachment scan',
+    sourceRoute: `/admin/operations?job=${SELF_MANAGED_SCAN_JOB_KEY}`,
+  },
+  {
+    // Nightly, and that is not a compromise: publish, edit and delete all write through on the
+    // request path, so this pass exists for the writes that never landed. A backstop that ran every
+    // five minutes would spend its life confirming what the request path already did.
+    jobKey: SELF_MANAGED_INDEX_JOB_KEY,
+    cronExpression: '30 2 * * *',
+    timezone: 'Europe/Copenhagen',
+    scope: 'platform',
+    label: 'Self-managed semantic reconciliation',
+    sourceRoute: `/admin/operations?job=${SELF_MANAGED_INDEX_JOB_KEY}`,
+  },
   {
     jobKey: 'alerts.evaluate',
     cronExpression: '*/15 * * * *',

@@ -359,3 +359,58 @@ describe('the segmented landing funnel', () => {
     expect(result.ok).toBe(false)
   })
 })
+
+describe('self-managed profiles put nothing identifying into the funnel (plan: phase-2/07)', () => {
+  const base = {
+    surface: 'onboarding' as const,
+    sessionId: '3f6b2b6e-2a35-4c5e-9c9a-0a2f6a1d0b11',
+    variant: 'baseline' as const,
+    occurredAt: '2027-09-01T10:00:00.000Z',
+  }
+
+  it('accepts the from-scratch branch as a step key rather than as free text', () => {
+    const result = parseConversionEvent({
+      ...base,
+      name: 'onboarding_flow_exited',
+      onboarding: { flowVersion: 2, preset: 'building', stepKey: 'building_create' },
+    })
+
+    // Its own key, because "skipped the lookup" and "went to write a profile" are opposite answers
+    // to the question the self-managed rollout is watching.
+    expect(result.ok, result.error ?? '').toBe(true)
+    expect(result.event!.onboarding!.stepKey).toBe('building_create')
+  })
+
+  it('has nowhere to put a handle, a filename or an attachment', () => {
+    for (const extra of [
+      { handle: 'ada' },
+      { profileId: 'smp-1' },
+      { fileName: 'cv.pdf' },
+      { attachmentTitle: 'A translated manual' },
+      { bio: 'Twelve years of documentation' },
+    ]) {
+      const result = parseConversionEvent({
+        ...base,
+        name: 'onboarding_step_completed',
+        onboarding: { flowVersion: 2, preset: 'building', stepKey: 'building_create' },
+        ...extra,
+      })
+      // `.strict()` is the mechanism, and that is the point: the reliable way to keep profile text
+      // out of the funnel is to give it nowhere to go rather than to strip it later.
+      expect(result.ok, Object.keys(extra)[0]).toBe(false)
+    }
+  })
+
+  it('reports publishing as a coarse activation type and nothing more', () => {
+    const result = parseConversionEvent({
+      ...base,
+      name: 'activation_reached',
+      activationType: 'profile_published',
+    })
+
+    expect(result.ok, result.error ?? '').toBe(true)
+    // An enum member — "what kind of first value did they reach", never which profile.
+    expect(result.event!.activationType).toBe('profile_published')
+    expect(JSON.stringify(result.event)).not.toMatch(/smp-|\/u\//)
+  })
+})

@@ -42,8 +42,8 @@ export interface OnboardingStepState {
   resolved: boolean
   /** Records the step as completed and moves the server's state on. Safe to call more than once. */
   complete: () => Promise<void>
-  /** Records that somebody left the flow here — skip, or the dashboard link. */
-  exit: () => void
+  /** Records that somebody left the flow here — skip, the dashboard link, or a named branch. */
+  exit: (stepKey?: OnboardingStepKey) => void
 }
 
 interface StatusV2 {
@@ -131,9 +131,19 @@ export function useOnboardingStep(route: OnboardingRouteName): OnboardingStepSta
     }
   }, [route])
 
-  const exit = React.useCallback(() => {
+  /**
+   * Somebody left the flow here.
+   *
+   * `stepKey` may be overridden for a branch the route itself does not name. The building step has
+   * two exits that mean opposite things — "skip, I am not in the index" and "I am not in the index
+   * so I will write my own profile" — and reporting both under `building_locate` would make the
+   * number the self-managed rollout exists to watch unrecoverable. It stays an
+   * `OnboardingStepKey`, so a branch cannot invent a label the funnel does not know.
+   */
+  const exit = React.useCallback((stepKey?: OnboardingStepKey) => {
+    const context = contextFor(route, presetRef.current, flowVersionRef.current)
     trackConversionEvent('onboarding_flow_exited', 'onboarding', {
-      onboarding: contextFor(route, presetRef.current, flowVersionRef.current),
+      onboarding: stepKey ? { ...context, stepKey } : context,
     })
   }, [route])
 

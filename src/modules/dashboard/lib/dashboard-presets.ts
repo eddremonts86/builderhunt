@@ -39,7 +39,7 @@ import type { SegmentPreset } from '~/shared/lib/user-segments'
  * compiler rather than asserted in a comment — and so the router's own typed `to` accepts it without
  * a cast that would let a typo through as a dead link.
  */
-export type DashboardCtaDestination = '/search' | '/sprints' | '/me'
+export type DashboardCtaDestination = '/search' | '/sprints' | '/me' | '/me/profile'
 
 export interface DashboardPresetCta {
   /** The tile's heading. */
@@ -157,11 +157,19 @@ export const DASHBOARD_PRESETS: Record<SegmentPreset, DashboardPreset> = {
     id: 'building',
     lead: ['profile-owner', 'activity', 'recent-builders'],
     hidden: ['review', 'shortlists', 'source-mix', 'alert-volume'],
+    /*
+     * `/me/profile` rather than `/me` (plan: phase-2/07-perfiles-autogestionados).
+     *
+     * The `building` segment covers two sub-modalities — somebody with an indexed footprint to
+     * claim, and somebody with none — and only one route serves both. `/me` needs a claim to show
+     * anything, so it is a dead end for exactly the people this plan added; the self-managed editor
+     * works for everyone in the segment, and a person with a claim loses nothing by starting there.
+     */
     cta: {
-      heading: 'Complete your profile',
+      heading: 'Write your profile',
       label: 'Go to my profile',
-      to: '/me',
-      description: 'Add your topics and what you are open to. What you fill in is what people see — nothing else is shown.',
+      to: '/me/profile',
+      description: 'Your own page, marked Self-managed — never verified, and never claiming to be. Attach work samples and decide who can see it.',
     },
   },
 }

@@ -146,6 +146,23 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       // metadata.lastSeen via the default branch above.
       const best = (metadata.bestVotes as number | undefined) ?? 0
       if (best > 0) score += Math.min(Math.log1p(best) * 1.2, 10)
+    } else if (source === 'self-managed') {
+      /*
+       * The only origin whose evidence is declared rather than observed, and it is scored on what
+       * the owner filled in — nothing else is knowable here.
+       *
+       * No follower term (there are none, and `followersCount` is left undefined rather than zeroed
+       * so nothing invents one) and no recency term: `lastSeen` is absent, so the shared branch
+       * above gives it the neutral five. That is deliberate and is the plan's dilution guard —
+       * editing a bio must never outrank a builder who shipped this morning, and a recency signal
+       * derived from `updatedAt` would do exactly that.
+       *
+       * Services are the one structured thing on the profile: a closed taxonomy, so declaring them
+       * is a filterable claim rather than free text. Small, and capped, because a person who ticks
+       * every box has told a reader less than one who ticked two.
+       */
+      const services = Array.isArray(metadata.services) ? metadata.services.length : 0
+      score += Math.min(services * 2, 6)
     } else if (source === 'bluesky') {
       // Followers/quality/topics ride the default paths; no lastSeen in v1
       // so recency uses the neutral default. Custom domain handle = a

@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
-import { searchBuilders } from '~/lib/search'
+import { searchBuilders, DEFAULT_SEARCH_SOURCES } from '~/lib/search'
 import { SEARCH_SOURCE_COUNT } from '~/shared/lib/search-connectors'
 import type { ScoredBuilder } from '~/lib/search'
+import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
 // `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
 // opens a real `postgres()` client at module scope — and the `postgres`
 // package's own internals reference the Node-only `Buffer` global. This
@@ -132,7 +133,10 @@ export const Route = createFileRoute('/api/og/explore')({
           try {
             builders = await searchBuilders({
               keywords,
-              sources,
+              // Anonymous, so there is no account preference and the default applies. Resolved
+              // through the policy anyway rather than hard-coded: the image must show what the page
+              // shows, and two places deciding that independently is how they come to disagree.
+              sources: withSelfManagedOrigin(sources ?? DEFAULT_SEARCH_SOURCES, decideSelfManagedInclusion()),
               language,
               perPage: 20,
               page: 1,

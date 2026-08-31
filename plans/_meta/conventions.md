@@ -168,3 +168,22 @@ as the bar, because unit tests have repeatedly passed over behavior that was bro
 
 Tasks carrying `Operator:` are the exception to (3) only in the sense that the person named there
 performs it, not that it is skipped.
+
+## A new matching surface declares itself
+
+Any code that produces a list of candidates, matches or relevant people — a route, a worker, a job,
+an agent — must either resolve the shared inclusion policy
+(`src/shared/lib/self-managed/inclusion-policy.ts`) or be declared in
+`scripts/check-self-managed-coverage.mjs` with a reason. `pnpm security:self-managed-coverage`
+enforces it in `ci:local` and in CI, and a new surface with neither fails at the moment somebody is
+already looking at the code that makes the decision.
+
+The gate checks that the question was asked, never what the answer was. Whether a given surface
+should include self-managed profiles is a product question with legitimate answers in both
+directions; what must not happen is a surface omitting a whole class of people by nobody having
+thought about it — which is invisible, because it looks exactly like nobody matching.
+
+A plan that introduces a matching surface answers the five questions in
+[`../phase-2/07-perfiles-autogestionados/spec.md`](../phase-2/07-perfiles-autogestionados/spec.md)
+§"Principio de cobertura universal en matching" in its own `spec.md`. "Does not apply" is an
+acceptable answer and must say why.

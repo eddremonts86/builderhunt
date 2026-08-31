@@ -12,6 +12,8 @@ import { checkExportBurstAndEmit, detectMissingOrImplausibleHeaders, recordExpor
 import { filterSuppressed } from '~/shared/lib/profile-suppression'
 import { env } from '~/shared/lib/env'
 import { isExportFormat, isExportScope, MAX_EXPORT_ROWS } from '~/shared/lib/exports/capability-registry'
+import { decideSelfManagedInclusion, withSelfManagedOrigin } from '~/shared/lib/self-managed/inclusion-policy'
+import { getUserPreferences } from '~/shared/lib/repositories/user-preferences'
 
 const QuerySchema = z.object({
   scope: z.string().default('all'),
@@ -169,10 +171,15 @@ export const Route = createFileRoute('/api/export/builders')({
             if (!query) {
               throw new SharedResourceError('not_found', 'Saved search not found', 404)
             }
-            const { searchBuilders } = await import('~/lib/search')
+            const { searchBuilders, DEFAULT_SEARCH_SOURCES } = await import('~/lib/search')
+            // An export is the searcher's own search, written down: it must contain what the search
+            // would have contained, so it resolves the same policy from the same person.
+            const exportInclusion = decideSelfManagedInclusion({
+              accountPreference: (await getUserPreferences(tx, principal.userId)).searchIncludeSelfManaged,
+            })
             const results = await searchBuilders({
               keywords: query.keywords,
-              sources: query.sources ?? undefined,
+              sources: withSelfManagedOrigin(query.sources ?? DEFAULT_SEARCH_SOURCES, exportInclusion),
               language: query.language ?? undefined,
               country: query.country ?? undefined,
               page: 1,

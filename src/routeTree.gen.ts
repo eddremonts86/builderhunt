@@ -41,6 +41,7 @@ import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welco
 import { Route as PortfolioClaimIdRouteImport } from './routes/portfolio/$claimId'
 import { Route as RSlugRouteImport } from './routes/r/$slug'
 import { Route as ScheduleInvitationIdRouteImport } from './routes/schedule/$invitationId'
+import { Route as UHandleRouteImport } from './routes/u/$handle'
 import { Route as DashboardAdminIndexRouteImport } from './routes/_dashboard/admin/index'
 import { Route as DashboardAdminAbuseRouteImport } from './routes/_dashboard/admin/abuse'
 import { Route as DashboardAdminAccessRequestsRouteImport } from './routes/_dashboard/admin/access-requests'
@@ -66,6 +67,7 @@ import { Route as DashboardInterviewsInvitationsRouteImport } from './routes/_da
 import { Route as DashboardListsIndexRouteImport } from './routes/_dashboard/lists/index'
 import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/lists/$listId'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
+import { Route as DashboardMeProfileRouteImport } from './routes/_dashboard/me/profile'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
@@ -147,6 +149,7 @@ import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recomm
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
+import { Route as ApiSelfManagedVisibilityRouteImport } from './routes/api/self-managed/visibility'
 import { Route as ApiSolutionsBillingStateRouteImport } from './routes/api/solutions/billing-state'
 import { Route as ApiSolutionsBriefsRouteImport } from './routes/api/solutions/briefs'
 import { Route as ApiSolutionsConfigRouteImport } from './routes/api/solutions/config'
@@ -212,6 +215,7 @@ import { Route as ApiAdminOperationsJobKeyRouteImport } from './routes/api/admin
 import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
 import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
+import { Route as ApiAdminSelfManagedRunWorkerRouteImport } from './routes/api/admin/self-managed/run-worker'
 import { Route as ApiAdminSeoIndexRouteImport } from './routes/api/admin/seo/index'
 import { Route as ApiAdminSolutionsGoldBriefsRouteImport } from './routes/api/admin/solutions/gold-briefs'
 import { Route as ApiAdminSolutionsSourcesRouteImport } from './routes/api/admin/solutions/sources'
@@ -259,6 +263,7 @@ import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-e
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMePreferencesIndexRouteImport } from './routes/api/me/preferences/index'
+import { Route as ApiMePreferencesSelfManagedRouteImport } from './routes/api/me/preferences/self-managed'
 import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
 import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
 import { Route as ApiOnboardingV2IndexRouteImport } from './routes/api/onboarding/v2/index'
@@ -275,6 +280,9 @@ import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/
 import { Route as ApiQueriesIdVisibilityRouteImport } from './routes/api/queries/$id/visibility'
 import { Route as ApiSchedulingInvitationsIndexRouteImport } from './routes/api/scheduling/invitations/index'
 import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
+import { Route as ApiSelfManagedAttachmentsIndexRouteImport } from './routes/api/self-managed/attachments/index'
+import { Route as ApiSelfManagedProfileIndexRouteImport } from './routes/api/self-managed/profile/index'
+import { Route as ApiSelfManagedProfileProfileIdRouteImport } from './routes/api/self-managed/profile/$profileId'
 import { Route as ApiSolutionsBriefsBriefIdRouteImport } from './routes/api/solutions/briefs.$briefId'
 import { Route as ApiSolutionsRunsRunIdRouteImport } from './routes/api/solutions/runs.$runId'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
@@ -309,6 +317,12 @@ import { Route as ApiPublicSchedulingInvitationIdUploadsRouteImport } from './ro
 import { Route as ApiPublicSchedulingInvitationIdWithdrawRouteImport } from './routes/api/public/scheduling/$invitationId/withdraw'
 import { Route as ApiSchedulingInvitationsInvitationIdRevokeRouteImport } from './routes/api/scheduling/invitations/$invitationId/revoke'
 import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
+import { Route as ApiSelfManagedAttachmentsAttachmentIdIndexRouteImport } from './routes/api/self-managed/attachments/$attachmentId/index'
+import { Route as ApiSelfManagedAttachmentsAttachmentIdCompleteRouteImport } from './routes/api/self-managed/attachments/$attachmentId/complete'
+import { Route as ApiSelfManagedAttachmentsAttachmentIdDownloadRouteImport } from './routes/api/self-managed/attachments/$attachmentId/download'
+import { Route as ApiSelfManagedHandleHandleIndexRouteImport } from './routes/api/self-managed/handle/$handle/index'
+import { Route as ApiSelfManagedHandleHandleReserveRouteImport } from './routes/api/self-managed/handle/$handle/reserve'
+import { Route as ApiSelfManagedProfileProfileIdPromoteRouteImport } from './routes/api/self-managed/profile/$profileId/promote'
 import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/publish'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -474,6 +488,11 @@ const ScheduleInvitationIdRoute = ScheduleInvitationIdRouteImport.update({
   path: '/schedule/$invitationId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UHandleRoute = UHandleRouteImport.update({
+  id: '/u/$handle',
+  path: '/u/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardAdminIndexRoute = DashboardAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -603,6 +622,11 @@ const DashboardListsListIdRoute = DashboardListsListIdRouteImport.update({
 const DashboardMeIndexRoute = DashboardMeIndexRouteImport.update({
   id: '/me/',
   path: '/me/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardMeProfileRoute = DashboardMeProfileRouteImport.update({
+  id: '/me/profile',
+  path: '/me/profile',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
@@ -1020,6 +1044,12 @@ const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
   path: '/api/search/semantic',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSelfManagedVisibilityRoute =
+  ApiSelfManagedVisibilityRouteImport.update({
+    id: '/api/self-managed/visibility',
+    path: '/api/self-managed/visibility',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSolutionsBillingStateRoute =
   ApiSolutionsBillingStateRouteImport.update({
     id: '/api/solutions/billing-state',
@@ -1375,6 +1405,12 @@ const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
   path: '/api/admin/roadmap/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminSelfManagedRunWorkerRoute =
+  ApiAdminSelfManagedRunWorkerRouteImport.update({
+    id: '/api/admin/self-managed/run-worker',
+    path: '/api/admin/self-managed/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminSeoIndexRoute = ApiAdminSeoIndexRouteImport.update({
   id: '/api/admin/seo/',
   path: '/api/admin/seo/',
@@ -1639,6 +1675,12 @@ const ApiMePreferencesIndexRoute = ApiMePreferencesIndexRouteImport.update({
   path: '/api/me/preferences/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMePreferencesSelfManagedRoute =
+  ApiMePreferencesSelfManagedRouteImport.update({
+    id: '/api/me/preferences/self-managed',
+    path: '/api/me/preferences/self-managed',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
   id: '/api/me/sessions/',
   path: '/api/me/sessions/',
@@ -1728,6 +1770,24 @@ const ApiSchedulingInvitationsInvitationIdRoute =
   ApiSchedulingInvitationsInvitationIdRouteImport.update({
     id: '/api/scheduling/invitations/$invitationId',
     path: '/api/scheduling/invitations/$invitationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedAttachmentsIndexRoute =
+  ApiSelfManagedAttachmentsIndexRouteImport.update({
+    id: '/api/self-managed/attachments/',
+    path: '/api/self-managed/attachments/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedProfileIndexRoute =
+  ApiSelfManagedProfileIndexRouteImport.update({
+    id: '/api/self-managed/profile/',
+    path: '/api/self-managed/profile/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedProfileProfileIdRoute =
+  ApiSelfManagedProfileProfileIdRouteImport.update({
+    id: '/api/self-managed/profile/$profileId',
+    path: '/api/self-managed/profile/$profileId',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiSolutionsBriefsBriefIdRoute =
@@ -1933,6 +1993,42 @@ const ApiSchedulingInvitationsInvitationIdSendRoute =
     path: '/send',
     getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
   } as any)
+const ApiSelfManagedAttachmentsAttachmentIdIndexRoute =
+  ApiSelfManagedAttachmentsAttachmentIdIndexRouteImport.update({
+    id: '/api/self-managed/attachments/$attachmentId/',
+    path: '/api/self-managed/attachments/$attachmentId/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedAttachmentsAttachmentIdCompleteRoute =
+  ApiSelfManagedAttachmentsAttachmentIdCompleteRouteImport.update({
+    id: '/api/self-managed/attachments/$attachmentId/complete',
+    path: '/api/self-managed/attachments/$attachmentId/complete',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedAttachmentsAttachmentIdDownloadRoute =
+  ApiSelfManagedAttachmentsAttachmentIdDownloadRouteImport.update({
+    id: '/api/self-managed/attachments/$attachmentId/download',
+    path: '/api/self-managed/attachments/$attachmentId/download',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedHandleHandleIndexRoute =
+  ApiSelfManagedHandleHandleIndexRouteImport.update({
+    id: '/api/self-managed/handle/$handle/',
+    path: '/api/self-managed/handle/$handle/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedHandleHandleReserveRoute =
+  ApiSelfManagedHandleHandleReserveRouteImport.update({
+    id: '/api/self-managed/handle/$handle/reserve',
+    path: '/api/self-managed/handle/$handle/reserve',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSelfManagedProfileProfileIdPromoteRoute =
+  ApiSelfManagedProfileProfileIdPromoteRouteImport.update({
+    id: '/promote',
+    path: '/promote',
+    getParentRoute: () => ApiSelfManagedProfileProfileIdRoute,
+  } as any)
 const ApiAdminBillingEventsEventIdReplayRoute =
   ApiAdminBillingEventsEventIdReplayRouteImport.update({
     id: '/replay',
@@ -2003,6 +2099,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
+  '/u/$handle': typeof UHandleRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/access-requests': typeof DashboardAdminAccessRequestsRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
@@ -2021,6 +2118,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
+  '/me/profile': typeof DashboardMeProfileRoute
   '/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/security': typeof DashboardSettingsSecurityRoute
@@ -2086,6 +2184,7 @@ export interface FileRoutesByFullPath {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/self-managed/visibility': typeof ApiSelfManagedVisibilityRoute
   '/api/solutions/billing-state': typeof ApiSolutionsBillingStateRoute
   '/api/solutions/briefs': typeof ApiSolutionsBriefsRouteWithChildren
   '/api/solutions/config': typeof ApiSolutionsConfigRoute
@@ -2160,6 +2259,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/self-managed/run-worker': typeof ApiAdminSelfManagedRunWorkerRoute
   '/api/admin/solutions/gold-briefs': typeof ApiAdminSolutionsGoldBriefsRoute
   '/api/admin/solutions/sources': typeof ApiAdminSolutionsSourcesRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -2196,6 +2296,7 @@ export interface FileRoutesByFullPath {
   '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/me/preferences/self-managed': typeof ApiMePreferencesSelfManagedRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
@@ -2207,6 +2308,7 @@ export interface FileRoutesByFullPath {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
+  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
   '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
@@ -2240,6 +2342,8 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/v2/': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
+  '/api/self-managed/attachments/': typeof ApiSelfManagedAttachmentsIndexRoute
+  '/api/self-managed/profile/': typeof ApiSelfManagedProfileIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
@@ -2265,12 +2369,18 @@ export interface FileRoutesByFullPath {
   '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
+  '/api/self-managed/attachments/$attachmentId/complete': typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRoute
+  '/api/self-managed/attachments/$attachmentId/download': typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRoute
+  '/api/self-managed/handle/$handle/reserve': typeof ApiSelfManagedHandleHandleReserveRoute
+  '/api/self-managed/profile/$profileId/promote': typeof ApiSelfManagedProfileProfileIdPromoteRoute
   '/api/admin/billing/events/': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/interviews/$interviewId/participants/': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   '/api/lists/$listId/items/': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
+  '/api/self-managed/attachments/$attachmentId/': typeof ApiSelfManagedAttachmentsAttachmentIdIndexRoute
+  '/api/self-managed/handle/$handle/': typeof ApiSelfManagedHandleHandleIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -2308,6 +2418,7 @@ export interface FileRoutesByTo {
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
+  '/u/$handle': typeof UHandleRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/access-requests': typeof DashboardAdminAccessRequestsRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
@@ -2326,6 +2437,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
+  '/me/profile': typeof DashboardMeProfileRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/security': typeof DashboardSettingsSecurityRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
@@ -2390,6 +2502,7 @@ export interface FileRoutesByTo {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/self-managed/visibility': typeof ApiSelfManagedVisibilityRoute
   '/api/solutions/billing-state': typeof ApiSolutionsBillingStateRoute
   '/api/solutions/briefs': typeof ApiSolutionsBriefsRouteWithChildren
   '/api/solutions/config': typeof ApiSolutionsConfigRoute
@@ -2464,6 +2577,7 @@ export interface FileRoutesByTo {
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/self-managed/run-worker': typeof ApiAdminSelfManagedRunWorkerRoute
   '/api/admin/solutions/gold-briefs': typeof ApiAdminSolutionsGoldBriefsRoute
   '/api/admin/solutions/sources': typeof ApiAdminSolutionsSourcesRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -2500,6 +2614,7 @@ export interface FileRoutesByTo {
   '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/me/preferences/self-managed': typeof ApiMePreferencesSelfManagedRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
@@ -2511,6 +2626,7 @@ export interface FileRoutesByTo {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
+  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
   '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
@@ -2544,6 +2660,8 @@ export interface FileRoutesByTo {
   '/api/onboarding/v2': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations': typeof ApiSchedulingInvitationsIndexRoute
+  '/api/self-managed/attachments': typeof ApiSelfManagedAttachmentsIndexRoute
+  '/api/self-managed/profile': typeof ApiSelfManagedProfileIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
@@ -2569,12 +2687,18 @@ export interface FileRoutesByTo {
   '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
+  '/api/self-managed/attachments/$attachmentId/complete': typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRoute
+  '/api/self-managed/attachments/$attachmentId/download': typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRoute
+  '/api/self-managed/handle/$handle/reserve': typeof ApiSelfManagedHandleHandleReserveRoute
+  '/api/self-managed/profile/$profileId/promote': typeof ApiSelfManagedProfileProfileIdPromoteRoute
   '/api/admin/billing/events': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/interviews/$interviewId/participants': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   '/api/lists/$listId/items': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId': typeof ApiPublicSchedulingInvitationIdIndexRoute
+  '/api/self-managed/attachments/$attachmentId': typeof ApiSelfManagedAttachmentsAttachmentIdIndexRoute
+  '/api/self-managed/handle/$handle': typeof ApiSelfManagedHandleHandleIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -2615,6 +2739,7 @@ export interface FileRoutesById {
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
+  '/u/$handle': typeof UHandleRoute
   '/_landing/': typeof LandingIndexRoute
   '/_dashboard/admin/abuse': typeof DashboardAdminAbuseRoute
   '/_dashboard/admin/access-requests': typeof DashboardAdminAccessRequestsRoute
@@ -2634,6 +2759,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/_dashboard/lists/$listId': typeof DashboardListsListIdRoute
+  '/_dashboard/me/profile': typeof DashboardMeProfileRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/_dashboard/settings/security': typeof DashboardSettingsSecurityRoute
@@ -2699,6 +2825,7 @@ export interface FileRoutesById {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/self-managed/visibility': typeof ApiSelfManagedVisibilityRoute
   '/api/solutions/billing-state': typeof ApiSolutionsBillingStateRoute
   '/api/solutions/briefs': typeof ApiSolutionsBriefsRouteWithChildren
   '/api/solutions/config': typeof ApiSolutionsConfigRoute
@@ -2773,6 +2900,7 @@ export interface FileRoutesById {
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/self-managed/run-worker': typeof ApiAdminSelfManagedRunWorkerRoute
   '/api/admin/solutions/gold-briefs': typeof ApiAdminSolutionsGoldBriefsRoute
   '/api/admin/solutions/sources': typeof ApiAdminSolutionsSourcesRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -2809,6 +2937,7 @@ export interface FileRoutesById {
   '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/me/preferences/self-managed': typeof ApiMePreferencesSelfManagedRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
@@ -2820,6 +2949,7 @@ export interface FileRoutesById {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
+  '/api/self-managed/profile/$profileId': typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
   '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
@@ -2853,6 +2983,8 @@ export interface FileRoutesById {
   '/api/onboarding/v2/': typeof ApiOnboardingV2IndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
+  '/api/self-managed/attachments/': typeof ApiSelfManagedAttachmentsIndexRoute
+  '/api/self-managed/profile/': typeof ApiSelfManagedProfileIndexRoute
   '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
@@ -2878,12 +3010,18 @@ export interface FileRoutesById {
   '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
+  '/api/self-managed/attachments/$attachmentId/complete': typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRoute
+  '/api/self-managed/attachments/$attachmentId/download': typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRoute
+  '/api/self-managed/handle/$handle/reserve': typeof ApiSelfManagedHandleHandleReserveRoute
+  '/api/self-managed/profile/$profileId/promote': typeof ApiSelfManagedProfileProfileIdPromoteRoute
   '/api/admin/billing/events/': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/interviews/$interviewId/participants/': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   '/api/lists/$listId/items/': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
+  '/api/self-managed/attachments/$attachmentId/': typeof ApiSelfManagedAttachmentsAttachmentIdIndexRoute
+  '/api/self-managed/handle/$handle/': typeof ApiSelfManagedHandleHandleIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -2924,6 +3062,7 @@ export interface FileRouteTypes {
     | '/portfolio/$claimId'
     | '/r/$slug'
     | '/schedule/$invitationId'
+    | '/u/$handle'
     | '/admin/abuse'
     | '/admin/access-requests'
     | '/admin/billing'
@@ -2942,6 +3081,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/interviews/invitations'
     | '/lists/$listId'
+    | '/me/profile'
     | '/settings/billing'
     | '/settings/privacy'
     | '/settings/security'
@@ -3007,6 +3147,7 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/self-managed/visibility'
     | '/api/solutions/billing-state'
     | '/api/solutions/briefs'
     | '/api/solutions/config'
@@ -3081,6 +3222,7 @@ export interface FileRouteTypes {
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/self-managed/run-worker'
     | '/api/admin/solutions/gold-briefs'
     | '/api/admin/solutions/sources'
     | '/api/admin/sprints/run-worker'
@@ -3117,6 +3259,7 @@ export interface FileRouteTypes {
     | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/me/preferences/self-managed'
     | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
@@ -3128,6 +3271,7 @@ export interface FileRouteTypes {
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
+    | '/api/self-managed/profile/$profileId'
     | '/api/solutions/briefs/$briefId'
     | '/api/solutions/runs/$runId'
     | '/api/sprints/$sprintId/results'
@@ -3161,6 +3305,8 @@ export interface FileRouteTypes {
     | '/api/onboarding/v2/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
+    | '/api/self-managed/attachments/'
+    | '/api/self-managed/profile/'
     | '/api/admin/billing/events/$eventId'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/admin/operations/$jobKey/run'
@@ -3186,12 +3332,18 @@ export interface FileRouteTypes {
     | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
+    | '/api/self-managed/attachments/$attachmentId/complete'
+    | '/api/self-managed/attachments/$attachmentId/download'
+    | '/api/self-managed/handle/$handle/reserve'
+    | '/api/self-managed/profile/$profileId/promote'
     | '/api/admin/billing/events/'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
     | '/api/interviews/$interviewId/participants/'
     | '/api/lists/$listId/items/'
     | '/api/public/scheduling/$invitationId/'
+    | '/api/self-managed/attachments/$attachmentId/'
+    | '/api/self-managed/handle/$handle/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -3229,6 +3381,7 @@ export interface FileRouteTypes {
     | '/portfolio/$claimId'
     | '/r/$slug'
     | '/schedule/$invitationId'
+    | '/u/$handle'
     | '/admin/abuse'
     | '/admin/access-requests'
     | '/admin/billing'
@@ -3247,6 +3400,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/interviews/invitations'
     | '/lists/$listId'
+    | '/me/profile'
     | '/settings/privacy'
     | '/settings/security'
     | '/settings/team'
@@ -3311,6 +3465,7 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/self-managed/visibility'
     | '/api/solutions/billing-state'
     | '/api/solutions/briefs'
     | '/api/solutions/config'
@@ -3385,6 +3540,7 @@ export interface FileRouteTypes {
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/self-managed/run-worker'
     | '/api/admin/solutions/gold-briefs'
     | '/api/admin/solutions/sources'
     | '/api/admin/sprints/run-worker'
@@ -3421,6 +3577,7 @@ export interface FileRouteTypes {
     | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/me/preferences/self-managed'
     | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
@@ -3432,6 +3589,7 @@ export interface FileRouteTypes {
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
+    | '/api/self-managed/profile/$profileId'
     | '/api/solutions/briefs/$briefId'
     | '/api/solutions/runs/$runId'
     | '/api/sprints/$sprintId/results'
@@ -3465,6 +3623,8 @@ export interface FileRouteTypes {
     | '/api/onboarding/v2'
     | '/api/organizations/invitations'
     | '/api/scheduling/invitations'
+    | '/api/self-managed/attachments'
+    | '/api/self-managed/profile'
     | '/api/admin/billing/events/$eventId'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/admin/operations/$jobKey/run'
@@ -3490,12 +3650,18 @@ export interface FileRouteTypes {
     | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
+    | '/api/self-managed/attachments/$attachmentId/complete'
+    | '/api/self-managed/attachments/$attachmentId/download'
+    | '/api/self-managed/handle/$handle/reserve'
+    | '/api/self-managed/profile/$profileId/promote'
     | '/api/admin/billing/events'
     | '/api/builders/$builderId/evidence'
     | '/api/interviews/$interviewId/brief'
     | '/api/interviews/$interviewId/participants'
     | '/api/lists/$listId/items'
     | '/api/public/scheduling/$invitationId'
+    | '/api/self-managed/attachments/$attachmentId'
+    | '/api/self-managed/handle/$handle'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -3535,6 +3701,7 @@ export interface FileRouteTypes {
     | '/portfolio/$claimId'
     | '/r/$slug'
     | '/schedule/$invitationId'
+    | '/u/$handle'
     | '/_landing/'
     | '/_dashboard/admin/abuse'
     | '/_dashboard/admin/access-requests'
@@ -3554,6 +3721,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/users'
     | '/_dashboard/interviews/invitations'
     | '/_dashboard/lists/$listId'
+    | '/_dashboard/me/profile'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
     | '/_dashboard/settings/security'
@@ -3619,6 +3787,7 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/self-managed/visibility'
     | '/api/solutions/billing-state'
     | '/api/solutions/briefs'
     | '/api/solutions/config'
@@ -3693,6 +3862,7 @@ export interface FileRouteTypes {
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/self-managed/run-worker'
     | '/api/admin/solutions/gold-briefs'
     | '/api/admin/solutions/sources'
     | '/api/admin/sprints/run-worker'
@@ -3729,6 +3899,7 @@ export interface FileRouteTypes {
     | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/me/preferences/self-managed'
     | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
@@ -3740,6 +3911,7 @@ export interface FileRouteTypes {
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
+    | '/api/self-managed/profile/$profileId'
     | '/api/solutions/briefs/$briefId'
     | '/api/solutions/runs/$runId'
     | '/api/sprints/$sprintId/results'
@@ -3773,6 +3945,8 @@ export interface FileRouteTypes {
     | '/api/onboarding/v2/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
+    | '/api/self-managed/attachments/'
+    | '/api/self-managed/profile/'
     | '/api/admin/billing/events/$eventId'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/admin/operations/$jobKey/run'
@@ -3798,12 +3972,18 @@ export interface FileRouteTypes {
     | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
+    | '/api/self-managed/attachments/$attachmentId/complete'
+    | '/api/self-managed/attachments/$attachmentId/download'
+    | '/api/self-managed/handle/$handle/reserve'
+    | '/api/self-managed/profile/$profileId/promote'
     | '/api/admin/billing/events/'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
     | '/api/interviews/$interviewId/participants/'
     | '/api/lists/$listId/items/'
     | '/api/public/scheduling/$invitationId/'
+    | '/api/self-managed/attachments/$attachmentId/'
+    | '/api/self-managed/handle/$handle/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -3826,6 +4006,7 @@ export interface RootRouteChildren {
   PortfolioClaimIdRoute: typeof PortfolioClaimIdRoute
   RSlugRoute: typeof RSlugRoute
   ScheduleInvitationIdRoute: typeof ScheduleInvitationIdRoute
+  UHandleRoute: typeof UHandleRoute
   ApiAdminPreferencesRoute: typeof ApiAdminPreferencesRoute
   ApiAdminSearchSourcesRoute: typeof ApiAdminSearchSourcesRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
@@ -3875,6 +4056,7 @@ export interface RootRouteChildren {
   ApiPrivacyProfileRemovalRoute: typeof ApiPrivacyProfileRemovalRouteWithChildren
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
+  ApiSelfManagedVisibilityRoute: typeof ApiSelfManagedVisibilityRoute
   ApiSolutionsBillingStateRoute: typeof ApiSolutionsBillingStateRoute
   ApiSolutionsBriefsRoute: typeof ApiSolutionsBriefsRouteWithChildren
   ApiSolutionsConfigRoute: typeof ApiSolutionsConfigRoute
@@ -3934,6 +4116,7 @@ export interface RootRouteChildren {
   ApiAdminOperationsJobKeyRoute: typeof ApiAdminOperationsJobKeyRouteWithChildren
   ApiAdminOperationsSyncSchedulesRoute: typeof ApiAdminOperationsSyncSchedulesRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
+  ApiAdminSelfManagedRunWorkerRoute: typeof ApiAdminSelfManagedRunWorkerRoute
   ApiAdminSolutionsGoldBriefsRoute: typeof ApiAdminSolutionsGoldBriefsRoute
   ApiAdminSolutionsSourcesRoute: typeof ApiAdminSolutionsSourcesRoute
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
@@ -3959,6 +4142,7 @@ export interface RootRouteChildren {
   ApiInterviewsInterviewIdTranscriptionTokenRoute: typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
+  ApiMePreferencesSelfManagedRoute: typeof ApiMePreferencesSelfManagedRoute
   ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   ApiOrganizationsInvitationsMineRoute: typeof ApiOrganizationsInvitationsMineRoute
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
@@ -3966,6 +4150,7 @@ export interface RootRouteChildren {
   ApiQueriesIdShareRoute: typeof ApiQueriesIdShareRoute
   ApiQueriesIdVisibilityRoute: typeof ApiQueriesIdVisibilityRoute
   ApiSchedulingInvitationsInvitationIdRoute: typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
+  ApiSelfManagedProfileProfileIdRoute: typeof ApiSelfManagedProfileProfileIdRouteWithChildren
   ApiAdminAbuseIndexRoute: typeof ApiAdminAbuseIndexRoute
   ApiAdminAccessRequestsIndexRoute: typeof ApiAdminAccessRequestsIndexRoute
   ApiAdminBuilderClaimsIndexRoute: typeof ApiAdminBuilderClaimsIndexRoute
@@ -3992,6 +4177,8 @@ export interface RootRouteChildren {
   ApiOnboardingV2IndexRoute: typeof ApiOnboardingV2IndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiSchedulingInvitationsIndexRoute: typeof ApiSchedulingInvitationsIndexRoute
+  ApiSelfManagedAttachmentsIndexRoute: typeof ApiSelfManagedAttachmentsIndexRoute
+  ApiSelfManagedProfileIndexRoute: typeof ApiSelfManagedProfileIndexRoute
   ApiAdminBillingEventsEventIdRoute: typeof ApiAdminBillingEventsEventIdRouteWithChildren
   ApiAdminBuilderClaimsClaimIdRevokeRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   ApiInterviewsInterviewIdBriefVersionRoute: typeof ApiInterviewsInterviewIdBriefVersionRoute
@@ -4006,10 +4193,15 @@ export interface RootRouteChildren {
   ApiPublicSchedulingInvitationIdSubmissionRoute: typeof ApiPublicSchedulingInvitationIdSubmissionRoute
   ApiPublicSchedulingInvitationIdUploadsRoute: typeof ApiPublicSchedulingInvitationIdUploadsRouteWithChildren
   ApiPublicSchedulingInvitationIdWithdrawRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRoute
+  ApiSelfManagedAttachmentsAttachmentIdCompleteRoute: typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRoute
+  ApiSelfManagedAttachmentsAttachmentIdDownloadRoute: typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRoute
+  ApiSelfManagedHandleHandleReserveRoute: typeof ApiSelfManagedHandleHandleReserveRoute
   ApiAdminBillingEventsIndexRoute: typeof ApiAdminBillingEventsIndexRoute
   ApiInterviewsInterviewIdBriefIndexRoute: typeof ApiInterviewsInterviewIdBriefIndexRoute
   ApiInterviewsInterviewIdParticipantsIndexRoute: typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   ApiPublicSchedulingInvitationIdIndexRoute: typeof ApiPublicSchedulingInvitationIdIndexRoute
+  ApiSelfManagedAttachmentsAttachmentIdIndexRoute: typeof ApiSelfManagedAttachmentsAttachmentIdIndexRoute
+  ApiSelfManagedHandleHandleIndexRoute: typeof ApiSelfManagedHandleHandleIndexRoute
   ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
 }
 
@@ -4239,6 +4431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScheduleInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/u/$handle': {
+      id: '/u/$handle'
+      path: '/u/$handle'
+      fullPath: '/u/$handle'
+      preLoaderRoute: typeof UHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/admin/': {
       id: '/_dashboard/admin/'
       path: '/admin'
@@ -4412,6 +4611,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/me/'
       preLoaderRoute: typeof DashboardMeIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/me/profile': {
+      id: '/_dashboard/me/profile'
+      path: '/me/profile'
+      fullPath: '/me/profile'
+      preLoaderRoute: typeof DashboardMeProfileRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/search/': {
@@ -4981,6 +5187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSearchSemanticRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/self-managed/visibility': {
+      id: '/api/self-managed/visibility'
+      path: '/api/self-managed/visibility'
+      fullPath: '/api/self-managed/visibility'
+      preLoaderRoute: typeof ApiSelfManagedVisibilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/solutions/billing-state': {
       id: '/api/solutions/billing-state'
       path: '/api/solutions/billing-state'
@@ -5436,6 +5649,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminRoadmapIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/self-managed/run-worker': {
+      id: '/api/admin/self-managed/run-worker'
+      path: '/api/admin/self-managed/run-worker'
+      fullPath: '/api/admin/self-managed/run-worker'
+      preLoaderRoute: typeof ApiAdminSelfManagedRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/seo/': {
       id: '/api/admin/seo/'
       path: '/api/admin/seo'
@@ -5765,6 +5985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMePreferencesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/me/preferences/self-managed': {
+      id: '/api/me/preferences/self-managed'
+      path: '/api/me/preferences/self-managed'
+      fullPath: '/api/me/preferences/self-managed'
+      preLoaderRoute: typeof ApiMePreferencesSelfManagedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/sessions/': {
       id: '/api/me/sessions/'
       path: '/api/me/sessions'
@@ -5875,6 +6102,27 @@ declare module '@tanstack/react-router' {
       path: '/api/scheduling/invitations/$invitationId'
       fullPath: '/api/scheduling/invitations/$invitationId'
       preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/attachments/': {
+      id: '/api/self-managed/attachments/'
+      path: '/api/self-managed/attachments'
+      fullPath: '/api/self-managed/attachments/'
+      preLoaderRoute: typeof ApiSelfManagedAttachmentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/profile/': {
+      id: '/api/self-managed/profile/'
+      path: '/api/self-managed/profile'
+      fullPath: '/api/self-managed/profile/'
+      preLoaderRoute: typeof ApiSelfManagedProfileIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/profile/$profileId': {
+      id: '/api/self-managed/profile/$profileId'
+      path: '/api/self-managed/profile/$profileId'
+      fullPath: '/api/self-managed/profile/$profileId'
+      preLoaderRoute: typeof ApiSelfManagedProfileProfileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/solutions/briefs/$briefId': {
@@ -6115,6 +6363,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdSendRouteImport
       parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
     }
+    '/api/self-managed/attachments/$attachmentId/': {
+      id: '/api/self-managed/attachments/$attachmentId/'
+      path: '/api/self-managed/attachments/$attachmentId'
+      fullPath: '/api/self-managed/attachments/$attachmentId/'
+      preLoaderRoute: typeof ApiSelfManagedAttachmentsAttachmentIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/attachments/$attachmentId/complete': {
+      id: '/api/self-managed/attachments/$attachmentId/complete'
+      path: '/api/self-managed/attachments/$attachmentId/complete'
+      fullPath: '/api/self-managed/attachments/$attachmentId/complete'
+      preLoaderRoute: typeof ApiSelfManagedAttachmentsAttachmentIdCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/attachments/$attachmentId/download': {
+      id: '/api/self-managed/attachments/$attachmentId/download'
+      path: '/api/self-managed/attachments/$attachmentId/download'
+      fullPath: '/api/self-managed/attachments/$attachmentId/download'
+      preLoaderRoute: typeof ApiSelfManagedAttachmentsAttachmentIdDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/handle/$handle/': {
+      id: '/api/self-managed/handle/$handle/'
+      path: '/api/self-managed/handle/$handle'
+      fullPath: '/api/self-managed/handle/$handle/'
+      preLoaderRoute: typeof ApiSelfManagedHandleHandleIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/handle/$handle/reserve': {
+      id: '/api/self-managed/handle/$handle/reserve'
+      path: '/api/self-managed/handle/$handle/reserve'
+      fullPath: '/api/self-managed/handle/$handle/reserve'
+      preLoaderRoute: typeof ApiSelfManagedHandleHandleReserveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/self-managed/profile/$profileId/promote': {
+      id: '/api/self-managed/profile/$profileId/promote'
+      path: '/promote'
+      fullPath: '/api/self-managed/profile/$profileId/promote'
+      preLoaderRoute: typeof ApiSelfManagedProfileProfileIdPromoteRouteImport
+      parentRoute: typeof ApiSelfManagedProfileProfileIdRoute
+    }
     '/api/admin/billing/events/$eventId/replay': {
       id: '/api/admin/billing/events/$eventId/replay'
       path: '/replay'
@@ -6196,6 +6486,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardInterviewsInvitationsRoute: typeof DashboardInterviewsInvitationsRoute
   DashboardListsListIdRoute: typeof DashboardListsListIdRoute
+  DashboardMeProfileRoute: typeof DashboardMeProfileRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRouteWithChildren
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
   DashboardSettingsSecurityRoute: typeof DashboardSettingsSecurityRoute
@@ -6238,6 +6529,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardInterviewsInvitationsRoute: DashboardInterviewsInvitationsRoute,
   DashboardListsListIdRoute: DashboardListsListIdRoute,
+  DashboardMeProfileRoute: DashboardMeProfileRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRouteWithChildren,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
   DashboardSettingsSecurityRoute: DashboardSettingsSecurityRoute,
@@ -6600,6 +6892,21 @@ const ApiSchedulingInvitationsInvitationIdRouteWithChildren =
     ApiSchedulingInvitationsInvitationIdRouteChildren,
   )
 
+interface ApiSelfManagedProfileProfileIdRouteChildren {
+  ApiSelfManagedProfileProfileIdPromoteRoute: typeof ApiSelfManagedProfileProfileIdPromoteRoute
+}
+
+const ApiSelfManagedProfileProfileIdRouteChildren: ApiSelfManagedProfileProfileIdRouteChildren =
+  {
+    ApiSelfManagedProfileProfileIdPromoteRoute:
+      ApiSelfManagedProfileProfileIdPromoteRoute,
+  }
+
+const ApiSelfManagedProfileProfileIdRouteWithChildren =
+  ApiSelfManagedProfileProfileIdRoute._addFileChildren(
+    ApiSelfManagedProfileProfileIdRouteChildren,
+  )
+
 interface ApiAdminBillingEventsEventIdRouteChildren {
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
@@ -6662,6 +6969,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortfolioClaimIdRoute: PortfolioClaimIdRoute,
   RSlugRoute: RSlugRoute,
   ScheduleInvitationIdRoute: ScheduleInvitationIdRoute,
+  UHandleRoute: UHandleRoute,
   ApiAdminPreferencesRoute: ApiAdminPreferencesRoute,
   ApiAdminSearchSourcesRoute: ApiAdminSearchSourcesRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
@@ -6713,6 +7021,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPrivacyProfileRemovalRoute: ApiPrivacyProfileRemovalRouteWithChildren,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
+  ApiSelfManagedVisibilityRoute: ApiSelfManagedVisibilityRoute,
   ApiSolutionsBillingStateRoute: ApiSolutionsBillingStateRoute,
   ApiSolutionsBriefsRoute: ApiSolutionsBriefsRouteWithChildren,
   ApiSolutionsConfigRoute: ApiSolutionsConfigRoute,
@@ -6772,6 +7081,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminOperationsJobKeyRoute: ApiAdminOperationsJobKeyRouteWithChildren,
   ApiAdminOperationsSyncSchedulesRoute: ApiAdminOperationsSyncSchedulesRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
+  ApiAdminSelfManagedRunWorkerRoute: ApiAdminSelfManagedRunWorkerRoute,
   ApiAdminSolutionsGoldBriefsRoute: ApiAdminSolutionsGoldBriefsRoute,
   ApiAdminSolutionsSourcesRoute: ApiAdminSolutionsSourcesRoute,
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
@@ -6799,6 +7109,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiInterviewsInterviewIdTranscriptionTokenRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
+  ApiMePreferencesSelfManagedRoute: ApiMePreferencesSelfManagedRoute,
   ApiOrganizationsInvitationsInvitationIdRoute:
     ApiOrganizationsInvitationsInvitationIdRouteWithChildren,
   ApiOrganizationsInvitationsMineRoute: ApiOrganizationsInvitationsMineRoute,
@@ -6808,6 +7119,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiQueriesIdVisibilityRoute: ApiQueriesIdVisibilityRoute,
   ApiSchedulingInvitationsInvitationIdRoute:
     ApiSchedulingInvitationsInvitationIdRouteWithChildren,
+  ApiSelfManagedProfileProfileIdRoute:
+    ApiSelfManagedProfileProfileIdRouteWithChildren,
   ApiAdminAbuseIndexRoute: ApiAdminAbuseIndexRoute,
   ApiAdminAccessRequestsIndexRoute: ApiAdminAccessRequestsIndexRoute,
   ApiAdminBuilderClaimsIndexRoute: ApiAdminBuilderClaimsIndexRoute,
@@ -6834,6 +7147,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingV2IndexRoute: ApiOnboardingV2IndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
   ApiSchedulingInvitationsIndexRoute: ApiSchedulingInvitationsIndexRoute,
+  ApiSelfManagedAttachmentsIndexRoute: ApiSelfManagedAttachmentsIndexRoute,
+  ApiSelfManagedProfileIndexRoute: ApiSelfManagedProfileIndexRoute,
   ApiAdminBillingEventsEventIdRoute:
     ApiAdminBillingEventsEventIdRouteWithChildren,
   ApiAdminBuilderClaimsClaimIdRevokeRoute:
@@ -6862,6 +7177,12 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicSchedulingInvitationIdUploadsRouteWithChildren,
   ApiPublicSchedulingInvitationIdWithdrawRoute:
     ApiPublicSchedulingInvitationIdWithdrawRoute,
+  ApiSelfManagedAttachmentsAttachmentIdCompleteRoute:
+    ApiSelfManagedAttachmentsAttachmentIdCompleteRoute,
+  ApiSelfManagedAttachmentsAttachmentIdDownloadRoute:
+    ApiSelfManagedAttachmentsAttachmentIdDownloadRoute,
+  ApiSelfManagedHandleHandleReserveRoute:
+    ApiSelfManagedHandleHandleReserveRoute,
   ApiAdminBillingEventsIndexRoute: ApiAdminBillingEventsIndexRoute,
   ApiInterviewsInterviewIdBriefIndexRoute:
     ApiInterviewsInterviewIdBriefIndexRoute,
@@ -6869,6 +7190,9 @@ const rootRouteChildren: RootRouteChildren = {
     ApiInterviewsInterviewIdParticipantsIndexRoute,
   ApiPublicSchedulingInvitationIdIndexRoute:
     ApiPublicSchedulingInvitationIdIndexRoute,
+  ApiSelfManagedAttachmentsAttachmentIdIndexRoute:
+    ApiSelfManagedAttachmentsAttachmentIdIndexRoute,
+  ApiSelfManagedHandleHandleIndexRoute: ApiSelfManagedHandleHandleIndexRoute,
   ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute:
     ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute,
 }

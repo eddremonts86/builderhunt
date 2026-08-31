@@ -217,6 +217,11 @@ export default defineConfig({
        * controls — see `segmented-landing-flag.spec.ts`.
        */
       SEGMENTED_LANDING_ENABLED: 'true',
+      // On for the shared server, so any spec that visits `/u/<handle>` or `/for/builders` through
+      // it sees the feature as it ships. The two self-managed specs spawn their own worker servers
+      // and declare the flag themselves — on in `self-managed-profile.spec.ts`, off in
+      // `self-managed-flag.spec.ts` — because a per-worker server inherits `process.env`, not this.
+      SELF_MANAGED_PROFILES_ENABLED: 'true',
     },
   },
 })

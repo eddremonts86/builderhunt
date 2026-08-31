@@ -2,7 +2,14 @@ import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
-import { searchBuilders } from '~/lib/search'
+import { searchBuilders, DEFAULT_SEARCH_SOURCES } from '~/lib/search'
+import {
+  decideSelfManagedInclusion,
+  isSelfManagedRow,
+  provenanceFor,
+  withSelfManagedOrigin,
+} from '~/shared/lib/self-managed/inclusion-policy'
+import { getUserPreferences } from '~/shared/lib/repositories/user-preferences'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { getTrackedKeySet, trackedKey } from '~/shared/lib/tracked-builders'
 import { listRecentSavedQueries } from '~/shared/lib/repositories/saved-queries'
@@ -108,6 +115,25 @@ export const Route = createFileRoute('/api/recommendations/')({
             new Set(userQueries.flatMap((q) => (q.sources ?? []) as string[])),
           )
 
+          /*
+           * The saved queries name network connectors, and none of them can name this origin —
+           * `self-managed` is not a `SourceName` and never appears in a query anybody saved. So the
+           * inclusion policy decides it, from the searcher's own standing preference, and appends
+           * it: included unless this person asked otherwise, and never at the cost of reordering
+           * the sources they did choose.
+           */
+          const inclusion = decideSelfManagedInclusion({
+            accountPreference: (await withTenantContext(principal, (tx) =>
+              getUserPreferences(tx, principal.userId))).searchIncludeSelfManaged,
+          })
+          // The union falls back to the defaults when every saved query is silent about sources:
+          // an empty list means "no sources at all" to the fan-out, so appending the origin to it
+          // would have searched nothing but self-managed profiles.
+          const searchSources = withSelfManagedOrigin(
+            sourcesUnion.length > 0 ? sourcesUnion : DEFAULT_SEARCH_SOURCES,
+            inclusion,
+          )
+
           // 3. Run all queries in parallel via the search pipeline
           const queryResults = await Promise.all(
             userQueries.map(async (q) => {
@@ -115,7 +141,7 @@ export const Route = createFileRoute('/api/recommendations/')({
               if (keywords.length === 0) return { name: q.name, results: [] as RawBuilder[] }
               const results = (await searchBuilders({
                 keywords,
-                sources: sourcesUnion,
+                sources: searchSources,
                 perPage: PER_QUERY_LIMIT,
               })) as RawBuilder[]
               return { name: q.name, results }
@@ -163,6 +189,17 @@ export const Route = createFileRoute('/api/recommendations/')({
                 reason: 'no_matches',
                 basedOnSearches: userQueries.length,
                 totalCandidates: 0,
+                // The same two fields the populated response carries, for the
+                // same stated reason — "so a surface can explain a short list
+                // instead of showing a gap". An empty list is the extreme case
+                // of a short one, and opting out is one of the things that can
+                // empty it: without these, the API is least explicable exactly
+                // when the explanation matters most. It is also the shape bug
+                // warned about further down — a field present on some
+                // responses and absent on others is one a reader treats as
+                // `undefined` and quietly ignores.
+                includesSelfManaged: inclusion.include,
+                selfManagedInclusionReason: inclusion.reason,
               },
             })
           }
@@ -208,6 +245,16 @@ export const Route = createFileRoute('/api/recommendations/')({
                   matchedSearchName: q.name,
                 })
               }
+            }
+            // A self-managed profile matched a query without that query naming the origin — no
+            // saved search can name it. Without this it would arrive with zero reasons and read as
+            // an unexplained recommendation, which is the one thing this list must never be.
+            if (isSelfManagedRow(b)) {
+              reasons.push({
+                type: 'source',
+                value: b.source,
+                matchedSearchName: userQueries[0]?.name ?? 'your saved searches',
+              })
             }
             // Keyword matches in bio / displayName / username
             for (const q of userQueries) {
@@ -255,10 +302,20 @@ export const Route = createFileRoute('/api/recommendations/')({
           })
 
           return Response.json({
-            recommendations,
+            // Every row carries its provenance, not only the self-managed ones: a field present on
+            // some rows and absent on others is one a renderer reads as `undefined` and treats as
+            // "no chip", which is exactly how the chip gets omitted by accident. Decorated on the
+            // `builder`, where `source` lives and where a card renders the name.
+            recommendations: recommendations.map((recommendation) => ({
+              ...recommendation,
+              builder: { ...recommendation.builder, ...provenanceFor(recommendation.builder) },
+            })),
             meta: {
               basedOnSearches: userQueries.length,
               totalCandidates: candidates.length,
+              // Said out loud, so a surface can explain a short list instead of showing a gap.
+              includesSelfManaged: inclusion.include,
+              selfManagedInclusionReason: inclusion.reason,
             },
           })
         } catch (err) {
