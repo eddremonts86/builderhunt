@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { requestNow } from '~/shared/lib/clock'
 import { calculateNextRun, OPERATIONAL_SCHEDULES } from '~/shared/lib/operational-schedules'
 import { listLatestJobRuns, listScheduleRegistry } from '~/shared/lib/repositories/platform-operations'
 
@@ -23,7 +24,10 @@ export const Route = createFileRoute('/api/admin/operations/')({
         try {
           await requirePlatformAdminPrincipal(request)
 
-          const now = new Date()
+          // `requestNow`, not `new Date()`: `nextRunAt` below is computed here and then rendered, so
+          // under the e2e harness it is the one value on this page that the browser's pinned clock
+          // cannot reach. See shared/lib/clock.ts for what the visual baseline did without it.
+          const now = requestNow()
           const registry = await listScheduleRegistry()
           const byKey = new Map(registry.map((row) => [row.jobKey, row]))
           const latestRuns = await listLatestJobRuns(OPERATIONAL_SCHEDULES.map((s) => s.jobKey))

@@ -12,6 +12,13 @@
  * when a product path needs one — introduced test-first by the task that
  * needs it. This module deliberately owns only the harness side: parsing,
  * arithmetic, and (for browser tests) `page.clock.setFixedTime`.
+ *
+ * One such seam exists, in `src/shared/lib/clock.ts`, and it reads the same
+ * `E2E_FIXED_TIME` this module sets. It is for a value the server *computes*
+ * from the clock and then renders, which `page.clock.setFixedTime` cannot
+ * reach — `/admin/operations`'s next-run column was recording whichever day
+ * its visual baseline was taken on. Reach for it only when that is the shape
+ * of the problem; a fixture-seeded timestamp is the answer everywhere else.
  */
 import type { Page } from 'playwright/test'
 
