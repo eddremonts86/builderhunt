@@ -143,7 +143,23 @@ function mapCheckoutSession(session: Stripe.Checkout.Session, priceId: string): 
     // `OtherString` arm for modes added after this SDK version. Excluding 'setup' would leave that
     // arm assignable to CheckoutMode, so an unrecognised future mode would flow through untranslated.
     mode: session.mode === 'subscription' ? 'subscription' : 'payment',
-    status: session.status ?? 'open',
+    // The third of the three, and the one that was left as a passthrough while `mode` and
+    // `billingAddressCollection` below were both reasoned about. stripe 22.6.0 added the same
+    // `OtherString` arm to `Session.Status` that those two already carried, which is what turned
+    // this into a type error — but the type error is the symptom. A status Stripe adds after this
+    // SDK version would otherwise reach a domain field declared `'open' | 'complete' | 'expired'`
+    // and be branched on as if it were one of them.
+    //
+    // `open` is the fallback rather than a throw for the same reason `?? 'open'` was: this is a
+    // read path, and `open` is the arm that grants nothing. `checkout.ts` asks only whether the
+    // session is `expired`, so an unrecognised status reads as still in progress — which is the
+    // safe half of being wrong about a status nobody here has seen yet.
+    //
+    // Written as literals on both arms rather than passing `session.status` through after a check:
+    // `OtherString` is `string & Record<never, never>`, and TypeScript does not narrow that arm away
+    // on a literal `===`, so the checked value still carries it. Naming the literal is what makes
+    // the translation real instead of a cast.
+    status: session.status === 'complete' ? 'complete' : session.status === 'expired' ? 'expired' : 'open',
     url: session.url ?? '',
     priceId,
     metadata: session.metadata ?? {},
