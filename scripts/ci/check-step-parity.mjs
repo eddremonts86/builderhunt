@@ -93,11 +93,17 @@ function envBlocksAgree() {
     'visual-baselines': readFileSync(join(root, '.github/workflows/visual-baselines.yml'), 'utf8'),
     'nightly-serial': readFileSync(join(root, '.github/workflows/nightly-serial.yml'), 'utf8'),
   }
+  // Keys *and* values. Comparing only the key names leaves the failure this file exists to catch
+  // wide open in its quietest form: `SEGMENTED_LANDING_ENABLED: 'true'` in one job and `'false'` in
+  // the next is a spec asserting one thing about a build configured for another, and every name
+  // lines up while it happens. The five jobs agree on all values today, so this costs nothing to
+  // adopt — which is the only moment it is cheap to adopt.
   const envOf = (job, file) => {
     const block = new RegExp(`^ {2}${job}:$([\\s\\S]*?)^ {4}steps:$`, 'm').exec(sources[file])
     if (!block) return null
     const env = /^ {4}env:$([\s\S]*)$/m.exec(block[1])
-    return env ? new Set([...env[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*):/gm)].map((k) => k[1])) : null
+    if (!env) return null
+    return new Map([...env[1].matchAll(/^ {6}([A-Z_][A-Z0-9_]*): *(.*)$/gm)].map((m) => [m[1], m[2].trim()]))
   }
   const quality = envOf('quality', 'quality')
   if (!quality) return []
@@ -123,8 +129,12 @@ function envBlocksAgree() {
   ]) {
     const other = envOf(job, file)
     if (!other) continue
-    for (const key of quality) if (!other.has(key)) problems.push(`${file}.yml's ${job} job is missing ${key}`)
-    for (const key of other) if (!quality.has(key)) problems.push(`${file}.yml's ${job} job has an extra ${key}`)
+    for (const key of quality.keys()) if (!other.has(key)) problems.push(`${file}.yml's ${job} job is missing ${key}`)
+    for (const key of other.keys()) if (!quality.has(key)) problems.push(`${file}.yml's ${job} job has an extra ${key}`)
+    for (const [key, value] of quality) {
+      if (!other.has(key) || other.get(key) === value) continue
+      problems.push(`${file}.yml's ${job} job sets ${key} to ${other.get(key)}, quality.yml sets ${value}`)
+    }
   }
   return problems
 }
