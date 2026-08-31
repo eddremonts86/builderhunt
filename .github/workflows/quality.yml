@@ -381,6 +381,22 @@ jobs:
       # request-abort or visibility guard. Static, so it fails on the pull request rather than on the deploy.
       - run: pnpm check:admin-metrics
       - run: pnpm check:table-surfaces
+      # The parity checker, run where it cannot be skipped.
+      #
+      # It lived only in `scripts/ci/local-quality.sh`, behind the pre-push hook — and a hook is one
+      # `--no-verify` away from not existing. Its own header says a branch is guarded by that script
+      # and nothing else, which was written when the workflow fired on master alone; pull requests
+      # are checked now, so the strongest place for it is here.
+      #
+      # Nothing about it needs a laptop: it compares committed workflow files against a committed
+      # shell script. Its sibling `check-env-fidelity` stays local by contrast, and correctly — there
+      # is no `.env` on a runner for it to read.
+      #
+      # Spelled as `node …` rather than `pnpm check:step-parity` to match how local-quality.sh
+      # invokes it. `pnpmScripts()` collects `pnpm <script>` from both sides and compares them, so
+      # the two spellings would make this step report itself as a check the workflow runs and the
+      # machine does not.
+      - run: node scripts/ci/check-step-parity.mjs
       - run: pnpm security:ui-route-graph
       - run: pnpm security:route-client-boundary
       - run: pnpm security:route-methods
@@ -1114,6 +1130,37 @@ jobs:
       # Bounded and retried — a stalled Ubuntu mirror once cost three required checks a full
       # timeout each. The reasoning is in the script.
       - run: ./scripts/ci/install-chromium.sh
+
+      # ── The database the shared server answers from ─────────────────────────────────────────────
+      #
+      # Almost every spec here drives a per-worker server whose disposable database the harness
+      # migrates itself, which is why this was invisible for so long. The handful that use the
+      # config's own `vite dev` — the segmented landing pages, the public surfaces — talk to
+      # `builderhunt_security_test_ci`, and until these two steps nothing had created a table in it.
+      #
+      # Not a theory: every shard's log carries eleven `relation "event_participants" does not exist`,
+      # and the same for `privacy_consents` and `scheduling_invitations`. `visual-baselines.yml`
+      # already names those three tables, in a comment written about a different workflow having this
+      # exact defect. It was the same defect here.
+      #
+      # The role migrations and the RLS fixture above are not enough on their own: they create the
+      # roles the grants target, and `drizzle-kit migrate` is what creates the tables to grant on.
+      - name: Migrate and seed the database the shared server uses
+        run: |
+          pnpm exec drizzle-kit migrate
+          pnpm db:seed:admin
+
+          # `seed-admin.ts` mints a fresh id per run, so this is read back rather than hardcoded.
+          # `auth-session.ts` reads `ADMIN_USER_IDS` and nothing else, so without it every `/admin/*`
+          # route on the shared server redirects — and a redirect answers 200.
+          ADMIN_ID="$(psql "$DATABASE_MIGRATION_URL" -Atc "select id from auth_users where email = 'edd_admin@local.com'")"
+          if [ -z "$ADMIN_ID" ]; then
+            echo "Seeded admin not found — every /admin/* gate would redirect." >&2
+            exit 1
+          fi
+          echo "ADMIN_USER_IDS=$ADMIN_ID" >> "$GITHUB_ENV"
+          echo "Platform admin: $ADMIN_ID"
+
       - name: End-to-end suite
         # Was `tests/e2e/team-accounts.spec.ts` — one file, ten tests, out of
         # nineteen files and 191. The other eighteen were written, passing
